@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-02T22:45:01.713600+00:00",
-  "last_checked_at": "2026-11-02T22:44:50.982232+00:00",
+  "updated_at": "2026-11-02T22:54:29.081502+00:00",
+  "last_checked_at": "2026-11-02T22:54:20.001985+00:00",
   "sync_error": null,
   "profile": {
     "id": 26260702,
@@ -24347,7 +24347,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 5,
+        "analysis_revision": 6,
         "duration_game_seconds": 3233.23,
         "civilization": "Franks",
         "map": "Arabia",
@@ -24927,6 +24927,10 @@
             }
           ],
           "eapm": 39,
+          "market": {
+            "events": [],
+            "basis": "recorded_requests_resource_units"
+          },
           "age_checkpoints": {
             "봉건": {
               "command_seconds": 525.22,
@@ -24937,6 +24941,7 @@
                 "Villager": 5
               },
               "research_commands_before_click": {},
+              "market_previous_120s": [],
               "villagers_alive": null,
               "unknown_unit_request_amounts": [],
               "reached_seconds": 656.23
@@ -24959,6 +24964,7 @@
                 "Gold Mining": 844.89,
                 "Loom": 1179.84
               },
+              "market_previous_120s": [],
               "villagers_alive": null,
               "unknown_unit_request_amounts": [],
               "reached_seconds": 1444.95
@@ -28358,6 +28364,10 @@
                 }
               ],
               "eapm": 25,
+              "market": {
+                "events": [],
+                "basis": "recorded_requests_resource_units"
+              },
               "age_checkpoints": {
                 "봉건": {
                   "command_seconds": 429.7,
@@ -28370,6 +28380,7 @@
                   "research_commands_before_click": {
                     "Loom": 330.22
                   },
+                  "market_previous_120s": [],
                   "villagers_alive": null,
                   "unknown_unit_request_amounts": [],
                   "reached_seconds": 559.7
@@ -28392,6 +28403,7 @@
                     "Scale Mail Armor": 1248.18,
                     "Forging": 1248.99
                   },
+                  "market_previous_120s": [],
                   "villagers_alive": null,
                   "unknown_unit_request_amounts": [],
                   "reached_seconds": 1440.49
@@ -28430,6 +28442,7 @@
                     "Leather Archer Armor": 1960.86,
                     "Elite Skirmisher": 2188.12
                   },
+                  "market_previous_120s": [],
                   "villagers_alive": null,
                   "unknown_unit_request_amounts": [],
                   "reached_seconds": 2844.4
@@ -31101,7 +31114,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 5,
+        "analysis_revision": 6,
         "duration_game_seconds": 1607.19,
         "civilization": "Vikings",
         "map": "Socotra",
@@ -31650,6 +31663,10 @@
             }
           ],
           "eapm": 36,
+          "market": {
+            "events": [],
+            "basis": "recorded_requests_resource_units"
+          },
           "age_checkpoints": {
             "봉건": {
               "command_seconds": 591.89,
@@ -31660,6 +31677,7 @@
                 "Villager": 4
               },
               "research_commands_before_click": {},
+              "market_previous_120s": [],
               "villagers_alive": null,
               "unknown_unit_request_amounts": [],
               "reached_seconds": 721.74
@@ -31681,6 +31699,7 @@
                 "Horse Collar": 737.6,
                 "Gold Mining": 812.47
               },
+              "market_previous_120s": [],
               "villagers_alive": null,
               "unknown_unit_request_amounts": []
             }
@@ -33180,6 +33199,10 @@
                 }
               ],
               "eapm": 33,
+              "market": {
+                "events": [],
+                "basis": "recorded_requests_resource_units"
+              },
               "age_checkpoints": {
                 "봉건": {
                   "command_seconds": 590.24,
@@ -33192,6 +33215,7 @@
                   "research_commands_before_click": {
                     "Loom": 45.23
                   },
+                  "market_previous_120s": [],
                   "villagers_alive": null,
                   "unknown_unit_request_amounts": [],
                   "reached_seconds": 724.21
@@ -34534,7 +34558,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 5,
+        "analysis_revision": 6,
         "duration_game_seconds": 1323.68,
         "civilization": "Franks",
         "map": "Arabia",
@@ -35059,6 +35083,10 @@
             }
           ],
           "eapm": 34,
+          "market": {
+            "events": [],
+            "basis": "recorded_requests_resource_units"
+          },
           "age_checkpoints": {
             "봉건": {
               "command_seconds": 491.28,
@@ -35069,6 +35097,7 @@
                 "Villager": 7
               },
               "research_commands_before_click": {},
+              "market_previous_120s": [],
               "villagers_alive": null,
               "unknown_unit_request_amounts": [],
               "reached_seconds": 621.27
@@ -35088,6 +35117,7 @@
                 "Gold Mining": 929.21,
                 "Loom": 1068.56
               },
+              "market_previous_120s": [],
               "villagers_alive": null,
               "unknown_unit_request_amounts": [],
               "reached_seconds": 1267.34
@@ -36290,6 +36320,29 @@
                 }
               ],
               "eapm": 23,
+              "market": {
+                "events": [
+                  {
+                    "seconds": 1197.75,
+                    "kind": "BUY",
+                    "label": "식량",
+                    "amount": 100
+                  },
+                  {
+                    "seconds": 1198.16,
+                    "kind": "BUY",
+                    "label": "식량",
+                    "amount": 100
+                  },
+                  {
+                    "seconds": 1199.57,
+                    "kind": "BUY",
+                    "label": "식량",
+                    "amount": 100
+                  }
+                ],
+                "basis": "recorded_requests_resource_units"
+              },
               "age_checkpoints": {
                 "봉건": {
                   "command_seconds": 566.84,
@@ -36302,6 +36355,7 @@
                   "research_commands_before_click": {
                     "Loom": 88.87
                   },
+                  "market_previous_120s": [],
                   "villagers_alive": null,
                   "unknown_unit_request_amounts": [],
                   "reached_seconds": 696.82
@@ -36315,6 +36369,7 @@
                   "research_commands_before_click": {
                     "Loom": 88.87
                   },
+                  "market_previous_120s": [],
                   "villagers_alive": null,
                   "unknown_unit_request_amounts": [],
                   "reached_seconds": 1085.55
@@ -36844,6 +36899,24 @@
                   "amount": 1
                 },
                 {
+                  "seconds": 1197.75,
+                  "kind": "BUY",
+                  "label": "식량",
+                  "amount": 100
+                },
+                {
+                  "seconds": 1198.16,
+                  "kind": "BUY",
+                  "label": "식량",
+                  "amount": 100
+                },
+                {
+                  "seconds": 1199.57,
+                  "kind": "BUY",
+                  "label": "식량",
+                  "amount": 100
+                },
+                {
                   "seconds": 1200.59,
                   "kind": "QUEUE",
                   "label": "Kona",
@@ -37312,7 +37385,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 5,
+        "analysis_revision": 6,
         "duration_game_seconds": 2114.24,
         "civilization": "Franks",
         "map": "Arabia",
@@ -37875,6 +37948,10 @@
             }
           ],
           "eapm": 36,
+          "market": {
+            "events": [],
+            "basis": "recorded_requests_resource_units"
+          },
           "age_checkpoints": {
             "봉건": {
               "command_seconds": 466.27,
@@ -37887,6 +37964,7 @@
               "research_commands_before_click": {
                 "Loom": 429.51
               },
+              "market_previous_120s": [],
               "villagers_alive": null,
               "unknown_unit_request_amounts": [],
               "reached_seconds": 596.26
@@ -37908,6 +37986,7 @@
                 "Scale Barding Armor": 952.76,
                 "Wheelbarrow": 1088.04
               },
+              "market_previous_120s": [],
               "villagers_alive": null,
               "unknown_unit_request_amounts": [],
               "reached_seconds": 1328.87
@@ -39977,6 +40056,10 @@
                 }
               ],
               "eapm": 40,
+              "market": {
+                "events": [],
+                "basis": "recorded_requests_resource_units"
+              },
               "age_checkpoints": {
                 "봉건": {
                   "command_seconds": 476.22,
@@ -39989,6 +40072,7 @@
                   "research_commands_before_click": {
                     "Loom": 3.76
                   },
+                  "market_previous_120s": [],
                   "villagers_alive": null,
                   "unknown_unit_request_amounts": [],
                   "reached_seconds": 606.1
@@ -40010,6 +40094,7 @@
                     "Loom": 3.76,
                     "Double-Bit Axe": 729.31
                   },
+                  "market_previous_120s": [],
                   "villagers_alive": null,
                   "unknown_unit_request_amounts": [],
                   "reached_seconds": 1413.66
