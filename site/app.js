@@ -233,6 +233,18 @@
     $('#source-link').href=`https://github.com/${repo}`;
     renderMatches();
   }
+  const civNames={Franks:'프랑크',Tatars:'타타르',Wei:'위',Japanese:'일본',Bengalis:'벵골',Vietnamese:'베트남',Vikings:'바이킹',Mapuche:'마푸체',Chinese:'중국'};
+  function civBadge(civ,side){
+    const name=civNames[civ]||civ||'문명 확인 전';
+    const icon=Object.hasOwn(civNames,civ)?`<img src="assets/civs/${civ.toLowerCase()}.png" alt="" width="28" height="28" loading="lazy">`:'';
+    return `<span class="civ-badge ${side==='나'?'own-civ':'opponent-civ'}" title="${esc(civ||name)}"><small>${esc(side)}</small>${icon}<span>${esc(name)}</span></span>`;
+  }
+  function matchCivs(m){
+    const own=m.analysis?.civilization||m.civilization;
+    const opponents=m.analysis?.opponents||[];
+    const fallback=(m.players||[]).filter(p=>!p.is_self);
+    return `<span class="match-civs">${civBadge(own,'나')}${opponents.length?opponents.map(p=>civBadge(p.civilization,'상대')).join(''):fallback.map(p=>civBadge(p.civilization,'상대')).join('')}</span>`;
+  }
   function renderMatches() {
     const matches=(report.matches||[]).filter(m=>filter==='all'||m.result===filter);
     const list=$('#matches');
@@ -243,7 +255,7 @@
       list.innerHTML=matches.slice(0,visible).map(m=>{
         const opponent=(m.players||[]).filter(p=>!p.is_self).map(p=>p.name).join(', ');
         const status=Object.hasOwn(labels,m.analysis_status)?m.analysis_status:'pending';
-        return `<button class="match" data-match="${Number(m.id)}" aria-label="${esc(m.map)} ${m.result==='win'?'승리':m.result==='loss'?'패배':'결과 미확인'} 경기 복기"><span class="result ${m.result==='loss'?'loss':m.result==='win'?'':'unknown'}">${m.result==='win'?'W':m.result==='loss'?'L':'?'}</span><span><h3>${esc(m.map)} <span style="color:#a0a88f;font-weight:400">/</span> ${esc(m.civilization)}</h3><p>vs ${esc(opponent||'상대 정보 없음')} · ${esc(date(m.started_at))}</p></span><span class="match-right"><span class="rating" title="경기 전 → 경기 후">${number(m.rating_before)} → ${number(m.rating_after)}</span><span class="tag ${status}">${labels[status]}</span></span></button>`;
+        return `<button class="match" data-match="${Number(m.id)}" aria-label="${esc(m.map)} ${m.result==='win'?'승리':m.result==='loss'?'패배':'결과 미확인'} 경기 복기"><span class="result ${m.result==='loss'?'loss':m.result==='win'?'':'unknown'}">${m.result==='win'?'W':m.result==='loss'?'L':'?'}</span><span class="match-info"><h3>${esc(m.map)}</h3>${matchCivs(m)}<span class="match-opponent">vs ${esc(opponent||'상대 정보 없음')} · ${esc(date(m.started_at))}</span></span><span class="match-right"><span class="rating" title="경기 전 → 경기 후">${number(m.rating_before)} → ${number(m.rating_after)}</span><span class="tag ${status}">${labels[status]}</span></span></button>`;
       }).join('');
       list.querySelectorAll('[data-match]').forEach(b=>b.addEventListener('click',()=>openMatch(Number(b.dataset.match))));
     }
@@ -356,7 +368,7 @@
     $('#match-subtitle').textContent=`경기 ${index>=0?index+1:''} / ${context.length} · #${m.id}`;
     const result=m.result==='win'?'승리':m.result==='loss'?'패배':'결과 미확인';
     const opponent=other?.name||(m.players||[]).filter(p=>!p.is_self).map(p=>p.name).join(', ')||'상대 정보 없음';
-    const header=`<header class="review-header"><div class="review-heading-row"><span class="outcome ${m.result==='loss'?'loss':''}">${result}</span><h2 id="review-title">${esc(m.map)} · ${esc(m.civilization)}</h2></div><p class="review-opponent">vs ${esc(opponent)}${other?.civilization?' · '+esc(other.civilization):''}</p><div class="review-meta"><span>${esc(date(m.started_at))}${a?' · '+fmtTime(a.duration_game_seconds):''}</span><span class="review-rating">${number(m.rating_before)} → ${number(m.rating_after)}</span></div></header>`;
+    const header=`<header class="review-header"><div class="review-heading-row"><span class="outcome ${m.result==='loss'?'loss':''}">${result}</span><h2 id="review-title">${esc(m.map)}</h2></div>${matchCivs(m)}<p class="review-opponent">vs ${esc(opponent)}</p><div class="review-meta"><span>${esc(date(m.started_at))}${a?' · '+fmtTime(a.duration_game_seconds):''}</span><span class="review-rating">${number(m.rating_before)} → ${number(m.rating_after)}</span></div></header>`;
     const links=`<footer class="review-footer"><a href="https://aoe.ms/replay/?gameId=${Number(m.id)}&amp;profileId=26260702" target="_blank" rel="noopener noreferrer">리플 다운로드 ↗</a><a href="https://www.aoe2insights.com/match/${Number(m.id)}/" target="_blank" rel="noopener noreferrer">AoE2 Insights ↗</a><a href="https://aoe2.gg/matches/${Number(m.id)}?tab=insights" target="_blank" rel="noopener noreferrer">AoE2.GG ↗</a></footer>`;
     let workspace;
     if(!a){

@@ -195,3 +195,6 @@ body.review-open{overflow:hidden}
  .record-player{padding:9px}
  .player-controls button,.player-controls select{min-height:36px}
 }
+
+.match-info{min-width:0}.match-civs{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;margin:5px 0}.civ-badge{display:inline-flex;align-items:center;gap:5px;min-width:0;font-size:12px;font-weight:500;line-height:1.5}.civ-badge small{font-size:10px;color:#64705b}.civ-badge img{display:block;width:28px;height:28px;object-fit:contain;flex:none}.civ-badge>span{overflow-wrap:anywhere}.match-opponent{display:block;font-size:11px;color:#65715c;overflow-wrap:anywhere}.review-header .match-civs{margin-top:8px}.asset-notice{display:block;margin:18px 0 0;color:#75806b;font-size:10px;line-height:1.5}.asset-notice a{text-underline-offset:2px}
+@media(max-width:600px){.match{grid-template-columns:28px minmax(0,1fr);gap:8px 10px}.match>.result{grid-column:1;grid-row:1;align-self:start}.match-info{grid-column:2;grid-row:1}.match-right{grid-column:2;display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;text-align:left}.match .rating{font-size:15px}.match-civs{gap:5px 10px}.civ-badge{font-size:12px}.civ-badge img{width:24px;height:24px}.match-opponent{font-size:10px}.review-opponent{white-space:normal;overflow-wrap:anywhere}}
