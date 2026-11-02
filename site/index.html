@@ -8,13 +8,15 @@
   <title>AoE2 리플 분석</title>
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="style.css?v=20261102-tabs">
-  <script defer src="app.js?v=20261102-tabs"></script>
+  <link rel="stylesheet" href="style.css?v=20261103-collect">
+  <script defer src="collection-watch.js?v=20261103-collect"></script>
+  <script defer src="app.js?v=20261103-collect"></script>
 </head>
 <body>
   <main id="overview">
     <header class="topbar"><h1>AoE2 리플 분석</h1><div class="toolbar"><button class="subtle" id="refresh">새로고침</button><button class="subtle" id="open-settings">계정</button><a id="source-link" href="https://github.com/ssapo/aoe2" target="_blank" rel="noopener noreferrer">GitHub</a></div></header>
     <section class="connection" id="connection" aria-live="polite"></section>
+    <section id="collection-feedback" class="collection-feedback" aria-live="polite" hidden><div><strong id="collection-title"></strong><p id="collection-hint"></p></div><button id="collection-dismiss" aria-label="수집 결과 자동 확인 닫기">닫기</button></section>
     <div class="section-heading"><h2><span id="player-name"></span> 요약</h2><span id="updated">연결 대기</span></div>
     <section class="stats" aria-label="경기 통계"><article><span>수집 경기</span><strong id="stat-games">—</strong><small>저장된 경기 기준</small></article><article><span>승률</span><strong id="stat-win">—</strong><small id="stat-record">결과 확인 경기 기준</small></article><article><span>최근 레이팅</span><strong id="stat-rating">—</strong><small id="stat-delta">—</small></article><article><span>분석 완료</span><strong id="stat-analysis">—</strong><small>명령 기록 분석</small></article></section>
     <section id="history"><div class="section-heading"><h2>경기 기록 <span id="match-count" class="count">0</span></h2><div class="filters" role="group" aria-label="경기 결과 필터"><button class="selected" data-filter="all" aria-pressed="true">전체</button><button data-filter="win" aria-pressed="false">승리</button><button data-filter="loss" aria-pressed="false">패배</button></div></div><div id="matches"></div><div id="pagination" class="pagination" hidden><button id="load-more" class="subtle">더 보기</button></div></section>

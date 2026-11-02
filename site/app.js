@@ -173,6 +173,15 @@
     if(report.sync_error) c.innerHTML=`<div class="text"><strong>수집 실패</strong><p>${esc(report.sync_error)} 마지막 확인: ${esc(date(report.last_checked_at))}</p></div><button class="connect">연결 확인</button>`;
     else if(report.profile?.id) c.innerHTML=`<div class="text"><strong>${esc(report.profile.name)}</strong><p>수집 주기 약 30분. 새로고침은 저장된 결과 조회.</p></div><button class="connect">계정 정보</button>`;
     else c.innerHTML='<div class="text"><strong>계정 연결 대기</strong><p>ssapo · 최초 수집 필요.</p></div><button class="connect">계정 정보</button>';
+    const collectLink=document.createElement('a');
+    collectLink.className='collect-now';collectLink.textContent='지금 수집 ↗';
+    collectLink.href=`https://github.com/${repo}/actions/workflows/update.yml`;
+    collectLink.target='_blank';collectLink.rel='noopener noreferrer';
+    collectLink.addEventListener('click',()=>{
+      if(location.protocol==='file:'||window.SSAPO_BOOTSTRAP){toast('자동 결과 확인은 운영 사이트에서 지원. GitHub에서 Run workflow 실행.');return;}
+      collectionWatch.start();
+    });
+    c.insertBefore(collectLink,c.querySelector('.connect'));
     c.querySelector('.connect')?.addEventListener('click',openSettings);
     $('#source-link').href=`https://github.com/${repo}`;
     renderMatches();
@@ -269,7 +278,12 @@
     document.body.classList.add('review-open');
     if(!dialog.open)dialog.showModal();
   }
-  async function load() {
+  let loadRequest=null;
+  function load() {
+    if(!loadRequest)loadRequest=loadReport().finally(()=>{loadRequest=null;});
+    return loadRequest;
+  }
+  async function loadReport() {
     $('#refresh').disabled=true;
     try {
       if(window.SSAPO_BOOTSTRAP) {
@@ -288,6 +302,32 @@
       return false;
     } finally {$('#refresh').disabled=false;}
   }
+  const collectionWatch=window.createCollectionWatch({
+    fetchStatus:async()=>{
+      const r=await fetch(`data/status.json?t=${Date.now()}`,{cache:'no-store'});
+      if(!r.ok)throw Error(`HTTP ${r.status}`);
+      return r.json();
+    },
+    refreshReport:async status=>{
+      const loaded=await load();
+      return loaded&&Date.parse(report.last_checked_at)>=Date.parse(status.last_checked_at);
+    },
+    visible:()=>!document.hidden,
+    onState:(state,detail)=>{
+      const messages={
+        waiting:['GitHub에서 수집 실행','열린 화면에서 Run workflow → Run workflow를 눌러줘. 새 결과는 여기서 자동 확인해.'],
+        retrying:['결과 확인 재시도 중','진행 상태를 읽지 못했어. 자동으로 다시 확인할게.'],
+        updated:['새 수집 결과 확인','목록을 최신 저장 결과로 갱신했어. 새 경기가 없어도 수집 확인 시각은 갱신돼.'],
+        failed:['수집 오류 확인',detail||'기존 분석을 유지했어. GitHub 실행 기록을 확인해줘.'],
+        timeout:['아직 새 수집 결과가 없어','자동 확인을 종료했어. GitHub에서 실행했는지, 대기·실패 상태인지 확인해줘.']
+      };
+      const [title,hint]=messages[state];
+      const box=$('#collection-feedback');box.hidden=false;box.dataset.state=state;
+      if($('#collection-title').textContent!==title)$('#collection-title').textContent=title;
+      if($('#collection-hint').textContent!==hint)$('#collection-hint').textContent=hint;
+    }
+  });
+  $('#collection-dismiss').addEventListener('click',()=>{collectionWatch.stop();$('#collection-feedback').hidden=true;});
   $('#match-dialog').addEventListener('close',()=>document.body.classList.remove('review-open'));
   $('#open-settings').addEventListener('click',openSettings);
   $('#refresh').addEventListener('click',()=>{filter='all';visible=12;syncFilter();load().then(ok=>toast(ok?'새로고침 완료':'조회 실패. 연결 상태 확인.'));});
@@ -296,7 +336,7 @@
   function syncFilter(){document.querySelectorAll('[data-filter]').forEach(b=>{b.classList.toggle('selected',b.dataset.filter===filter);b.setAttribute('aria-pressed',String(b.dataset.filter===filter));});}
   document.querySelectorAll('[data-filter]').forEach(b=>b.addEventListener('click',()=>{filter=b.dataset.filter;visible=12;syncFilter();renderMatches();}));
   $('#load-more').addEventListener('click',()=>{visible+=12;renderMatches();});
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden)load();});
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden){load();collectionWatch.check();}});
   setInterval(()=>{if(!document.hidden)load();},120000);
   render();load();
 })();

@@ -66,6 +66,11 @@ class CollectorTests(unittest.TestCase):
             self.assertEqual(saved['matches'],original['matches'])
             self.assertEqual(saved['updated_at'],'original')
             self.assertTrue(saved['sync_error'])
+            status=json.loads((path.parent/'status.json').read_text())
+            self.assertEqual(status['last_checked_at'],saved['last_checked_at'])
+            self.assertEqual(status['updated_at'],'original')
+            self.assertEqual(status['sync_error'],saved['sync_error'])
+            self.assertNotIn('matches',status)
 
     def test_profile_switch_does_not_mix_histories(self):
         payload={'result':{'code':0},'profiles':[{'profile_id':222,'alias':'New Player'}],
@@ -88,6 +93,10 @@ class CollectorTests(unittest.TestCase):
             with patch.object(sys,'argv',['collect','--profile-id','1234','--limit','0','--output',str(path)]),patch.object(collect,'fetch',return_value=json.dumps(payload).encode()):
                 collect.main()
             self.assertEqual(json.loads(path.read_text())['profile']['id'],1234)
+            status=json.loads((path.parent/'status.json').read_text())
+            self.assertIsNone(status['sync_error'])
+            self.assertEqual(status['schema_version'],1)
+            self.assertEqual(status['last_checked_at'],json.loads(path.read_text())['last_checked_at'])
 
     def test_upgrade_failure_keeps_success_and_has_bounded_retries(self):
         old={'analysis':{'analysis_revision':4,'metrics':{'preserved':True}},'analysis_status':'complete'}

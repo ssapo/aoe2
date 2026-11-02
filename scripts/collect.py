@@ -50,6 +50,16 @@ def write_json(path, data):
     os.replace(temporary, path)
 
 
+def write_report(path, data):
+    write_json(path, data)
+    write_json(path.with_name('status.json'), {
+        'schema_version': 1,
+        'last_checked_at': data.get('last_checked_at'),
+        'updated_at': data.get('updated_at'),
+        'sync_error': data.get('sync_error'),
+    })
+
+
 def fetch(url, limit=MAX_DOWNLOAD):
     req = urllib.request.Request(url, headers={'User-Agent': 'ssapo-aoe2/1.0 (personal post-game analysis)'})
     for attempt in range(3):
@@ -335,7 +345,7 @@ def main():
         # Preserve successful data and its timestamp on any remote error.
         previous['last_checked_at'] = checked_at
         previous['sync_error'] = '경기 기록을 가져오지 못했습니다. 기존 분석 결과를 유지했습니다.'
-        write_json(args.output, previous)
+        write_report(args.output, previous)
         raise
     aliases = {p['profile_id']: p.get('alias', str(p['profile_id'])) for p in payload.get('profiles', [])}
     same_profile = (previous.get('profile') or {}).get('id') == own_id
@@ -385,7 +395,7 @@ def main():
         'profile': {'id': own_id, 'insights_user_id': config.get('insights_user_id'), 'name': aliases.get(own_id, str(own_id))},
         'matches': sorted([m for m in old.values() if not config.get('only_1v1') or m.get('players_count') == 2], key=lambda m: m.get('started_at') or 0, reverse=True)[:200],
     }
-    write_json(args.output, output)
+    write_report(args.output, output)
     print(f'수집 완료: {len(output["matches"])}경기 / 분석 완료 {sum(m["analysis_status"] == "complete" for m in output["matches"])}경기')
 
 
