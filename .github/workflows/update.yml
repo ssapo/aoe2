@@ -39,7 +39,7 @@ jobs:
       - name: Check collector behavior
         run: |
           python -m unittest discover -s tests -v
-          node --test tests/test_collection_watch.cjs
+          node --test tests/test_collection_watch.cjs tests/test_building_map.cjs
       - name: Collect public matches
         id: collect
         continue-on-error: true

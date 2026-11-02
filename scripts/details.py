@@ -56,7 +56,12 @@ def detailed_metrics(match, player):
             label = str(payload.get(key) or f'{fallback} {payload.get(key + "_id", "?")}')
             table = buildings if kind == 'BUILD' else research
             row = table.setdefault(label, {'first_seconds': at, 'last_seconds': at, 'commands': 0})
-            timeline.append({'seconds': at, 'kind': kind, 'label': label})
+            event={'seconds': at, 'kind': kind, 'label': label}
+            if kind=='BUILD':
+                from mapview import point
+                pos=point(getattr(action,'position',None),getattr(getattr(match,'map',None),'dimension',0))
+                if pos:event.update(pos)
+            timeline.append(event)
             age = AGE_TECHS.get(payload.get('technology_id')) if kind == 'RESEARCH' else None
             if age and age not in ages:
                 recent = Counter()

@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MAX_DOWNLOAD = 64 * 1024 * 1024
 MAX_REPLAY = 256 * 1024 * 1024
 AGE_IDS = {101: '봉건', 102: '성주', 103: '왕정'}
-ANALYSIS_REVISION = 6
+ANALYSIS_REVISION = 7
 
 
 def now():
@@ -261,6 +261,8 @@ def analyze_replay(raw, own_id):
     own = next((p for p in match.players if p.profile_id == own_id), None)
     if own is None:
         raise ValueError('리플에서 본인 프로필을 확인할 수 없습니다.')
+    from mapview import building_map
+    map_view = building_map(match, own)
     own_metrics = command_metrics(match, own)
     from details import detailed_metrics
     own_metrics.update(detailed_metrics(match, own))
@@ -270,7 +272,7 @@ def analyze_replay(raw, own_id):
                  for p in match.players if p.number != own.number and p not in (own.team or [])]
     return {
         'parser': 'mgz', 'analysis_revision': ANALYSIS_REVISION, 'duration_game_seconds': seconds(match.duration + match.restored_at),
-        'civilization': own.civilization, 'map': match.map.name,
+        'civilization': own.civilization, 'map': match.map.name, 'map_view': map_view,
         'metrics': own_metrics, 'opponents': opponents,
         'insights': coaching(own_metrics, opponents, len(match.players)),
         'limitations': ['생산 지시량은 양수 amount의 합. 생산 완료·생존 수가 아니며 취소·자원 부족·인구 제한을 반영하지 않습니다. 건설·연구 명령도 실제 완료와 다를 수 있습니다.',
