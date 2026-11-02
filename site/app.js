@@ -61,8 +61,18 @@
   function renderProductionPanel() {
     return `<div class="panel-toolbar"><div class="segments" role="group" aria-label="기록 종류"><button data-category="unit_orders" aria-pressed="true">유닛</button><button data-category="research_orders" aria-pressed="false">업그레이드</button><button data-category="building_orders" aria-pressed="false">건물</button></div></div><div class="search-row"><input id="production-search" type="search" aria-label="생산·연구 기록 검색" placeholder="이름 검색 · 한글 / 영문" autocomplete="off"><span id="production-count" class="toolbar-note" role="status"></span></div><div id="production-table"></div><p id="production-note" class="compact-note"></p>`;
   }
+  function timelineRows(events) {
+    const rows=new Map();
+    for(const e of events){const second=Math.floor(e.seconds);if(!rows.has(second))rows.set(second,{second,mine:[],theirs:[]});rows.get(second)[e.side].push(e);}
+    return [...rows.values()];
+  }
+  function splitTimeline(rows) {
+    const types={QUEUE:'생산',DE_QUEUE:'생산',MULTIQUEUE:'생산',BUILD:'건설',RESEARCH:'연구',BUY:'시장 구매',SELL:'시장 판매'};
+    const cell=events=>events.length?[...events].sort((a,b)=>a.seconds-b.seconds).map(e=>`<div class="timeline-order"><span>${esc(label(e.label))}${Number.isFinite(e.amount)?' × '+number(e.amount):''}</span><small>${esc(types[e.kind]||e.kind)}</small></div>`).join(''):'<span class="no-order" aria-label="이 시간에 기록 없음">—</span>';
+    return `<table class="timeline event-table split-timeline"><colgroup><col class="time-col"><col><col></colgroup><thead><tr><th scope="col">시간</th><th scope="col" class="mine-col">나</th><th scope="col" class="theirs-col">상대</th></tr></thead><tbody>${rows.map(r=>`<tr><th scope="row">${fmtTime(r.second)}</th><td class="mine-col">${cell(r.mine)}</td><td class="theirs-col">${cell(r.theirs)}</td></tr>`).join('')}</tbody></table>`;
+  }
   function renderTimelinePanel() {
-    return `<details class="record-player"><summary>기록 재생</summary><p class="compact-note">양쪽의 생산·건설·연구·시장 요청을 시간순으로 재생해요. 유닛 이동이나 전투 장면은 포함되지 않아요.</p><div class="player-controls"><button id="record-play">재생</button><button id="record-prev" aria-label="이전 기록으로">이전</button><button id="record-next" aria-label="다음 기록으로">다음</button><label>배속 <select id="record-speed"><option value="1">1×</option><option value="4">4×</option><option value="16" selected>16×</option><option value="64">64×</option></select></label><output id="record-clock"></output></div><input id="record-seek" type="range" min="0" step="0.01" value="0" aria-label="기록 재생 시간"><div id="record-events"></div></details><div class="panel-toolbar"><div class="segments" role="group" aria-label="타임라인 선수"><button data-side="both" aria-pressed="true">양측</button><button data-side="mine" aria-pressed="false">나</button><button data-side="theirs" aria-pressed="false">상대</button></div><label class="select-label">명령<select id="timeline-kind"><option value="all">전체</option><option value="QUEUE">생산</option><option value="BUILD">건설</option><option value="RESEARCH">연구</option><option value="BUY">시장 구매</option><option value="SELL">시장 판매</option></select></label><label class="select-label">시간<select id="timeline-range"></select></label></div><div class="timeline-pagination"><span id="timeline-count" role="status"></span><div><button id="timeline-prev" aria-label="이전 명령 페이지">이전</button><span id="timeline-page"></span><button id="timeline-next" aria-label="다음 명령 페이지">다음</button></div></div><div id="timeline-table"></div><p class="compact-note">건설·생산·연구·시장 거래를 요청한 기록이에요. 완료 시각과는 달라요.</p>`;
+    return `<details class="record-player"><summary>기록 재생</summary><p class="compact-note">양쪽의 생산·건설·연구·시장 요청을 시간순으로 재생해요. 유닛 이동이나 전투 장면은 포함되지 않아요.</p><div class="player-controls"><button id="record-play">재생</button><button id="record-prev" aria-label="이전 기록으로">이전</button><button id="record-next" aria-label="다음 기록으로">다음</button><label>배속 <select id="record-speed"><option value="1">1×</option><option value="4">4×</option><option value="16" selected>16×</option><option value="64">64×</option></select></label><output id="record-clock"></output></div><input id="record-seek" type="range" min="0" step="0.01" value="0" aria-label="기록 재생 시간"><div id="record-events"></div></details><div class="panel-toolbar"><div class="segments" role="group" aria-label="타임라인 선수"><button data-side="both" aria-pressed="true">양측</button><button data-side="mine" aria-pressed="false">나</button><button data-side="theirs" aria-pressed="false">상대</button></div><label class="select-label">명령<select id="timeline-kind"><option value="all">전체</option><option value="QUEUE">생산</option><option value="BUILD">건설</option><option value="RESEARCH">연구</option><option value="BUY">시장 구매</option><option value="SELL">시장 판매</option></select></label><label class="select-label">시간<select id="timeline-range"></select></label></div><div class="timeline-pagination"><span id="timeline-count" role="status"></span><div><button id="timeline-prev" aria-label="이전 명령 페이지">이전</button><span id="timeline-page"></span><button id="timeline-next" aria-label="다음 명령 페이지">다음</button></div></div><div id="timeline-table"></div><p class="compact-note">같은 초의 기록을 한 행에 모았어요. 건설·생산·연구·시장 거래를 요청한 시각이며 완료 시각과는 달라요.</p>`;
   }
   function renderBasics(mine,theirs,other) {
     const controlled=p=>p.food_evidence?.livestock_control?`${number(p.food_evidence.livestock_control.observed_targets)}개체`:'—';
@@ -148,8 +158,7 @@
       seek.value=String(cursor);root.querySelector('#record-clock').textContent=`${fmtTime(cursor)} / ${fmtTime(end)}`;
       let lo=0,hi=events.length;while(lo<hi){const mid=(lo+hi)>>1;if(events[mid].seconds<=cursor)lo=mid+1;else hi=mid;}
       const recent=events.slice(Math.max(0,lo-6),lo).reverse();
-      const names={QUEUE:'생산',DE_QUEUE:'생산',MULTIQUEUE:'생산',BUILD:'건설',RESEARCH:'연구',BUY:'구매',SELL:'판매'};
-      root.querySelector('#record-events').innerHTML=recent.length?recent.map(e=>`<div class="record-event"><time>${fmtTime(e.seconds)}</time><span class="player-tag ${e.side}">${e.side==='mine'?'나':'상대'}</span><span>${esc(label(e.label))}${Number.isFinite(e.amount)?' × '+number(e.amount):''} · ${esc(names[e.kind]||e.kind)}</span></div>`).join(''):'<p class="compact-note">아직 기록이 없어요. 다음 버튼으로 첫 기록부터 볼 수 있어요.</p>';
+      root.querySelector('#record-events').innerHTML=recent.length?splitTimeline(timelineRows(recent)):'<p class="compact-note">아직 기록이 없어요. 다음 버튼으로 첫 기록부터 볼 수 있어요.</p>';
     };
     play.disabled=!events.length;
     play.addEventListener('click',()=>{
@@ -172,13 +181,14 @@
     const kind=root.querySelector('#timeline-kind'),size=15;
     const renderTimeline=()=>{
       const filtered=events.filter(e=>(side==='both'||e.side===side)&&(kind.value==='all'||(e.kind===kind.value)||(kind.value==='QUEUE'&&['DE_QUEUE','MULTIQUEUE'].includes(e.kind)))&&(range.value==='all'||Math.floor(e.seconds/300)===Number(range.value)));
-      const pages=Math.max(1,Math.ceil(filtered.length/size));page=Math.min(page,pages-1);
+      const rows=timelineRows(filtered);
+      const pages=Math.max(1,Math.ceil(rows.length/size));page=Math.min(page,pages-1);
       root.querySelector('#timeline-count').textContent=`${number(filtered.length)}개 기록`;
       root.querySelector('#timeline-page').textContent=`${page+1} / ${pages}`;
       root.querySelector('#timeline-prev').disabled=page===0;
       root.querySelector('#timeline-next').disabled=page>=pages-1;
-      const visible=filtered.slice(page*size,(page+1)*size),types={QUEUE:'생산',DE_QUEUE:'생산',MULTIQUEUE:'생산',BUILD:'건설',RESEARCH:'연구',BUY:'시장 구매',SELL:'시장 판매'};
-      root.querySelector('#timeline-table').innerHTML=visible.length?`<table class="timeline event-table"><thead><tr><th scope="col">시간</th><th scope="col">선수</th><th scope="col">명령</th></tr></thead><tbody>${visible.map(e=>`<tr><td>${fmtTime(e.seconds)}</td><td><span class="player-tag ${e.side}">${e.side==='mine'?'나':'상대'}</span></td><td>${esc(label(e.label))}${Number.isFinite(e.amount)?' × '+number(e.amount):''}<small class="cell-meta">${esc(types[e.kind]||e.kind)}</small></td></tr>`).join('')}</tbody></table>`:'<p class="panel-empty">이 조건의 명령 없음</p>';
+      const visible=rows.slice(page*size,(page+1)*size);
+      root.querySelector('#timeline-table').innerHTML=visible.length?splitTimeline(visible):'<p class="panel-empty">이 조건의 명령 없음</p>';
     };
     root.querySelectorAll('[data-side]').forEach(b=>b.addEventListener('click',()=>{
       side=b.dataset.side;page=0;
