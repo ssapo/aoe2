@@ -243,15 +243,18 @@ def analyze_replay(raw, own_id):
     decoded = decode_replay(raw)
     match = parse_match(io.BytesIO(decoded))
     food = food_order_evidence(decoded, match)
+    from berry import estimate_berry_switches
+    berry = estimate_berry_switches(decoded, match)
     own = next((p for p in match.players if p.profile_id == own_id), None)
     if own is None:
         raise ValueError('리플에서 본인 프로필을 확인할 수 없습니다.')
     own_metrics = command_metrics(match, own)
     own_metrics['food_evidence'] = food.get(own.number)
-    opponents = [{'name': p.name, 'civilization': p.civilization, 'metrics': dict(command_metrics(match, p), food_evidence=food.get(p.number))}
+    own_metrics['berry_switches'] = berry.get(own.number)
+    opponents = [{'name': p.name, 'civilization': p.civilization, 'metrics': dict(command_metrics(match, p), food_evidence=food.get(p.number), berry_switches=berry.get(p.number))}
                  for p in match.players if p.number != own.number and p not in (own.team or [])]
     return {
-        'parser': 'mgz', 'analysis_revision': 3, 'duration_game_seconds': seconds(match.duration),
+        'parser': 'mgz', 'analysis_revision': 4, 'duration_game_seconds': seconds(match.duration),
         'civilization': own.civilization, 'map': match.map.name,
         'metrics': own_metrics, 'opponents': opponents,
         'insights': coaching(own_metrics, opponents, len(match.players)),

@@ -111,31 +111,21 @@
       content+=renderReview(m);
       const other=a.opponents?.length===1?a.opponents[0]:null;
       const mine=a.metrics||{}, theirs=other?.metrics||{};
-      const foodStatus=(metrics,group)=>{
-        const e=metrics.food_evidence?.[group];
-        if(!e)return '추가 분석 대기';
-        if(!e.observed_targets)return '지시 미확인';
-        const names={'Sheep':'양','Goat':'염소','Cow':'소','Water Buffalo':'물소','Turkey':'칠면조','Llama':'라마','Pig':'돼지','Goose':'거위','Yak':'야크','Wild Boar':'멧돼지','Boar':'멧돼지','Fruit Bush':'열매','Forage Bush':'열매'};
-        const species=(e.species||[]).map(n=>names[n]||n).join(', ');
-        return `지시 확인 · 최소 ${e.observed_targets}대상 (${species}) · 최초 확인 ${fmtTime(e.first_seconds)}`;
-      };
       const controlled=metrics=>{
         const e=metrics.food_evidence?.livestock_control;
         return e?`${number(e.observed_targets)}개체 조작 확인`:'추가 분석 대기';
       };
+      const berryTime=metrics=>(metrics.berry_switches?.windows||[]).map(w=>`${fmtTime(w.start_seconds)}${w.end_seconds>w.start_seconds?'–'+fmtTime(w.end_seconds):''} (${w.workers}/${w.observed_berry_workers}명)`).join('; ')||'단체 전환 근거 부족';
+      const hasBerryWindow=(mine.berry_switches?.windows?.length||0)+(theirs.berry_switches?.windows?.length||0)>0;
       const rows=[
         ['eAPM',number(mine.eapm),number(theirs.eapm)],
         ...['봉건','성주','왕정'].map(age=>[`${age} 전환 명령`,fmtTime(mine.age_commands?.[age]),fmtTime(theirs.age_commands?.[age])]),
         ['첫 농장 건설 명령',fmtTime(mine.first_build_commands?.Farm),fmtTime(theirs.first_build_commands?.Farm)],
         ['농장 건설 명령 수',number(mine.command_counts?.Farm),number(theirs.command_counts?.Farm)],
-        ['실제 유지 농장 수','미측정','미측정'],
         ['직접 조작한 가축 수 (누적)',controlled(mine),controlled(theirs)],
-        ['양·가축 대상 지시',foodStatus(mine,'livestock'),foodStatus(theirs,'livestock')],
-        ['사냥감 대상 지시',foodStatus(mine,'hunt'),foodStatus(theirs,'hunt')],
-        ['열매 대상 지시',foodStatus(mine,'berries'),foodStatus(theirs,'berries')],
-        ['실제 채집 식량량','미측정','미측정'],
+        ...(hasBerryWindow?[['열매 작업 전환 (추정)',berryTime(mine),berryTime(theirs)]]:[]),
       ];
-      content+=`<h3 style="font-size:14px;margin:25px 0 8px">상대 비교</h3><table class="timeline"><thead><tr><th scope="col">항목</th><th scope="col">나 (${esc(report.profile?.name||'ssapo')})</th><th scope="col">상대 (${esc(other?.name||'정보 없음')})</th></tr></thead><tbody>${rows.map(([label,left,right])=>`<tr><th scope="row">${esc(label)}</th><td>${esc(left)}</td><td>${esc(right)}</td></tr>`).join('')}</tbody></table><p class="detail-note">시간은 게임 내 명령 시점. 농장 건설 명령에는 재지시·취소가 포함될 수 있으며, 실제 유지 농장 수가 아님. —는 기록 미확인. 직접 조작한 가축 수는 가축을 선택해 이동·대상·경유 지시한 개체 ID를 중복 제거한 누적 수. 발견·현재 보유·본진 도착·섭취 완료 수와 다르며, 빼앗긴 가축은 양측에 포함될 수 있음. 자동 채집이나 생략된 선택은 모두 복원하지 않음. 식량 대상 지시는 시작 주민의 명시적 명령만 확인한 하한값. 새 주민·선택 생략·자동 전환은 누락될 수 있음. 지시 미확인은 미사용을 뜻하지 않음. 지시 확인도 사냥·채집 완료나 식량 획득을 확정하지 않음. 실제 채집량과 유지 농장 수는 미측정.</p>`;
+      content+=`<h3 style="font-size:14px;margin:25px 0 8px">상대 비교</h3><table class="timeline"><thead><tr><th scope="col">항목</th><th scope="col">나 (${esc(report.profile?.name||'ssapo')})</th><th scope="col">상대 (${esc(other?.name||'정보 없음')})</th></tr></thead><tbody>${rows.map(([label,left,right])=>`<tr><th scope="row">${esc(label)}</th><td>${esc(left)}</td><td>${esc(right)}</td></tr>`).join('')}</tbody></table><p class="detail-note">시간은 게임 내 명령 시점. 농장 건설 명령에는 재지시·취소가 포함될 수 있으며, 실제 유지 농장 수가 아님. —는 기록 미확인. 직접 조작한 가축 수는 가축을 선택해 이동·대상·경유 지시한 개체 ID를 중복 제거한 누적 수. 발견·현재 보유·본진 도착·섭취 완료 수와 다르며, 빼앗긴 가축은 양측에 포함될 수 있음. 자동 채집이나 생략된 선택은 모두 복원하지 않음. 열매 시각은 같은 군락으로 지시받은 주민들의 후속 작업 지시가 모인 구간. 괄호는 전환 지시 인원/확인된 열매 작업자 수. 실제 고갈·채집 종료 시각이 아니며, 중간의 자동 작업·이동은 누락될 수 있음.</p>`;
       content+='<details><summary>초반 명령 타임라인 보기 (최대 100개)</summary><table class="timeline"><thead><tr><th>게임 시간</th><th>명령</th><th>종류</th></tr></thead><tbody>'+(a.metrics?.timeline||[]).map(e=>`<tr><td>${fmtTime(e.seconds)}</td><td>${esc(e.label)}</td><td class="type">${esc(e.kind)}</td></tr>`).join('')+'</tbody></table></details>';
       content+=(a.limitations||[]).map(t=>`<p class="detail-note">${esc(t)}</p>`).join('');
 
