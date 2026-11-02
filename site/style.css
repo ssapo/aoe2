@@ -171,3 +171,7 @@ body.review-open{overflow:hidden}
 .review-body .comparison td{font-weight:500}
 .review-body .comparison tbody th{color:#475b40}
 @media(max-width:600px){.signal-card h4{font-size:13px}.signal-card>p{font-size:12px}.review-body .comparison td,.review-body .comparison tbody th{font-size:12px}.finding-stage{font-size:10px}}
+
+[data-number-panel="market"] td{white-space:pre-line;line-height:1.7}
+
+.record-player{border:1px solid #dfe5d8;border-radius:8px;padding:12px;margin-bottom:16px;background:#f6f8f2}.record-player summary{cursor:pointer;font-weight:600}.player-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0}.player-controls output{margin-left:auto;font-variant-numeric:tabular-nums}.record-player input[type=range]{width:100%;margin:8px 0}.record-event{display:grid;grid-template-columns:46px 42px 1fr;gap:8px;padding:8px 0;border-bottom:1px solid #e3e8dd;font-size:12px}.record-event:first-child{font-weight:600}.record-event time{font-variant-numeric:tabular-nums}

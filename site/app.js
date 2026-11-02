@@ -62,7 +62,7 @@
     return `<div class="panel-toolbar"><div class="segments" role="group" aria-label="기록 종류"><button data-category="unit_orders" aria-pressed="true">유닛</button><button data-category="research_orders" aria-pressed="false">업그레이드</button><button data-category="building_orders" aria-pressed="false">건물</button></div></div><div class="search-row"><input id="production-search" type="search" aria-label="생산·연구 기록 검색" placeholder="이름 검색 · 한글 / 영문" autocomplete="off"><span id="production-count" class="toolbar-note" role="status"></span></div><div id="production-table"></div><p id="production-note" class="compact-note"></p>`;
   }
   function renderTimelinePanel() {
-    return `<div class="panel-toolbar"><div class="segments" role="group" aria-label="타임라인 선수"><button data-side="both" aria-pressed="true">양측</button><button data-side="mine" aria-pressed="false">나</button><button data-side="theirs" aria-pressed="false">상대</button></div><label class="select-label">명령<select id="timeline-kind"><option value="all">전체</option><option value="QUEUE">생산</option><option value="BUILD">건설</option><option value="RESEARCH">연구</option></select></label><label class="select-label">시간<select id="timeline-range"></select></label></div><div class="timeline-pagination"><span id="timeline-count" role="status"></span><div><button id="timeline-prev" aria-label="이전 명령 페이지">이전</button><span id="timeline-page"></span><button id="timeline-next" aria-label="다음 명령 페이지">다음</button></div></div><div id="timeline-table"></div><p class="compact-note">건설·생산·연구를 요청한 기록이에요. 완료 시각과는 달라요.</p>`;
+    return `<details class="record-player"><summary>기록 재생</summary><p class="compact-note">양쪽의 생산·건설·연구·시장 요청을 시간순으로 재생해요. 유닛 이동이나 전투 장면은 포함되지 않아요.</p><div class="player-controls"><button id="record-play">재생</button><button id="record-prev" aria-label="이전 기록으로">이전</button><button id="record-next" aria-label="다음 기록으로">다음</button><label>배속 <select id="record-speed"><option value="1">1×</option><option value="4">4×</option><option value="16" selected>16×</option><option value="64">64×</option></select></label><output id="record-clock"></output></div><input id="record-seek" type="range" min="0" step="0.01" value="0" aria-label="기록 재생 시간"><div id="record-events"></div></details><div class="panel-toolbar"><div class="segments" role="group" aria-label="타임라인 선수"><button data-side="both" aria-pressed="true">양측</button><button data-side="mine" aria-pressed="false">나</button><button data-side="theirs" aria-pressed="false">상대</button></div><label class="select-label">명령<select id="timeline-kind"><option value="all">전체</option><option value="QUEUE">생산</option><option value="BUILD">건설</option><option value="RESEARCH">연구</option><option value="BUY">시장 구매</option><option value="SELL">시장 판매</option></select></label><label class="select-label">시간<select id="timeline-range"></select></label></div><div class="timeline-pagination"><span id="timeline-count" role="status"></span><div><button id="timeline-prev" aria-label="이전 명령 페이지">이전</button><span id="timeline-page"></span><button id="timeline-next" aria-label="다음 명령 페이지">다음</button></div></div><div id="timeline-table"></div><p class="compact-note">건설·생산·연구·시장 거래를 요청한 기록이에요. 완료 시각과는 달라요.</p>`;
   }
   function renderBasics(mine,theirs,other) {
     const controlled=p=>p.food_evidence?.livestock_control?`${number(p.food_evidence.livestock_control.observed_targets)}개체`:'—';
@@ -138,6 +138,33 @@
     search.addEventListener('input',renderProduction);
     renderProduction();
     const events=[...[mine,theirs].flatMap((metrics,side)=>(metrics.full_timeline||metrics.timeline||[]).map(e=>({...e,side:side?'theirs':'mine'})))].sort((a,b)=>a.seconds-b.seconds);
+    const playerBox=root.querySelector('.record-player'),seek=root.querySelector('#record-seek'),play=root.querySelector('#record-play');
+    const end=events.length?events[events.length-1].seconds:0;
+    const start=(mine.recording_restored||theirs.recording_restored)&&events.length?events[0].seconds:0;
+    seek.min=String(start);seek.max=String(end);seek.value=String(start);
+    let cursor=start,timer=null,lastTick=0;
+    const stop=()=>{if(timer!==null)clearInterval(timer);timer=null;play.textContent='재생';};
+    const drawPlayer=()=>{
+      seek.value=String(cursor);root.querySelector('#record-clock').textContent=`${fmtTime(cursor)} / ${fmtTime(end)}`;
+      let lo=0,hi=events.length;while(lo<hi){const mid=(lo+hi)>>1;if(events[mid].seconds<=cursor)lo=mid+1;else hi=mid;}
+      const recent=events.slice(Math.max(0,lo-6),lo).reverse();
+      const names={QUEUE:'생산',DE_QUEUE:'생산',MULTIQUEUE:'생산',BUILD:'건설',RESEARCH:'연구',BUY:'구매',SELL:'판매'};
+      root.querySelector('#record-events').innerHTML=recent.length?recent.map(e=>`<div class="record-event"><time>${fmtTime(e.seconds)}</time><span class="player-tag ${e.side}">${e.side==='mine'?'나':'상대'}</span><span>${esc(label(e.label))}${Number.isFinite(e.amount)?' × '+number(e.amount):''} · ${esc(names[e.kind]||e.kind)}</span></div>`).join(''):'<p class="compact-note">아직 기록이 없어요. 다음 버튼으로 첫 기록부터 볼 수 있어요.</p>';
+    };
+    play.disabled=!events.length;
+    play.addEventListener('click',()=>{
+      if(timer!==null){stop();return;}if(cursor>=end)cursor=start;
+      lastTick=performance.now();play.textContent='일시정지';
+      timer=setInterval(()=>{
+        if(!play.isConnected||!document.querySelector('#match-dialog')?.open||root.querySelector('#panel-timeline').hidden||!playerBox.open||document.hidden){stop();return;}
+        const now=performance.now();cursor=Math.min(end,cursor+(now-lastTick)/1000*Number(root.querySelector('#record-speed').value));lastTick=now;drawPlayer();if(cursor>=end)stop();
+      },100);
+    });
+    seek.addEventListener('input',()=>{stop();cursor=Number(seek.value);drawPlayer();});
+    root.querySelector('#record-prev').addEventListener('click',()=>{stop();cursor=[...events].reverse().find(e=>e.seconds<cursor)?.seconds??start;drawPlayer();});
+    root.querySelector('#record-next').addEventListener('click',()=>{stop();cursor=events.find(e=>e.seconds>cursor)?.seconds??end;drawPlayer();});
+    playerBox.addEventListener('toggle',()=>{if(!playerBox.open)stop();});
+    drawPlayer();
     const range=root.querySelector('#timeline-range');
     const intervals=[...new Set(events.map(e=>Math.floor(e.seconds/300)))];
     range.innerHTML='<option value="all">전체 시간</option>'+intervals.map(i=>`<option value="${i}">${i*5}–${(i+1)*5}분</option>`).join('');
@@ -150,7 +177,7 @@
       root.querySelector('#timeline-page').textContent=`${page+1} / ${pages}`;
       root.querySelector('#timeline-prev').disabled=page===0;
       root.querySelector('#timeline-next').disabled=page>=pages-1;
-      const visible=filtered.slice(page*size,(page+1)*size),types={QUEUE:'생산',DE_QUEUE:'생산',MULTIQUEUE:'생산',BUILD:'건설',RESEARCH:'연구'};
+      const visible=filtered.slice(page*size,(page+1)*size),types={QUEUE:'생산',DE_QUEUE:'생산',MULTIQUEUE:'생산',BUILD:'건설',RESEARCH:'연구',BUY:'시장 구매',SELL:'시장 판매'};
       root.querySelector('#timeline-table').innerHTML=visible.length?`<table class="timeline event-table"><thead><tr><th scope="col">시간</th><th scope="col">선수</th><th scope="col">명령</th></tr></thead><tbody>${visible.map(e=>`<tr><td>${fmtTime(e.seconds)}</td><td><span class="player-tag ${e.side}">${e.side==='mine'?'나':'상대'}</span></td><td>${esc(label(e.label))}${Number.isFinite(e.amount)?' × '+number(e.amount):''}<small class="cell-meta">${esc(types[e.kind]||e.kind)}</small></td></tr>`).join('')}</tbody></table>`:'<p class="panel-empty">이 조건의 명령 없음</p>';
     };
     root.querySelectorAll('[data-side]').forEach(b=>b.addEventListener('click',()=>{
@@ -285,8 +312,14 @@
     const point=(s,t)=>{const p=s.checkpoints.find(p=>p.seconds===t);return p?`주민 ${number(p.villager_requests)} · 군사 ${number(p.military_requests)}`:'—';};
     const phase=s=>`${fmtTime(s.start)}–${fmtTime(s.end)} · 주민 ${number(s.villager_requests)} / 군사 ${number(s.military_requests)} / 연구 ${number(s.research_kinds)} / 건설 ${number(s.building_commands)}`;
     const phases=[...new Set([...a.phases,...b.phases].map(p=>p.stage))];
-    const panels=[['core','핵심'],['checkpoints','5분별'],['phases','시대별'],...(review.personal_benchmarks.length?[['benchmark','내 기록']]:[])];
+    const panels=[['core','핵심'],['checkpoints','5분별'],['phases','시대별'],...((mine.market||theirs.market)?[['market','시장']]:[]),...(review.personal_benchmarks.length?[['benchmark','내 기록']]:[])];
     let html=`<div class="segments numbers-segments" role="group" aria-label="수치 비교 종류">${panels.map(([id,name],i)=>`<button data-numbers="${id}" aria-pressed="${i===0}">${name}</button>`).join('')}</div><p class="data-caution">주민·군사 수량은 <b>생산 요청</b> 기준이에요. 실제 살아 있는 유닛 수와는 달라요.</p><section data-number-panel="core">${compareTable(core,other)}</section><section data-number-panel="checkpoints" hidden>${compareTable(points.map(t=>[`${Math.round(t/60)}분 누적`,point(a,t),point(b,t)]),other)}</section><section data-number-panel="phases" hidden><p class="compact-note">각자 시대가 바뀐 뒤의 기록이에요. 연구는 종류, 건설은 요청 횟수로 셌어요.</p>${compareTable(phases.map(stage=>{const l=a.phases.find(p=>p.stage===stage),r=b.phases.find(p=>p.stage===stage);return [stage,l?phase(l):'—',r?phase(r):'—'];}),other)}</section>`;
+    if(mine.market||theirs.market){
+      const total=(m,kind,resource)=>m.market?number(m.market.events.filter(e=>e.kind===kind&&e.label===resource).reduce((n,e)=>n+e.amount,0)):'—';
+      const rows=['식량','목재','돌'].flatMap(resource=>['BUY','SELL'].map(kind=>[`${resource} ${kind==='BUY'?'구매':'판매'} 요청`,total(mine,kind,resource),total(theirs,kind,resource)]));
+      const before=(m,age)=>{const p=checkpoint(m,age);if(!m.market||!Number.isFinite(p.command_seconds))return '—';const ev=p.market_previous_120s||[];return `${fmtTime(Math.max(0,p.command_seconds-120))}–${fmtTime(p.command_seconds)}\n`+(ev.length?ev.map(e=>`${fmtTime(e.seconds)} ${esc(e.label)} ${number(e.amount)} ${e.kind==='BUY'?'구매':'판매'}`).join('\n'):'거래 요청 없음');};
+      html+=`<section data-number-panel="market" hidden><p class="compact-note">자원 단위로 합산한 매매 요청이에요. 실제 체결량이나 금 지출·수입은 계산하지 않아요.</p>${compareTable(rows,other)}<h3>시대업 누르기 전 2분</h3>${compareTable(ageList.filter(age=>Number.isFinite(checkpoint(mine,age).command_seconds)||Number.isFinite(checkpoint(theirs,age).command_seconds)).map(age=>[age,before(mine,age),before(theirs,age)]),other)}</section>`;
+    }
     if(review.personal_benchmarks.length){
       html+=`<section data-number-panel="benchmark" hidden><p class="compact-note">같은 맵·문명·첫 병종으로 했던 내 경기와 비교해요. 최근 10경기 안에서 비교 가능한 기록만 모았어요.</p><table class="timeline comparison"><thead><tr><th>항목</th><th>이번 경기</th><th>내 과거 중앙값</th></tr></thead><tbody>${review.personal_benchmarks.map(p=>`<tr><th scope="row">${esc(p.label)}</th><td>${fmtTime(p.current_seconds)}<small class="cell-meta">${Math.round(Math.abs(p.delta_seconds))}초 ${p.delta_seconds<0?'빠름':p.delta_seconds>0?'늦음':'차이'}</small></td><td>${fmtTime(p.median_seconds)}<small class="cell-meta">${p.samples}경기</small></td></tr>`).join('')}</tbody></table></section>`;
     }

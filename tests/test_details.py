@@ -67,3 +67,26 @@ class DetailTests(unittest.TestCase):
 
 
 if __name__=='__main__': unittest.main()
+
+class MarketTests(unittest.TestCase):
+    setUp = DetailTests.setUp
+    action = DetailTests.action
+    metrics = DetailTests.metrics
+    def test_market_units_player_and_click_order(self):
+        result=self.metrics([
+            self.action(100,'SELL',{'resource_id':2,'amount':500}),
+            self.action(200,'BUY',{'resource_id':0,'amount':100}),
+            self.action(200,'BUY',{'resource_id':0,'amount':100},other=True),
+            self.action(210,'RESEARCH',{'technology_id':102,'technology':'Castle Age'}),
+            self.action(210,'BUY',{'resource_id':0,'amount':100}),
+            self.action(211,'BUY',{'resource_id':0,'amount':-1}),
+            self.action(212,'BUY',{'resource_id':99,'amount':100}),
+        ],restored_at=60)
+        events=result['market']['events']
+        self.assertEqual([e['amount'] for e in events],[500,100,100])
+        self.assertEqual(events[0]['seconds'],160)
+        self.assertEqual(len(result['age_checkpoints']['성주']['market_previous_120s']),2)
+        self.assertEqual(len([e for e in result['full_timeline'] if e['kind']=='BUY']),2)
+
+    def test_empty_market_is_distinct_from_missing_old_analysis(self):
+        self.assertEqual(self.metrics([])['market']['events'],[])

@@ -147,6 +147,19 @@ def findings(mine, theirs, my_metrics, their_metrics):
         if a is not None and b is not None and abs(a-b)>=10:
             add('investment','전체','병력 생산 요청 비교',f'나 {a} · 상대 {b} · {abs(a-b)} 차이.',
                 '어떤 병력을 많이 요청했고 언제 싸움에 투입했는지 살펴보세요.',3)
+    for age, point in my_metrics.get('age_checkpoints', {}).items():
+        trades = point.get('market_previous_120s', [])
+        if not trades:
+            continue
+        totals = {}
+        for e in trades:
+            key = (e['kind'], e['label'])
+            totals[key] = totals.get(key, 0) + e['amount']
+        summary = ' · '.join(f'{resource} {amount} {"구매" if kind == "BUY" else "판매"}' for (kind,resource),amount in totals.items())
+        at = point['command_seconds']
+        add('investment', phase_at(my_metrics,at), f'{age} 누르기 전 시장 이용',
+            f'{clock(max(0,at-120))}–{clock(at)} · {summary} 요청.',
+            '부족한 자원을 시장에서 채웠는지 볼 구간이에요. 거래가 시대업을 앞당겼는지, 이후 병력이나 TC에 쓸 자원이 부족해졌는지 함께 살펴보세요.',2)
     upgrades=[]
     for tech, label in TECHS.items():
         a=my_metrics.get('first_research_commands',{}).get(tech)

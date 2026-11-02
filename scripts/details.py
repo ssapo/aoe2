@@ -12,6 +12,7 @@ def detailed_metrics(match, player):
     requested = Counter()
     queue_events, timeline = [], []
     unknown_units = set()
+    market_events = []
     offset = getattr(match, 'restored_at', timedelta()).total_seconds()
     arrivals = {}
     for notice in getattr(match, 'uptimes', []):
@@ -42,6 +43,14 @@ def detailed_metrics(match, player):
                 row['unknown_amount_commands'] += 1
                 unknown_units.add(label)
             timeline.append({'seconds': at, 'kind': 'QUEUE', 'label': label, 'amount': amount})
+        elif kind in {'BUY', 'SELL'}:
+            resource = {0: '식량', 1: '목재', 2: '돌'}.get(payload.get('resource_id'))
+            amount = payload.get('amount')
+            if resource and isinstance(amount, int) and not isinstance(amount, bool) and amount > 0:
+                # mgz already normalizes trade lots to resource units; do not multiply by 100.
+                event = {'seconds': at, 'kind': kind, 'label': resource, 'amount': amount}
+                market_events.append(event)
+                timeline.append(event.copy())
         elif kind in {'BUILD', 'RESEARCH'}:
             key, fallback = ('building', 'Building') if kind == 'BUILD' else ('technology', 'Technology')
             label = str(payload.get(key) or f'{fallback} {payload.get(key + "_id", "?")}')
@@ -60,6 +69,7 @@ def detailed_metrics(match, player):
                              'research_commands_before_click': {
                                  k: v['first_seconds'] for k, v in research.items()
                                  if k != label and k not in {'Feudal Age', 'Castle Age', 'Imperial Age'}},
+                             'market_previous_120s': [e.copy() for e in market_events if at-120 <= e['seconds'] <= at],
                              'villagers_alive': None,
                              'unknown_unit_request_amounts': sorted(unknown_units)}
         if row is not None:
@@ -68,7 +78,7 @@ def detailed_metrics(match, player):
 
     for age, at in arrivals.items():
         ages.setdefault(age, {'villagers_alive': None})['reached_seconds'] = at
-    return {'age_checkpoints': ages, 'unit_orders': units, 'building_orders': buildings,
+    return {'market': {'events': market_events, 'basis': 'recorded_requests_resource_units'}, 'age_checkpoints': ages, 'unit_orders': units, 'building_orders': buildings,
             'research_orders': research, 'full_timeline': timeline,
             'recording_restored': bool(getattr(match, 'restored', False)),
             'villager_count_source': 'unavailable_without_game_state',
