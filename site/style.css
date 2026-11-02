@@ -142,3 +142,18 @@ body.review-open{overflow:hidden}
 .collection-feedback[data-state=updated]{border-color:#a4bea1;background:#e7f0e3}
 .collection-feedback[data-state=failed],.collection-feedback[data-state=timeout]{border-color:#ddc7ae;background:#f4eadf}
 @media(max-width:600px){.connection{gap:8px}.collect-now{font-size:11px;padding:7px 10px;min-height:38px}.connection .text{flex-basis:145px}.collection-feedback{padding:10px 11px}}
+
+.review-tabs{grid-template-columns:repeat(5,1fr)}
+.opening-pair{display:flex;justify-content:space-between;gap:10px;margin:0 0 12px;font-size:11px;color:#5a7051}
+.opening-pair span{padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:#eaf0e2}
+.review-intro{margin:-2px 0 13px}
+.finding-stage{display:block;font-size:10px;color:#728064;margin-bottom:4px}
+.signal-card.investment{border-left-color:#8b93a3}
+.numbers-segments{margin-bottom:12px}
+#panel-numbers .comparison th:first-child{width:35%}
+@media(max-width:600px){.review-tabs button{font-size:12px;padding:8px 2px}.review-tabs{padding:0 3px}.stage-segments button{padding:6px 9px;font-size:11px}.review-footer{gap:16px}.review-footer a{font-size:10px}.opening-pair{font-size:10px}.signal-card p{line-height:1.7}}
+.practice-card{margin:0 0 16px;padding:12px 14px;background:#e7ecf1;border:1px solid #d6dee8;border-radius:6px;color:#3b4e63}
+.practice-card strong{font-size:13px}.practice-card p{font-size:11px;margin:4px 0 0;line-height:1.7}.practice-card details{margin-top:5px}.practice-card summary{font-size:11px;color:#536a80}
+.practice-card{margin:0 0 14px}.practice-card>summary{color:#3b4e63;font-size:12px}.practice-card>summary span{display:block;margin-left:15px;font-size:11px;margin-top:3px}
+#panel-numbers .comparison td,#panel-numbers .comparison th{padding:8px 7px}
+@media(max-width:600px){#panel-numbers .comparison td,#panel-numbers .comparison th{padding:7px 5px}.practice-card{padding:10px 11px}.practice-card>summary strong{font-size:12px}}

@@ -30,7 +30,7 @@
   const ageList = ['봉건','성주','왕정'];
   const quantities = counts => Object.entries(counts||{}).filter(([,v])=>v>0).map(([k,v])=>`${label(k)} ${number(v)}`).join(' · ') || '지시 없음';
   function compareTable(rows, other) {
-    return `<div class="table-scroll"><table class="timeline comparison"><thead><tr><th scope="col">항목</th><th scope="col">나 (${esc(report.profile?.name||'ssapo')})</th><th scope="col">상대 (${esc(other?.name||'정보 없음')}${other?.civilization?' · '+esc(other.civilization):''})</th></tr></thead><tbody>${rows.map(([title,left,right])=>`<tr><th scope="row">${esc(title)}</th><td>${esc(left)}</td><td>${esc(right)}</td></tr>`).join('')}</tbody></table></div>`;
+    return `<div class="table-scroll"><table class="timeline comparison"><thead><tr><th scope="col">항목</th><th scope="col" title="${esc(report.profile?.name||'ssapo')}">나</th><th scope="col" title="${esc(other?.name||'정보 없음')}${other?.civilization?' · '+esc(other.civilization):''}">상대</th></tr></thead><tbody>${rows.map(([title,left,right])=>`<tr><th scope="row">${esc(title)}</th><td>${esc(left)}</td><td>${esc(right)}</td></tr>`).join('')}</tbody></table></div>`;
   }
   const agesIn = (mine,theirs) => ageList.filter(age=>mine.age_checkpoints?.[age]||theirs.age_checkpoints?.[age]||Number.isFinite(mine.age_commands?.[age])||Number.isFinite(theirs.age_commands?.[age]));
   const checkpoint = (metrics,age) => metrics.age_checkpoints?.[age] || {command_seconds:metrics.age_commands?.[age]};
@@ -38,7 +38,7 @@
     const left=checkpoint(mine,age),right=checkpoint(theirs,age);
     const reached=[left.reached_seconds,right.reached_seconds].every(Number.isFinite);
     const a=reached?left.reached_seconds:left.command_seconds,b=reached?right.reached_seconds:right.command_seconds;
-    const delta=Number.isFinite(a)&&Number.isFinite(b)?Math.round(a-b):null;
+    const delta=Number.isFinite(a)&&Number.isFinite(b)?Math.floor(a)-Math.floor(b):null;
     return {a,b,reached,delta,text:delta===null?'비교 기록 부족':delta===0?'같은 시각':`${Math.abs(delta)}초 ${delta<0?'빠름':'늦음'}`};
   }
   function renderAgePanel(mine,theirs,other) {
@@ -74,7 +74,7 @@
   function renderMethods(analysis) {
     return `<details class="method-note"><summary>분석 기준·제한</summary><p>시대 도달 알림과 명령의 시점을 비교한 복기 후보이며, 승패의 인과관계나 상대 실수를 확정하지 않음. eAPM·건설 지시 횟수를 승리 원인으로 사용하지 않음.</p><p>건설·생산·연구 지시에는 반복·취소·실패가 포함될 수 있음. 실제 보유 병력·완공 건물·유지 농장 수와 다름. 기록 미확인 기술은 문명 무료 제공일 수도 있음.</p><p>가축은 직접 이동·대상·경유 지시한 개체 ID의 누적 수. 발견·현재 보유·본진 도착·섭취 완료 수와 다름. 빼앗긴 가축은 양측에 포함될 수 있음.</p><p>열매는 같은 군락 작업자의 후속 지시가 모인 구간. 괄호는 전환 지시 인원/확인된 작업자 수. 실제 고갈·채집 종료 시각이 아니며 자동 작업은 누락될 수 있음.</p>${(analysis.limitations||[]).map(t=>`<p>${esc(t)}</p>`).join('')}</details>`;
   }
-  function bindWorkspace(root,mine,theirs,other) {
+  function bindWorkspace(root,mine,theirs,other,review) {
     const body=root.querySelector('.review-body');
     const tabs=[...root.querySelectorAll('[role="tab"]')];
     const activate=id=>{
@@ -97,6 +97,16 @@
       activate(b.dataset.openPanel);
       if(b.dataset.openAge)root.querySelector(`[data-age="${b.dataset.openAge}"]`)?.click();
       tabs.find(t=>t.dataset.panel===b.dataset.openPanel)?.focus();
+    }));
+    root.querySelectorAll('[data-review-stage]').forEach(b=>b.addEventListener('click',()=>{
+      root.querySelectorAll('[data-review-stage]').forEach(t=>t.setAttribute('aria-pressed',String(t===b)));
+      const select=items=>items.filter(f=>b.dataset.reviewStage==='전체'||f.stage===b.dataset.reviewStage);
+      root.querySelector('#own-findings').innerHTML=findingSide('나',select(review.own_findings));
+      root.querySelector('#opponent-findings').innerHTML=findingSide('상대',select(review.opponent_findings));body.scrollTop=0;
+    }));
+    root.querySelectorAll('[data-numbers]').forEach(b=>b.addEventListener('click',()=>{
+      root.querySelectorAll('[data-numbers]').forEach(t=>t.setAttribute('aria-pressed',String(t===b)));
+      root.querySelectorAll('[data-number-panel]').forEach(p=>p.hidden=p.dataset.numberPanel!==b.dataset.numbers);body.scrollTop=0;
     }));
     root.querySelectorAll('[data-age]').forEach(b=>b.addEventListener('click',()=>{
       root.querySelectorAll('[data-age]').forEach(t=>t.setAttribute('aria-pressed',String(t===b)));
@@ -240,7 +250,51 @@
       u.gap>0?'상대의 동일 업그레이드 지시가 늦었음. 연구 완료 전후 실제 교전이 있었는지 확인.':'상대가 동일 업그레이드를 먼저 지시. 그 차이가 있던 구간의 교전 확인.');
     return signals;
   }
+  function findingCard(f,opponent=false) {
+    const evidence=opponent?f.evidence.replace(/나 (?=\d)/g,'__PLAYER__ ').replace(/상대 (?=\d)/g,'나 ').replace(/__PLAYER__ /g,'상대 '):f.evidence;
+    return `<article class="signal-card ${f.kind==='review'?'negative':f.kind==='advantage'?'positive':'investment'}"><span class="finding-stage">${esc(f.stage)} · ${f.kind==='review'?'복기 우선':f.kind==='advantage'?'앞선 기록':'투자 차이'}</span><h4>${esc(f.title)}</h4><p>${esc(evidence)}</p><details><summary>${opponent?'상대가 확인할 점':'고칠 행동·확인할 점'}</summary><p>${esc(f.action)}</p></details></article>`;
+  }
+  function findingSide(title,items) {
+    const render=f=>findingCard(f,title==='상대');
+    return `<section class="signal-group"><h3>${esc(title)}<span>${items.length}</span></h3>${items.length?items.slice(0,2).map(render).join(''):'<p class="compact-note">이 단계에서 비교할 진단 근거 부족</p>'}${items.length>2?`<details class="more-signals"><summary>${items.length-2}개 더 보기</summary>${items.slice(2).map(render).join('')}</details>`:''}</section>`;
+  }
+  function renderEvidenceReview(match) {
+    const review=match.analysis.review;
+    const stages=['전체','암흑','봉건','성주','왕정'].filter(s=>s==='전체'||[...review.own_findings,...review.opponent_findings].some(f=>f.stage===s));
+    return `${review.practice?`<details class="practice-card"><summary><strong>${esc(review.practice.title)}</strong><span>이번 ${fmtTime(review.practice.current_seconds)} → 연습 목표 ${fmtTime(review.practice.target_seconds)}</span></summary><p>${esc(review.practice.evidence)}</p><p>${esc(review.practice.action)}</p></details>`:''}<div class="opening-pair"><span>나 · ${esc(review.own.opening_label)}</span><span>상대 · ${esc(review.opponent.opening_label)}</span></div><div class="panel-toolbar"><div class="segments stage-segments" role="group" aria-label="진단할 시대">${stages.map((s,i)=>`<button data-review-stage="${s}" aria-pressed="${i===0}">${s}</button>`).join('')}</div><button class="subtle" data-open-panel="numbers">전체 수치 보기 →</button></div><p class="compact-note review-intro">수치로 찾은 복기 후보. 각 카드에서 근거와 고칠 행동을 확인.</p><div class="signal-columns"><div id="own-findings">${findingSide('나',review.own_findings)}</div><div id="opponent-findings">${findingSide('상대',review.opponent_findings)}</div></div>`;
+  }
+  function renderNumbersPanel(review,mine,theirs,other) {
+    if(!review)return '<p class="panel-empty">다음 수집에서 수치 분석 갱신</p>';
+    const a=review.own,b=review.opponent;
+    const at15=s=>s.checkpoints.find(p=>p.seconds===900)?.villager_requests;
+    const longest=s=>s.villager_command_gaps.length?Math.max(...s.villager_command_gaps.map(g=>g.seconds)):null;
+    const core=[
+      ['파서 eAPM',number(mine.eapm),number(theirs.eapm)],
+      ...ageList.filter(age=>Number.isFinite(checkpoint(mine,age).reached_seconds)||Number.isFinite(checkpoint(theirs,age).reached_seconds)).map(age=>[`${age} 도달 · 알림`,fmtTime(checkpoint(mine,age).reached_seconds),fmtTime(checkpoint(theirs,age).reached_seconds)]),
+      ['첫 군사 생산 지시',fmtTime(a.first_military_seconds),fmtTime(b.first_military_seconds)],
+      ['봉건 도달 후 첫 군사 지시',Number.isFinite(a.after_feudal_first_military_seconds)?`${Math.round(a.after_feudal_first_military_seconds)}초`:'—',Number.isFinite(b.after_feudal_first_military_seconds)?`${Math.round(b.after_feudal_first_military_seconds)}초`:'—'],
+      ['15분까지 주민 지시량',number(at15(a)),number(at15(b))],
+      ['전체 주민 생산 지시량',number(a.villager_requests),number(b.villager_requests)],
+      ['전체 군사 생산 지시량',number(a.military_requests),number(b.military_requests)],
+      ['군사 생산 지시 병종 수',number(a.military_types),number(b.military_types)],
+      ['연구 종류 · 시대업 포함',number(a.research_kinds),number(b.research_kinds)],
+      ['추가 TC 건설 지시',`${number(a.additional_tc_build_commands)}회`,`${number(b.additional_tc_build_commands)}회`],
+      ['최장 주민 지시 간격',fmtTime(longest(a)),fmtTime(longest(b))]
+    ];
+    const points=[...new Set([...a.checkpoints,...b.checkpoints].map(p=>p.seconds))].sort((x,y)=>x-y);
+    const point=(s,t)=>{const p=s.checkpoints.find(p=>p.seconds===t);return p?`주민 ${number(p.villager_requests)} · 군사 ${number(p.military_requests)}`:'—';};
+    const phase=s=>`${fmtTime(s.start)}–${fmtTime(s.end)} · 주민 ${number(s.villager_requests)} / 군사 ${number(s.military_requests)} / 연구 ${number(s.research_kinds)} / 건설 ${number(s.building_commands)}`;
+    const phases=[...new Set([...a.phases,...b.phases].map(p=>p.stage))];
+    const panels=[['core','핵심'],['checkpoints','5분별'],['phases','시대별'],...(review.personal_benchmarks.length?[['benchmark','내 기록']]:[])];
+    let html=`<div class="segments numbers-segments" role="group" aria-label="수치 비교 종류">${panels.map(([id,name],i)=>`<button data-numbers="${id}" aria-pressed="${i===0}">${name}</button>`).join('')}</div><p class="data-caution">주민·군사 수량은 <b>생산 지시량</b>. 실제 생존 수와 다름.</p><section data-number-panel="core">${compareTable(core,other)}</section><section data-number-panel="checkpoints" hidden>${compareTable(points.map(t=>[`${Math.round(t/60)}분 누적`,point(a,t),point(b,t)]),other)}</section><section data-number-panel="phases" hidden><p class="compact-note">각자의 실제 시대 도달 구간별 지시. 연구는 종류, 건설은 횟수.</p>${compareTable(phases.map(stage=>{const l=a.phases.find(p=>p.stage===stage),r=b.phases.find(p=>p.stage===stage);return [stage,l?phase(l):'—',r?phase(r):'—'];}),other)}</section>`;
+    if(review.personal_benchmarks.length){
+      html+=`<section data-number-panel="benchmark" hidden><p class="compact-note">같은 맵·문명·첫 군사 생산 병종 계열의 이전 최대 10경기 중 비교 가능한 표본. 글로벌 평균·백분위가 아님.</p><table class="timeline comparison"><thead><tr><th>항목</th><th>이번 경기</th><th>내 과거 중앙값</th></tr></thead><tbody>${review.personal_benchmarks.map(p=>`<tr><th scope="row">${esc(p.label)}</th><td>${fmtTime(p.current_seconds)}<small class="cell-meta">${Math.round(Math.abs(p.delta_seconds))}초 ${p.delta_seconds<0?'빠름':p.delta_seconds>0?'늦음':'차이'}</small></td><td>${fmtTime(p.median_seconds)}<small class="cell-meta">${p.samples}경기</small></td></tr>`).join('')}</tbody></table></section>`;
+    }
+    return html+'<details class="method-note"><summary>수치의 범위·진단 기준</summary><p>시대 도달은 시스템 알림, 첫 군사·업그레이드는 최초 지시 시각. 군사 수량에서 주민·어선·교역·수송선을 제외. 초기 유닛과 무료 획득은 포함하지 않음.</p><p>현재 복기 후보 기준: 시대 도달·첫 군사 지시 20초 이상 차이, 같은 첫 병종의 15분 주민 지시량 5 이상 차이, 군사 지시량 10 이상 차이, 같은 기술 최초 지시 60초 이상 차이. 전략의 정답이나 통계적 등급 기준이 아님.</p><p>주민 지시 공백은 실제 TC 유휴가 아님. 예약 대기·취소·실패·자원·인구 제한·피해를 게임 엔진으로 재생하지 않음. 검증되지 않은 TC 유휴·교환비·등급·글로벌 백분위는 만들지 않음.</p></details>';
+  }
+
   function renderReview(match) {
+    if(match.analysis?.review)return renderEvidenceReview(match);
     const signals=reviewSignals(match),good=signals.filter(s=>s.positive),bad=signals.filter(s=>!s.positive);
     const card=s=>`<article class="signal-card ${s.positive?'positive':'negative'}"><h4>${esc(s.title)}</h4><p>${esc(s.evidence)}</p><details><summary>복기 포인트</summary><p>${esc(s.meaning)}</p></details></article>`;
     const group=(title,items)=>`<section class="signal-group"><h3>${title}<span>${items.length}</span></h3>${items.length?items.slice(0,2).map(card).join(''):'<p class="compact-note">뚜렷한 비교 근거 없음</p>'}${items.length>2?`<details class="more-signals"><summary>${items.length-2}개 더 보기</summary>${items.slice(2).map(card).join('')}</details>`:''}</section>`;
@@ -260,7 +314,7 @@
     const result=m.result==='win'?'승리':m.result==='loss'?'패배':'결과 미확인';
     const opponent=other?.name||(m.players||[]).filter(p=>!p.is_self).map(p=>p.name).join(', ')||'상대 정보 없음';
     const header=`<header class="review-header"><div class="review-heading-row"><span class="outcome ${m.result==='loss'?'loss':''}">${result}</span><h2 id="review-title">${esc(m.map)} · ${esc(m.civilization)}</h2></div><p class="review-opponent">vs ${esc(opponent)}${other?.civilization?' · '+esc(other.civilization):''}</p><div class="review-meta"><span>${esc(date(m.started_at))}${a?' · '+fmtTime(a.duration_game_seconds):''}</span><span class="review-rating">${number(m.rating_before)} → ${number(m.rating_after)}</span></div></header>`;
-    const links=`<footer class="review-footer"><a href="https://aoe.ms/replay/?gameId=${Number(m.id)}&amp;profileId=26260702" target="_blank" rel="noopener noreferrer">리플 다운로드 ↗</a><a href="https://www.aoe2insights.com/match/${Number(m.id)}/" target="_blank" rel="noopener noreferrer">AoE2 Insights ↗</a></footer>`;
+    const links=`<footer class="review-footer"><a href="https://aoe.ms/replay/?gameId=${Number(m.id)}&amp;profileId=26260702" target="_blank" rel="noopener noreferrer">리플 다운로드 ↗</a><a href="https://www.aoe2insights.com/match/${Number(m.id)}/" target="_blank" rel="noopener noreferrer">AoE2 Insights ↗</a><a href="https://aoe2.gg/matches/${Number(m.id)}?tab=insights" target="_blank" rel="noopener noreferrer">AoE2.GG ↗</a></footer>`;
     let workspace;
     if(!a){
       workspace=header+`<div class="review-body"><p class="panel-empty">${esc(m.analysis_note||'리플 미확보 또는 분석 대기.')}</p></div>`+links;
@@ -269,11 +323,11 @@
         const d=ageDifference(mine,theirs,age);
         return `<button class="highlight ${d.delta===null||d.delta===0?'':d.delta<0?'ahead':'behind'}" data-open-panel="ages" data-open-age="${age}"><span>${age} ${d.reached?'도달':'클릭'}</span><strong>${esc(d.text)}</strong><small>나 ${fmtTime(d.a)} · 상대 ${fmtTime(d.b)}</small></button>`;
       }).join('');
-      const tabs=[['summary','요약'],['ages','시대업'],['production','생산·연구'],['timeline','타임라인']];
-      workspace=header+`<nav class="review-tabs" role="tablist" aria-label="경기 분석 항목">${tabs.map(([id,title],i)=>`<button role="tab" id="tab-${id}" aria-controls="panel-${id}" aria-selected="${i===0}" tabindex="${i===0?0:-1}" data-panel="${id}">${title}</button>`).join('')}</nav><div class="review-body"><section id="panel-summary" role="tabpanel" aria-labelledby="tab-summary" tabindex="0"><div class="highlights">${highlights||'<p class="compact-note">비교할 시대 전환 기록 없음</p>'}</div>${renderReview(m)}${renderBasics(mine,theirs,other)}${renderMethods(a)}</section><section id="panel-ages" role="tabpanel" aria-labelledby="tab-ages" tabindex="0" hidden>${renderAgePanel(mine,theirs,other)}</section><section id="panel-production" role="tabpanel" aria-labelledby="tab-production" tabindex="0" hidden>${renderProductionPanel()}</section><section id="panel-timeline" role="tabpanel" aria-labelledby="tab-timeline" tabindex="0" hidden>${renderTimelinePanel()}</section></div>`+links;
+      const tabs=[['summary','진단'],['numbers','수치'],['ages','시대업'],['production','생산·연구'],['timeline','타임라인']];
+      workspace=header+`<nav class="review-tabs" role="tablist" aria-label="경기 분석 항목">${tabs.map(([id,title],i)=>`<button role="tab" id="tab-${id}" aria-controls="panel-${id}" aria-selected="${i===0}" tabindex="${i===0?0:-1}" data-panel="${id}">${title}</button>`).join('')}</nav><div class="review-body"><section id="panel-summary" role="tabpanel" aria-labelledby="tab-summary" tabindex="0"><div class="highlights">${highlights||'<p class="compact-note">비교할 시대 전환 기록 없음</p>'}</div>${renderReview(m)}${renderBasics(mine,theirs,other)}${renderMethods(a)}</section><section id="panel-numbers" role="tabpanel" aria-labelledby="tab-numbers" tabindex="0" hidden>${renderNumbersPanel(a.review,mine,theirs,other)}</section><section id="panel-ages" role="tabpanel" aria-labelledby="tab-ages" tabindex="0" hidden>${renderAgePanel(mine,theirs,other)}</section><section id="panel-production" role="tabpanel" aria-labelledby="tab-production" tabindex="0" hidden>${renderProductionPanel()}</section><section id="panel-timeline" role="tabpanel" aria-labelledby="tab-timeline" tabindex="0" hidden>${renderTimelinePanel()}</section></div>`+links;
     }
     $('#match-detail').innerHTML=`<div class="review-workspace">${workspace}</div>`;
-    if(a)bindWorkspace($('#match-detail .review-workspace'),mine,theirs,other);
+    if(a)bindWorkspace($('#match-detail .review-workspace'),mine,theirs,other,a.review);
     const dialog=$('#match-dialog');dialog.scrollTop=0;
     document.body.classList.add('review-open');
     if(!dialog.open)dialog.showModal();

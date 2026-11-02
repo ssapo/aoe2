@@ -51,6 +51,8 @@ def write_json(path, data):
 
 
 def write_report(path, data):
+    from review import enrich_report
+    enrich_report(data)
     write_json(path, data)
     write_json(path.with_name('status.json'), {
         'schema_version': 1,
