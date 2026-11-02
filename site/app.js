@@ -50,6 +50,55 @@
     $('#pagination').hidden=matches.length<=visible;
   }
   function openSettings() { $('#settings-dialog').showModal(); }
+  function reviewSignals(match) {
+    const a=match.analysis, other=a?.opponents?.length===1?a.opponents[0]:null;
+    if(!other)return [];
+    const mine=a.metrics||{}, theirs=other.metrics||{}, signals=[];
+    const add=(positive,title,evidence,meaning)=>signals.push({positive,title,evidence,meaning});
+    const ages=['봉건','성주','왕정'];
+    for(const age of ages){
+      const left=mine.age_commands?.[age],right=theirs.age_commands?.[age];
+      if(!Number.isFinite(left)||!Number.isFinite(right)||Math.abs(right-left)<10)continue;
+      const lead=right-left;
+      add(lead>0,`${age} 전환 명령 ${Math.round(Math.abs(lead))}초 ${lead>0?'앞섬':'늦음'}`,
+        `나 ${fmtTime(left)} · 상대 ${fmtTime(right)}`,
+        lead>0?'상대보다 전환을 먼저 지시. 실제 시대 도달과 병력 투입도 빨랐는지 확인.':'상대가 전환을 먼저 지시. 앞선 시점을 상대가 활용했는지 확인.');
+    }
+    const f1=mine.age_commands?.['봉건'],f2=theirs.age_commands?.['봉건'];
+    const c1=mine.age_commands?.['성주'],c2=theirs.age_commands?.['성주'];
+    if([f1,f2,c1,c2].every(Number.isFinite)&&f1>f2+10&&c1<c2){
+      add(true,'봉건 전환 열세를 성주 전환에서 역전',
+        `봉건 ${Math.round(f1-f2)}초 뒤 → 성주 ${Math.round(c2-c1)}초 앞`,
+        '봉건 이후 상대보다 빠르게 성주 전환을 준비한 기록. 상대의 병력·경제 투자 차이와 함께 복기.');
+    }
+    const combatTechs={'Scale Barding Armor':'기병 방어 1단계','Chain Barding Armor':'기병 방어 2단계','Plate Barding Armor':'기병 방어 3단계','Fletching':'궁사 공격 1단계','Bodkin Arrow':'궁사 공격 2단계','Bracer':'궁사 공격 3단계','Forging':'근접 공격 1단계','Iron Casting':'근접 공격 2단계','Blast Furnace':'근접 공격 3단계','Bloodlines':'혈통','Ballistics':'탄도학'};
+    const upgrades=[];
+    for(const [tech,label] of Object.entries(combatTechs)){
+      const left=mine.first_research_commands?.[tech],right=theirs.first_research_commands?.[tech];
+      if(!Number.isFinite(left)||!Number.isFinite(right)||Math.abs(right-left)<30)continue;
+      upgrades.push({label,left,right,gap:right-left});
+    }
+    upgrades.sort((a,b)=>Math.abs(b.gap)-Math.abs(a.gap));
+    for(const u of upgrades.slice(0,2))add(u.gap>0,`${u.label} 명령 ${Math.round(Math.abs(u.gap))}초 ${u.gap>0?'앞섬':'늦음'}`,
+      `나 ${fmtTime(u.left)} · 상대 ${fmtTime(u.right)}`,
+      u.gap>0?'상대의 동일 업그레이드 지시가 늦었음. 연구 완료 전후 실제 교전이 있었는지 확인.':'상대가 동일 업그레이드를 먼저 지시. 그 차이가 있던 구간의 교전 확인.');
+    return signals;
+  }
+  function renderReview(match) {
+    const signals=reviewSignals(match);
+    const good=signals.filter(s=>s.positive),bad=signals.filter(s=>!s.positive);
+    const card=s=>`<article class="insight ${s.positive?'strength':'review'}"><h3>${esc(s.title)}</h3><p>${esc(s.evidence)}</p><p class="action">${esc(s.meaning)}</p></article>`;
+    const title=match.result==='win'?'승리 요인 · 상대 실수 후보':match.result==='loss'?'패배 복기 · 상대 우위':'양측 복기';
+    let html=`<h3 style="font-size:15px;margin:20px 0 10px">${title}</h3>`;
+    if(match.result==='win'){
+      html+=good.length?good.slice(0,4).map(card).join(''):'<p class="detail-note">명령 기록에서 뚜렷한 우위 근거를 찾지 못함. 이겼다는 이유만으로 상대 실수를 추정하지 않음.</p>';
+      if(bad.length)html+='<h4 style="font-size:13px;margin:18px 0 8px">승리해도 개선할 점</h4>'+bad.slice(0,2).map(card).join('');
+    }else{
+      html+=bad.length?bad.slice(0,4).map(card).join(''):'<p class="detail-note">비교할 명령 차이 부족. 패인 미확정.</p>';
+      if(good.length)html+='<h4 style="font-size:13px;margin:18px 0 8px">내가 앞선 기록</h4>'+good.slice(0,2).map(card).join('');
+    }
+    return html+'<p class="detail-note">위 항목은 명령 시점에 근거한 복기 후보. 실제 연구 완료·교전 결과·주민 피해·실제 자원 상태는 재현하지 않으므로, 상대의 실수나 승패 원인으로 확정할 수 없음. eAPM과 농장 건설 명령 수 차이는 승리 원인으로 사용하지 않음.</p>';
+  }
   function openMatch(id) {
     const m = (report.matches||[]).find(m=>m.id===id); if(!m)return;
     const a=m.analysis;
@@ -59,7 +108,7 @@
       content+=`<article class="insight"><h3>상세 분석 없음</h3><p>${esc(m.analysis_note||'리플 미확보 또는 분석 대기.')}</p></article>`;
     } else {
       content+=`<div class="review-stats"><article><small>게임 시간</small><strong>${fmtTime(a.duration_game_seconds)}</strong></article><article><small>파서 eAPM</small><strong>${number(a.metrics?.eapm)}</strong></article><article><small>분석 범위</small><strong style="font-size:15px">명령 기록</strong></article></div>`;
-      content+=(a.insights||[]).filter(i=>i.kind!=='practice').map(i=>`<article class="insight ${['strength','practice','review'].includes(i.kind)?i.kind:'review'}"><h3>${esc(i.title)}</h3><p>${esc(i.evidence)}</p><p class="action">→ ${esc(i.action)}</p><small>${esc(i.confidence)}</small></article>`).join('');
+      content+=renderReview(m);
       const other=a.opponents?.length===1?a.opponents[0]:null;
       const mine=a.metrics||{}, theirs=other?.metrics||{};
       const rows=[
