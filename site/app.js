@@ -8,6 +8,72 @@
   const fmtTime = (s) => Number.isFinite(s) ? `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}` : '—';
   const date = (stamp) => stamp ? new Date(typeof stamp === 'number' ? stamp*1000 : stamp).toLocaleString('ko-KR',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '아직 수집 전';
   const number = (n) => Number.isFinite(n) ? n.toLocaleString('ko-KR') : '—';
+  const names = {
+    'Villager':'주민','Scout Cavalry':'정찰 기병','Knight':'기사','Cavalier':'고급 기병','Paladin':'팔라딘',
+    'Archer':'궁사','Crossbowman':'석궁병','Arbalester':'철석궁병','Skirmisher':'척후병',
+    'Elite Skirmisher':'정예 척후병','Spearman':'창병','Pikeman':'장창병','Halberdier':'미늘창병',
+    'Cavalry Archer':'기마 궁사','Monk':'수도사','Mangonel':'망고넬','Battering Ram':'공성추',
+    'Town Center':'마을 회관','House':'집','Farm':'농장','Mill':'제분소','Lumber Camp':'제재목 캠프',
+    'Mining Camp':'채광 캠프','Barracks':'보병 양성소','Archery Range':'궁사 양성소','Stable':'기병 양성소',
+    'Blacksmith':'대장간','Market':'시장','Monastery':'수도원','Siege Workshop':'공성 무기 제조소',
+    'Castle':'성','University':'대학','Dock':'항구','Loom':'베틀',
+    'Double-Bit Axe':'이중날 도끼','Bow Saw':'활톱','Two-Man Saw':'2인용 톱',
+    'Horse Collar':'말 목장','Heavy Plow':'중형 쟁기','Crop Rotation':'윤작',
+    'Wheelbarrow':'외바퀴 수레','Hand Cart':'손수레','Gold Mining':'금 채광','Stone Mining':'석재 채광',
+    'Fletching':'궁사 공격 1단계','Bodkin Arrow':'궁사 공격 2단계','Bracer':'궁사 공격 3단계',
+    'Forging':'근접 공격 1단계','Iron Casting':'근접 공격 2단계','Blast Furnace':'근접 공격 3단계',
+    'Scale Barding Armor':'기병 방어 1단계','Chain Barding Armor':'기병 방어 2단계',
+    'Plate Barding Armor':'기병 방어 3단계','Bloodlines':'혈통','Husbandry':'사육술','Ballistics':'탄도학',
+    'Feudal Age':'봉건 시대','Castle Age':'성주 시대','Imperial Age':'왕정 시대'
+  };
+  const label = value => names[value] || value;
+  const ageList = ['봉건','성주','왕정'];
+  const quantities = counts => Object.entries(counts||{}).filter(([,v])=>v>0).map(([k,v])=>`${label(k)} ${number(v)}`).join(' · ') || '지시 없음';
+  function compareTable(rows, other) {
+    return `<div class="table-scroll"><table class="timeline comparison"><thead><tr><th scope="col">항목</th><th scope="col">나 (${esc(report.profile?.name||'ssapo')})</th><th scope="col">상대 (${esc(other?.name||'정보 없음')}${other?.civilization?' · '+esc(other.civilization):''})</th></tr></thead><tbody>${rows.map(([title,left,right])=>`<tr><th scope="row">${esc(title)}</th><td>${esc(left)}</td><td>${esc(right)}</td></tr>`).join('')}</tbody></table></div>`;
+  }
+  function renderExpandedComparison(mine, theirs, other) {
+    if(!mine.age_checkpoints && !theirs.age_checkpoints)return '';
+    let html='<h3 class="detail-heading">시대업 클릭 당시 기록</h3><p class="detail-note">아래 주민 수량은 <strong>누적 생산 지시량</strong>이며 실제 일꾼 수가 아님. 실제 주민 수는 현재 데이터로 복원할 수 없어 표시하지 않음.</p>';
+    for(const age of ageList){
+      const left=mine.age_checkpoints?.[age],right=theirs.age_checkpoints?.[age];
+      if(!left&&!right)continue;
+      const requests=p=>p&&Number.isFinite(p.command_seconds)&&!p.unknown_unit_request_amounts?.includes('Villager')?number(p.unit_requests_before_click?.Villager??0):'—';
+      const recent=p=>p&&Number.isFinite(p.command_seconds)?quantities(p.unit_requests_previous_120s):'—';
+      const prior=p=>p&&Number.isFinite(p.command_seconds)?quantities(Object.fromEntries(Object.entries(p.unit_requests_before_click||{}).filter(([k])=>k!=='Villager'))):'—';
+      html+=`<h4 class="checkpoint-title">${age}</h4>`+compareTable([
+        ['첫 시대업 클릭',fmtTime(left?.command_seconds),fmtTime(right?.command_seconds)],
+        ['실제 시대 도달',fmtTime(left?.reached_seconds),fmtTime(right?.reached_seconds)],
+        ['주민 생산 지시량 (누적)',requests(left),requests(right)],
+        ['다른 유닛 생산 지시량 (누적)',prior(left),prior(right)],
+        ['클릭 전 2분 생산 지시량',recent(left),recent(right)]
+      ],other);
+    }
+    html+='<p class="detail-note">시작 주민 제외. 생산 대기·취소·실패·사망·전향 미반영. 시대 도달은 시스템 알림 기준. 클릭은 최초 지시이므로 취소·재지시 시 실제 연구 시작과 다를 수 있음.</p>';
+    if(mine.recording_restored||theirs.recording_restored)html+='<p class="detail-note">재개된 리플: 누적량은 기록 시작 이후 명령만 포함.</p>';
+    const sections=[
+      ['유닛별 생산 지시','unit_orders',v=>`${fmtTime(v.first_seconds)} 첫 지시 · 수량 ${number(v.requested_amount)} · ${v.commands}회${v.negative_amount?' · 음수 수량 '+number(v.negative_amount):''}${v.unknown_amount_commands?' · 일부 수량 판독 불가':''}`],
+      ['경제·군사 업그레이드 지시','research_orders',v=>`${fmtTime(v.first_seconds)} · ${v.commands}회`],
+      ['건물별 건설 지시','building_orders',v=>`${fmtTime(v.first_seconds)} 첫 지시 · ${v.commands}회`]
+    ];
+    for(const [title,key,format] of sections){
+      const keys=[...new Set([...Object.keys(mine[key]||{}),...Object.keys(theirs[key]||{})])]
+        .filter(k=>key!=='research_orders'||!['Feudal Age','Castle Age','Imperial Age'].includes(k))
+        .sort((x,y)=>Math.min(mine[key]?.[x]?.first_seconds??Infinity,theirs[key]?.[x]?.first_seconds??Infinity)-Math.min(mine[key]?.[y]?.first_seconds??Infinity,theirs[key]?.[y]?.first_seconds??Infinity));
+      if(!keys.length)continue;
+      html+=`<details><summary>${title} (${keys.length}종)</summary>`+compareTable(keys.map(k=>[label(k),mine[key]?.[k]?format(mine[key][k]):'—',theirs[key]?.[k]?format(theirs[key][k]):'—']),other)+'</details>';
+    }
+    return html+'<p class="detail-note">수량은 생산 명령의 양수 수량 합. 횟수는 반복·실패 지시도 포함. 실제 보유 병력·완공 건물·업그레이드 완료 수와 다름. —는 명령 미확인으로, 문명 무료 기술이나 기본 제공 여부까지 판단하지 않음.</p>';
+  }
+  function renderTimelines(mine, theirs, other) {
+    const types={QUEUE:'생산 지시',BUILD:'건설 지시',RESEARCH:'연구 지시'};
+    return [[mine,'나'],[theirs,`상대 (${other?.name||'정보 없음'})`]].map(([metrics,who])=>{
+      const events=metrics.full_timeline||metrics.timeline||[];
+      if(!events.length)return '';
+      const legacy=!metrics.full_timeline?' · 기존 분석 최대 100개':'';
+      return `<details><summary>${esc(who)} 명령 타임라인 (${events.length}개${legacy})</summary><div class="timeline-window" tabindex="0" aria-label="${esc(who)} 명령 기록"><table class="timeline"><thead><tr><th scope="col">게임 시간</th><th scope="col">명령</th><th scope="col">종류</th></tr></thead><tbody>${events.map(e=>`<tr><td>${fmtTime(e.seconds)}</td><td>${esc(label(e.label))}${Number.isFinite(e.amount)?' × '+number(e.amount):''}</td><td class="type">${esc(types[e.kind]||e.kind)}</td></tr>`).join('')}</tbody></table></div></details>`;
+    }).join('');
+  }
   function toast(message) { $('#toast').textContent=message; $('#toast').hidden=false; clearTimeout(toastTimer); toastTimer=setTimeout(()=>$('#toast').hidden=true,4000); }
   function render() {
     const matches = Array.isArray(report.matches) ? report.matches : [];
@@ -57,19 +123,22 @@
     const add=(positive,title,evidence,meaning)=>signals.push({positive,title,evidence,meaning});
     const ages=['봉건','성주','왕정'];
     for(const age of ages){
-      const left=mine.age_commands?.[age],right=theirs.age_commands?.[age];
+      const hasArrival=Number.isFinite(mine.age_checkpoints?.[age]?.reached_seconds)&&Number.isFinite(theirs.age_checkpoints?.[age]?.reached_seconds);
+      const left=hasArrival?mine.age_checkpoints[age].reached_seconds:mine.age_commands?.[age],right=hasArrival?theirs.age_checkpoints[age].reached_seconds:theirs.age_commands?.[age];
       if(!Number.isFinite(left)||!Number.isFinite(right)||Math.abs(right-left)<10)continue;
       const lead=right-left;
-      add(lead>0,`${age} 전환 명령 ${Math.round(Math.abs(lead))}초 ${lead>0?'앞섬':'늦음'}`,
+      add(lead>0,`${age} ${hasArrival?'도달':'전환 명령'} ${Math.round(Math.abs(lead))}초 ${lead>0?'앞섬':'늦음'}`,
         `나 ${fmtTime(left)} · 상대 ${fmtTime(right)}`,
-        lead>0?'상대보다 전환을 먼저 지시. 실제 시대 도달과 병력 투입도 빨랐는지 확인.':'상대가 전환을 먼저 지시. 앞선 시점을 상대가 활용했는지 확인.');
+        hasArrival?(lead>0?'시스템 알림에서 시대 도달이 빨랐음. 그 뒤 병력 생산·기술 활용·실제 교전을 확인.':'상대가 새 시대에 먼저 도달. 그 시간 동안의 병력 생산·업그레이드·교전을 확인.'):(lead>0?'상대보다 전환을 먼저 지시. 실제 시대 도달과 병력 투입도 빨랐는지 확인.':'상대가 전환을 먼저 지시. 앞선 시점을 상대가 활용했는지 확인.'));
     }
-    const f1=mine.age_commands?.['봉건'],f2=theirs.age_commands?.['봉건'];
-    const c1=mine.age_commands?.['성주'],c2=theirs.age_commands?.['성주'];
+    const compareArrivals=['봉건','성주'].every(age=>[mine,theirs].every(p=>Number.isFinite(p.age_checkpoints?.[age]?.reached_seconds)));
+    const comparisonTime=(p,age)=>compareArrivals?p.age_checkpoints[age].reached_seconds:p.age_commands?.[age];
+    const f1=comparisonTime(mine,'봉건'),f2=comparisonTime(theirs,'봉건');
+    const c1=comparisonTime(mine,'성주'),c2=comparisonTime(theirs,'성주');
     if([f1,f2,c1,c2].every(Number.isFinite)&&f1>f2+10&&c1<c2){
-      add(true,'봉건 전환 열세를 성주 전환에서 역전',
+      add(true,`봉건 ${compareArrivals?'도달':'전환 명령'} 열세를 성주에서 역전`,
         `봉건 ${Math.round(f1-f2)}초 뒤 → 성주 ${Math.round(c2-c1)}초 앞`,
-        '봉건 이후 상대보다 빠르게 성주 전환을 준비한 기록. 상대의 병력·경제 투자 차이와 함께 복기.');
+        `${compareArrivals?'시대 도달 알림':'전환 명령'} 기준. 상대의 병력·경제 투자 차이와 함께 복기.`);
     }
     const combatTechs={'Scale Barding Armor':'기병 방어 1단계','Chain Barding Armor':'기병 방어 2단계','Plate Barding Armor':'기병 방어 3단계','Fletching':'궁사 공격 1단계','Bodkin Arrow':'궁사 공격 2단계','Bracer':'궁사 공격 3단계','Forging':'근접 공격 1단계','Iron Casting':'근접 공격 2단계','Blast Furnace':'근접 공격 3단계','Bloodlines':'혈통','Ballistics':'탄도학'};
     const upgrades=[];
@@ -97,7 +166,7 @@
       html+=bad.length?bad.slice(0,4).map(card).join(''):'<p class="detail-note">비교할 명령 차이 부족. 패인 미확정.</p>';
       if(good.length)html+='<h4 style="font-size:13px;margin:18px 0 8px">내가 앞선 기록</h4>'+good.slice(0,2).map(card).join('');
     }
-    return html+'<p class="detail-note">위 항목은 명령 시점에 근거한 복기 후보. 실제 연구 완료·교전 결과·주민 피해·실제 자원 상태는 재현하지 않으므로, 상대의 실수나 승패 원인으로 확정할 수 없음. eAPM과 농장 건설 명령 수 차이는 승리 원인으로 사용하지 않음.</p>';
+    return html+'<p class="detail-note">시대 도달 알림과 명령 시점을 비교한 복기 후보. 교전 결과·주민 피해·실제 자원 상태는 재현하지 않으므로 상대의 실수나 승패 원인으로 확정할 수 없음. eAPM과 농장 건설 명령 수 차이는 승리 원인으로 사용하지 않음.</p>';
   }
   function openMatch(id) {
     const m = (report.matches||[]).find(m=>m.id===id); if(!m)return;
@@ -107,7 +176,7 @@
     if(!a) {
       content+=`<article class="insight"><h3>상세 분석 없음</h3><p>${esc(m.analysis_note||'리플 미확보 또는 분석 대기.')}</p></article>`;
     } else {
-      content+=`<div class="review-stats"><article><small>게임 시간</small><strong>${fmtTime(a.duration_game_seconds)}</strong></article><article><small>파서 eAPM</small><strong>${number(a.metrics?.eapm)}</strong></article><article><small>분석 범위</small><strong style="font-size:15px">명령 기록</strong></article></div>`;
+      content+=`<div class="review-stats"><article><small>게임 시간</small><strong>${fmtTime(a.duration_game_seconds)}</strong></article><article><small>파서 eAPM</small><strong>${number(a.metrics?.eapm)}</strong></article><article><small>분석 범위</small><strong style="font-size:15px">명령·시대 알림</strong></article></div>`;
       content+=renderReview(m);
       const other=a.opponents?.length===1?a.opponents[0]:null;
       const mine=a.metrics||{}, theirs=other?.metrics||{};
@@ -126,7 +195,8 @@
         ...(hasBerryWindow?[['열매 작업 전환 (추정)',berryTime(mine),berryTime(theirs)]]:[]),
       ];
       content+=`<h3 style="font-size:14px;margin:25px 0 8px">상대 비교</h3><table class="timeline"><thead><tr><th scope="col">항목</th><th scope="col">나 (${esc(report.profile?.name||'ssapo')})</th><th scope="col">상대 (${esc(other?.name||'정보 없음')})</th></tr></thead><tbody>${rows.map(([label,left,right])=>`<tr><th scope="row">${esc(label)}</th><td>${esc(left)}</td><td>${esc(right)}</td></tr>`).join('')}</tbody></table><p class="detail-note">시간은 게임 내 명령 시점. 농장 건설 명령에는 재지시·취소가 포함될 수 있으며, 실제 유지 농장 수가 아님. —는 기록 미확인. 직접 조작한 가축 수는 가축을 선택해 이동·대상·경유 지시한 개체 ID를 중복 제거한 누적 수. 발견·현재 보유·본진 도착·섭취 완료 수와 다르며, 빼앗긴 가축은 양측에 포함될 수 있음. 자동 채집이나 생략된 선택은 모두 복원하지 않음. 열매 시각은 같은 군락으로 지시받은 주민들의 후속 작업 지시가 모인 구간. 괄호는 전환 지시 인원/확인된 열매 작업자 수. 실제 고갈·채집 종료 시각이 아니며, 중간의 자동 작업·이동은 누락될 수 있음.</p>`;
-      content+='<details><summary>초반 명령 타임라인 보기 (최대 100개)</summary><table class="timeline"><thead><tr><th>게임 시간</th><th>명령</th><th>종류</th></tr></thead><tbody>'+(a.metrics?.timeline||[]).map(e=>`<tr><td>${fmtTime(e.seconds)}</td><td>${esc(e.label)}</td><td class="type">${esc(e.kind)}</td></tr>`).join('')+'</tbody></table></details>';
+      content+=renderExpandedComparison(mine,theirs,other);
+      content+=renderTimelines(mine,theirs,other);
       content+=(a.limitations||[]).map(t=>`<p class="detail-note">${esc(t)}</p>`).join('');
 
     }

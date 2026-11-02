@@ -89,5 +89,26 @@ class CollectorTests(unittest.TestCase):
                 collect.main()
             self.assertEqual(json.loads(path.read_text())['profile']['id'],1234)
 
+    def test_upgrade_failure_keeps_success_and_has_bounded_retries(self):
+        old={'analysis':{'analysis_revision':4,'metrics':{'preserved':True}},'analysis_status':'complete'}
+        row=dict(old)
+        with patch.object(collect,'fetch',side_effect=OSError('expired replay')):
+            self.assertTrue(collect.upgrade_analysis(row,old,{'id':123},1))
+        self.assertEqual(row['analysis'],old['analysis'])
+        self.assertEqual(row['analysis_status'],'complete')
+        row['analysis_upgrade']['attempts']=3
+        with patch.object(collect,'fetch') as remote:
+            self.assertFalse(collect.upgrade_analysis(row,row,{'id':123},1))
+            remote.assert_not_called()
+
+    def test_upgrade_success_replaces_analysis_and_clears_retry_state(self):
+        old={'analysis':{'analysis_revision':4},'analysis_status':'complete'}
+        row=dict(old)
+        newer={'analysis_revision':collect.ANALYSIS_REVISION,'metrics':{'age_checkpoints':{}}}
+        with patch.object(collect,'fetch',return_value=b'replay'),patch.object(collect,'analyze_replay',return_value=newer):
+            self.assertTrue(collect.upgrade_analysis(row,old,{'id':123},1))
+        self.assertEqual(row['analysis'],newer)
+        self.assertNotIn('analysis_upgrade',row)
+
 
 if __name__=='__main__': unittest.main()

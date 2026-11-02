@@ -20,6 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MAX_DOWNLOAD = 64 * 1024 * 1024
 MAX_REPLAY = 256 * 1024 * 1024
 AGE_IDS = {101: '봉건', 102: '성주', 103: '왕정'}
+ANALYSIS_REVISION = 5
 
 
 def now():
@@ -107,7 +108,7 @@ def command_metrics(match, target):
     for action in match.actions:
         if action.player is None or action.player.number != target.number:
             continue
-        at = seconds(action.timestamp)
+        at = seconds(action.timestamp) + (seconds(match.restored_at) if getattr(match, 'restored_at', None) else 0)
         kind = action.type.name
         payload = action.payload
         label = None
@@ -249,16 +250,19 @@ def analyze_replay(raw, own_id):
     if own is None:
         raise ValueError('리플에서 본인 프로필을 확인할 수 없습니다.')
     own_metrics = command_metrics(match, own)
+    from details import detailed_metrics
+    own_metrics.update(detailed_metrics(match, own))
     own_metrics['food_evidence'] = food.get(own.number)
     own_metrics['berry_switches'] = berry.get(own.number)
-    opponents = [{'name': p.name, 'civilization': p.civilization, 'metrics': dict(command_metrics(match, p), food_evidence=food.get(p.number), berry_switches=berry.get(p.number))}
+    opponents = [{'name': p.name, 'civilization': p.civilization, 'metrics': dict(command_metrics(match, p), **detailed_metrics(match, p), food_evidence=food.get(p.number), berry_switches=berry.get(p.number))}
                  for p in match.players if p.number != own.number and p not in (own.team or [])]
     return {
-        'parser': 'mgz', 'analysis_revision': 4, 'duration_game_seconds': seconds(match.duration),
+        'parser': 'mgz', 'analysis_revision': ANALYSIS_REVISION, 'duration_game_seconds': seconds(match.duration + match.restored_at),
         'civilization': own.civilization, 'map': match.map.name,
         'metrics': own_metrics, 'opponents': opponents,
         'insights': coaching(own_metrics, opponents, len(match.players)),
-        'limitations': ['생산·건설·연구 명령은 실제 완료와 다를 수 있습니다. 취소·파괴·자원 부족은 재현하지 않습니다.',
+        'limitations': ['생산 지시량은 양수 amount의 합. 생산 완료·생존 수가 아니며 취소·자원 부족·인구 제한을 반영하지 않습니다. 건설·연구 명령도 실제 완료와 다를 수 있습니다.',
+                        '시대 도달 시각은 시스템 알림이 있는 경우에만 표시합니다. 생산 지시량으로 실제 주민 수를 추정하지 않습니다.',
                         'TC 유휴시간, 실시간 보유 자원, 교전 손실, 승패의 인과관계는 이 버전에서 계산하지 않습니다.'],
     }
 
@@ -283,6 +287,24 @@ def metadata(match, own_id, aliases):
         'analysis_status': 'pending', 'analysis': None, 'attempts': 0,
         'source_url': f'https://www.aoe2insights.com/match/{int(match["id"])}/',
     }
+
+
+def upgrade_analysis(row, existing, match, own_id):
+    """Retry an outdated successful analysis without discarding it on failure."""
+    state = existing.get('analysis_upgrade', {})
+    attempts = state.get('attempts', 0) if state.get('revision') == ANALYSIS_REVISION else 0
+    if attempts >= 3:
+        return False
+    row['analysis_upgrade'] = {'revision': ANALYSIS_REVISION, 'attempts': attempts + 1}
+    for url in replay_urls(match, own_id):
+        try:
+            analysis = analyze_replay(fetch(url), own_id)
+        except Exception:
+            continue
+        row['analysis'] = analysis
+        row.pop('analysis_upgrade', None)
+        break
+    return True
 
 
 def main():
@@ -331,7 +353,10 @@ def main():
         existing = old.get(row['id'], {})
         if existing.get('analysis_status') == 'complete':
             # Keep analysis, but refresh finalized outcome and rating.
-            row.update({k: existing[k] for k in ('analysis', 'analysis_status', 'attempts') if k in existing})
+            row.update({k: existing[k] for k in ('analysis', 'analysis_status', 'attempts', 'analysis_upgrade') if k in existing})
+            if budget and (existing.get('analysis') or {}).get('analysis_revision', 0) < ANALYSIS_REVISION:
+                if upgrade_analysis(row, existing, match, own_id):
+                    budget -= 1
         elif budget and existing.get('attempts', 0) < 3:
             budget -= 1
             row['attempts'] = existing.get('attempts', 0) + 1
