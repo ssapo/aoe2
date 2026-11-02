@@ -60,8 +60,19 @@
     } else {
       content+=`<div class="review-stats"><article><small>게임 시간</small><strong>${fmtTime(a.duration_game_seconds)}</strong></article><article><small>파서 eAPM</small><strong>${number(a.metrics?.eapm)}</strong></article><article><small>분석 범위</small><strong style="font-size:15px">명령 기록</strong></article></div>`;
       content+=(a.insights||[]).filter(i=>i.kind!=='practice').map(i=>`<article class="insight ${['strength','practice','review'].includes(i.kind)?i.kind:'review'}"><h3>${esc(i.title)}</h3><p>${esc(i.evidence)}</p><p class="action">→ ${esc(i.action)}</p><small>${esc(i.confidence)}</small></article>`).join('');
-      const ages=Object.entries(a.metrics?.age_commands||{});
-      if(ages.length) content+=`<h3 style="font-size:14px;margin:25px 0 8px">시대 전환 명령</h3><p class="detail-note">전환 명령 시점. 시대 도달 시점과 다름.</p><div class="review-stats">${ages.map(([k,v])=>`<article><small>${esc(k)} 명령</small><strong>${fmtTime(v)}</strong></article>`).join('')}</div>`;
+      const other=a.opponents?.length===1?a.opponents[0]:null;
+      const mine=a.metrics||{}, theirs=other?.metrics||{};
+      const rows=[
+        ['eAPM',number(mine.eapm),number(theirs.eapm)],
+        ...['봉건','성주','왕정'].map(age=>[`${age} 전환 명령`,fmtTime(mine.age_commands?.[age]),fmtTime(theirs.age_commands?.[age])]),
+        ['첫 농장 건설 명령',fmtTime(mine.first_build_commands?.Farm),fmtTime(theirs.first_build_commands?.Farm)],
+        ['농장 건설 명령 수',number(mine.command_counts?.Farm),number(theirs.command_counts?.Farm)],
+        ['실제 유지 농장 수','미측정','미측정'],
+        ['양·가축 채집 식량','미측정','미측정'],
+        ['사냥감 채집 식량','미측정','미측정'],
+        ['열매 채집 식량','미측정','미측정'],
+      ];
+      content+=`<h3 style="font-size:14px;margin:25px 0 8px">상대 비교</h3><table class="timeline"><thead><tr><th scope="col">항목</th><th scope="col">나 (${esc(report.profile?.name||'ssapo')})</th><th scope="col">상대 (${esc(other?.name||'정보 없음')})</th></tr></thead><tbody>${rows.map(([label,left,right])=>`<tr><th scope="row">${esc(label)}</th><td>${esc(left)}</td><td>${esc(right)}</td></tr>`).join('')}</tbody></table><p class="detail-note">시간은 게임 내 명령 시점. 농장 건설 명령에는 재지시·취소가 포함될 수 있으며, 실제 유지 농장 수가 아님. —는 기록 미확인. 실제 채집량과 유지 농장 수는 현재 파서로 측정하지 않음.</p>`;
       content+='<details><summary>초반 명령 타임라인 보기 (최대 100개)</summary><table class="timeline"><thead><tr><th>게임 시간</th><th>명령</th><th>종류</th></tr></thead><tbody>'+(a.metrics?.timeline||[]).map(e=>`<tr><td>${fmtTime(e.seconds)}</td><td>${esc(e.label)}</td><td class="type">${esc(e.kind)}</td></tr>`).join('')+'</tbody></table></details>';
       content+=(a.limitations||[]).map(t=>`<p class="detail-note">${esc(t)}</p>`).join('');
 
