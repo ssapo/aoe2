@@ -37,7 +37,7 @@ def summarize(metrics, duration):
     unknown = {e['label'] for e in timeline if e['kind'] in {'QUEUE', 'DE_QUEUE', 'MULTIQUEUE'} and (not isinstance(e.get('amount'), int) or isinstance(e.get('amount'), bool))}
     unknown_military = any(k not in CIVILIAN for k in unknown) or any(e['label'].startswith('Unit ') for e in queue)
     first = min(military, key=lambda e: e['seconds']) if military else None
-    opening, opening_label = OPENINGS.get(first['label'], ('unit:'+first['label'], first['label'])) if first else ('none', '군사 생산 지시 없음')
+    opening, opening_label = OPENINGS.get(first['label'], ('unit:'+first['label'], first['label'])) if first else ('none', '병력 생산 요청 없음')
     restored = bool(metrics.get('recording_restored'))
     record_start = min((e['seconds'] for e in timeline),default=0) if restored else 0
     if restored:opening_label='재개 기록 · '+opening_label
@@ -101,52 +101,52 @@ def findings(mine, theirs, my_metrics, their_metrics):
         if a is None or b is None or abs(a-b) < 20:
             continue
         delta = int(a)-int(b)
-        add('review' if delta > 0 else 'advantage', STAGES[i], f'{age} 도달 {abs(delta)}초 {"뒤" if delta > 0 else "앞"}',
-            f'나 {clock(a)} · 상대 {clock(b)}. 시스템 시대 도달 알림 기준.',
-            '다음 판은 같은 오프닝의 시대업 클릭 전 구간부터 복기. 주민 예약·베틀·경제 업그레이드 순서와 군사 투자를 함께 확인.' if delta > 0 else '새 시대에 먼저 도달한 구간에서 첫 병력·관련 업그레이드 지시가 이어졌는지 확인.',1 if i == 0 else 2)
+        add('review' if delta > 0 else 'advantage', STAGES[i], f'{age} {abs(delta)}초 {"늦음" if delta > 0 else "빠름"}',
+            f'나 {clock(a)} · 상대 {clock(b)}.',
+            '시대업을 누르기 전 2분을 먼저 돌려보세요. 주민 생산이 끊겼는지, 베틀이나 건물 순서가 달랐는지 살펴보면 좋아요.' if delta > 0 else '시대를 먼저 올린 뒤 병력과 업그레이드도 바로 준비했는지 살펴보세요.',1 if i == 0 else 2)
     first,other = mine.get('first_military_seconds'), theirs.get('first_military_seconds')
     if first is not None and other is not None and abs(first-other) >= 20:
         gap = int(first)-int(other)
-        evidence = f'첫 군사 생산 지시 나 {clock(first)} · 상대 {clock(other)}.'
-        action = '서로 다른 병종·빌드의 첫 생산 시각을 빠르기만으로 평가하지 말고 당시 투자 방향을 함께 확인.'
+        evidence = f'첫 병력 생산 요청 · 나 {clock(first)} · 상대 {clock(other)}.'
+        action = '첫 병종이나 빌드가 다르면 준비 시간도 달라져요. 어떤 병력을 먼저 준비했는지 함께 보세요.'
         phase,priority = phase_at(my_metrics,first),2
         a,b = mine.get('after_feudal_first_military_seconds'), theirs.get('after_feudal_first_military_seconds')
         if mine['opening'] == theirs['opening'] and mine['opening'] in {'scouts','archers','skirmishers','spears','eagles'} and a is not None and b is not None and (reached(my_metrics,'성주') is None or first<reached(my_metrics,'성주')) and (reached(their_metrics,'성주') is None or other<reached(their_metrics,'성주')):
             prep = round(a-b)
-            evidence += f' 봉건 도달 후에는 나 {round(a)}초 · 상대 {round(b)}초로 준비 시간 차이 {abs(prep)}초.'
+            evidence += f' 봉건이 된 뒤 첫 요청까지 나 {round(a)}초 · 상대 {round(b)}초로 {abs(prep)}초 차이예요.'
             if gap > 0 and abs(prep) < abs(gap)/2:
-                action = '첫 병력 지시 지연의 대부분은 봉건 도달 차이. 마구간 조작보다 암흑 빌드·시대업 클릭 전 구간을 먼저 확인.'
+                action = '봉건이 늦었던 영향이 커 보여요. 생산 건물 조작보다 봉건을 누르기 전 빌드를 먼저 살펴보세요.'
                 phase,priority = '암흑',1
             elif prep > 20:
-                action = '봉건 도달 뒤 군사 건물 건설 지시와 첫 생산 예약 사이를 복기. 다음 판은 이 준비 구간을 줄이는 것을 목표로 연습.'
+                action = '봉건이 된 뒤 첫 병력을 요청하기까지 시간이 걸렸어요. 군사 건물을 언제 짓고 생산을 눌렀는지 돌려보세요.'
                 priority=1
-        add('review' if gap > 0 else 'advantage',phase,f'첫 군사 생산 지시 {abs(gap)}초 {"뒤" if gap > 0 else "앞"}',evidence,action,priority)
+        add('review' if gap > 0 else 'advantage',phase,f'첫 병력 요청 {abs(gap)}초 {"늦음" if gap > 0 else "빠름"}',evidence,action,priority)
     for gap in sorted(mine.get('villager_command_gaps',[]), key=lambda g:g['seconds'], reverse=True):
         if not gap['review_candidate'] or gap['seconds'] < 90:
             continue
-        add('review',gap['stage'],'주민 생산 예약을 다시 확인할 구간',
-            f'{clock(gap["start"])}–{clock(gap["end"])} · 주민 생산 지시 사이 {round(gap["seconds"])}초. TC 실제 유휴시간과는 다름.',
-            '이 구간의 생산 대기열·인구 제한·교전 집중 여부를 확인. 예약이 실제 비었다면 TC 선택 → 주민 예약을 병력 조작 사이에 넣는 연습.',2)
+        add('review',gap['stage'],'주민 생산을 다시 볼 구간',
+            f'{clock(gap["start"])}–{clock(gap["end"])} · 주민 생산 요청이 {round(gap["seconds"])}초 동안 없었어요. TC가 그만큼 쉬었다는 뜻은 아니에요.',
+            '당시 생산 대기열과 인구 제한을 확인해 보세요. 대기열이 비어 있었다면 병력을 움직인 뒤 TC에서 주민을 예약하는 습관을 들여보세요.',2)
         break
     if mine.get('opening') == theirs.get('opening'):
         a = next((p['villager_requests'] for p in mine.get('checkpoints',[]) if p['seconds']==900),None)
         b = next((p['villager_requests'] for p in theirs.get('checkpoints',[]) if p['seconds']==900),None)
         if a is not None and b is not None and abs(a-b)>=5:
-            add('investment',phase_at(my_metrics,900),'15분까지 주민 생산 지시량 차이',f'나 {a} · 상대 {b} · {abs(a-b)}명분 차이. 생존·실제 생산 주민 수가 아님.',
-                '주민 예약을 줄이고 병력에 투자한 것인지, 취소·실패가 많았는지 확인. 경제 우위나 실수로 단정하지 않음.',3)
+            add('investment',phase_at(my_metrics,900),'15분까지 주민 생산 요청 비교',f'나 {a} · 상대 {b} · {abs(a-b)} 차이.',
+                '주민 대신 병력을 준비한 건지, 생산 요청이 취소됐거나 실행되지 않은 건지 살펴보세요.',3)
     castle_mine=next((p for p in mine.get('phases',[]) if p['stage']=='성주'),None)
     castle_other=next((p for p in theirs.get('phases',[]) if p['stage']=='성주'),None)
     a=castle_mine.get('military_requests') if castle_mine else None
     b=castle_other.get('military_requests') if castle_other else None
     if a is not None and b is not None and abs(a-b)>=10:
-        add('investment','성주','성주 구간 군사 생산 지시량 차이',
-            f'나 {a} ({clock(castle_mine["start"])}–{clock(castle_mine["end"])}) · 상대 {b} ({clock(castle_other["start"])}–{clock(castle_other["end"])}). 각자의 시대 도달 이후 집계이며 구간 길이는 다를 수 있음.',
-            '해당 구간에서 생산을 지시한 병종과 실제 전장 투입을 대조. 승패 복기 후보이지만 실제 보유 병력·사상자·교환비나 승리 원인으로 확정하지 않음.',3)
+        add('investment','성주','성주 때 병력 생산 요청 비교',
+            f'나 {a} ({clock(castle_mine["start"])}–{clock(castle_mine["end"])}) · 상대 {b} ({clock(castle_other["start"])}–{clock(castle_other["end"])}). 각자 성주가 된 뒤의 기록이라 집계 구간은 달라요.',
+            '요청한 병력이 언제 전장에 도착했는지 돌려보세요. 많이 요청한 것과 교전에서 잘 싸운 것은 따로 봐야 해요.',3)
     else:
         a,b=mine.get('military_requests'),theirs.get('military_requests')
         if a is not None and b is not None and abs(a-b)>=10:
-            add('investment','전체','전체 군사 생산 지시량 차이',f'나 {a} · 상대 {b} · {abs(a-b)}명분 차이. 현재 병력·사상자·교환비와 다름.',
-                '생산 지시가 많았던 병종과 실제로 전장에 투입한 시점을 함께 확인. 물량 투자 차이를 교전 효율로 해석하지 않음.',3)
+            add('investment','전체','병력 생산 요청 비교',f'나 {a} · 상대 {b} · {abs(a-b)} 차이.',
+                '어떤 병력을 많이 요청했고 언제 싸움에 투입했는지 살펴보세요.',3)
     upgrades=[]
     for tech, label in TECHS.items():
         a=my_metrics.get('first_research_commands',{}).get(tech)
@@ -154,9 +154,9 @@ def findings(mine, theirs, my_metrics, their_metrics):
         if a is not None and b is not None and abs(a-b)>=60:
             upgrades.append((abs(a-b),a-b,label,a,b))
     for _,delta,label,a,b in sorted(upgrades,reverse=True)[:2]:
-        add('review' if delta>0 else 'advantage',phase_at(my_metrics,a),f'{label} 지시 {round(abs(delta))}초 {"뒤" if delta>0 else "앞"}',
-            f'나 {clock(a)} · 상대 {clock(b)}. 최초 연구 지시이며 완료 시각은 아님.',
-            '이 기술이 필요한 병력을 실제로 사용한 구간과 대조. 지시 격차가 있던 시점에 교전했는지 확인.',2)
+        add('review' if delta>0 else 'advantage',phase_at(my_metrics,a),f'{label} 요청 {round(abs(delta))}초 {"늦음" if delta>0 else "빠름"}',
+            f'나 {clock(a)} · 상대 {clock(b)}. 연구를 누른 시각이에요.',
+            '이 업그레이드가 필요한 병력으로 언제 싸웠는지 보세요. 연구가 끝나기 전에 교전했는지도 확인해 보세요.',2)
     return sorted(result,key=lambda f:f['priority'])
 
 
@@ -191,7 +191,7 @@ def enrich_report(report):
         earlier=earlier[:10]
         descriptors=[('봉건 도달',reached(mine,'봉건'),lambda data,s:reached(data.get('metrics',{}),'봉건')),
                      ('성주 도달',reached(mine,'성주'),lambda data,s:reached(data.get('metrics',{}),'성주')),
-                     ('첫 군사 생산 지시',a['first_military_seconds'],lambda data,s:s['first_military_seconds'])]
+                     ('첫 병력 생산 요청',a['first_military_seconds'],lambda data,s:s['first_military_seconds'])]
         if not a.get('restored'):
             for label,value,get in descriptors:
                 values=[get(data,s) for data,s in earlier if get(data,s) is not None]
@@ -203,9 +203,9 @@ def enrich_report(report):
         own_feudal,other_feudal=reached(mine,'봉건'),reached(theirs,'봉건')
         if own_feudal is not None and other_feudal is not None and own_feudal-other_feudal>=20:
             target=max(0,own_feudal-20)
-            practice={'title':'다음 판 연습 · 봉건 도달 20초 단축','current_seconds':own_feudal,'target_seconds':target,
-                      'evidence':f'이번 {clock(own_feudal)} → 연습 목표 {clock(target)}. 보편적인 정답 시간이 아닌 개인 연습 목표.',
-                      'action':'같은 맵·문명·빌드로 초반을 3회 연습. 주민 예약·베틀·군사 건설 순서를 적고, 봉건 클릭 직전 2분부터 확인.'}
+            practice={'title':'다음 판은 봉건 20초 빠르게','current_seconds':own_feudal,'target_seconds':target,
+                      'evidence':f'이번 {clock(own_feudal)} → 연습 목표 {clock(target)}. 이번 기록에서 20초 줄여보는 연습 목표예요.',
+                      'action':'같은 맵과 빌드로 초반만 세 번 연습해 보세요. 주민 생산, 베틀, 건물 순서를 적어두면 어디서 늦어지는지 찾기 쉬워요.'}
         analysis['review']={'revision':1,'own':a,'opponent':b,'own_findings':own_findings,
                             'opponent_findings':findings(b,a,theirs,mine),'personal_benchmarks':benchmarks,'practice':practice,
                             'benchmark_basis':'same_map_civilization_first_military_order_prior_up_to_10_matches_min_3',

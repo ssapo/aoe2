@@ -157,3 +157,17 @@ body.review-open{overflow:hidden}
 .practice-card{margin:0 0 14px}.practice-card>summary{color:#3b4e63;font-size:12px}.practice-card>summary span{display:block;margin-left:15px;font-size:11px;margin-top:3px}
 #panel-numbers .comparison td,#panel-numbers .comparison th{padding:8px 7px}
 @media(max-width:600px){#panel-numbers .comparison td,#panel-numbers .comparison th{padding:7px 5px}.practice-card{padding:10px 11px}.practice-card>summary strong{font-size:12px}}
+
+/* Readability polish; keep the review layout and comparison structure. */
+.review-body .compact-note,.review-body .cell-meta{color:#596652}
+.signal-card h4{font-size:14px;line-height:1.55;color:#253e2d}
+.signal-card>p{font-size:12px;line-height:1.7;color:#53604c}
+.signal-card details p{color:#405539}
+.finding-stage{color:#5b6b51}
+.opening-pair span{background:none;border:0;padding:2px 0;color:#53644d}
+.data-caution{background:#edf0e8;border-color:#dfe5d8;color:#4c5c43}
+.review-body .comparison{background:#fff}
+.review-body .comparison tbody tr:nth-child(even){background:#f6f8f2}
+.review-body .comparison td{font-weight:500}
+.review-body .comparison tbody th{color:#475b40}
+@media(max-width:600px){.signal-card h4{font-size:13px}.signal-card>p{font-size:12px}.review-body .comparison td,.review-body .comparison tbody th{font-size:12px}.finding-stage{font-size:10px}}

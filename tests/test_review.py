@@ -34,10 +34,10 @@ class ReviewTests(unittest.TestCase):
         m=metrics([event(686,'Scout Cavalry')],feudal=603)
         o=metrics([event(607,'Scout Cavalry')],feudal=532)
         f=findings(summarize(m,1600),summarize(o,1600),m,o)
-        first=next(x for x in f if x['title'].startswith('첫 군사'))
-        self.assertIn('준비 시간 차이 8초',first['evidence'])
+        first=next(x for x in f if x['title'].startswith('첫 병력'))
+        self.assertIn('8초 차이예요',first['evidence'])
         self.assertEqual(first['stage'],'암흑')
-        self.assertIn('봉건 도달 차이',first['action'])
+        self.assertIn('봉건이 늦었던 영향',first['action'])
 
     def test_age_research_gap_is_not_reported_as_tc_idle(self):
         m=metrics([event(450,'Villager'),event(650,'Villager'),event(800,'Villager'),event(1000,'Villager')])
