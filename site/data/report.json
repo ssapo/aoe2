@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-02T18:38:03.806896+00:00",
-  "last_checked_at": "2026-11-02T18:38:03.498680+00:00",
+  "updated_at": "2026-11-02T22:45:01.713600+00:00",
+  "last_checked_at": "2026-11-02T22:44:50.982232+00:00",
   "sync_error": null,
   "profile": {
     "id": 26260702,
@@ -35,7 +35,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 5,
+        "analysis_revision": 6,
         "duration_game_seconds": 2043.06,
         "civilization": "Franks",
         "map": "Arabian Desert",
@@ -605,6 +605,10 @@
             }
           ],
           "eapm": 48,
+          "market": {
+            "events": [],
+            "basis": "recorded_requests_resource_units"
+          },
           "age_checkpoints": {
             "봉건": {
               "command_seconds": 471.28,
@@ -617,6 +621,7 @@
               "research_commands_before_click": {
                 "Loom": 293.71
               },
+              "market_previous_120s": [],
               "villagers_alive": null,
               "unknown_unit_request_amounts": [],
               "reached_seconds": 603.4
@@ -636,6 +641,7 @@
                 "Double-Bit Axe": 613.2,
                 "Wheelbarrow": 1026.93
               },
+              "market_previous_120s": [],
               "villagers_alive": null,
               "unknown_unit_request_amounts": [],
               "reached_seconds": 1340.88
@@ -2888,6 +2894,71 @@
                 }
               ],
               "eapm": 30,
+              "market": {
+                "events": [
+                  {
+                    "seconds": 1062.57,
+                    "kind": "SELL",
+                    "label": "돌",
+                    "amount": 500
+                  },
+                  {
+                    "seconds": 1066.45,
+                    "kind": "BUY",
+                    "label": "식량",
+                    "amount": 100
+                  },
+                  {
+                    "seconds": 1066.68,
+                    "kind": "BUY",
+                    "label": "식량",
+                    "amount": 100
+                  },
+                  {
+                    "seconds": 1107.91,
+                    "kind": "SELL",
+                    "label": "식량",
+                    "amount": 100
+                  },
+                  {
+                    "seconds": 1309.06,
+                    "kind": "BUY",
+                    "label": "돌",
+                    "amount": 100
+                  },
+                  {
+                    "seconds": 1501.22,
+                    "kind": "BUY",
+                    "label": "목재",
+                    "amount": 100
+                  },
+                  {
+                    "seconds": 1590.06,
+                    "kind": "BUY",
+                    "label": "돌",
+                    "amount": 100
+                  },
+                  {
+                    "seconds": 1648.46,
+                    "kind": "BUY",
+                    "label": "목재",
+                    "amount": 100
+                  },
+                  {
+                    "seconds": 1742.15,
+                    "kind": "BUY",
+                    "label": "식량",
+                    "amount": 100
+                  },
+                  {
+                    "seconds": 1742.35,
+                    "kind": "BUY",
+                    "label": "식량",
+                    "amount": 100
+                  }
+                ],
+                "basis": "recorded_requests_resource_units"
+              },
               "age_checkpoints": {
                 "봉건": {
                   "command_seconds": 402.08,
@@ -2900,6 +2971,7 @@
                   "research_commands_before_click": {
                     "Loom": 320.27
                   },
+                  "market_previous_120s": [],
                   "villagers_alive": null,
                   "unknown_unit_request_amounts": [],
                   "reached_seconds": 531.98
@@ -2920,6 +2992,32 @@
                     "Town Watch": 586.18,
                     "Wheelbarrow": 1054.91
                   },
+                  "market_previous_120s": [
+                    {
+                      "seconds": 1062.57,
+                      "kind": "SELL",
+                      "label": "돌",
+                      "amount": 500
+                    },
+                    {
+                      "seconds": 1066.45,
+                      "kind": "BUY",
+                      "label": "식량",
+                      "amount": 100
+                    },
+                    {
+                      "seconds": 1066.68,
+                      "kind": "BUY",
+                      "label": "식량",
+                      "amount": 100
+                    },
+                    {
+                      "seconds": 1107.91,
+                      "kind": "SELL",
+                      "label": "식량",
+                      "amount": 100
+                    }
+                  ],
                   "villagers_alive": null,
                   "unknown_unit_request_amounts": [],
                   "reached_seconds": 1289.91
@@ -3583,6 +3681,24 @@
                   "amount": 1
                 },
                 {
+                  "seconds": 1062.57,
+                  "kind": "SELL",
+                  "label": "돌",
+                  "amount": 500
+                },
+                {
+                  "seconds": 1066.45,
+                  "kind": "BUY",
+                  "label": "식량",
+                  "amount": 100
+                },
+                {
+                  "seconds": 1066.68,
+                  "kind": "BUY",
+                  "label": "식량",
+                  "amount": 100
+                },
+                {
                   "seconds": 1089.37,
                   "kind": "QUEUE",
                   "label": "Spearman",
@@ -3597,6 +3713,12 @@
                   "seconds": 1098.01,
                   "kind": "BUILD",
                   "label": "House"
+                },
+                {
+                  "seconds": 1107.91,
+                  "kind": "SELL",
+                  "label": "식량",
+                  "amount": 100
                 },
                 {
                   "seconds": 1110.57,
@@ -3695,6 +3817,12 @@
                   "kind": "QUEUE",
                   "label": "Knight",
                   "amount": 1
+                },
+                {
+                  "seconds": 1309.06,
+                  "kind": "BUY",
+                  "label": "돌",
+                  "amount": 100
                 },
                 {
                   "seconds": 1314.43,
@@ -3835,6 +3963,12 @@
                   "amount": 1
                 },
                 {
+                  "seconds": 1501.22,
+                  "kind": "BUY",
+                  "label": "목재",
+                  "amount": 100
+                },
+                {
                   "seconds": 1503.67,
                   "kind": "BUILD",
                   "label": "Farm"
@@ -3878,6 +4012,12 @@
                   "kind": "QUEUE",
                   "label": "Villager",
                   "amount": 3
+                },
+                {
+                  "seconds": 1590.06,
+                  "kind": "BUY",
+                  "label": "돌",
+                  "amount": 100
                 },
                 {
                   "seconds": 1598.77,
@@ -3944,6 +4084,12 @@
                   "label": "House"
                 },
                 {
+                  "seconds": 1648.46,
+                  "kind": "BUY",
+                  "label": "목재",
+                  "amount": 100
+                },
+                {
                   "seconds": 1649.7,
                   "kind": "BUILD",
                   "label": "Farm"
@@ -3987,6 +4133,18 @@
                   "kind": "QUEUE",
                   "label": "Knight",
                   "amount": 2
+                },
+                {
+                  "seconds": 1742.15,
+                  "kind": "BUY",
+                  "label": "식량",
+                  "amount": 100
+                },
+                {
+                  "seconds": 1742.35,
+                  "kind": "BUY",
+                  "label": "식량",
+                  "amount": 100
                 },
                 {
                   "seconds": 1744.4,
@@ -4699,6 +4857,14 @@
               "priority": 2
             },
             {
+              "kind": "investment",
+              "stage": "봉건",
+              "title": "성주 누르기 전 시장 이용",
+              "evidence": "16:30–18:30 · 돌 500 판매 · 식량 200 구매 · 식량 100 판매 요청.",
+              "action": "부족한 자원을 시장에서 채웠는지 볼 구간이에요. 거래가 시대업을 앞당겼는지, 이후 병력이나 TC에 쓸 자원이 부족해졌는지 함께 살펴보세요.",
+              "priority": 2
+            },
+            {
               "kind": "review",
               "stage": "봉건",
               "title": "이중날 도끼 요청 603초 늦음",
@@ -4775,7 +4941,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 5,
+        "analysis_revision": 6,
         "duration_game_seconds": 1577.79,
         "civilization": "Franks",
         "map": "Arabia",
@@ -5340,6 +5506,10 @@
             }
           ],
           "eapm": 38,
+          "market": {
+            "events": [],
+            "basis": "recorded_requests_resource_units"
+          },
           "age_checkpoints": {
             "봉건": {
               "command_seconds": 496.56,
@@ -5352,6 +5522,7 @@
               "research_commands_before_click": {
                 "Loom": 426.28
               },
+              "market_previous_120s": [],
               "villagers_alive": null,
               "unknown_unit_request_amounts": [],
               "reached_seconds": 642.42
@@ -5375,6 +5546,7 @@
                 "Stone Mining": 1011.89,
                 "Gold Mining": 1013.71
               },
+              "market_previous_120s": [],
               "villagers_alive": null,
               "unknown_unit_request_amounts": [],
               "reached_seconds": 1283.36
@@ -7006,6 +7178,10 @@
                 }
               ],
               "eapm": 25,
+              "market": {
+                "events": [],
+                "basis": "recorded_requests_resource_units"
+              },
               "age_checkpoints": {
                 "봉건": {
                   "command_seconds": 462.64,
@@ -7018,6 +7194,7 @@
                   "research_commands_before_click": {
                     "Loom": 416.32
                   },
+                  "market_previous_120s": [],
                   "villagers_alive": null,
                   "unknown_unit_request_amounts": [],
                   "reached_seconds": 592.34
@@ -7038,6 +7215,7 @@
                     "Horse Collar": 731.78,
                     "Bloodlines": 779.71
                   },
+                  "market_previous_120s": [],
                   "villagers_alive": null,
                   "unknown_unit_request_amounts": [],
                   "reached_seconds": 1308.69
@@ -8489,7 +8667,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 5,
+        "analysis_revision": 6,
         "duration_game_seconds": 2113.68,
         "civilization": "Franks",
         "map": "Arabia",
@@ -9061,6 +9239,10 @@
             }
           ],
           "eapm": 44,
+          "market": {
+            "events": [],
+            "basis": "recorded_requests_resource_units"
+          },
           "age_checkpoints": {
             "봉건": {
               "command_seconds": 446.97,
@@ -9073,6 +9255,7 @@
               "research_commands_before_click": {
                 "Loom": 390.91
               },
+              "market_previous_120s": [],
               "villagers_alive": null,
               "unknown_unit_request_amounts": [],
               "reached_seconds": 576.95
@@ -9095,6 +9278,7 @@
                 "Wheelbarrow": 963.72,
                 "Gold Mining": 1091.69
               },
+              "market_previous_120s": [],
               "villagers_alive": null,
               "unknown_unit_request_amounts": [],
               "reached_seconds": 1371.34
@@ -11439,6 +11623,29 @@
                 }
               ],
               "eapm": 27,
+              "market": {
+                "events": [
+                  {
+                    "seconds": 1160.76,
+                    "kind": "BUY",
+                    "label": "목재",
+                    "amount": 100
+                  },
+                  {
+                    "seconds": 1302.94,
+                    "kind": "BUY",
+                    "label": "목재",
+                    "amount": 100
+                  },
+                  {
+                    "seconds": 1444.52,
+                    "kind": "BUY",
+                    "label": "돌",
+                    "amount": 100
+                  }
+                ],
+                "basis": "recorded_requests_resource_units"
+              },
               "age_checkpoints": {
                 "봉건": {
                   "command_seconds": 508.31,
@@ -11451,6 +11658,7 @@
                   "research_commands_before_click": {
                     "Loom": 426.26
                   },
+                  "market_previous_120s": [],
                   "villagers_alive": null,
                   "unknown_unit_request_amounts": [],
                   "reached_seconds": 640.18
@@ -11467,6 +11675,7 @@
                     "Man-at-Arms": 679.95,
                     "Scale Mail Armor": 719.97
                   },
+                  "market_previous_120s": [],
                   "villagers_alive": null,
                   "unknown_unit_request_amounts": [],
                   "reached_seconds": 1238.26
@@ -12088,6 +12297,12 @@
                   "label": "House"
                 },
                 {
+                  "seconds": 1160.76,
+                  "kind": "BUY",
+                  "label": "목재",
+                  "amount": 100
+                },
+                {
                   "seconds": 1168.67,
                   "kind": "BUILD",
                   "label": "Lumber Camp"
@@ -12130,6 +12345,12 @@
                   "kind": "QUEUE",
                   "label": "Villager",
                   "amount": 1
+                },
+                {
+                  "seconds": 1302.94,
+                  "kind": "BUY",
+                  "label": "목재",
+                  "amount": 100
                 },
                 {
                   "seconds": 1317.97,
@@ -12204,6 +12425,12 @@
                   "kind": "QUEUE",
                   "label": "Villager",
                   "amount": 1
+                },
+                {
+                  "seconds": 1444.52,
+                  "kind": "BUY",
+                  "label": "돌",
+                  "amount": 100
                 },
                 {
                   "seconds": 1458.74,
@@ -13080,7 +13307,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 5,
+        "analysis_revision": 6,
         "duration_game_seconds": 2218.78,
         "civilization": "Franks",
         "map": "Arabia",
@@ -13656,6 +13883,10 @@
             }
           ],
           "eapm": 37,
+          "market": {
+            "events": [],
+            "basis": "recorded_requests_resource_units"
+          },
           "age_checkpoints": {
             "봉건": {
               "command_seconds": 450.19,
@@ -13668,6 +13899,7 @@
               "research_commands_before_click": {
                 "Loom": 364.35
               },
+              "market_previous_120s": [],
               "villagers_alive": null,
               "unknown_unit_request_amounts": [],
               "reached_seconds": 580.18
@@ -13689,6 +13921,7 @@
                 "Double-Bit Axe": 637.85,
                 "Gold Mining": 960.89
               },
+              "market_previous_120s": [],
               "villagers_alive": null,
               "unknown_unit_request_amounts": [],
               "reached_seconds": 1256.55
@@ -16064,6 +16297,10 @@
                 }
               ],
               "eapm": 35,
+              "market": {
+                "events": [],
+                "basis": "recorded_requests_resource_units"
+              },
               "age_checkpoints": {
                 "봉건": {
                   "command_seconds": 522.85,
@@ -16074,6 +16311,7 @@
                   "research_commands_before_click": {
                     "Loom": 8.66
                   },
+                  "market_previous_120s": [],
                   "villagers_alive": null,
                   "unknown_unit_request_amounts": [],
                   "reached_seconds": 652.83
@@ -16090,6 +16328,7 @@
                     "Double-Bit Axe": 659.16,
                     "Horse Collar": 835.17
                   },
+                  "market_previous_120s": [],
                   "villagers_alive": null,
                   "unknown_unit_request_amounts": [],
                   "reached_seconds": 1275.11
@@ -16114,6 +16353,7 @@
                     "Heavy Plow": 1302.31,
                     "Gold Shaft Mining": 1510.86
                   },
+                  "market_previous_120s": [],
                   "villagers_alive": null,
                   "unknown_unit_request_amounts": [],
                   "reached_seconds": 1947.8
@@ -18154,7 +18394,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 5,
+        "analysis_revision": 6,
         "duration_game_seconds": 2759.36,
         "civilization": "Franks",
         "map": "Arabia",
@@ -18733,6 +18973,10 @@
             }
           ],
           "eapm": 44,
+          "market": {
+            "events": [],
+            "basis": "recorded_requests_resource_units"
+          },
           "age_checkpoints": {
             "봉건": {
               "command_seconds": 491.07,
@@ -18745,6 +18989,7 @@
               "research_commands_before_click": {
                 "Loom": 471.17
               },
+              "market_previous_120s": [],
               "villagers_alive": null,
               "unknown_unit_request_amounts": [],
               "reached_seconds": 626.78
@@ -18765,6 +19010,7 @@
                 "Double-Bit Axe": 627.57,
                 "Wheelbarrow": 634.07
               },
+              "market_previous_120s": [],
               "villagers_alive": null,
               "unknown_unit_request_amounts": [],
               "reached_seconds": 1318.13
@@ -22082,6 +22328,10 @@
                 }
               ],
               "eapm": 33,
+              "market": {
+                "events": [],
+                "basis": "recorded_requests_resource_units"
+              },
               "age_checkpoints": {
                 "봉건": {
                   "command_seconds": 535.77,
@@ -22094,6 +22344,7 @@
                   "research_commands_before_click": {
                     "Loom": 180.91
                   },
+                  "market_previous_120s": [],
                   "villagers_alive": null,
                   "unknown_unit_request_amounts": [],
                   "reached_seconds": 665.75
@@ -22116,6 +22367,7 @@
                     "Padded Archer Armor": 868.28,
                     "Wheelbarrow": 887.57
                   },
+                  "market_previous_120s": [],
                   "villagers_alive": null,
                   "unknown_unit_request_amounts": [],
                   "reached_seconds": 1302.29
