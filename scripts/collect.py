@@ -171,7 +171,7 @@ FOOD_NAMES = {
 
 
 def food_order_evidence(raw, match):
-    """Positive evidence only: raw explicit ORDER by a known starting villager.
+    """Explicit livestock-control and starting-villager target commands only.
 
     Do not use model.actions object_ids: upstream Inputs caches missing selections
     across players. Do not infer actors from an omitted/reused selection, count
@@ -185,6 +185,9 @@ def food_order_evidence(raw, match):
     workers = {p.number: {o.instance_id for o in p.objects if o.name == 'Villager'} for p in match.players}
     result = {p.number: {group: {'observed_targets': 0, 'first_seconds': None, 'species': [], 'evidence': 'explicit_starting_villager_order'} for group in FOOD_NAMES} for p in match.players}
     targets = {p.number: {group: {} for group in FOOD_NAMES} for p in match.players}
+    controls = {p.number: {} for p in match.players}
+    for p in match.players:
+        result[p.number]['livestock_control'] = {'observed_targets': 0, 'first_seconds': None, 'species': [], 'evidence': 'explicit_livestock_control_order'}
     handle = io.BytesIO(raw)
     parse(handle)
     fast.meta(handle)
@@ -199,7 +202,17 @@ def food_order_evidence(raw, match):
         elif kind is fast.Operation.ACTION:
             action, payload = value
             player_id = payload.get('player_id')
-            if action is not fast.Action.ORDER or player_id not in workers:
+            if player_id not in workers:
+                continue
+            if action in (fast.Action.MOVE, fast.Action.ORDER, fast.Action.ADD_WAYPOINT):
+                for iid in set(payload.get('object_ids') or []):
+                    obj = objects.get(iid)
+                    if obj and obj.name in FOOD_NAMES['livestock']:
+                        controls[player_id].setdefault(iid, obj.name)
+                        row = result[player_id]['livestock_control']
+                        if row['first_seconds'] is None:
+                            row['first_seconds'] = round(timestamp / 1000 + match.restored_at.total_seconds(), 2)
+            if action is not fast.Action.ORDER:
                 continue
             # Explicit source IDs only; no guess about compressed selections.
             if not workers[player_id].intersection(payload.get('object_ids') or []):
@@ -219,6 +232,9 @@ def food_order_evidence(raw, match):
         for group, seen in groups.items():
             result[player_id][group]['observed_targets'] = len(seen)
             result[player_id][group]['species'] = sorted(set(seen.values()))
+    for player_id, seen in controls.items():
+        result[player_id]['livestock_control']['observed_targets'] = len(seen)
+        result[player_id]['livestock_control']['species'] = sorted(set(seen.values()))
     return result
 
 
@@ -235,7 +251,7 @@ def analyze_replay(raw, own_id):
     opponents = [{'name': p.name, 'civilization': p.civilization, 'metrics': dict(command_metrics(match, p), food_evidence=food.get(p.number))}
                  for p in match.players if p.number != own.number and p not in (own.team or [])]
     return {
-        'parser': 'mgz', 'analysis_revision': 2, 'duration_game_seconds': seconds(match.duration),
+        'parser': 'mgz', 'analysis_revision': 3, 'duration_game_seconds': seconds(match.duration),
         'civilization': own.civilization, 'map': match.map.name,
         'metrics': own_metrics, 'opponents': opponents,
         'insights': coaching(own_metrics, opponents, len(match.players)),
