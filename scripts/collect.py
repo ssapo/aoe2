@@ -163,17 +163,79 @@ def coaching(own, opponents, players_count):
     return cards[:3]
 
 
+FOOD_NAMES = {
+    'livestock': {'Sheep', 'Goat', 'Turkey', 'Llama', 'Cow', 'Water Buffalo', 'Pig', 'Goose', 'Yak'},
+    'hunt': {'Wild Boar', 'Boar', 'Javelina', 'Deer', 'Gazelle', 'Zebra', 'Ostrich', 'Ibex', 'Elephant', 'Rhinoceros', 'Wild Bactrian Camel'},
+    'berries': {'Forage Bush', 'Fruit Bush', 'Berry Bush'},
+}
+
+
+def food_order_evidence(raw, match):
+    """Positive evidence only: raw explicit ORDER by a known starting villager.
+
+    Do not use model.actions object_ids: upstream Inputs caches missing selections
+    across players. Do not infer actors from an omitted/reused selection, count
+    scout attacks, rally points, or claim kills/food collected.
+    """
+    from mgz import fast
+    from mgz.fast.header import parse
+    objects = {o.instance_id: o for o in match.gaia}
+    for player in match.players:
+        objects.update({o.instance_id: o for o in player.objects})
+    workers = {p.number: {o.instance_id for o in p.objects if o.name == 'Villager'} for p in match.players}
+    result = {p.number: {group: {'observed_targets': 0, 'first_seconds': None, 'species': [], 'evidence': 'explicit_starting_villager_order'} for group in FOOD_NAMES} for p in match.players}
+    targets = {p.number: {group: {} for group in FOOD_NAMES} for p in match.players}
+    handle = io.BytesIO(raw)
+    parse(handle)
+    fast.meta(handle)
+    timestamp = 0
+    while True:
+        try:
+            kind, value = fast.operation(handle)
+        except EOFError:
+            break
+        if kind is fast.Operation.SYNC:
+            timestamp += value[0]
+        elif kind is fast.Operation.ACTION:
+            action, payload = value
+            player_id = payload.get('player_id')
+            if action is not fast.Action.ORDER or player_id not in workers:
+                continue
+            # Explicit source IDs only; no guess about compressed selections.
+            if not workers[player_id].intersection(payload.get('object_ids') or []):
+                continue
+            obj = objects.get(payload.get('target_id'))
+            if obj is None:
+                continue
+            for group, names in FOOD_NAMES.items():
+                if obj.name not in names:
+                    continue
+                row = result[player_id][group]
+                targets[player_id][group].setdefault(obj.instance_id, obj.name)
+                if row['first_seconds'] is None:
+                    row['first_seconds'] = round(timestamp / 1000 + match.restored_at.total_seconds(), 2)
+                break
+    for player_id, groups in targets.items():
+        for group, seen in groups.items():
+            result[player_id][group]['observed_targets'] = len(seen)
+            result[player_id][group]['species'] = sorted(set(seen.values()))
+    return result
+
+
 def analyze_replay(raw, own_id):
     from mgz.model import parse_match
-    match = parse_match(io.BytesIO(decode_replay(raw)))
+    decoded = decode_replay(raw)
+    match = parse_match(io.BytesIO(decoded))
+    food = food_order_evidence(decoded, match)
     own = next((p for p in match.players if p.profile_id == own_id), None)
     if own is None:
         raise ValueError('리플에서 본인 프로필을 확인할 수 없습니다.')
     own_metrics = command_metrics(match, own)
-    opponents = [{'name': p.name, 'civilization': p.civilization, 'metrics': command_metrics(match, p)}
+    own_metrics['food_evidence'] = food.get(own.number)
+    opponents = [{'name': p.name, 'civilization': p.civilization, 'metrics': dict(command_metrics(match, p), food_evidence=food.get(p.number))}
                  for p in match.players if p.number != own.number and p not in (own.team or [])]
     return {
-        'parser': 'mgz', 'duration_game_seconds': seconds(match.duration),
+        'parser': 'mgz', 'analysis_revision': 2, 'duration_game_seconds': seconds(match.duration),
         'civilization': own.civilization, 'map': match.map.name,
         'metrics': own_metrics, 'opponents': opponents,
         'insights': coaching(own_metrics, opponents, len(match.players)),
