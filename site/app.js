@@ -32,47 +32,125 @@
   function compareTable(rows, other) {
     return `<div class="table-scroll"><table class="timeline comparison"><thead><tr><th scope="col">항목</th><th scope="col">나 (${esc(report.profile?.name||'ssapo')})</th><th scope="col">상대 (${esc(other?.name||'정보 없음')}${other?.civilization?' · '+esc(other.civilization):''})</th></tr></thead><tbody>${rows.map(([title,left,right])=>`<tr><th scope="row">${esc(title)}</th><td>${esc(left)}</td><td>${esc(right)}</td></tr>`).join('')}</tbody></table></div>`;
   }
-  function renderExpandedComparison(mine, theirs, other) {
-    if(!mine.age_checkpoints && !theirs.age_checkpoints)return '';
-    let html='<h3 class="detail-heading">시대업 클릭 당시 기록</h3><p class="detail-note">아래 주민 수량은 <strong>누적 생산 지시량</strong>이며 실제 일꾼 수가 아님. 실제 주민 수는 현재 데이터로 복원할 수 없어 표시하지 않음.</p>';
-    for(const age of ageList){
-      const left=mine.age_checkpoints?.[age],right=theirs.age_checkpoints?.[age];
-      if(!left&&!right)continue;
-      const requests=p=>p&&Number.isFinite(p.command_seconds)&&!p.unknown_unit_request_amounts?.includes('Villager')?number(p.unit_requests_before_click?.Villager??0):'—';
-      const recent=p=>p&&Number.isFinite(p.command_seconds)?quantities(p.unit_requests_previous_120s):'—';
-      const prior=p=>p&&Number.isFinite(p.command_seconds)?quantities(Object.fromEntries(Object.entries(p.unit_requests_before_click||{}).filter(([k])=>k!=='Villager'))):'—';
-      html+=`<h4 class="checkpoint-title">${age}</h4>`+compareTable([
-        ['첫 시대업 클릭',fmtTime(left?.command_seconds),fmtTime(right?.command_seconds)],
-        ['실제 시대 도달',fmtTime(left?.reached_seconds),fmtTime(right?.reached_seconds)],
-        ['주민 생산 지시량 (누적)',requests(left),requests(right)],
-        ['다른 유닛 생산 지시량 (누적)',prior(left),prior(right)],
-        ['클릭 전 2분 생산 지시량',recent(left),recent(right)]
-      ],other);
-    }
-    html+='<p class="detail-note">시작 주민 제외. 생산 대기·취소·실패·사망·전향 미반영. 시대 도달은 시스템 알림 기준. 클릭은 최초 지시이므로 취소·재지시 시 실제 연구 시작과 다를 수 있음.</p>';
-    if(mine.recording_restored||theirs.recording_restored)html+='<p class="detail-note">재개된 리플: 누적량은 기록 시작 이후 명령만 포함.</p>';
-    const sections=[
-      ['유닛별 생산 지시','unit_orders',v=>`${fmtTime(v.first_seconds)} 첫 지시 · 수량 ${number(v.requested_amount)} · ${v.commands}회${v.negative_amount?' · 음수 수량 '+number(v.negative_amount):''}${v.unknown_amount_commands?' · 일부 수량 판독 불가':''}`],
-      ['경제·군사 업그레이드 지시','research_orders',v=>`${fmtTime(v.first_seconds)} · ${v.commands}회`],
-      ['건물별 건설 지시','building_orders',v=>`${fmtTime(v.first_seconds)} 첫 지시 · ${v.commands}회`]
-    ];
-    for(const [title,key,format] of sections){
-      const keys=[...new Set([...Object.keys(mine[key]||{}),...Object.keys(theirs[key]||{})])]
-        .filter(k=>key!=='research_orders'||!['Feudal Age','Castle Age','Imperial Age'].includes(k))
-        .sort((x,y)=>Math.min(mine[key]?.[x]?.first_seconds??Infinity,theirs[key]?.[x]?.first_seconds??Infinity)-Math.min(mine[key]?.[y]?.first_seconds??Infinity,theirs[key]?.[y]?.first_seconds??Infinity));
-      if(!keys.length)continue;
-      html+=`<details><summary>${title} (${keys.length}종)</summary>`+compareTable(keys.map(k=>[label(k),mine[key]?.[k]?format(mine[key][k]):'—',theirs[key]?.[k]?format(theirs[key][k]):'—']),other)+'</details>';
-    }
-    return html+'<p class="detail-note">수량은 생산 명령의 양수 수량 합. 횟수는 반복·실패 지시도 포함. 실제 보유 병력·완공 건물·업그레이드 완료 수와 다름. —는 명령 미확인으로, 문명 무료 기술이나 기본 제공 여부까지 판단하지 않음.</p>';
+  const agesIn = (mine,theirs) => ageList.filter(age=>mine.age_checkpoints?.[age]||theirs.age_checkpoints?.[age]||Number.isFinite(mine.age_commands?.[age])||Number.isFinite(theirs.age_commands?.[age]));
+  const checkpoint = (metrics,age) => metrics.age_checkpoints?.[age] || {command_seconds:metrics.age_commands?.[age]};
+  function ageDifference(mine,theirs,age) {
+    const left=checkpoint(mine,age),right=checkpoint(theirs,age);
+    const reached=[left.reached_seconds,right.reached_seconds].every(Number.isFinite);
+    const a=reached?left.reached_seconds:left.command_seconds,b=reached?right.reached_seconds:right.command_seconds;
+    const delta=Number.isFinite(a)&&Number.isFinite(b)?Math.round(a-b):null;
+    return {a,b,reached,delta,text:delta===null?'비교 기록 부족':delta===0?'같은 시각':`${Math.abs(delta)}초 ${delta<0?'빠름':'늦음'}`};
   }
-  function renderTimelines(mine, theirs, other) {
-    const types={QUEUE:'생산 지시',BUILD:'건설 지시',RESEARCH:'연구 지시'};
-    return [[mine,'나'],[theirs,`상대 (${other?.name||'정보 없음'})`]].map(([metrics,who])=>{
-      const events=metrics.full_timeline||metrics.timeline||[];
-      if(!events.length)return '';
-      const legacy=!metrics.full_timeline?' · 기존 분석 최대 100개':'';
-      return `<details><summary>${esc(who)} 명령 타임라인 (${events.length}개${legacy})</summary><div class="timeline-window" tabindex="0" aria-label="${esc(who)} 명령 기록"><table class="timeline"><thead><tr><th scope="col">게임 시간</th><th scope="col">명령</th><th scope="col">종류</th></tr></thead><tbody>${events.map(e=>`<tr><td>${fmtTime(e.seconds)}</td><td>${esc(label(e.label))}${Number.isFinite(e.amount)?' × '+number(e.amount):''}</td><td class="type">${esc(types[e.kind]||e.kind)}</td></tr>`).join('')}</tbody></table></div></details>`;
-    }).join('');
+  function renderAgePanel(mine,theirs,other) {
+    const available=agesIn(mine,theirs);
+    if(!available.length)return '<p class="panel-empty">시대 전환 기록 없음</p>';
+    return `<div class="panel-toolbar"><div class="segments" role="group" aria-label="비교할 시대">${available.map((age,i)=>`<button data-age="${age}" aria-pressed="${i===0}">${age}</button>`).join('')}</div><span class="toolbar-note">나 / 상대 비교</span></div><p class="data-caution">주민 항목은 생산 <b>지시량</b>. 실제 일꾼 수가 아님.</p>`+available.map((age,i)=>{
+      const left=checkpoint(mine,age),right=checkpoint(theirs,age),diff=ageDifference(mine,theirs,age);
+      const requests=p=>Number.isFinite(p.command_seconds)&&p.unit_requests_before_click&&!p.unknown_unit_request_amounts?.includes('Villager')?number(p.unit_requests_before_click.Villager??0):'—';
+      const recent=p=>p.unit_requests_previous_120s?quantities(p.unit_requests_previous_120s):'—';
+      const prior=p=>p.unit_requests_before_click?quantities(Object.fromEntries(Object.entries(p.unit_requests_before_click).filter(([k])=>k!=='Villager'))):'—';
+      return `<section data-age-panel="${age}" ${i?'hidden':''}><div class="panel-title"><h3>${age} ${diff.reached?'도달':'클릭'}</h3><span class="difference ${diff.delta===null||diff.delta===0?'':diff.delta<0?'ahead':'behind'}">${esc(diff.text)}</span></div>`+compareTable([
+        ['첫 시대업 클릭',fmtTime(left.command_seconds),fmtTime(right.command_seconds)],
+        ['실제 시대 도달',fmtTime(left.reached_seconds),fmtTime(right.reached_seconds)],
+        ['주민 생산 지시량 · 누적',requests(left),requests(right)],
+        ['다른 유닛 지시량 · 누적',prior(left),prior(right)],
+        ['클릭 전 2분 생산 지시량',recent(left),recent(right)]
+      ],other)+'</section>';
+    }).join('')+'<details class="method-note"><summary>이 수치를 읽는 방법</summary><p>주민 지시량은 시작 주민을 제외한 양수 수량의 합. 대기·취소·실패·사망·전향을 반영하지 않음. 시대 도달은 시스템 알림으로 확인하며 첫 클릭은 실제 연구 시작과 다를 수 있음. —는 기록 미확인.</p>'+((mine.recording_restored||theirs.recording_restored)?'<p>재개된 리플의 누적량은 기록 시작 이후만 포함.</p>':'')+'</details>';
+  }
+  function renderProductionPanel() {
+    return `<div class="panel-toolbar"><div class="segments" role="group" aria-label="기록 종류"><button data-category="unit_orders" aria-pressed="true">유닛</button><button data-category="research_orders" aria-pressed="false">업그레이드</button><button data-category="building_orders" aria-pressed="false">건물</button></div></div><div class="search-row"><input id="production-search" type="search" aria-label="생산·연구 기록 검색" placeholder="이름 검색 · 한글 / 영문" autocomplete="off"><span id="production-count" class="toolbar-note" role="status"></span></div><div id="production-table"></div><p id="production-note" class="compact-note"></p>`;
+  }
+  function renderTimelinePanel() {
+    return `<div class="panel-toolbar"><div class="segments" role="group" aria-label="타임라인 선수"><button data-side="both" aria-pressed="true">양측</button><button data-side="mine" aria-pressed="false">나</button><button data-side="theirs" aria-pressed="false">상대</button></div><label class="select-label">명령<select id="timeline-kind"><option value="all">전체</option><option value="QUEUE">생산</option><option value="BUILD">건설</option><option value="RESEARCH">연구</option></select></label><label class="select-label">시간<select id="timeline-range"></select></label></div><div class="timeline-pagination"><span id="timeline-count" role="status"></span><div><button id="timeline-prev" aria-label="이전 명령 페이지">이전</button><span id="timeline-page"></span><button id="timeline-next" aria-label="다음 명령 페이지">다음</button></div></div><div id="timeline-table"></div><p class="compact-note">건설·생산·연구 지시 기록. 실제 완료 시각과 다를 수 있음.</p>`;
+  }
+  function renderBasics(mine,theirs,other) {
+    const controlled=p=>p.food_evidence?.livestock_control?`${number(p.food_evidence.livestock_control.observed_targets)}개체`:'—';
+    const berry=p=>(p.berry_switches?.windows||[]).map(w=>`${fmtTime(w.start_seconds)}${w.end_seconds>w.start_seconds?'–'+fmtTime(w.end_seconds):''} (${w.workers}/${w.observed_berry_workers}명)`).join('; ')||'단체 전환 근거 부족';
+    const hasBerry=(mine.berry_switches?.windows?.length||0)+(theirs.berry_switches?.windows?.length||0)>0;
+    const rows=[['eAPM',number(mine.eapm),number(theirs.eapm)],['첫 농장 건설 지시',fmtTime(mine.first_build_commands?.Farm),fmtTime(theirs.first_build_commands?.Farm)],['농장 건설 지시 횟수',number(mine.building_orders?.Farm?.commands??mine.command_counts?.Farm),number(theirs.building_orders?.Farm?.commands??theirs.command_counts?.Farm)],['직접 조작한 가축 · 누적',controlled(mine),controlled(theirs)],...(hasBerry?[['열매 작업 전환 · 추정',berry(mine),berry(theirs)]]:[])];
+    return `<details class="basic-comparison"><summary>경제·조작 기록 비교</summary>${compareTable(rows,other)}</details>`;
+  }
+  function renderMethods(analysis) {
+    return `<details class="method-note"><summary>분석 기준·제한</summary><p>시대 도달 알림과 명령의 시점을 비교한 복기 후보이며, 승패의 인과관계나 상대 실수를 확정하지 않음. eAPM·건설 지시 횟수를 승리 원인으로 사용하지 않음.</p><p>건설·생산·연구 지시에는 반복·취소·실패가 포함될 수 있음. 실제 보유 병력·완공 건물·유지 농장 수와 다름. 기록 미확인 기술은 문명 무료 제공일 수도 있음.</p><p>가축은 직접 이동·대상·경유 지시한 개체 ID의 누적 수. 발견·현재 보유·본진 도착·섭취 완료 수와 다름. 빼앗긴 가축은 양측에 포함될 수 있음.</p><p>열매는 같은 군락 작업자의 후속 지시가 모인 구간. 괄호는 전환 지시 인원/확인된 작업자 수. 실제 고갈·채집 종료 시각이 아니며 자동 작업은 누락될 수 있음.</p>${(analysis.limitations||[]).map(t=>`<p>${esc(t)}</p>`).join('')}</details>`;
+  }
+  function bindWorkspace(root,mine,theirs,other) {
+    const body=root.querySelector('.review-body');
+    const tabs=[...root.querySelectorAll('[role="tab"]')];
+    const activate=id=>{
+      tabs.forEach(t=>{const selected=t.dataset.panel===id;t.setAttribute('aria-selected',String(selected));t.tabIndex=selected?0:-1;});
+      root.querySelectorAll('[role="tabpanel"]').forEach(p=>p.hidden=p.id!==`panel-${id}`);
+      body.scrollTop=0;
+    };
+    tabs.forEach((tab,i)=>{
+      tab.addEventListener('click',()=>activate(tab.dataset.panel));
+      tab.addEventListener('keydown',e=>{
+        let next;
+        if(e.key==='ArrowRight')next=(i+1)%tabs.length;
+        else if(e.key==='ArrowLeft')next=(i+tabs.length-1)%tabs.length;
+        else if(e.key==='Home')next=0;
+        else if(e.key==='End')next=tabs.length-1;
+        if(next!==undefined){e.preventDefault();activate(tabs[next].dataset.panel);tabs[next].focus();}
+      });
+    });
+    root.querySelectorAll('[data-open-panel]').forEach(b=>b.addEventListener('click',()=>{
+      activate(b.dataset.openPanel);
+      if(b.dataset.openAge)root.querySelector(`[data-age="${b.dataset.openAge}"]`)?.click();
+      tabs.find(t=>t.dataset.panel===b.dataset.openPanel)?.focus();
+    }));
+    root.querySelectorAll('[data-age]').forEach(b=>b.addEventListener('click',()=>{
+      root.querySelectorAll('[data-age]').forEach(t=>t.setAttribute('aria-pressed',String(t===b)));
+      root.querySelectorAll('[data-age-panel]').forEach(p=>p.hidden=p.dataset.agePanel!==b.dataset.age);
+      body.scrollTop=0;
+    }));
+    let category='unit_orders';
+    const search=root.querySelector('#production-search');
+    const renderProduction=()=>{
+      const query=search.value.trim().toLocaleLowerCase();
+      const keys=[...new Set([...Object.keys(mine[category]||{}),...Object.keys(theirs[category]||{})])]
+        .filter(k=>(category!=='research_orders'||!['Feudal Age','Castle Age','Imperial Age'].includes(k))&&`${k} ${label(k)}`.toLocaleLowerCase().includes(query))
+        .sort((x,y)=>Math.min(mine[category]?.[x]?.first_seconds??Infinity,theirs[category]?.[x]?.first_seconds??Infinity)-Math.min(mine[category]?.[y]?.first_seconds??Infinity,theirs[category]?.[y]?.first_seconds??Infinity));
+      const cell=v=>{
+        if(!v)return '<span class="no-record">—</span>';
+        const value=category==='unit_orders'?`지시량 ${number(v.requested_amount)}`:category==='building_orders'?`${number(v.commands)}회`:fmtTime(v.first_seconds);
+        const meta=category==='research_orders'?`${number(v.commands)}회 지시`:`첫 지시 ${fmtTime(v.first_seconds)}${category==='unit_orders'?' · '+number(v.commands)+'회':''}`;
+        return `<strong class="cell-value">${value}</strong><small class="cell-meta">${meta}</small>${v.negative_amount?`<small class="cell-meta">음수 수량 ${number(v.negative_amount)}</small>`:''}${v.unknown_amount_commands?'<small class="cell-meta">일부 수량 판독 불가</small>':''}`;
+      };
+      root.querySelector('#production-count').textContent=`${keys.length}종`;
+      root.querySelector('#production-table').innerHTML=keys.length?`<table class="timeline comparison data-table"><thead><tr><th scope="col">항목</th><th scope="col">나</th><th scope="col">상대</th></tr></thead><tbody>${keys.map(k=>`<tr><th scope="row">${esc(label(k))}</th><td>${cell(mine[category]?.[k])}</td><td>${cell(theirs[category]?.[k])}</td></tr>`).join('')}</tbody></table>`:'<p class="panel-empty">'+(query?'검색 결과 없음':'분석된 기록 없음')+'</p>';
+      root.querySelector('#production-note').textContent=category==='unit_orders'?'수량은 양수 생산 지시량의 합. 실제 생산·생존 수가 아님.':category==='research_orders'?'최초 연구 지시 시각. 실제 완료와 다르며, —는 지시 미확인.':'반복·취소를 포함한 건설 지시 횟수. 실제 건물 수가 아님.';
+    };
+    root.querySelectorAll('[data-category]').forEach(b=>b.addEventListener('click',()=>{
+      category=b.dataset.category;search.value='';
+      root.querySelectorAll('[data-category]').forEach(t=>t.setAttribute('aria-pressed',String(t===b)));
+      renderProduction();body.scrollTop=0;
+    }));
+    search.addEventListener('input',renderProduction);
+    renderProduction();
+    const events=[...[mine,theirs].flatMap((metrics,side)=>(metrics.full_timeline||metrics.timeline||[]).map(e=>({...e,side:side?'theirs':'mine'})))].sort((a,b)=>a.seconds-b.seconds);
+    const range=root.querySelector('#timeline-range');
+    const intervals=[...new Set(events.map(e=>Math.floor(e.seconds/300)))];
+    range.innerHTML='<option value="all">전체 시간</option>'+intervals.map(i=>`<option value="${i}">${i*5}–${(i+1)*5}분</option>`).join('');
+    let side='both',page=0;
+    const kind=root.querySelector('#timeline-kind'),size=15;
+    const renderTimeline=()=>{
+      const filtered=events.filter(e=>(side==='both'||e.side===side)&&(kind.value==='all'||(e.kind===kind.value)||(kind.value==='QUEUE'&&['DE_QUEUE','MULTIQUEUE'].includes(e.kind)))&&(range.value==='all'||Math.floor(e.seconds/300)===Number(range.value)));
+      const pages=Math.max(1,Math.ceil(filtered.length/size));page=Math.min(page,pages-1);
+      root.querySelector('#timeline-count').textContent=`${number(filtered.length)}개 지시`;
+      root.querySelector('#timeline-page').textContent=`${page+1} / ${pages}`;
+      root.querySelector('#timeline-prev').disabled=page===0;
+      root.querySelector('#timeline-next').disabled=page>=pages-1;
+      const visible=filtered.slice(page*size,(page+1)*size),types={QUEUE:'생산',DE_QUEUE:'생산',MULTIQUEUE:'생산',BUILD:'건설',RESEARCH:'연구'};
+      root.querySelector('#timeline-table').innerHTML=visible.length?`<table class="timeline event-table"><thead><tr><th scope="col">시간</th><th scope="col">선수</th><th scope="col">명령</th></tr></thead><tbody>${visible.map(e=>`<tr><td>${fmtTime(e.seconds)}</td><td><span class="player-tag ${e.side}">${e.side==='mine'?'나':'상대'}</span></td><td>${esc(label(e.label))}${Number.isFinite(e.amount)?' × '+number(e.amount):''}<small class="cell-meta">${esc(types[e.kind]||e.kind)}</small></td></tr>`).join('')}</tbody></table>`:'<p class="panel-empty">이 조건의 명령 없음</p>';
+    };
+    root.querySelectorAll('[data-side]').forEach(b=>b.addEventListener('click',()=>{
+      side=b.dataset.side;page=0;
+      root.querySelectorAll('[data-side]').forEach(t=>t.setAttribute('aria-pressed',String(t===b)));renderTimeline();
+    }));
+    [range,kind].forEach(select=>select.addEventListener('change',()=>{page=0;renderTimeline();}));
+    root.querySelector('#timeline-prev').addEventListener('click',()=>{page--;renderTimeline();body.scrollTop=0;});
+    root.querySelector('#timeline-next').addEventListener('click',()=>{page++;renderTimeline();body.scrollTop=0;});
+    renderTimeline();
   }
   function toast(message) { $('#toast').textContent=message; $('#toast').hidden=false; clearTimeout(toastTimer); toastTimer=setTimeout(()=>$('#toast').hidden=true,4000); }
   function render() {
@@ -154,55 +232,42 @@
     return signals;
   }
   function renderReview(match) {
-    const signals=reviewSignals(match);
-    const good=signals.filter(s=>s.positive),bad=signals.filter(s=>!s.positive);
-    const card=s=>`<article class="insight ${s.positive?'strength':'review'}"><h3>${esc(s.title)}</h3><p>${esc(s.evidence)}</p><p class="action">${esc(s.meaning)}</p></article>`;
-    const title=match.result==='win'?'승리 요인 · 상대 실수 후보':match.result==='loss'?'패배 복기 · 상대 우위':'양측 복기';
-    let html=`<h3 style="font-size:15px;margin:20px 0 10px">${title}</h3>`;
-    if(match.result==='win'){
-      html+=good.length?good.slice(0,4).map(card).join(''):'<p class="detail-note">명령 기록에서 뚜렷한 우위 근거를 찾지 못함. 이겼다는 이유만으로 상대 실수를 추정하지 않음.</p>';
-      if(bad.length)html+='<h4 style="font-size:13px;margin:18px 0 8px">승리해도 개선할 점</h4>'+bad.slice(0,2).map(card).join('');
-    }else{
-      html+=bad.length?bad.slice(0,4).map(card).join(''):'<p class="detail-note">비교할 명령 차이 부족. 패인 미확정.</p>';
-      if(good.length)html+='<h4 style="font-size:13px;margin:18px 0 8px">내가 앞선 기록</h4>'+good.slice(0,2).map(card).join('');
-    }
-    return html+'<p class="detail-note">시대 도달 알림과 명령 시점을 비교한 복기 후보. 교전 결과·주민 피해·실제 자원 상태는 재현하지 않으므로 상대의 실수나 승패 원인으로 확정할 수 없음. eAPM과 농장 건설 명령 수 차이는 승리 원인으로 사용하지 않음.</p>';
+    const signals=reviewSignals(match),good=signals.filter(s=>s.positive),bad=signals.filter(s=>!s.positive);
+    const card=s=>`<article class="signal-card ${s.positive?'positive':'negative'}"><h4>${esc(s.title)}</h4><p>${esc(s.evidence)}</p><details><summary>복기 포인트</summary><p>${esc(s.meaning)}</p></details></article>`;
+    const group=(title,items)=>`<section class="signal-group"><h3>${title}<span>${items.length}</span></h3>${items.length?items.slice(0,2).map(card).join(''):'<p class="compact-note">뚜렷한 비교 근거 없음</p>'}${items.length>2?`<details class="more-signals"><summary>${items.length-2}개 더 보기</summary>${items.slice(2).map(card).join('')}</details>`:''}</section>`;
+    const left=match.result==='loss'?group('상대가 앞선 기록',bad):group('내가 앞선 기록',good);
+    const right=match.result==='loss'?group('내가 앞선 기록',good):group('개선할 기록',bad);
+    return `<div class="summary-label">${match.result==='win'?'승리 요인 · 상대 실수 후보':match.result==='loss'?'패배 복기 · 상대 우위':'양측 복기'}<small>승패의 원인으로 확정하지 않음</small></div><div class="signal-columns">${left}${right}</div>`;
   }
   function openMatch(id) {
-    const m = (report.matches||[]).find(m=>m.id===id); if(!m)return;
-    const a=m.analysis;
-    $('#match-subtitle').textContent=`경기 #${m.id}`;
-    let content=`<h2 class="review-title">${esc(m.map)} · ${esc(m.civilization)}</h2><div class="review-meta">${esc(date(m.started_at))} · ${m.result==='win'?'승리':m.result==='loss'?'패배':'결과 미확인'} · 레이팅 ${number(m.rating_before)} → ${number(m.rating_after)}</div>`;
-    if(!a) {
-      content+=`<article class="insight"><h3>상세 분석 없음</h3><p>${esc(m.analysis_note||'리플 미확보 또는 분석 대기.')}</p></article>`;
-    } else {
-      content+=`<div class="review-stats"><article><small>게임 시간</small><strong>${fmtTime(a.duration_game_seconds)}</strong></article><article><small>파서 eAPM</small><strong>${number(a.metrics?.eapm)}</strong></article><article><small>분석 범위</small><strong style="font-size:15px">명령·시대 알림</strong></article></div>`;
-      content+=renderReview(m);
-      const other=a.opponents?.length===1?a.opponents[0]:null;
-      const mine=a.metrics||{}, theirs=other?.metrics||{};
-      const controlled=metrics=>{
-        const e=metrics.food_evidence?.livestock_control;
-        return e?`${number(e.observed_targets)}개체 조작 확인`:'추가 분석 대기';
-      };
-      const berryTime=metrics=>(metrics.berry_switches?.windows||[]).map(w=>`${fmtTime(w.start_seconds)}${w.end_seconds>w.start_seconds?'–'+fmtTime(w.end_seconds):''} (${w.workers}/${w.observed_berry_workers}명)`).join('; ')||'단체 전환 근거 부족';
-      const hasBerryWindow=(mine.berry_switches?.windows?.length||0)+(theirs.berry_switches?.windows?.length||0)>0;
-      const rows=[
-        ['eAPM',number(mine.eapm),number(theirs.eapm)],
-        ...['봉건','성주','왕정'].map(age=>[`${age} 전환 명령`,fmtTime(mine.age_commands?.[age]),fmtTime(theirs.age_commands?.[age])]),
-        ['첫 농장 건설 명령',fmtTime(mine.first_build_commands?.Farm),fmtTime(theirs.first_build_commands?.Farm)],
-        ['농장 건설 명령 수',number(mine.command_counts?.Farm),number(theirs.command_counts?.Farm)],
-        ['직접 조작한 가축 수 (누적)',controlled(mine),controlled(theirs)],
-        ...(hasBerryWindow?[['열매 작업 전환 (추정)',berryTime(mine),berryTime(theirs)]]:[]),
-      ];
-      content+=`<h3 style="font-size:14px;margin:25px 0 8px">상대 비교</h3><table class="timeline"><thead><tr><th scope="col">항목</th><th scope="col">나 (${esc(report.profile?.name||'ssapo')})</th><th scope="col">상대 (${esc(other?.name||'정보 없음')})</th></tr></thead><tbody>${rows.map(([label,left,right])=>`<tr><th scope="row">${esc(label)}</th><td>${esc(left)}</td><td>${esc(right)}</td></tr>`).join('')}</tbody></table><p class="detail-note">시간은 게임 내 명령 시점. 농장 건설 명령에는 재지시·취소가 포함될 수 있으며, 실제 유지 농장 수가 아님. —는 기록 미확인. 직접 조작한 가축 수는 가축을 선택해 이동·대상·경유 지시한 개체 ID를 중복 제거한 누적 수. 발견·현재 보유·본진 도착·섭취 완료 수와 다르며, 빼앗긴 가축은 양측에 포함될 수 있음. 자동 채집이나 생략된 선택은 모두 복원하지 않음. 열매 시각은 같은 군락으로 지시받은 주민들의 후속 작업 지시가 모인 구간. 괄호는 전환 지시 인원/확인된 열매 작업자 수. 실제 고갈·채집 종료 시각이 아니며, 중간의 자동 작업·이동은 누락될 수 있음.</p>`;
-      content+=renderExpandedComparison(mine,theirs,other);
-      content+=renderTimelines(mine,theirs,other);
-      content+=(a.limitations||[]).map(t=>`<p class="detail-note">${esc(t)}</p>`).join('');
-
+    const m=(report.matches||[]).find(m=>m.id===id);if(!m)return;
+    const a=m.analysis,other=a?.opponents?.length===1?a.opponents[0]:null,mine=a?.metrics||{},theirs=other?.metrics||{};
+    const context=(report.matches||[]).filter(row=>filter==='all'||row.result===filter),index=context.findIndex(row=>row.id===id);
+    const newer=$('#match-newer'),older=$('#match-older');
+    newer.disabled=index<=0;older.disabled=index<0||index>=context.length-1;
+    newer.onclick=()=>{if(index>0)openMatch(context[index-1].id);};
+    older.onclick=()=>{if(index>=0&&index<context.length-1)openMatch(context[index+1].id);};
+    $('#match-subtitle').textContent=`경기 ${index>=0?index+1:''} / ${context.length} · #${m.id}`;
+    const result=m.result==='win'?'승리':m.result==='loss'?'패배':'결과 미확인';
+    const opponent=other?.name||(m.players||[]).filter(p=>!p.is_self).map(p=>p.name).join(', ')||'상대 정보 없음';
+    const header=`<header class="review-header"><div class="review-heading-row"><span class="outcome ${m.result==='loss'?'loss':''}">${result}</span><h2 id="review-title">${esc(m.map)} · ${esc(m.civilization)}</h2></div><p class="review-opponent">vs ${esc(opponent)}${other?.civilization?' · '+esc(other.civilization):''}</p><div class="review-meta"><span>${esc(date(m.started_at))}${a?' · '+fmtTime(a.duration_game_seconds):''}</span><span class="review-rating">${number(m.rating_before)} → ${number(m.rating_after)}</span></div></header>`;
+    const links=`<footer class="review-footer"><a href="https://aoe.ms/replay/?gameId=${Number(m.id)}&amp;profileId=26260702" target="_blank" rel="noopener noreferrer">리플 다운로드 ↗</a><a href="https://www.aoe2insights.com/match/${Number(m.id)}/" target="_blank" rel="noopener noreferrer">AoE2 Insights ↗</a></footer>`;
+    let workspace;
+    if(!a){
+      workspace=header+`<div class="review-body"><p class="panel-empty">${esc(m.analysis_note||'리플 미확보 또는 분석 대기.')}</p></div>`+links;
+    }else{
+      const highlights=agesIn(mine,theirs).map(age=>{
+        const d=ageDifference(mine,theirs,age);
+        return `<button class="highlight ${d.delta===null||d.delta===0?'':d.delta<0?'ahead':'behind'}" data-open-panel="ages" data-open-age="${age}"><span>${age} ${d.reached?'도달':'클릭'}</span><strong>${esc(d.text)}</strong><small>나 ${fmtTime(d.a)} · 상대 ${fmtTime(d.b)}</small></button>`;
+      }).join('');
+      const tabs=[['summary','요약'],['ages','시대업'],['production','생산·연구'],['timeline','타임라인']];
+      workspace=header+`<nav class="review-tabs" role="tablist" aria-label="경기 분석 항목">${tabs.map(([id,title],i)=>`<button role="tab" id="tab-${id}" aria-controls="panel-${id}" aria-selected="${i===0}" tabindex="${i===0?0:-1}" data-panel="${id}">${title}</button>`).join('')}</nav><div class="review-body"><section id="panel-summary" role="tabpanel" aria-labelledby="tab-summary" tabindex="0"><div class="highlights">${highlights||'<p class="compact-note">비교할 시대 전환 기록 없음</p>'}</div>${renderReview(m)}${renderBasics(mine,theirs,other)}${renderMethods(a)}</section><section id="panel-ages" role="tabpanel" aria-labelledby="tab-ages" tabindex="0" hidden>${renderAgePanel(mine,theirs,other)}</section><section id="panel-production" role="tabpanel" aria-labelledby="tab-production" tabindex="0" hidden>${renderProductionPanel()}</section><section id="panel-timeline" role="tabpanel" aria-labelledby="tab-timeline" tabindex="0" hidden>${renderTimelinePanel()}</section></div>`+links;
     }
-    content+=`<a class="source-button" href="https://aoe.ms/replay/?gameId=${Number(m.id)}&amp;profileId=26260702" target="_blank" rel="noopener noreferrer">리플 다운로드</a> · <a class="source-button" href="https://www.aoe2insights.com/match/${Number(m.id)}/" target="_blank" rel="noopener noreferrer">AoE2 Insights</a>`;
-    $('#match-detail').innerHTML=content;
-    $('#match-dialog').showModal();
+    $('#match-detail').innerHTML=`<div class="review-workspace">${workspace}</div>`;
+    if(a)bindWorkspace($('#match-detail .review-workspace'),mine,theirs,other);
+    const dialog=$('#match-dialog');dialog.scrollTop=0;
+    document.body.classList.add('review-open');
+    if(!dialog.open)dialog.showModal();
   }
   async function load() {
     $('#refresh').disabled=true;
@@ -223,6 +288,7 @@
       return false;
     } finally {$('#refresh').disabled=false;}
   }
+  $('#match-dialog').addEventListener('close',()=>document.body.classList.remove('review-open'));
   $('#open-settings').addEventListener('click',openSettings);
   $('#refresh').addEventListener('click',()=>{filter='all';visible=12;syncFilter();load().then(ok=>toast(ok?'새로고침 완료':'조회 실패. 연결 상태 확인.'));});
   document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>document.getElementById(b.dataset.close).close()));
