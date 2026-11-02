@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#19251f">
+  <meta name="description" content="AoE2 경기 기록과 리플 분석">
+  <title>AoE2 리플 분석</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="style.css">
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <main id="overview">
+    <header class="topbar"><h1>AoE2 리플 분석</h1><div class="toolbar"><button class="subtle" id="refresh">새로고침</button><button class="subtle" id="open-settings">계정</button><a id="source-link" href="https://github.com/ssapo/aoe2" target="_blank" rel="noopener noreferrer">GitHub</a></div></header>
+    <section class="connection" id="connection" aria-live="polite"></section>
+    <div class="section-heading"><h2><span id="player-name"></span> 요약</h2><span id="updated">연결 대기</span></div>
+    <section class="stats" aria-label="경기 통계"><article><span>수집 경기</span><strong id="stat-games">—</strong><small>저장된 경기 기준</small></article><article><span>승률</span><strong id="stat-win">—</strong><small id="stat-record">결과 확인 경기 기준</small></article><article><span>최근 레이팅</span><strong id="stat-rating">—</strong><small id="stat-delta">—</small></article><article><span>분석 완료</span><strong id="stat-analysis">—</strong><small>명령 기록 분석</small></article></section>
+    <section id="history"><div class="section-heading"><h2>경기 기록 <span id="match-count" class="count">0</span></h2><div class="filters" role="group" aria-label="경기 결과 필터"><button class="selected" data-filter="all" aria-pressed="true">전체</button><button data-filter="win" aria-pressed="false">승리</button><button data-filter="loss" aria-pressed="false">패배</button></div></div><div id="matches"></div><div id="pagination" class="pagination" hidden><button id="load-more" class="subtle">더 보기</button></div></section>
+  </main>
+  <dialog id="settings-dialog"><div class="dialog-head"><h2>계정 · 수집</h2><button class="close" data-close="settings-dialog" aria-label="닫기">×</button></div><p><b>ssapo</b> · 1v1</p><p><a href="https://www.aoe2insights.com/user/13810994/" target="_blank" rel="noopener noreferrer">AoE2 Insights 프로필</a></p><p><a href="https://github.com/ssapo/aoe2/actions/workflows/update.yml" target="_blank" rel="noopener noreferrer">GitHub 수집 실행</a></p><details><summary>수집 제한</summary><p>GitHub Actions로 약 30분마다 수집. 실행 지연, 리플 미제공, 파서 호환 문제로 일부 분석이 누락될 수 있음. 닉네임과 결과는 공개됨.</p><p>60일간 저장소 활동이 없으면 예약 실행이 중지될 수 있음. 새로고침은 저장된 결과만 다시 읽음.</p></details></dialog>
+  <dialog id="match-dialog"><div class="dialog-head"><span id="match-subtitle">경기 분석</span><button class="close" data-close="match-dialog" aria-label="닫기">×</button></div><div id="match-detail"></div></dialog>
+  <div class="toast" id="toast" role="status" hidden></div>
+</body>
+</html>

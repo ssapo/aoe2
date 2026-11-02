@@ -1,0 +1,287 @@
+"""Public match collector. Never publishes replays, chats, or credentials."""
+from __future__ import annotations
+
+import argparse
+from collections import Counter
+from datetime import datetime, timezone
+import gzip
+import io
+import json
+import os
+from pathlib import Path
+import tempfile
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+import zipfile
+
+ROOT = Path(__file__).resolve().parents[1]
+MAX_DOWNLOAD = 64 * 1024 * 1024
+MAX_REPLAY = 256 * 1024 * 1024
+AGE_IDS = {101: '봉건', 102: '성주', 103: '왕정'}
+
+
+def now():
+    return datetime.now(timezone.utc).isoformat()
+
+
+def profile_id(value):
+    text = str(value).strip()
+    if text.isdecimal() and 0 < int(text) < 2**63:
+        return int(text)
+    raise ValueError('게임 서버의 숫자 프로필 ID가 필요합니다. AoE2 Insights 사용자 ID와 다를 수 있습니다.')
+
+
+def read_json(path, default):
+    try:
+        return json.loads(path.read_text(encoding='utf-8'))
+    except FileNotFoundError:
+        return default
+
+
+def write_json(path, data):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile('w', encoding='utf-8', dir=path.parent, delete=False) as h:
+        json.dump(data, h, ensure_ascii=False, indent=2, allow_nan=False)
+        h.write('\n')
+        temporary = h.name
+    os.replace(temporary, path)
+
+
+def fetch(url, limit=MAX_DOWNLOAD):
+    req = urllib.request.Request(url, headers={'User-Agent': 'ssapo-aoe2/1.0 (personal post-game analysis)'})
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(req, timeout=35) as response:
+                if response.headers.get('Content-Length') and int(response.headers['Content-Length']) > limit:
+                    raise ValueError('응답 크기 제한 초과')
+                body = response.read(limit + 1)
+                if len(body) > limit:
+                    raise ValueError('응답 크기 제한 초과')
+                return body
+        except (OSError, TimeoutError) as exc:
+            if isinstance(exc, urllib.error.HTTPError) and exc.code not in {429, 500, 502, 503, 504}:
+                raise
+            if attempt == 2:
+                raise
+            time.sleep(1 + attempt)
+
+
+def decode_replay(data):
+    if data.startswith(b'\x1f\x8b'):
+        with gzip.GzipFile(fileobj=io.BytesIO(data)) as h:
+            data = h.read(MAX_REPLAY + 1)
+    elif data.startswith(b'PK\x03\x04'):
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            entries = [m for m in archive.infolist() if m.filename.lower().endswith(('.aoe2record', '.mgz'))]
+            if not entries or entries[0].file_size > MAX_REPLAY:
+                raise ValueError('리플 압축파일 형식 또는 크기를 확인할 수 없습니다.')
+            with archive.open(entries[0]) as h:
+                data = h.read(MAX_REPLAY + 1)
+    if len(data) > MAX_REPLAY or len(data) < 20 or data.lstrip().startswith((b'<', b'{')):
+        raise ValueError('유효한 리플 파일이 아닙니다.')
+    return data
+
+
+def replay_urls(match, own_id):
+    urls = sorted(match.get('matchurls', []), key=lambda u: u.get('profile_id') != own_id)
+    candidates = [f'https://aoe.ms/replay/?gameId={int(match["id"])}&profileId={own_id}']
+    for entry in urls:
+        url = entry.get('url', '')
+        parsed = urllib.parse.urlparse(url)
+        host = parsed.hostname or ''
+        if parsed.scheme == 'https' and host.endswith('.blob.core.windows.net'):
+            candidates.append(url)
+    return candidates[:3]
+
+
+def seconds(value):
+    return round(value.total_seconds(), 2)
+
+
+def command_metrics(match, target):
+    """Commands are orders, never claimed as completed units or buildings."""
+    events, ages, build_first, research_first = [], {}, {}, {}
+    counts = Counter()
+    for action in match.actions:
+        if action.player is None or action.player.number != target.number:
+            continue
+        at = seconds(action.timestamp)
+        kind = action.type.name
+        payload = action.payload
+        label = None
+        if kind == 'RESEARCH':
+            label = payload.get('technology') or f'Technology {payload.get("technology_id", "?")}'
+            research_first.setdefault(str(label), at)
+            age = AGE_IDS.get(payload.get('technology_id'))
+            if age:
+                ages.setdefault(age, at)
+        elif kind == 'BUILD':
+            label = payload.get('building') or f'Building {payload.get("building_id", "?")}'
+            build_first.setdefault(str(label), at)
+        elif kind in {'QUEUE', 'DE_QUEUE', 'MULTIQUEUE'}:
+            label = payload.get('unit')
+        if label:
+            counts[str(label)] += 1
+            events.append({'seconds': at, 'kind': kind, 'label': str(label)})
+    return {
+        'age_commands': ages,
+        'first_build_commands': build_first,
+        'first_research_commands': research_first,
+        'command_counts': dict(counts.most_common(24)),
+        'timeline': events[:100],
+        'eapm': target.eapm,
+    }
+
+
+def coaching(own, opponents, players_count):
+    cards = []
+    # A timing difference is an observation, not proof of a mistake.
+    if players_count == 2 and len(opponents) == 1:
+        other = opponents[0]['metrics']
+        for age in ('봉건', '성주', '왕정'):
+            mine = own['age_commands'].get(age)
+            theirs = other['age_commands'].get(age)
+            if mine is None or theirs is None:
+                continue
+            delta = round(mine - theirs)
+            if abs(delta) >= 20:
+                later = delta > 0
+                cards.append({
+                    'kind': 'review' if later else 'strength',
+                    'title': f'{age} 전환 명령이 상대보다 {abs(delta)}초 {"늦음" if later else "빠름"}',
+                    'evidence': f'내 명령 {mine:.0f}초 · 상대 명령 {theirs:.0f}초. 실제 시대 도달 시간은 아님.',
+                    'action': '직전 병력·업그레이드 투자를 확인하고 같은 빌드의 전환 명령 시점과 비교.' if later else '전환 직후 병력 생산·공격 명령 시점 확인.',
+                    'confidence': '명령 기록 확인 · 전략 평가는 참고',
+                })
+    if not cards:
+        cards.append({'kind': 'review', 'title': '시대 전환 비교 데이터 없음',
+                      'evidence': '건설·생산·연구 명령 기록 제공.',
+                      'action': '동일 문명·맵·빌드의 첫 군사 건물 및 시대 전환 명령 시점과 비교.',
+                      'confidence': '명령 기록 기반'})
+    return cards[:3]
+
+
+def analyze_replay(raw, own_id):
+    from mgz.model import parse_match
+    match = parse_match(io.BytesIO(decode_replay(raw)))
+    own = next((p for p in match.players if p.profile_id == own_id), None)
+    if own is None:
+        raise ValueError('리플에서 본인 프로필을 확인할 수 없습니다.')
+    own_metrics = command_metrics(match, own)
+    opponents = [{'name': p.name, 'civilization': p.civilization, 'metrics': command_metrics(match, p)}
+                 for p in match.players if p.number != own.number and p not in (own.team or [])]
+    return {
+        'parser': 'mgz', 'duration_game_seconds': seconds(match.duration),
+        'civilization': own.civilization, 'map': match.map.name,
+        'metrics': own_metrics, 'opponents': opponents,
+        'insights': coaching(own_metrics, opponents, len(match.players)),
+        'limitations': ['생산·건설·연구 명령은 실제 완료와 다를 수 있습니다. 취소·파괴·자원 부족은 재현하지 않습니다.',
+                        'TC 유휴시간, 실시간 보유 자원, 교전 손실, 승패의 인과관계는 이 버전에서 계산하지 않습니다.'],
+    }
+
+
+def metadata(match, own_id, aliases):
+    results = match.get('matchhistoryreportresults', [])
+    own = next((p for p in results if int(p['profile_id']) == own_id), None)
+    if own is None:
+        return None
+    members = match.get('matchhistorymember', [])
+    rating = next((p for p in members if int(p['profile_id']) == own_id), {})
+    result = {1: 'win', 0: 'loss'}.get(own.get('resulttype'), 'unknown')
+    return {
+        'id': int(match['id']), 'started_at': match.get('startgametime'),
+        'finished_at': match.get('completiontime'),
+        'map': str(match.get('mapname', 'Unknown')).removesuffix('.rms'),
+        'civilization': f'문명 ID {own.get("civilization_id", "?")}',
+        'result': result, 'rating_before': rating.get('oldrating'), 'rating_after': rating.get('newrating'),
+        'match_type_id': match.get('matchtype_id'), 'players_count': len(results),
+        'players': [{'profile_id': p['profile_id'], 'name': aliases.get(p['profile_id'], str(p['profile_id'])),
+                     'is_self': int(p['profile_id']) == own_id} for p in results],
+        'analysis_status': 'pending', 'analysis': None, 'attempts': 0,
+        'source_url': f'https://www.aoe2insights.com/match/{int(match["id"])}/',
+    }
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--profile-id', default='')
+    parser.add_argument('--limit', type=int, default=5)
+    parser.add_argument('--replay', help='개발·검증용 로컬 리플 경로')
+    parser.add_argument('--output', type=Path, default=ROOT / 'site/data/report.json')
+    args = parser.parse_args()
+    previous = read_json(args.output, {})
+    config = read_json(ROOT / 'config.json', {})
+    selected = args.profile_id or config.get('profile_id')
+    if not selected:
+        print('프로필 미설정: config.json 또는 AOE2_PROFILE_ID를 설정하세요. 네트워크 요청 없음.')
+        return
+    own_id = profile_id(selected)
+    if args.replay:
+        write_json(args.output, analyze_replay(Path(args.replay).read_bytes(), own_id))
+        return
+    checked_at = now()
+    endpoint = 'https://aoe-api.worldsedgelink.com/community/leaderboard/getRecentMatchHistory?'
+    endpoint += urllib.parse.urlencode({'title': 'age2', 'profile_ids': json.dumps([own_id])})
+    try:
+        payload = json.loads(fetch(endpoint, 10 * 1024 * 1024))
+        if payload.get('result', {}).get('code') != 0 or not isinstance(payload.get('matchHistoryStats'), list):
+            raise ValueError('경기 기록 API 응답을 확인할 수 없습니다.')
+    except Exception:
+        # Preserve successful data and its timestamp on any remote error.
+        previous['last_checked_at'] = checked_at
+        previous['sync_error'] = '경기 기록을 가져오지 못했습니다. 기존 분석 결과를 유지했습니다.'
+        write_json(args.output, previous)
+        raise
+    aliases = {p['profile_id']: p.get('alias', str(p['profile_id'])) for p in payload.get('profiles', [])}
+    same_profile = (previous.get('profile') or {}).get('id') == own_id
+    old = {m['id']: m for m in previous.get('matches', [])} if same_profile else {}
+    pending = sorted(payload['matchHistoryStats'], key=lambda m: m.get('startgametime', 0), reverse=True)
+    budget = max(0, min(args.limit, 10))
+    for match in pending:
+        if config.get('only_1v1') and len(match.get('matchhistoryreportresults', [])) != 2:
+            continue
+        if not match.get('completiontime'):
+            continue
+        row = metadata(match, own_id, aliases)
+        if row is None:
+            continue
+        existing = old.get(row['id'], {})
+        if existing.get('analysis_status') == 'complete':
+            # Keep analysis, but refresh finalized outcome and rating.
+            row.update({k: existing[k] for k in ('analysis', 'analysis_status', 'attempts') if k in existing})
+        elif budget and existing.get('attempts', 0) < 3:
+            budget -= 1
+            row['attempts'] = existing.get('attempts', 0) + 1
+            row['analysis_status'] = 'unavailable'
+            for url in replay_urls(match, own_id):
+                try:
+                    raw = fetch(url)
+                except Exception:
+                    continue
+                try:
+                    row['analysis'] = analyze_replay(raw, own_id)
+                    row['analysis_status'] = 'complete'
+                    break
+                except Exception:
+                    row['analysis_status'] = 'parser_error'
+            row['analysis_note'] = {'complete': '명령 기록 분석 완료', 'unavailable': '공개 리플을 확보하지 못했습니다.',
+                                    'parser_error': '리플 형식이 현재 파서와 호환되지 않거나 분석에 실패했습니다.'}[row['analysis_status']]
+        else:
+            row.update({k: existing[k] for k in ('analysis_status', 'attempts', 'analysis_note') if k in existing})
+        if row.get('analysis'):
+            row['civilization'] = row['analysis']['civilization']
+            row['map'] = row['analysis']['map']
+        old[row['id']] = row
+    output = {
+        'schema_version': 1, 'updated_at': now(), 'last_checked_at': checked_at, 'sync_error': None,
+        'profile': {'id': own_id, 'insights_user_id': config.get('insights_user_id'), 'name': aliases.get(own_id, str(own_id))},
+        'matches': sorted([m for m in old.values() if not config.get('only_1v1') or m.get('players_count') == 2], key=lambda m: m.get('started_at') or 0, reverse=True)[:200],
+    }
+    write_json(args.output, output)
+    print(f'수집 완료: {len(output["matches"])}경기 / 분석 완료 {sum(m["analysis_status"] == "complete" for m in output["matches"])}경기')
+
+
+if __name__ == '__main__':
+    main()
