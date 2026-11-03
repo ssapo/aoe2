@@ -430,3 +430,16 @@ python scripts/build_preview.py /tmp/SSAPO_AoE2_preview.html
 - 실제 Hera 서버 ID 199325로 최근 1v1 43개 조회, 2개 상세 분석 확인. 외부 계정의 분석 결과·리플 다운로드 ID·링크에 ssapo 값이 섞이지 않게 처리.
 - 무료 정적 사이트의 제한에 따라 미수집 계정은 GitHub workflow profile_id 입력으로 최초 생성. 공개 방문자의 검색만으로 서버 분석이 시작되지는 않음.
 - 검색·ID 검증·동명이인·개인정보 제외·경로 분리·이전 계정의 늦은 응답 차단 검사 추가. 브라우저 시각 검증 차단은 기존 제한으로 남음.
+
+### 준비 중: 사이트 내 직접 수집
+
+- 운영 반영 전 기능 브랜치. `server/collect_service.py`가 GitHub 토큰 없이 기존 Python 수집기를 실행한다. POST /collect → job_id → GET /jobs/ID → 전체 보고서 반환. GET /health로 무료 서버 시작을 기다린다.
+- `render.yaml`: Python 3.12.11, plan=free, 512MB 무료 웹서비스, 포트는 PORT 또는 10000. 빌드에서 고정 의존성·mgz 패치를 준비한다. Start는 python server/collect_service.py. 서버 배포 전 실제 Render 연결·생성 권한 확인이 필요하며, 유료 플랜·유료 저장소를 만들지 않는다.
+- 프런트 `collection-client.js`를 app.js 전에 로드한다. 배포 후 `site/collection-service.json`의 endpoint를 실제 검증한 HTTPS origin으로 설정한다. 비밀 토큰은 필요 없고, endpoint 빈 값은 미연결 상태다. 빈 설정으로 운영 버튼을 완성했다고 보고하지 않는다.
+- 브라우저는 /health를 최대 2분 확인 후 POST 1회, 상태 조회 후 검증된 선택 계정 보고서만 적용한다. 취소·계정 전환 뒤 늦은 응답은 무시한다. 일반 새로고침에서 오래된 Pages 보고서가 현재 탭의 새 결과를 덮지 않도록 메모리 캐시한다.
+- 직접 수집 결과는 현재 탭 및 서버 메모리에만 임시 보관한다. GitHub 저장소에 쓰지 않는다. Render 재시작·유휴 종료 후 임시 결과가 사라질 수 있다. 기존 GitHub 예약 보고서는 영구 기록 경로로 유지한다.
+- 서버는 한 번에 1계정, 같은 계정 진행 중 요청은 동일 job으로 합침. 최근 1분 결과 재사용, 최대 10개 시작/시간, 결과 10분 유지. 프로필은 양의 숫자만 받고 임의 URL·shell 코드를 받지 않는다. 수집 subprocess는 240초 제한, 요청당 상세 분석은 최대 2경기.
+- CORS/POST Origin은 https://ssapo.github.io에 고정. 공개 데이터 서버이며 Origin 검사는 사용자 인증이나 완전한 남용 방지를 뜻하지 않는다. 웹서버 프로세스 재시작 시 메모리 제한 상태도 초기화된다.
+- 무료 Render는 유휴 15분 뒤 종료되고 다음 요청 시 약 1분 준비 시간이 있을 수 있다. 무료 시간 소진 시 중지되며 자동으로 유료 인스턴스를 사용하도록 설정하지 않는다. 실제 배포 전 Render 최신 무료 한도를 확인한다.
+- 테스트 추가: 중복 요청 통합·전체 동시 실행 제한·잘못된 계정 결과 차단·잘못된 입력·POST 실패·수집 취소·클라이언트 계정 검증. 현재 Python 36개 + Node 16개 = 52개 통과. 서버 로컬 검사와 배포 후 실제 수집 확인을 구분한다.
+- Render 연결이 확인되면: public feature branch로 Free 웹서비스 생성 → /health 확인 → 실제 계정 1회 수집 검증 → endpoint를 프런트 설정에 기록 → 기존 Pages main에 묶어서 반영 → 공개 버튼 흐름 확인. 현재 외부 서버가 생성됐다고 주장하지 않는다.

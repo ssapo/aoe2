@@ -8,7 +8,7 @@ test('late account response cannot overwrite the newly selected profile',async()
  const fs=require('node:fs'),vm=require('node:vm'),code=fs.readFileSync(require('node:path').join(__dirname,'../site/app.js'),'utf8');
  const pending=new Map(),controls={disabled:false};
  const ctx=vm.createContext({window:{},console,Date,render(){},$:()=>controls,fetch:url=>new Promise(resolve=>pending.set(url,resolve))});
- vm.runInContext("let selectedProfile=199325,selectedName='Hera',report={matches:[]};const dataPath=(id,file)=>`data/profiles/${id}/${file}`;",ctx);
+ vm.runInContext("let selectedProfile=199325,selectedName='Hera',report={matches:[]};const liveReports=new Map();const dataPath=(id,file)=>`data/profiles/${id}/${file}`;",ctx);
  vm.runInContext(code.slice(code.indexOf('  let loadRequest=null;'),code.indexOf('  async function selectProfile(')),ctx);
  const first=vm.runInContext('load()',ctx);vm.runInContext('selectedProfile=123;selectedName="Other";',ctx);const second=vm.runInContext('load()',ctx);
  const urls=[...pending.keys()];pending.get(urls[1])({ok:true,status:200,json:async()=>({schema_version:1,profile:{id:123,name:'Other'},matches:[]})});await second;

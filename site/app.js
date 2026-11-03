@@ -7,7 +7,8 @@
   let toastTimer;
   let selectedProfile=window.SSAPOPlayers.profileId(new URL(location.href).searchParams.get('profile'))||26260702;
   let selectedName=selectedProfile===26260702?'ssapo':selectedProfile===199325?'Hera':`프로필 ${selectedProfile}`;
-  let catalog=null,searchSequence=0;
+  let catalog=null,searchSequence=0,collectBusy=false,collectionRequestSerial=0;
+  const liveReports=new Map();
   const dataPath=(id,file)=>id===26260702?`data/${file}`:`data/profiles/${id}/${file}`;
   const fmtTime = (s) => Number.isFinite(s) ? `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}` : '—';
   const date = (stamp) => stamp ? new Date(typeof stamp === 'number' ? stamp*1000 : stamp).toLocaleString('ko-KR',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '아직 수집 전';
@@ -227,17 +228,12 @@
     const c = $('#connection');
     c.className = 'connection'+(report.sync_error?' error':'');
     if(report.sync_error) c.innerHTML=`<div class="text"><strong>수집 실패</strong><p>${esc(report.sync_error)} 마지막 확인: ${esc(date(report.last_checked_at))}</p></div><button class="connect">연결 확인</button>`;
-    else if(report.pending_profile)c.innerHTML=`<div class="text"><strong>${esc(selectedName)} · 아직 저장된 경기 없음</strong><p>GitHub 수집 실행에서 profile_id에 ${selectedProfile}을 입력해 주세요. 수집 후 이 화면에서 확인할 수 있어요.</p></div><button class="connect">계정 정보</button>`;
-    else if(report.profile?.id) c.innerHTML=`<div class="text"><strong>${esc(report.profile.name)}</strong><p>약 30분마다 수집해요. 새로고침은 저장된 기록을 다시 불러와요.</p></div><button class="connect">계정 정보</button>`;
+    else if(report.pending_profile)c.innerHTML=`<div class="text"><strong>${esc(selectedName)} · 아직 저장된 경기 없음</strong><p>지금 수집을 누르면 이 계정의 경기와 분석을 가져와요.</p></div><button class="connect">계정 정보</button>`;
+    else if(report.profile?.id) c.innerHTML=`<div class="text"><strong>${esc(report.profile.name)}</strong><p>지금 수집은 새 결과를 가져와요. 새로고침은 저장된 기록을 다시 읽어요.</p></div><button class="connect">계정 정보</button>`;
     else c.innerHTML='<div class="text"><strong>계정 연결 대기</strong><p>ssapo · 최초 수집 필요.</p></div><button class="connect">계정 정보</button>';
-    const collectLink=document.createElement('a');
-    collectLink.className='collect-now';collectLink.textContent='지금 수집 ↗';
-    collectLink.href=`https://github.com/${repo}/actions/workflows/update.yml`;
-    collectLink.target='_blank';collectLink.rel='noopener noreferrer';
-    collectLink.addEventListener('click',()=>{
-      if(location.protocol==='file:'||window.SSAPO_BOOTSTRAP){toast('자동 결과 확인은 운영 사이트에서 지원. GitHub에서 Run workflow 실행.');return;}
-      toast(`추가 수집 ID: ${selectedProfile} · GitHub의 profile_id 입력란에 넣어주세요.`);collectionWatch.start();
-    });
+    const collectLink=document.createElement('button');
+    collectLink.className='collect-now';collectLink.textContent=collectBusy?'수집 중…':'지금 수집';collectLink.disabled=collectBusy;
+    collectLink.addEventListener('click',requestCollection);
     c.insertBefore(collectLink,c.querySelector('.connect'));
     c.querySelector('.connect')?.addEventListener('click',openSettings);
     $('#source-link').href=`https://github.com/${repo}`;
@@ -275,7 +271,7 @@
     $('#settings-profile').textContent=`${report.profile?.name||selectedName} · ID ${selectedProfile} · 1v1`;
     $('#settings-profile-link').textContent=selectedProfile===26260702?'AoE2 Insights 프로필':'AoE II Companion 프로필';
     $('#settings-profile-link').href=selectedProfile===26260702?'https://www.aoe2insights.com/user/13810994/':`https://www.aoe2companion.com/players/${selectedProfile}`;
-    $('#settings-collection-note').textContent=`추가 수집: Run workflow의 profile_id에 ${selectedProfile} 입력. 비워두면 ssapo와 Hera만 수집해요.`;
+    $('#settings-collection-note').textContent='이 화면의 지금 수집을 누르면 GitHub 화면 이동 없이 수집해요. 무료 서버가 쉬고 있으면 시작까지 약 1분 걸릴 수 있어요.';
     $('#settings-dialog').showModal();
   }
   function reviewSignals(match) {
@@ -414,12 +410,12 @@
       if(window.SSAPO_BOOTSTRAP&&id===26260702){if(id!==selectedProfile)return false;report=structuredClone(window.SSAPO_BOOTSTRAP);render();return true;}
       const response=await fetch(`${dataPath(id,'report.json')}?t=${Date.now()}`,{cache:'no-store'});
       if(id!==selectedProfile)return false;
-      if(response.status===404&&id!==26260702){report={schema_version:1,profile:{id,name:selectedName},matches:[],pending_profile:true};render();return true;}
+      if(response.status===404&&id!==26260702){report=liveReports.get(id)||{schema_version:1,profile:{id,name:selectedName},matches:[],pending_profile:true};render();return true;}
       if(!response.ok)throw Error(`HTTP ${response.status}`);
       const incoming=await response.json();
       if(id!==selectedProfile)return false;
       if(incoming.schema_version!==1||!Array.isArray(incoming.matches)||incoming.profile?.id!==id)throw Error('Profile report mismatch');
-      report=incoming;selectedName=incoming.profile.name||selectedName;render();return true;
+      const live=liveReports.get(id);report=live&&Date.parse(live.last_checked_at)>=Date.parse(incoming.last_checked_at)?live:incoming;selectedName=report.profile.name||selectedName;render();return true;
     } catch(error) {
       if(id!==selectedProfile)return false;
       report={...report,sync_error:'결과 파일을 읽지 못했어요. 잠시 후 다시 확인해 주세요.'};render();console.warn('Report loading failed:',error.message);return false;
@@ -427,7 +423,7 @@
   }
   async function selectProfile(id,name,writeUrl=true){
     id=window.SSAPOPlayers.profileId(id);if(!id)return;
-    collectionWatch.stop();$('#collection-feedback').hidden=true;
+    collectionWatch.stop();directCollection.stop();collectionRequestSerial++;collectBusy=false;$('#collection-feedback').hidden=true;
     $('#match-dialog').close();document.body.classList.remove('review-open');
     selectedProfile=id;selectedName=name||(id===26260702?'ssapo':id===199325?'Hera':`프로필 ${id}`);
     report={profile:{id,name:selectedName},matches:[]};filter='all';visible=12;syncFilter();
@@ -455,6 +451,32 @@
       else $('#player-search-status').textContent='검색 명단을 불러오지 못했어요. Hera 바로가기나 숫자 프로필 ID를 이용해 주세요.';
     }finally{if(seq===searchSequence)$('#player-search-submit').disabled=false;}
   });
+  function collectionMessage(title,hint){
+    const box=$('#collection-feedback');box.hidden=false;$('#collection-title').textContent=title;$('#collection-hint').textContent=hint;
+  }
+  const directCollection=window.createCollectionClient({
+    onState:state=>{
+      const messages={waking:['수집 서버를 준비하고 있어요','서버가 쉬고 있었다면 시작까지 약 1분 걸릴 수 있어요.'],requesting:['수집을 요청하고 있어요','잠시만 기다려 주세요.'],running:['경기와 리플을 분석하고 있어요','완료되면 이 화면에 결과를 표시해요.'],complete:['수집 결과를 불러왔어요','새 결과는 현재 탭에서 유지돼요. 예약 수집 기록은 따로 저장돼요.']};
+      collectionMessage(...messages[state]);
+    },
+    applyReport:async incoming=>{
+      if(incoming.profile.id!==selectedProfile)return;
+      liveReports.set(selectedProfile,incoming);report=incoming;selectedName=incoming.profile.name||selectedName;render();
+    }
+  });
+  async function requestCollection(){
+    if(collectBusy)return;
+    const serial=++collectionRequestSerial,requestedProfile=selectedProfile;
+    collectBusy=true;render();
+    try{
+      const response=await fetch('collection-service.json',{cache:'no-store'});if(!response.ok)throw Error('수집 서버 설정을 읽지 못했어요.');
+      const config=await response.json();
+      if(serial!==collectionRequestSerial||requestedProfile!==selectedProfile)return;
+      if(!config.endpoint)throw Error('수집 서버 연결을 준비하고 있어요. 연결이 끝나면 이 버튼으로 바로 수집할 수 있어요.');
+      await directCollection.start(config.endpoint,requestedProfile);
+    }catch(error){if(serial===collectionRequestSerial)collectionMessage('수집을 시작하거나 완료하지 못했어요',error.message);}
+    finally{if(serial===collectionRequestSerial){collectBusy=false;render();}}
+  }
   const collectionWatch=window.createCollectionWatch({
     fetchStatus:async()=>{
       const r=await fetch(`${dataPath(selectedProfile,'status.json')}?t=${Date.now()}`,{cache:'no-store'});
@@ -480,7 +502,7 @@
       if($('#collection-hint').textContent!==hint)$('#collection-hint').textContent=hint;
     }
   });
-  $('#collection-dismiss').addEventListener('click',()=>{collectionWatch.stop();$('#collection-feedback').hidden=true;});
+  $('#collection-dismiss').addEventListener('click',()=>{collectionWatch.stop();directCollection.stop();collectionRequestSerial++;collectBusy=false;render();$('#collection-feedback').hidden=true;});
   $('#match-dialog').addEventListener('close',()=>document.body.classList.remove('review-open'));
   $('#open-settings').addEventListener('click',openSettings);
   $('#refresh').addEventListener('click',()=>{filter='all';visible=12;syncFilter();load().then(ok=>toast(ok?'새로고침 완료':'조회 실패. 연결 상태 확인.'));});

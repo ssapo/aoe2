@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: ssapo-aoe2-collect
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt && python scripts/patch_parser.py
+    startCommand: python server/collect_service.py
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.11
+      - key: ALLOWED_ORIGIN
+        value: https://ssapo.github.io
