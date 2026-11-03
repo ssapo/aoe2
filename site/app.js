@@ -76,14 +76,18 @@
     const cell=events=>events.length?[...events].sort((a,b)=>a.seconds-b.seconds).map(e=>`<div class="timeline-order"><span>${esc(label(e.label))}${Number.isFinite(e.amount)?' × '+number(e.amount):''}</span><small>${esc(types[e.kind]||e.kind)}</small></div>`).join(''):'<span class="no-order" aria-label="이 시간에 기록 없음">—</span>';
     return `<table class="timeline event-table split-timeline"><colgroup><col class="time-col"><col><col></colgroup><thead><tr><th scope="col">시간</th><th scope="col" class="mine-col">${civBadge(civs[0],'나',randoms[0])}</th><th scope="col" class="theirs-col">${civBadge(civs[1],'상대',randoms[1])}</th></tr></thead><tbody>${rows.map(r=>`<tr><th scope="row">${fmtTime(r.second)}</th><td class="mine-col">${cell(r.mine)}</td><td class="theirs-col">${cell(r.theirs)}</td></tr>`).join('')}</tbody></table>`;
   }
-  function renderTimelinePanel() {
+  function renderTimelinePanel(analysis) {
+    const field=window.SSAPOFieldControl.summarize(analysis.map_view,analysis.duration_game_seconds);
+    const statistics=renderFieldControl(field);
     return `<div class="timeline-workspace">
       <div class="timeline-dock" role="group" aria-label="기록 재생 조작">
         <div class="player-controls"><button id="record-play" aria-label="재생" title="재생" aria-pressed="false"><svg class="play-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5 20 12 9 19Z"/></svg><svg class="pause-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h4v14H7zm7 0h4v14h-4z"/></svg></button><button id="record-prev" aria-label="이전 기록으로">이전</button><button id="record-next" aria-label="다음 기록으로">다음</button><label>배속 <select id="record-speed"><option value="1">1×</option><option value="4">4×</option><option value="16" selected>16×</option><option value="64">64×</option></select></label><output id="record-clock" aria-label="현재 시간 / 전체 시간"></output></div>
         <input id="record-seek" type="range" min="0" step="0.01" value="0" aria-label="기록 재생 시간">
       </div>
+      ${field?.total?renderFieldTimeline(field,analysis.duration_game_seconds):''}
       <div class="timeline-stage"><div id="building-map-host"></div></div>
-      <section class="timeline-history" aria-labelledby="timeline-history-title"><h3 id="timeline-history-title">전체 기록</h3><div class="panel-toolbar"><div class="segments" role="group" aria-label="타임라인 선수"><button data-side="both" aria-pressed="true">양측</button><button data-side="mine" aria-pressed="false">나</button><button data-side="theirs" aria-pressed="false">상대</button></div><label class="select-label">명령<select id="timeline-kind"><option value="all">전체</option><option value="QUEUE">생산</option><option value="BUILD">건설</option><option value="RESEARCH">연구</option><option value="BUY">시장 구매</option><option value="SELL">시장 판매</option></select></label><label class="select-label">시간<select id="timeline-range"></select></label></div><div class="timeline-pagination"><span id="timeline-count" role="status"></span><div><button id="timeline-prev" aria-label="이전 명령 페이지">이전</button><span id="timeline-page"></span><button id="timeline-next" aria-label="다음 명령 페이지">다음</button></div></div><div id="timeline-table"></div><p class="compact-note">생산·건설·연구·시장 거래를 요청한 시각이에요. 완료 시각과는 달라요.</p></section>
+      ${statistics?`<details class="flow-statistics"><summary>진영별 시간·비율</summary>${statistics}</details>`:''}
+      <section class="timeline-history" aria-labelledby="timeline-history-title"><h3 id="timeline-history-title">전체 기록</h3><div class="panel-toolbar"><div class="segments" role="group" aria-label="기록을 볼 선수"><button data-side="both" aria-pressed="true">양측</button><button data-side="mine" aria-pressed="false">나</button><button data-side="theirs" aria-pressed="false">상대</button></div><label class="select-label">명령<select id="timeline-kind"><option value="all">전체</option><option value="QUEUE">생산</option><option value="BUILD">건설</option><option value="RESEARCH">연구</option><option value="BUY">시장 구매</option><option value="SELL">시장 판매</option></select></label><label class="select-label">시간<select id="timeline-range"></select></label></div><div class="timeline-pagination"><span id="timeline-count" role="status"></span><div><button id="timeline-prev" aria-label="이전 명령 페이지">이전</button><span id="timeline-page"></span><button id="timeline-next" aria-label="다음 명령 페이지">다음</button></div></div><div id="timeline-table"></div><p class="compact-note">생산·건설·연구·시장 거래를 요청한 시각이에요. 완료 시각과는 달라요.</p></section>
     </div>`;
   }
   function renderBasics(mine,theirs,other) {
@@ -175,7 +179,7 @@
       const button=e.currentTarget,show=button.getAttribute('aria-pressed')!=='true';
       button.setAttribute('aria-pressed',String(show));mapPlayer?.activity(show);
     });
-    const end=(mapData?.command_activity||[]).reduce((last,e)=>Math.max(last,e.seconds),events.length?events[events.length-1].seconds:0);
+    const end=(mapData?.command_activity||[]).reduce((last,e)=>Math.max(last,e.seconds),Math.max(match.analysis?.duration_game_seconds||0,events.length?events[events.length-1].seconds:0));
     const first=Math.min(events[0]?.seconds??Infinity,mapData?.command_activity?.[0]?.seconds??Infinity);
     const start=(mine.recording_restored||theirs.recording_restored)&&Number.isFinite(first)?first:0;
     seek.min=String(start);seek.max=String(end);seek.value=String(start);
@@ -202,29 +206,20 @@
     root.querySelector('#record-prev').addEventListener('click',()=>{stop();cursor=[...events].reverse().find(e=>e.seconds<cursor)?.seconds??start;drawPlayer();});
     root.querySelector('#record-next').addEventListener('click',()=>{stop();cursor=events.find(e=>e.seconds>cursor)?.seconds??end;drawPlayer();});
     drawPlayer();
-    const openRecordAt=time=>{
-      stop();activate('timeline');cursor=Math.max(start,Math.min(end,time));
-      drawPlayer();seek.focus({preventScroll:true});
-    };
-    root.querySelectorAll('[data-seek-record]').forEach(button=>button.addEventListener('click',()=>openRecordAt(Number(button.dataset.seekRecord))));
-    const fieldSlider=root.querySelector('#field-seek');
-    if(fieldSlider){
-      const plot=root.querySelector('#field-time-plot'),readout=root.querySelector('#field-time-readout'),open=root.querySelector('#field-open');
-      const maximum=Number(fieldSlider.max);
+    const fieldPlot=root.querySelector('#field-time-plot');
+    if(fieldPlot){
+      const maximum=Number(fieldPlot.dataset.duration);
       syncFieldClock=time=>{
         const selected=Math.max(0,Math.min(maximum,time));
-        fieldSlider.value=String(selected);readout.textContent=fmtTime(selected);
-        fieldSlider.setAttribute('aria-valuetext',fmtTime(selected));
-        plot.style.setProperty('--field-cursor',`${maximum?selected/maximum*100:0}%`);
-        open.dataset.seekRecord=String(selected);
+        fieldPlot.style.setProperty('--field-cursor',`${maximum?selected/maximum*100:0}%`);
       };
-      fieldSlider.addEventListener('input',()=>syncFieldClock(Number(fieldSlider.value)));
+      seek.setAttribute('aria-describedby','field-time-hint');
       root.querySelectorAll('[data-field-track]').forEach(track=>track.addEventListener('click',event=>{
         const bounds=track.getBoundingClientRect();if(!bounds.width)return;
         const time=Math.round(Math.max(0,Math.min(1,(event.clientX-bounds.left)/bounds.width))*maximum);
-        syncFieldClock(time);openRecordAt(time);
+        stop();cursor=Math.max(start,Math.min(end,time));drawPlayer();
       }));
-      syncFieldClock(Number(fieldSlider.value));
+      syncFieldClock(cursor);
     }
     const range=root.querySelector('#timeline-range');
     const intervals=[...new Set(events.map(e=>Math.floor(e.seconds/300)))];
@@ -371,17 +366,16 @@
   function renderFieldTimeline(field,duration) {
     const {end,lanes}=window.SSAPOFieldControl.timeline(field,duration);
     if(!end)return '';
-    const names={home:'내 진영',middle:'중앙',away:'상대 진영'},first=field.intervals[0]?.start||0;
-    return `<details class="field-windows" open><summary>구간 타임라인</summary><div class="field-time-chart"><div class="field-time-labels" aria-hidden="true">${lanes.map(l=>`<span>${names[l.zone]}</span>`).join('')}</div><div id="field-time-plot" class="field-time-plot" style="--field-cursor:${first/end*100}%"><div class="field-time-lanes" aria-hidden="true">${lanes.map(l=>`<div class="field-lane-track" data-field-track="${l.zone}" title="눌러서 이 시각의 지도 보기">${l.marks.map(m=>`<span class="field-time-mark field-${l.zone}" style="left:${m.left}%;width:${m.width}%"></span>`).join('')}</div>`).join('')}</div><span class="field-time-cursor" aria-hidden="true"></span><div class="field-time-axis" aria-hidden="true">${[0,.25,.5,.75,1].map(t=>`<span style="left:${t*100}%">${fmtTime(end*t)}</span>`).join('')}</div></div></div><div class="field-scrub-row"><input id="field-seek" type="range" min="0" max="${end}" step="1" value="${first}" aria-label="전장 위치 시간 선택" aria-describedby="field-time-hint"></div><div class="field-time-actions"><output id="field-time-readout" for="field-seek">${fmtTime(first)}</output><button id="field-open" data-seek-record="${first}">지도에서 보기 ↗</button></div><p id="field-time-hint" class="field-time-hint">색 막대는 지시가 겹친 구간이에요. 눌러서 지도를 보거나 시간 바를 움직여 선택할 수 있어요.</p></details>`;
+    const names={home:'내 진영',middle:'중앙',away:'상대 진영'};
+    return `<details class="field-windows flow-overview" open><summary>진영별 활동 <small>명령 기반 추정</small></summary><div class="field-time-chart"><div class="field-time-labels" aria-hidden="true">${lanes.map(l=>`<span>${names[l.zone]}</span>`).join('')}</div><div id="field-time-plot" class="field-time-plot" data-duration="${end}" style="--field-cursor:0%"><div class="field-time-lanes" aria-hidden="true">${lanes.map(l=>`<div class="field-lane-track" data-field-track="${l.zone}" title="지도 재생 시간을 이곳으로 이동">${l.marks.map(m=>`<span class="field-time-mark field-${l.zone}" style="left:${m.left}%;width:${m.width}%"></span>`).join('')}</div>`).join('')}</div><span class="field-time-cursor" aria-hidden="true"></span><div class="field-time-axis" aria-hidden="true">${[0,.25,.5,.75,1].map(t=>`<span style="left:${t*100}%">${fmtTime(end*t)}</span>`).join('')}</div></div></div><p id="field-time-hint" class="field-time-hint">색 막대를 누르거나 위의 시간 바를 움직이면 아래 지도의 시간이 바뀌어요.</p></details>`;
   }
-  function renderFieldControl(analysis) {
-    const field=window.SSAPOFieldControl.summarize(analysis.map_view,analysis.duration_game_seconds);
+  function renderFieldControl(field) {
     if(!field)return '';
     const zones=[['home','내 진영'],['middle','중앙'],['away','상대 진영']];
     const names=Object.fromEntries(zones);
     const largest=zones.filter(([id])=>field.seconds[id]===Math.max(...Object.values(field.seconds))).map(([id])=>id);
     const lead=!field.total?'양쪽 지시가 가까이 겹친 구간을 찾지 못했어요.':!field.enough?'겹친 구간이 짧아서 비율은 아직 표시하지 않아요.':largest.length===1?`${names[largest[0]]}에서 양쪽 지시가 가장 자주 맞물렸어요.`:'여러 지역에서 비슷한 비중으로 맞물렸어요.';
-    return `<section class="field-control" aria-labelledby="field-title"><div class="field-heading"><h3 id="field-title">전장 위치</h3><span>명령 기반 추정</span></div><p class="field-lead">${lead}</p>${field.total?`<p class="field-caption">가까이 겹친 지시 구간 ${fmtTime(Math.round(field.total))} · ${field.bins}개 시간 구간${field.enough?' 안의 비율':''}</p>${field.enough?`<div class="field-bar" role="img" aria-label="${zones.map(([id,name])=>name+' '+field.percentages[id]+'%').join(', ')}">${zones.map(([id])=>`<span class="field-${id}" style="flex:${field.percentages[id]}"></span>`).join('')}</div>`:''}<div class="field-stats">${zones.map(([id,name])=>`<div><span>${name}</span>${field.enough?`<strong>${field.percentages[id]}<small>%</small></strong>`:''}<time>${fmtTime(Math.round(field.seconds[id]))}</time></div>`).join('')}</div>${renderFieldTimeline(field,analysis.duration_game_seconds)}`:''}<details class="field-method"><summary>계산 기준</summary><p>양측의 지시 지점이 8타일 이내이고 명령 시각이 10초 이내인 경우를 찾아, 10초 구간당 한 번만 세요. 같은 구간에 여러 지역이 겹치면 시간을 나눠요. 시작 TC 사이를 3등분해 내 진영·중앙·상대 진영을 구분해요.</p><p>비율은 이렇게 찾은 구간 안의 분포예요. 실제 교전 시간·맵 점유율·승리 기여도는 아니에요. 주민이나 가축에게 내린 지시도 포함될 수 있어요. 겹친 구간이 30초 미만이면 비율을 생략해요.</p></details></section>`;
+    return `<section class="field-control" aria-labelledby="field-title"><div class="field-heading"><h3 id="field-title">전장 위치</h3><span>명령 기반 추정</span></div><p class="field-lead">${lead}</p>${field.total?`<p class="field-caption">가까이 겹친 지시 구간 ${fmtTime(Math.round(field.total))} · ${field.bins}개 시간 구간${field.enough?' 안의 비율':''}</p>${field.enough?`<div class="field-bar" role="img" aria-label="${zones.map(([id,name])=>name+' '+field.percentages[id]+'%').join(', ')}">${zones.map(([id])=>`<span class="field-${id}" style="flex:${field.percentages[id]}"></span>`).join('')}</div>`:''}<div class="field-stats">${zones.map(([id,name])=>`<div><span>${name}</span>${field.enough?`<strong>${field.percentages[id]}<small>%</small></strong>`:''}<time>${fmtTime(Math.round(field.seconds[id]))}</time></div>`).join('')}</div>`:''}<details class="field-method"><summary>계산 기준</summary><p>양측의 지시 지점이 8타일 이내이고 명령 시각이 10초 이내인 경우를 찾아, 10초 구간당 한 번만 세요. 같은 구간에 여러 지역이 겹치면 시간을 나눠요. 시작 TC 사이를 3등분해 내 진영·중앙·상대 진영을 구분해요.</p><p>비율은 이렇게 찾은 구간 안의 분포예요. 실제 교전 시간·맵 점유율·승리 기여도는 아니에요. 주민이나 가축에게 내린 지시도 포함될 수 있어요. 겹친 구간이 30초 미만이면 비율을 생략해요.</p></details></section>`;
   }
   function renderNumbersPanel(review,mine,theirs,other) {
     if(!review)return '<p class="panel-empty">다음 수집이 끝나면 수치를 볼 수 있어요.</p>';
@@ -449,8 +443,8 @@
         const d=ageDifference(mine,theirs,age);
         return `<button class="highlight ${d.delta===null||d.delta===0?'':d.delta<0?'ahead':'behind'}" data-open-panel="ages" data-open-age="${age}"><span>${age} ${d.reached?'도달':'클릭'}</span><strong>${esc(d.text)}</strong><small>나 ${fmtTime(d.a)} · 상대 ${fmtTime(d.b)}</small></button>`;
       }).join('');
-      const tabs=[['summary','복기'],['numbers','수치'],['ages','시대업'],['production','생산·연구'],['timeline','타임라인']];
-      workspace=header+`<nav class="review-tabs" role="tablist" aria-label="경기 분석 항목">${tabs.map(([id,title],i)=>`<button role="tab" id="tab-${id}" aria-controls="panel-${id}" aria-selected="${i===0}" tabindex="${i===0?0:-1}" data-panel="${id}">${title}</button>`).join('')}</nav><div class="review-body"><section id="panel-summary" role="tabpanel" aria-labelledby="tab-summary" tabindex="0"><div class="highlights">${highlights||'<p class="compact-note">비교할 시대 전환 기록 없음</p>'}</div>${renderFieldControl(a)}${renderReview(m)}${renderBasics(mine,theirs,other)}${renderMethods(a)}</section><section id="panel-numbers" role="tabpanel" aria-labelledby="tab-numbers" tabindex="0" hidden>${renderNumbersPanel(a.review,mine,theirs,other)}</section><section id="panel-ages" role="tabpanel" aria-labelledby="tab-ages" tabindex="0" hidden>${renderAgePanel(mine,theirs,other)}</section><section id="panel-production" role="tabpanel" aria-labelledby="tab-production" tabindex="0" hidden>${renderProductionPanel()}</section><section id="panel-timeline" role="tabpanel" aria-labelledby="tab-timeline" tabindex="0" hidden>${renderTimelinePanel()}</section></div>`+links;
+      const tabs=[['summary','복기'],['numbers','수치'],['ages','시대업'],['production','생산·연구'],['timeline','경기 흐름']];
+      workspace=header+`<nav class="review-tabs" role="tablist" aria-label="경기 분석 항목">${tabs.map(([id,title],i)=>`<button role="tab" id="tab-${id}" aria-controls="panel-${id}" aria-selected="${i===0}" tabindex="${i===0?0:-1}" data-panel="${id}">${title}</button>`).join('')}</nav><div class="review-body"><section id="panel-summary" role="tabpanel" aria-labelledby="tab-summary" tabindex="0"><div class="highlights">${highlights||'<p class="compact-note">비교할 시대 전환 기록 없음</p>'}</div>${renderReview(m)}${renderBasics(mine,theirs,other)}${renderMethods(a)}</section><section id="panel-numbers" role="tabpanel" aria-labelledby="tab-numbers" tabindex="0" hidden>${renderNumbersPanel(a.review,mine,theirs,other)}</section><section id="panel-ages" role="tabpanel" aria-labelledby="tab-ages" tabindex="0" hidden>${renderAgePanel(mine,theirs,other)}</section><section id="panel-production" role="tabpanel" aria-labelledby="tab-production" tabindex="0" hidden>${renderProductionPanel()}</section><section id="panel-timeline" role="tabpanel" aria-labelledby="tab-timeline" tabindex="0" hidden>${renderTimelinePanel(a)}</section></div>`+links;
     }
     $('#match-detail').innerHTML=`<div class="review-workspace">${workspace}</div>`;
     if(a)bindWorkspace($('#match-detail .review-workspace'),mine,theirs,other,a.review,a.map_view,m);

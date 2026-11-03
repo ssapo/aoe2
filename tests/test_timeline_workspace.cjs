@@ -2,7 +2,7 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 
-test('record paging keeps the reading position and playback still seeks on either tab',()=>{
+test('paging and field selection keep the flow tab and scroll position with one time control',()=>{
   const nodes=new Map();
   const node=()=>({value:'all',hidden:false,textContent:'',innerHTML:'',scrollTop:0,dataset:{},
     listeners:{},attributes:{},style:{values:{},setProperty(k,v){this.values[k]=v;}},classList:{toggle(){}},setAttribute(key,value){this.attributes[key]=value;},focus(){},
@@ -13,10 +13,9 @@ test('record paging keeps the reading position and playback still seeks on eithe
   const body=get('.review-body');
   let active=false;body.classList.toggle=(name,on)=>{if(name==='timeline-active')active=on;};
   get('#production-search').value='';
-  const jump={...node(),dataset:{seekRecord:'15'}};
-  nodes.set('#field-open',jump);get('#field-seek').value='15';get('#field-seek').max='40';
+  get('#field-time-plot').dataset.duration='40';
   const track={...node(),getBoundingClientRect:()=>({left:100,width:400})};
-  const root={querySelector:get,querySelectorAll:selector=>selector==='[role="tab"]'?tabs:selector==='[role="tabpanel"]'?panels:selector==='[data-seek-record]'?[jump]:selector==='[data-field-track]'?[track]:[]};
+  const root={querySelector:get,querySelectorAll:selector=>selector==='[role="tab"]'?tabs:selector==='[role="tabpanel"]'?panels:selector==='[data-field-track]'?[track]:[]};
   const code=fs.readFileSync(path.join(__dirname,'../site/app.js'),'utf8');
   const ctx=vm.createContext({root,window:{},document:{querySelector:()=>({open:true})},
     label:String,esc:String,number:String,fmtTime:String,performance:{now:()=>0},
@@ -39,12 +38,15 @@ test('record paging keeps the reading position and playback still seeks on eithe
   get('#record-play').listeners.click();assert.equal(get('#record-play').attributes['aria-label'],'일시정지');
   get('#record-play').listeners.click();assert.equal(get('#record-play').attributes['aria-label'],'재생');
   assert.equal(nodes.has('#record-events'),false);
-  tabs[0].listeners.click();assert.equal(active,false);
-  get('#field-seek').value='15';get('#field-seek').listeners.input();
-  assert.equal(get('#field-time-readout').textContent,'15');
-  jump.listeners.click();assert.equal(active,true);assert.equal(body.scrollTop,0);assert.equal(get('#record-seek').value,'15');
-  tabs[0].listeners.click();
+  assert.equal(nodes.has('#field-seek'),false);
+  get('#record-seek').value='15';get('#record-seek').listeners.input();
+  assert.equal(get('#field-time-plot').style.values['--field-cursor'],'37.5%');
+  assert.equal(body.scrollTop,480);
   track.listeners.click({clientX:300});assert.equal(active,true);assert.equal(get('#record-seek').value,'20');
+  assert.equal(body.scrollTop,480);
   assert.equal(get('#field-time-plot').style.values['--field-cursor'],'50%');
-  get('#record-next').listeners.click();assert.equal(get('#field-seek').value,'21');
+  get('#record-next').listeners.click();assert.equal(get('#field-time-plot').style.values['--field-cursor'],'52.5%');
+  track.listeners.click({clientX:50});assert.equal(get('#record-seek').value,'0');assert.equal(body.scrollTop,480);
+  track.listeners.click({clientX:600});assert.equal(get('#record-seek').value,'40');assert.equal(body.scrollTop,480);
+  tabs[0].listeners.click();assert.equal(active,false);
 });

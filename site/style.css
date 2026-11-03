@@ -279,10 +279,17 @@ body.review-open{overflow:hidden}
 .field-time-cursor:before{content:"";position:absolute;top:-1px;left:-3px;width:8px;height:8px;border-radius:50%;background:#314a35}
 .field-time-axis{position:relative;height:23px;margin-top:5px;color:#6d7964;font-size:10px;font-variant-numeric:tabular-nums}
 .field-time-axis span{position:absolute;transform:translateX(-50%);white-space:nowrap}.field-time-axis span:first-child{transform:none}.field-time-axis span:last-child{transform:translateX(-100%)}
-.field-scrub-row{margin-left:calc(var(--field-label-width) + var(--field-lane-gap))}
-#field-seek{display:block;width:100%;height:32px;padding:0;margin:0;border:0;background:transparent;accent-color:var(--green);cursor:ew-resize}
-.field-time-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:2px}
-.field-time-actions output{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;color:#314d37}
-.field-time-actions button{min-height:36px;padding:6px 10px;border-radius:5px;background:#e8eee2;color:#34543b;font-size:11px}
 .field-time-hint{font-size:10px;color:#6b7762;line-height:1.7;margin:6px 0 0}
-@media(max-width:600px){.field-windows{--field-label-width:48px;--field-lane-gap:8px}.field-time-labels span{font-size:10px}.field-time-axis{font-size:9px}.field-time-actions button{min-height:40px}}
+@media(max-width:600px){.field-windows{--field-label-width:48px;--field-lane-gap:8px}.field-time-labels span{font-size:10px}.field-time-axis{font-size:9px}}
+
+/* The shared playback controls drive both the map and the field overview. */
+.flow-overview{padding:9px 12px;margin:12px 0 0;border:1px solid var(--border);border-radius:8px;background:#fff}
+.flow-overview>summary{font-weight:600;color:#3c553f}.flow-overview>summary small{font-weight:400;font-size:10px;color:#74806b;margin-left:7px}
+.flow-overview .field-time-chart{margin-top:9px}
+.flow-overview .field-time-labels,.flow-overview .field-time-lanes{grid-template-rows:repeat(3,18px);gap:4px}
+.flow-overview .field-time-mark{top:3px;bottom:3px}
+.flow-overview .field-time-cursor{height:68px}
+.flow-overview .field-time-mark.field-home{background:#4c805c}.flow-overview .field-time-mark.field-middle{background:#777e6b}.flow-overview .field-time-mark.field-away{background:#a96b51}
+.flow-overview .field-time-axis{height:18px;margin-top:4px}
+.flow-overview .field-time-hint{margin-top:0}
+.flow-statistics{margin:0 0 16px}.flow-statistics>summary{font-weight:500;padding:8px 0}.flow-statistics .field-control{margin:4px 0 0}
