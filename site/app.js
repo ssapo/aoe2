@@ -77,7 +77,14 @@
     return `<table class="timeline event-table split-timeline"><colgroup><col class="time-col"><col><col></colgroup><thead><tr><th scope="col">시간</th><th scope="col" class="mine-col">${civBadge(civs[0],'나')}</th><th scope="col" class="theirs-col">${civBadge(civs[1],'상대')}</th></tr></thead><tbody>${rows.map(r=>`<tr><th scope="row">${fmtTime(r.second)}</th><td class="mine-col">${cell(r.mine)}</td><td class="theirs-col">${cell(r.theirs)}</td></tr>`).join('')}</tbody></table>`;
   }
   function renderTimelinePanel() {
-    return `<details class="record-player" open><summary>기록 재생</summary><p class="compact-note">양쪽의 생산·건설·연구·시장 요청을 시간순으로 재생해요. 맵에는 해당 시각까지의 건설 요청이 나타나요.</p><div class="player-controls"><button id="record-play">재생</button><button id="record-prev" aria-label="이전 기록으로">이전</button><button id="record-next" aria-label="다음 기록으로">다음</button><label>배속 <select id="record-speed"><option value="1">1×</option><option value="4">4×</option><option value="16" selected>16×</option><option value="64">64×</option></select></label><output id="record-clock"></output></div><input id="record-seek" type="range" min="0" step="0.01" value="0" aria-label="기록 재생 시간"><div id="building-map-host"></div><div id="record-events"></div></details><div class="panel-toolbar"><div class="segments" role="group" aria-label="타임라인 선수"><button data-side="both" aria-pressed="true">양측</button><button data-side="mine" aria-pressed="false">나</button><button data-side="theirs" aria-pressed="false">상대</button></div><label class="select-label">명령<select id="timeline-kind"><option value="all">전체</option><option value="QUEUE">생산</option><option value="BUILD">건설</option><option value="RESEARCH">연구</option><option value="BUY">시장 구매</option><option value="SELL">시장 판매</option></select></label><label class="select-label">시간<select id="timeline-range"></select></label></div><div class="timeline-pagination"><span id="timeline-count" role="status"></span><div><button id="timeline-prev" aria-label="이전 명령 페이지">이전</button><span id="timeline-page"></span><button id="timeline-next" aria-label="다음 명령 페이지">다음</button></div></div><div id="timeline-table"></div><p class="compact-note">같은 초의 기록을 한 행에 모았어요. 건설·생산·연구·시장 거래를 요청한 시각이며 완료 시각과는 달라요.</p>`;
+    return `<div class="timeline-workspace">
+      <div class="timeline-dock" role="group" aria-label="기록 재생 조작">
+        <div class="player-controls"><button id="record-play">재생</button><button id="record-prev" aria-label="이전 기록으로">이전</button><button id="record-next" aria-label="다음 기록으로">다음</button><label>배속 <select id="record-speed"><option value="1">1×</option><option value="4">4×</option><option value="16" selected>16×</option><option value="64">64×</option></select></label><output id="record-clock" aria-label="현재 시간 / 전체 시간"></output></div>
+        <input id="record-seek" type="range" min="0" step="0.01" value="0" aria-label="기록 재생 시간">
+      </div>
+      <div class="timeline-stage"><div id="building-map-host"></div><section class="record-recent" aria-labelledby="record-recent-title"><h3 id="record-recent-title">최근 기록</h3><div id="record-events" tabindex="0" role="region" aria-label="현재 시각까지의 최근 기록"></div></section></div>
+      <section class="timeline-history" aria-labelledby="timeline-history-title"><h3 id="timeline-history-title">전체 기록</h3><div class="panel-toolbar"><div class="segments" role="group" aria-label="타임라인 선수"><button data-side="both" aria-pressed="true">양측</button><button data-side="mine" aria-pressed="false">나</button><button data-side="theirs" aria-pressed="false">상대</button></div><label class="select-label">명령<select id="timeline-kind"><option value="all">전체</option><option value="QUEUE">생산</option><option value="BUILD">건설</option><option value="RESEARCH">연구</option><option value="BUY">시장 구매</option><option value="SELL">시장 판매</option></select></label><label class="select-label">시간<select id="timeline-range"></select></label></div><div class="timeline-pagination"><span id="timeline-count" role="status"></span><div><button id="timeline-prev" aria-label="이전 명령 페이지">이전</button><span id="timeline-page"></span><button id="timeline-next" aria-label="다음 명령 페이지">다음</button></div></div><div id="timeline-table"></div><p class="compact-note">생산·건설·연구·시장 거래를 요청한 시각이에요. 완료 시각과는 달라요.</p></section>
+    </div>`;
   }
   function renderBasics(mine,theirs,other) {
     const controlled=p=>p.food_evidence?.livestock_control?`${number(p.food_evidence.livestock_control.observed_targets)}개체`:'—';
@@ -95,6 +102,7 @@
     const activate=id=>{
       tabs.forEach(t=>{const selected=t.dataset.panel===id;t.setAttribute('aria-selected',String(selected));t.tabIndex=selected?0:-1;});
       root.querySelectorAll('[role="tabpanel"]').forEach(p=>p.hidden=p.id!==`panel-${id}`);
+      body.classList.toggle('timeline-active',id==='timeline');
       body.scrollTop=0;
     };
     tabs.forEach((tab,i)=>{
@@ -153,10 +161,10 @@
     search.addEventListener('input',renderProduction);
     renderProduction();
     const events=[...[mine,theirs].flatMap((metrics,side)=>(metrics.full_timeline||metrics.timeline||[]).map(e=>({...e,side:side?'theirs':'mine'})))].sort((a,b)=>a.seconds-b.seconds);
-    const playerBox=root.querySelector('.record-player'),seek=root.querySelector('#record-seek'),play=root.querySelector('#record-play');
+    const seek=root.querySelector('#record-seek'),play=root.querySelector('#record-play');
     const civs=[match.analysis?.civilization||match.civilization,other?.civilization];
     const mapHost=root.querySelector('#building-map-host');
-    mapHost.innerHTML=mapData?`<div class="map-legend">${civBadge(civs[0],'나')}${civBadge(civs[1],'상대')}</div><div class="map-focus"><button data-map-focus="all">전체 맵</button><button data-map-focus="mine">내 본진</button><button data-map-focus="theirs">상대 본진</button></div><canvas id="building-map" width="720" height="420" role="img" aria-label="실제 지형과 양측 건설 요청 위치"></canvas><p id="building-map-info" class="compact-note" aria-live="polite">건물 표시를 누르면 이름·시각·좌표를 볼 수 있어요.</p><p class="compact-note">초록은 나, 빨강은 상대. 시작 건물과 누적 건설 요청 위치예요. 취소·파괴·완료는 반영하지 않아요. 금·돌·열매도 시작 위치예요.</p>`:'<p class="compact-note">이 경기의 맵 자료는 다음 재분석 후 표시돼요.</p>';
+    mapHost.innerHTML=mapData?`<div class="map-toolbar"><div class="map-legend">${civBadge(civs[0],'나')}${civBadge(civs[1],'상대')}</div><div class="map-focus"><button data-map-focus="all">전체 맵</button><button data-map-focus="mine">내 본진</button><button data-map-focus="theirs">상대 본진</button></div></div><canvas id="building-map" width="720" height="420" role="img" aria-label="실제 지형과 양측 건설 요청 위치"></canvas><p id="building-map-info" class="compact-note" aria-live="polite">건물 표시를 누르면 이름·시각·좌표를 볼 수 있어요.</p><details class="map-note"><summary>지도 표시 기준</summary><p class="compact-note">초록은 나, 빨강은 상대. 시작 건물과 누적 건설 요청 위치예요. 취소·파괴·완료는 반영하지 않아요. 금·돌·열매도 시작 위치예요.</p></details>`:'<p class="compact-note">이 경기의 맵 자료는 다음 재분석 후 표시돼요.</p>';
     const mapPlayer=mapData?window.SSAPOBuildingMap.mount(root.querySelector('#building-map'),root.querySelector('#building-map-info'),mapData,events,label,fmtTime):null;
     root.querySelectorAll('[data-map-focus]').forEach(b=>b.addEventListener('click',()=>mapPlayer?.focus(b.dataset.mapFocus)));
     const end=events.length?events[events.length-1].seconds:0;
@@ -175,14 +183,13 @@
       if(timer!==null){stop();return;}if(cursor>=end)cursor=start;
       lastTick=performance.now();play.textContent='일시정지';
       timer=setInterval(()=>{
-        if(!play.isConnected||!document.querySelector('#match-dialog')?.open||root.querySelector('#panel-timeline').hidden||!playerBox.open||document.hidden){stop();return;}
+        if(!play.isConnected||!document.querySelector('#match-dialog')?.open||root.querySelector('#panel-timeline').hidden||document.hidden){stop();return;}
         const now=performance.now();cursor=Math.min(end,cursor+(now-lastTick)/1000*Number(root.querySelector('#record-speed').value));lastTick=now;drawPlayer();if(cursor>=end)stop();
       },100);
     });
     seek.addEventListener('input',()=>{stop();cursor=Number(seek.value);drawPlayer();});
     root.querySelector('#record-prev').addEventListener('click',()=>{stop();cursor=[...events].reverse().find(e=>e.seconds<cursor)?.seconds??start;drawPlayer();});
     root.querySelector('#record-next').addEventListener('click',()=>{stop();cursor=events.find(e=>e.seconds>cursor)?.seconds??end;drawPlayer();});
-    playerBox.addEventListener('toggle',()=>{if(!playerBox.open)stop();});
     drawPlayer();
     const range=root.querySelector('#timeline-range');
     const intervals=[...new Set(events.map(e=>Math.floor(e.seconds/300)))];
@@ -205,8 +212,8 @@
       root.querySelectorAll('[data-side]').forEach(t=>t.setAttribute('aria-pressed',String(t===b)));renderTimeline();
     }));
     [range,kind].forEach(select=>select.addEventListener('change',()=>{page=0;renderTimeline();}));
-    root.querySelector('#timeline-prev').addEventListener('click',()=>{page--;renderTimeline();body.scrollTop=0;});
-    root.querySelector('#timeline-next').addEventListener('click',()=>{page++;renderTimeline();body.scrollTop=0;});
+    root.querySelector('#timeline-prev').addEventListener('click',()=>{page--;renderTimeline();});
+    root.querySelector('#timeline-next').addEventListener('click',()=>{page++;renderTimeline();});
     renderTimeline();
   }
   function toast(message) { $('#toast').textContent=message; $('#toast').hidden=false; clearTimeout(toastTimer); toastTimer=setTimeout(()=>$('#toast').hidden=true,4000); }

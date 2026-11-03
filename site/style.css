@@ -174,7 +174,41 @@ body.review-open{overflow:hidden}
 
 [data-number-panel="market"] td{white-space:pre-line;line-height:1.7}
 
-.record-player{border:1px solid #dfe5d8;border-radius:8px;padding:12px;margin-bottom:16px;background:#f6f8f2}.record-player summary{cursor:pointer;font-weight:600}.player-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0}.player-controls output{margin-left:auto;font-variant-numeric:tabular-nums}.record-player input[type=range]{width:100%;margin:8px 0}.record-event{display:grid;grid-template-columns:46px 42px 1fr;gap:8px;padding:8px 0;border-bottom:1px solid #e3e8dd;font-size:12px}.record-event:first-child{font-weight:600}.record-event time{font-variant-numeric:tabular-nums}
+/* Keep playback controls beside the time bar and below the analysis tabs. */
+.review-body.timeline-active{padding-top:0;overflow-anchor:none}
+#panel-timeline,.timeline-workspace{min-height:100%}
+.timeline-dock{position:sticky;top:0;z-index:4;margin:0 -24px;padding:10px 24px 7px;background:var(--paper);border-bottom:1px solid var(--border);box-shadow:0 3px 8px #24382e0a}
+.player-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0}
+.player-controls button{min-height:38px;padding:6px 12px;border:1px solid #d5dfcb;border-radius:5px;background:#fff;color:#314c32;font-size:12px}
+.player-controls #record-play{background:var(--green);border-color:var(--green);color:#fff;min-width:72px}
+.player-controls label{display:flex;align-items:center;gap:5px;font-size:11px;white-space:nowrap}
+.player-controls select{font:inherit;min-height:38px;border:1px solid #d5dfcb;border-radius:5px;background:#fff;color:var(--ink);padding:3px 5px}
+.player-controls output{margin-left:auto;font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
+#record-seek{display:block;width:100%;height:32px;padding:0;margin:2px 0 0;accent-color:var(--green);border:0;background:transparent;cursor:pointer;touch-action:pan-y}
+.timeline-stage{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:18px;padding:14px 0 18px;align-items:start}
+.timeline-stage>*,.record-recent{min-width:0}
+.record-recent{display:flex;flex-direction:column;height:clamp(240px,39dvh,360px);border:1px solid var(--border);border-radius:8px;background:#fff;overflow:hidden}
+.record-recent h3,.timeline-history h3{font-size:13px;font-weight:600;margin:0 0 10px}
+.record-recent h3{flex:none;margin:0;padding:9px 12px;border-bottom:1px solid var(--border)}
+#record-events{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;overflow-anchor:none}
+#record-events .compact-note{padding:12px;margin:0}
+#record-events .event-table{margin:0}
+.timeline-history{border-top:1px solid var(--border);padding-top:16px}
+#timeline-table .event-table thead{position:static}
+@media(max-width:700px){
+ .timeline-stage{grid-template-columns:minmax(0,1fr);gap:12px}
+ #building-map{width:auto;max-width:100%;max-height:29dvh;margin-inline:auto}
+ .record-recent{height:210px}
+}
+@media(max-width:600px){
+ .timeline-dock{margin:0 -14px;padding:8px 14px 5px}
+ .player-controls{gap:6px}
+ .player-controls button{padding:5px 9px;min-height:36px}
+ .player-controls #record-play{min-width:64px}
+ .player-controls select{min-height:36px}
+ .player-controls output{font-size:11px}
+}
+@media(max-width:380px){.player-controls output{flex-basis:100%;margin-left:0;text-align:right}}
 
 /* Shared time axis keeps both players readable on phones. */
 .split-timeline{table-layout:fixed;width:100%;border-collapse:collapse}
@@ -192,7 +226,6 @@ body.review-open{overflow:hidden}
 @media(max-width:600px){
  .split-timeline .time-col{width:42px}
  .split-timeline td,.split-timeline th{padding:7px 5px;font-size:12px;line-height:1.45}
- .record-player{padding:9px}
  .player-controls button,.player-controls select{min-height:36px}
 }
 
@@ -202,3 +235,9 @@ body.review-open{overflow:hidden}
 #building-map{display:block;width:100%;height:auto;background:#18271e;border-radius:8px;cursor:crosshair;touch-action:manipulation}.map-legend{display:flex;flex-wrap:wrap;gap:18px;margin:8px 0}.map-legend .own-civ{border-left:4px solid #2cbd5c;padding-left:6px}.map-legend .opponent-civ{border-left:4px solid #ed5058;padding-left:6px}.map-focus{display:flex;gap:8px;margin:10px 0}.map-focus button{background:#e3eade;color:#294333;padding:7px 10px;border-radius:4px;font-size:12px}.split-timeline .civ-badge{flex-wrap:wrap;gap:4px;font-size:11px}.split-timeline .civ-badge img{width:22px;height:22px}@media(max-width:600px){.map-focus button{min-height:36px}.map-legend{gap:10px}.split-timeline .civ-badge img{width:20px;height:20px}}
 
 .player-search{padding:15px;border:1px solid var(--border);border-radius:8px;background:#fff;margin-bottom:18px}.profile-shortcuts{display:flex;gap:8px}.profile-shortcuts button{background:#e8efe2;color:#31533b;padding:6px 12px;border-radius:5px}.player-search form{display:flex;gap:8px}.player-search input{min-width:0;flex:1;padding:10px;border:1px solid #cbd5c4;border-radius:5px}.player-search form>button{background:#2d5e45;color:#fff;padding:8px 18px;border-radius:5px}.player-result{display:flex;justify-content:space-between;gap:10px;align-items:center;width:100%;padding:10px;background:#f5f7f0;border-bottom:1px solid var(--border);text-align:left;overflow-wrap:anywhere}.player-result span{font-size:11px;color:#64705b}.player-search .compact-note{margin:8px 0 0}@media(max-width:600px){.player-result{align-items:flex-start;flex-direction:column;gap:2px}.player-search{padding:12px}.player-search .section-heading{align-items:center}.profile-shortcuts button{min-height:36px}}
+
+.map-toolbar{display:flex;align-items:center;justify-content:space-between;gap:6px 12px;flex-wrap:wrap;margin-bottom:8px}
+.map-toolbar .map-legend{margin:0;gap:10px}
+.map-toolbar .map-focus{margin:0;gap:5px}
+.map-toolbar .map-focus button{padding:5px 8px;min-height:34px;font-size:11px}
+.map-note{margin-top:6px}.map-note summary{font-size:11px}.map-note .compact-note{margin-top:4px}
