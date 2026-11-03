@@ -1,5 +1,5 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');
-const {summarize}=require('../site/field-control.js');
+const {summarize,timeline}=require('../site/field-control.js');
 const bases=[{side:'mine',label:'Town Center',x:10,y:50},{side:'theirs',label:'Town Center',x:100,y:50}];
 const event=(side,seconds,x,y=50)=>({side,seconds,x,y,kind:'MOVE'});
 const data=events=>({size:120,initial_buildings:bases,command_activity:events});
@@ -26,4 +26,14 @@ test('same-side, distant, late and invalid targets produce no contact sample',()
 test('nearby commands across a window boundary match, while simultaneous zones share time',()=>{
  const a=summarize(data([event('mine',9.9,95),event('theirs',10.1,96)]),60);assert.equal(a.total,10);
  const b=summarize(data([...pair(1,15),...pair(1,95)]),60);assert.equal(b.total,10);assert.equal(b.seconds.home,5);assert.equal(b.seconds.away,5);
+});
+test('visual lanes share the full match time scale and clip intervals at its edges',()=>{
+ const visual=timeline({intervals:[{start:-10,end:20,zones:['home']},{start:40,end:60,zones:['middle','away']},{start:90,end:120,zones:['away']}]},100);
+ assert.equal(visual.end,100);
+ assert.deepEqual(visual.lanes[0].marks,[{start:0,end:20,left:0,width:20}]);
+ assert.equal(visual.lanes[1].marks[0].left,40);
+ assert.equal(visual.lanes[1].marks[0].width,20);
+ assert.equal(visual.lanes[2].marks[1].left,90);
+ assert.equal(visual.lanes[2].marks[1].width,10);
+ assert.equal(timeline({intervals:[]},0).end,0);
 });

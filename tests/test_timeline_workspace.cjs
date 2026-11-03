@@ -4,8 +4,8 @@ const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 
 test('record paging keeps the reading position and playback still seeks on either tab',()=>{
   const nodes=new Map();
-  const node=()=>({value:'all',hidden:false,textContent:'',innerHTML:'',scrollTop:0,
-    listeners:{},attributes:{},style:{setProperty(){}},classList:{toggle(){}},setAttribute(key,value){this.attributes[key]=value;},focus(){},
+  const node=()=>({value:'all',hidden:false,textContent:'',innerHTML:'',scrollTop:0,dataset:{},
+    listeners:{},attributes:{},style:{values:{},setProperty(k,v){this.values[k]=v;}},classList:{toggle(){}},setAttribute(key,value){this.attributes[key]=value;},focus(){},
     addEventListener(type,fn){this.listeners[type]=fn;}});
   const get=selector=>{if(!nodes.has(selector))nodes.set(selector,node());return nodes.get(selector);};
   const tabs=['summary','timeline'].map(id=>({...node(),dataset:{panel:id}}));
@@ -14,7 +14,9 @@ test('record paging keeps the reading position and playback still seeks on eithe
   let active=false;body.classList.toggle=(name,on)=>{if(name==='timeline-active')active=on;};
   get('#production-search').value='';
   const jump={...node(),dataset:{seekRecord:'15'}};
-  const root={querySelector:get,querySelectorAll:selector=>selector==='[role="tab"]'?tabs:selector==='[role="tabpanel"]'?panels:selector==='[data-seek-record]'?[jump]:[]};
+  nodes.set('#field-open',jump);get('#field-seek').value='15';get('#field-seek').max='40';
+  const track={...node(),getBoundingClientRect:()=>({left:100,width:400})};
+  const root={querySelector:get,querySelectorAll:selector=>selector==='[role="tab"]'?tabs:selector==='[role="tabpanel"]'?panels:selector==='[data-seek-record]'?[jump]:selector==='[data-field-track]'?[track]:[]};
   const code=fs.readFileSync(path.join(__dirname,'../site/app.js'),'utf8');
   const ctx=vm.createContext({root,window:{},document:{querySelector:()=>({open:true})},
     label:String,esc:String,number:String,fmtTime:String,performance:{now:()=>0},
@@ -38,5 +40,11 @@ test('record paging keeps the reading position and playback still seeks on eithe
   get('#record-play').listeners.click();assert.equal(get('#record-play').attributes['aria-label'],'재생');
   assert.equal(nodes.has('#record-events'),false);
   tabs[0].listeners.click();assert.equal(active,false);
+  get('#field-seek').value='15';get('#field-seek').listeners.input();
+  assert.equal(get('#field-time-readout').textContent,'15');
   jump.listeners.click();assert.equal(active,true);assert.equal(body.scrollTop,0);assert.equal(get('#record-seek').value,'15');
+  tabs[0].listeners.click();
+  track.listeners.click({clientX:300});assert.equal(active,true);assert.equal(get('#record-seek').value,'20');
+  assert.equal(get('#field-time-plot').style.values['--field-cursor'],'50%');
+  get('#record-next').listeners.click();assert.equal(get('#field-seek').value,'21');
 });

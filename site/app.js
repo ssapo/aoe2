@@ -182,10 +182,12 @@
     let cursor=start,timer=null,lastTick=0;
     const showPlaying=playing=>{const text=playing?'일시정지':'재생';play.setAttribute('aria-pressed',String(playing));play.setAttribute('aria-label',text);play.title=text;};
     const stop=()=>{if(timer!==null)clearInterval(timer);timer=null;showPlaying(false);};
+    let syncFieldClock=()=>{};
     const drawPlayer=()=>{
       mapPlayer?.draw(cursor);seek.value=String(cursor);root.querySelector('#record-clock').textContent=`${fmtTime(cursor)} / ${fmtTime(end)}`;
       seek.style.setProperty('--replay-progress',`${end>start?(cursor-start)/(end-start)*100:0}%`);
       seek.setAttribute('aria-valuetext',`${fmtTime(cursor)} / ${fmtTime(end)}`);
+      syncFieldClock(cursor);
     };
     play.disabled=!events.length;
     play.addEventListener('click',()=>{
@@ -200,10 +202,30 @@
     root.querySelector('#record-prev').addEventListener('click',()=>{stop();cursor=[...events].reverse().find(e=>e.seconds<cursor)?.seconds??start;drawPlayer();});
     root.querySelector('#record-next').addEventListener('click',()=>{stop();cursor=events.find(e=>e.seconds>cursor)?.seconds??end;drawPlayer();});
     drawPlayer();
-    root.querySelectorAll('[data-seek-record]').forEach(button=>button.addEventListener('click',()=>{
-      stop();activate('timeline');cursor=Math.max(start,Math.min(end,Number(button.dataset.seekRecord)));
+    const openRecordAt=time=>{
+      stop();activate('timeline');cursor=Math.max(start,Math.min(end,time));
       drawPlayer();seek.focus({preventScroll:true});
-    }));
+    };
+    root.querySelectorAll('[data-seek-record]').forEach(button=>button.addEventListener('click',()=>openRecordAt(Number(button.dataset.seekRecord))));
+    const fieldSlider=root.querySelector('#field-seek');
+    if(fieldSlider){
+      const plot=root.querySelector('#field-time-plot'),readout=root.querySelector('#field-time-readout'),open=root.querySelector('#field-open');
+      const maximum=Number(fieldSlider.max);
+      syncFieldClock=time=>{
+        const selected=Math.max(0,Math.min(maximum,time));
+        fieldSlider.value=String(selected);readout.textContent=fmtTime(selected);
+        fieldSlider.setAttribute('aria-valuetext',fmtTime(selected));
+        plot.style.setProperty('--field-cursor',`${maximum?selected/maximum*100:0}%`);
+        open.dataset.seekRecord=String(selected);
+      };
+      fieldSlider.addEventListener('input',()=>syncFieldClock(Number(fieldSlider.value)));
+      root.querySelectorAll('[data-field-track]').forEach(track=>track.addEventListener('click',event=>{
+        const bounds=track.getBoundingClientRect();if(!bounds.width)return;
+        const time=Math.round(Math.max(0,Math.min(1,(event.clientX-bounds.left)/bounds.width))*maximum);
+        syncFieldClock(time);openRecordAt(time);
+      }));
+      syncFieldClock(Number(fieldSlider.value));
+    }
     const range=root.querySelector('#timeline-range');
     const intervals=[...new Set(events.map(e=>Math.floor(e.seconds/300)))];
     range.innerHTML='<option value="all">전체 시간</option>'+intervals.map(i=>`<option value="${i}">${i*5}–${(i+1)*5}분</option>`).join('');
@@ -346,6 +368,12 @@
     const stages=['전체','암흑','봉건','성주','왕정'].filter(s=>s==='전체'||[...review.own_findings,...review.opponent_findings].some(f=>f.stage===s));
     return `${review.practice?`<details class="practice-card"><summary><strong>${esc(review.practice.title)}</strong><span>이번 ${fmtTime(review.practice.current_seconds)} → 목표 ${fmtTime(review.practice.target_seconds)}</span></summary><p>${esc(review.practice.evidence)}</p><p>${esc(review.practice.action)}</p></details>`:''}<div class="opening-pair"><span>나 · ${esc(review.own.opening_label)}</span><span>상대 · ${esc(review.opponent.opening_label)}</span></div><div class="panel-toolbar"><div class="segments stage-segments" role="group" aria-label="복기할 시대">${stages.map((s,i)=>`<button data-review-stage="${s}" aria-pressed="${i===0}">${s}</button>`).join('')}</div><button class="subtle" data-open-panel="numbers">수치 비교 →</button></div><div class="signal-columns"><div id="own-findings">${findingSide('나',review.own_findings)}</div><div id="opponent-findings">${findingSide('상대',review.opponent_findings)}</div></div>`;
   }
+  function renderFieldTimeline(field,duration) {
+    const {end,lanes}=window.SSAPOFieldControl.timeline(field,duration);
+    if(!end)return '';
+    const names={home:'내 진영',middle:'중앙',away:'상대 진영'},first=field.intervals[0]?.start||0;
+    return `<details class="field-windows" open><summary>구간 타임라인</summary><div class="field-time-chart"><div class="field-time-labels" aria-hidden="true">${lanes.map(l=>`<span>${names[l.zone]}</span>`).join('')}</div><div id="field-time-plot" class="field-time-plot" style="--field-cursor:${first/end*100}%"><div class="field-time-lanes" aria-hidden="true">${lanes.map(l=>`<div class="field-lane-track" data-field-track="${l.zone}" title="눌러서 이 시각의 지도 보기">${l.marks.map(m=>`<span class="field-time-mark field-${l.zone}" style="left:${m.left}%;width:${m.width}%"></span>`).join('')}</div>`).join('')}</div><span class="field-time-cursor" aria-hidden="true"></span><div class="field-time-axis" aria-hidden="true">${[0,.25,.5,.75,1].map(t=>`<span style="left:${t*100}%">${fmtTime(end*t)}</span>`).join('')}</div></div></div><div class="field-scrub-row"><input id="field-seek" type="range" min="0" max="${end}" step="1" value="${first}" aria-label="전장 위치 시간 선택" aria-describedby="field-time-hint"></div><div class="field-time-actions"><output id="field-time-readout" for="field-seek">${fmtTime(first)}</output><button id="field-open" data-seek-record="${first}">지도에서 보기 ↗</button></div><p id="field-time-hint" class="field-time-hint">색 막대는 지시가 겹친 구간이에요. 눌러서 지도를 보거나 시간 바를 움직여 선택할 수 있어요.</p></details>`;
+  }
   function renderFieldControl(analysis) {
     const field=window.SSAPOFieldControl.summarize(analysis.map_view,analysis.duration_game_seconds);
     if(!field)return '';
@@ -353,7 +381,7 @@
     const names=Object.fromEntries(zones);
     const largest=zones.filter(([id])=>field.seconds[id]===Math.max(...Object.values(field.seconds))).map(([id])=>id);
     const lead=!field.total?'양쪽 지시가 가까이 겹친 구간을 찾지 못했어요.':!field.enough?'겹친 구간이 짧아서 비율은 아직 표시하지 않아요.':largest.length===1?`${names[largest[0]]}에서 양쪽 지시가 가장 자주 맞물렸어요.`:'여러 지역에서 비슷한 비중으로 맞물렸어요.';
-    return `<section class="field-control" aria-labelledby="field-title"><div class="field-heading"><h3 id="field-title">전장 위치</h3><span>명령 기반 추정</span></div><p class="field-lead">${lead}</p>${field.total?`<p class="field-caption">가까이 겹친 지시 구간 ${fmtTime(Math.round(field.total))} · ${field.bins}개 시간 구간${field.enough?' 안의 비율':''}</p>${field.enough?`<div class="field-bar" role="img" aria-label="${zones.map(([id,name])=>name+' '+field.percentages[id]+'%').join(', ')}">${zones.map(([id])=>`<span class="field-${id}" style="flex:${field.percentages[id]}"></span>`).join('')}</div>`:''}<div class="field-stats">${zones.map(([id,name])=>`<div><span>${name}</span>${field.enough?`<strong>${field.percentages[id]}<small>%</small></strong>`:''}<time>${fmtTime(Math.round(field.seconds[id]))}</time></div>`).join('')}</div><details class="field-windows"><summary>해당 구간 보기</summary><div class="field-intervals">${field.intervals.map(interval=>`<button data-seek-record="${interval.start}" aria-label="${fmtTime(interval.start)} 지도에서 보기"><time>${fmtTime(interval.start)}–${fmtTime(interval.end)}</time><span>${interval.zones.map(z=>names[z]).join(' · ')}</span><span aria-hidden="true">↗</span></button>`).join('')}</div></details>`:''}<details class="field-method"><summary>계산 기준</summary><p>양측의 지시 지점이 8타일 이내이고 명령 시각이 10초 이내인 경우를 찾아, 10초 구간당 한 번만 세요. 같은 구간에 여러 지역이 겹치면 시간을 나눠요. 시작 TC 사이를 3등분해 내 진영·중앙·상대 진영을 구분해요.</p><p>비율은 이렇게 찾은 구간 안의 분포예요. 실제 교전 시간·맵 점유율·승리 기여도는 아니에요. 주민이나 가축에게 내린 지시도 포함될 수 있어요. 겹친 구간이 30초 미만이면 비율을 생략해요.</p></details></section>`;
+    return `<section class="field-control" aria-labelledby="field-title"><div class="field-heading"><h3 id="field-title">전장 위치</h3><span>명령 기반 추정</span></div><p class="field-lead">${lead}</p>${field.total?`<p class="field-caption">가까이 겹친 지시 구간 ${fmtTime(Math.round(field.total))} · ${field.bins}개 시간 구간${field.enough?' 안의 비율':''}</p>${field.enough?`<div class="field-bar" role="img" aria-label="${zones.map(([id,name])=>name+' '+field.percentages[id]+'%').join(', ')}">${zones.map(([id])=>`<span class="field-${id}" style="flex:${field.percentages[id]}"></span>`).join('')}</div>`:''}<div class="field-stats">${zones.map(([id,name])=>`<div><span>${name}</span>${field.enough?`<strong>${field.percentages[id]}<small>%</small></strong>`:''}<time>${fmtTime(Math.round(field.seconds[id]))}</time></div>`).join('')}</div>${renderFieldTimeline(field,analysis.duration_game_seconds)}`:''}<details class="field-method"><summary>계산 기준</summary><p>양측의 지시 지점이 8타일 이내이고 명령 시각이 10초 이내인 경우를 찾아, 10초 구간당 한 번만 세요. 같은 구간에 여러 지역이 겹치면 시간을 나눠요. 시작 TC 사이를 3등분해 내 진영·중앙·상대 진영을 구분해요.</p><p>비율은 이렇게 찾은 구간 안의 분포예요. 실제 교전 시간·맵 점유율·승리 기여도는 아니에요. 주민이나 가축에게 내린 지시도 포함될 수 있어요. 겹친 구간이 30초 미만이면 비율을 생략해요.</p></details></section>`;
   }
   function renderNumbersPanel(review,mine,theirs,other) {
     if(!review)return '<p class="panel-empty">다음 수집이 끝나면 수치를 볼 수 있어요.</p>';

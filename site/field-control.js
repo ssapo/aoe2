@@ -48,5 +48,13 @@
     return {seconds,percentages,total,intervals,bins:samples,enough:total>=30,
       basis:'opposing_command_targets_8_tiles_10_seconds_initial_tc_axis_thirds'};
   }
-  const api={summarize};if(typeof module==='object'&&module.exports)module.exports=api;else global.SSAPOFieldControl=api;
+  function timeline(field,duration){
+    const intervals=field?.intervals||[];
+    const end=Number.isFinite(duration)&&duration>0?duration:Math.max(0,...intervals.map(e=>e.end));
+    return {end,lanes:zones.map(zone=>({zone,marks:intervals.filter(e=>e.zones.includes(zone)).flatMap(e=>{
+      const start=Math.max(0,e.start),stop=Math.min(end,e.end);
+      return end>0&&stop>start?[{start,end:stop,left:start/end*100,width:(stop-start)/end*100}]:[];
+    })}))};
+  }
+  const api={summarize,timeline};if(typeof module==='object'&&module.exports)module.exports=api;else global.SSAPOFieldControl=api;
 })(typeof window==='undefined'?globalThis:window);
