@@ -13,7 +13,8 @@ test('record paging keeps the reading position and playback still seeks on eithe
   const body=get('.review-body');
   let active=false;body.classList.toggle=(name,on)=>{if(name==='timeline-active')active=on;};
   get('#production-search').value='';
-  const root={querySelector:get,querySelectorAll:selector=>selector==='[role="tab"]'?tabs:selector==='[role="tabpanel"]'?panels:[]};
+  const jump={...node(),dataset:{seekRecord:'15'}};
+  const root={querySelector:get,querySelectorAll:selector=>selector==='[role="tab"]'?tabs:selector==='[role="tabpanel"]'?panels:selector==='[data-seek-record]'?[jump]:[]};
   const code=fs.readFileSync(path.join(__dirname,'../site/app.js'),'utf8');
   const ctx=vm.createContext({root,window:{},document:{querySelector:()=>({open:true})},
     label:String,esc:String,number:String,fmtTime:String,performance:{now:()=>0},
@@ -37,4 +38,5 @@ test('record paging keeps the reading position and playback still seeks on eithe
   get('#record-play').listeners.click();assert.equal(get('#record-play').attributes['aria-label'],'재생');
   assert.equal(nodes.has('#record-events'),false);
   tabs[0].listeners.click();assert.equal(active,false);
+  jump.listeners.click();assert.equal(active,true);assert.equal(body.scrollTop,0);assert.equal(get('#record-seek').value,'15');
 });
