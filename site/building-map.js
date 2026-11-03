@@ -26,7 +26,7 @@
     const size=data.size,scale=120/size;
     const pos=(x,y)=>project(x*scale,y*scale,120);
     const back=document.createElement('canvas');back.width=720;back.height=420;
-    const bg=back.getContext('2d');bg.fillStyle='#18271e';bg.fillRect(0,0,720,420);
+    const bg=back.getContext('2d');bg.fillStyle='#eef1e8';bg.fillRect(0,0,720,420);
     let index=0;
     for(const [terrain,elevation,count] of data.terrain_runs){
       bg.fillStyle=data.terrain_names?.[terrain]?.colors?.level||'#879481';
