@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MAX_DOWNLOAD = 64 * 1024 * 1024
 MAX_REPLAY = 256 * 1024 * 1024
 AGE_IDS = {101: '봉건', 102: '성주', 103: '왕정'}
-ANALYSIS_REVISION = 8
+ANALYSIS_REVISION = 9
 
 
 def now():
@@ -252,6 +252,24 @@ def food_order_evidence(raw, match):
     return result
 
 
+def random_civ_flags(decoded):
+    """Map profile_id -> True/False from the DE lobby flag `prefer_random`.
+
+    The match-history API does not carry this, so it is only known for replays we
+    parse. Missing or unreadable values are left out instead of guessed."""
+    try:
+        from mgz.fast.header import parse
+        players = parse(io.BytesIO(decoded)).get('de', {}).get('players', [])
+    except Exception:
+        return {}
+    flags = {}
+    for p in players:
+        pid, flag = p.get('profile_id'), p.get('prefer_random')
+        if isinstance(pid, int) and pid > 0 and isinstance(flag, bool):
+            flags[pid] = flag
+    return flags
+
+
 def analyze_replay(raw, own_id):
     from mgz.model import parse_match
     decoded = decode_replay(raw)
@@ -272,11 +290,12 @@ def analyze_replay(raw, own_id):
     own_metrics.update(detailed_metrics(match, own))
     own_metrics['food_evidence'] = food.get(own.number)
     own_metrics['berry_switches'] = berry.get(own.number)
-    opponents = [{'name': p.name, 'civilization': p.civilization, 'metrics': dict(command_metrics(match, p), **detailed_metrics(match, p), food_evidence=food.get(p.number), berry_switches=berry.get(p.number))}
+    randoms = random_civ_flags(decoded)
+    opponents = [{'name': p.name, 'civilization': p.civilization, 'random_civ': randoms.get(p.profile_id), 'metrics': dict(command_metrics(match, p), **detailed_metrics(match, p), food_evidence=food.get(p.number), berry_switches=berry.get(p.number))}
                  for p in match.players if p.number != own.number and p not in (own.team or [])]
     return {
         'parser': 'mgz', 'analysis_revision': ANALYSIS_REVISION, 'duration_game_seconds': seconds(match.duration + match.restored_at),
-        'civilization': own.civilization, 'map': match.map.name, 'map_view': map_view,
+        'civilization': own.civilization, 'random_civ': randoms.get(own.profile_id), 'map': match.map.name, 'map_view': map_view,
         'metrics': own_metrics, 'opponents': opponents,
         'insights': coaching(own_metrics, opponents, len(match.players)),
         'limitations': ['생산 지시량은 양수 amount의 합. 생산 완료·생존 수가 아니며 취소·자원 부족·인구 제한을 반영하지 않습니다. 건설·연구 명령도 실제 완료와 다를 수 있습니다.',

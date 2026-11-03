@@ -249,3 +249,11 @@ body.review-open{overflow:hidden}
 .map-toolbar .map-focus{margin:0;gap:5px}
 .map-toolbar .map-focus button{padding:5px 8px;min-height:34px;font-size:11px}
 .map-note{margin-top:6px}.map-note summary{font-size:11px}.map-note .compact-note{margin-top:4px}
+
+/* Random civ marker: a small pill that wraps with the name on phones. */
+.civ-random{display:inline-flex;align-items:center;gap:3px;margin-left:2px;padding:1px 6px 1px 4px;border:1px solid #d8ddcc;border-radius:999px;background:#f3f5ee;color:#5f6d57;font-size:10px;font-weight:600;line-height:1.5;white-space:nowrap;vertical-align:middle}
+.civ-random svg{width:11px;height:11px;flex:none}
+.civ-random rect{fill:none;stroke:currentColor;stroke-width:1.4}
+.civ-random circle{fill:currentColor}
+.civ-badge{flex-wrap:wrap}
+@media(max-width:600px){.civ-random{font-size:9px;padding:0 5px 0 3px}.civ-random svg{width:10px;height:10px}}

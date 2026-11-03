@@ -71,10 +71,10 @@
     for(const e of events){const second=Math.floor(e.seconds);if(!rows.has(second))rows.set(second,{second,mine:[],theirs:[]});rows.get(second)[e.side].push(e);}
     return [...rows.values()];
   }
-  function splitTimeline(rows,civs=[]) {
+  function splitTimeline(rows,civs=[],randoms=[]) {
     const types={QUEUE:'생산',DE_QUEUE:'생산',MULTIQUEUE:'생산',BUILD:'건설',RESEARCH:'연구',BUY:'시장 구매',SELL:'시장 판매'};
     const cell=events=>events.length?[...events].sort((a,b)=>a.seconds-b.seconds).map(e=>`<div class="timeline-order"><span>${esc(label(e.label))}${Number.isFinite(e.amount)?' × '+number(e.amount):''}</span><small>${esc(types[e.kind]||e.kind)}</small></div>`).join(''):'<span class="no-order" aria-label="이 시간에 기록 없음">—</span>';
-    return `<table class="timeline event-table split-timeline"><colgroup><col class="time-col"><col><col></colgroup><thead><tr><th scope="col">시간</th><th scope="col" class="mine-col">${civBadge(civs[0],'나')}</th><th scope="col" class="theirs-col">${civBadge(civs[1],'상대')}</th></tr></thead><tbody>${rows.map(r=>`<tr><th scope="row">${fmtTime(r.second)}</th><td class="mine-col">${cell(r.mine)}</td><td class="theirs-col">${cell(r.theirs)}</td></tr>`).join('')}</tbody></table>`;
+    return `<table class="timeline event-table split-timeline"><colgroup><col class="time-col"><col><col></colgroup><thead><tr><th scope="col">시간</th><th scope="col" class="mine-col">${civBadge(civs[0],'나',randoms[0])}</th><th scope="col" class="theirs-col">${civBadge(civs[1],'상대',randoms[1])}</th></tr></thead><tbody>${rows.map(r=>`<tr><th scope="row">${fmtTime(r.second)}</th><td class="mine-col">${cell(r.mine)}</td><td class="theirs-col">${cell(r.theirs)}</td></tr>`).join('')}</tbody></table>`;
   }
   function renderTimelinePanel() {
     return `<div class="timeline-workspace">
@@ -163,8 +163,9 @@
     const events=[...[mine,theirs].flatMap((metrics,side)=>(metrics.full_timeline||metrics.timeline||[]).map(e=>({...e,side:side?'theirs':'mine'})))].sort((a,b)=>a.seconds-b.seconds);
     const seek=root.querySelector('#record-seek'),play=root.querySelector('#record-play');
     const civs=[match.analysis?.civilization||match.civilization,other?.civilization];
+    const civRandoms=[match.analysis?.random_civ,other?.random_civ];
     const mapHost=root.querySelector('#building-map-host');
-    mapHost.innerHTML=mapData?`<div class="map-toolbar"><div class="map-legend">${civBadge(civs[0],'나')}${civBadge(civs[1],'상대')}</div><div class="map-focus"><button data-map-focus="all" aria-pressed="true">전체 맵</button><button data-map-focus="mine" aria-pressed="false">내 본진</button><button data-map-focus="theirs" aria-pressed="false">상대 본진</button>${Array.isArray(mapData.command_activity)?'<button id="map-activity" aria-pressed="true">유닛 지시</button>':''}</div></div><canvas id="building-map" width="720" height="420" role="img" aria-label="실제 지형과 양측 건설·이동 지시 위치"></canvas><p id="building-map-info" class="compact-note" aria-live="polite">${Array.isArray(mapData.command_activity)?'원은 최근 30초의 지시 지점, 원의 크기·숫자는 선택 대상 수예요.':'유닛 지시는 이 경기 재분석 후 표시돼요.'}</p><details class="map-note"><summary>지도 표시 기준</summary><p class="compact-note">초록은 나, 빨강은 상대. 시작 건물과 누적 건설 요청 위치예요. 취소·파괴·완료는 반영하지 않아요. 금·돌·열매도 시작 위치예요. 원은 이동·공격·대상 지시를 한 곳이에요. 실제 유닛 위치·이동 경로·생존 병력은 아니며 주민·가축도 포함될 수 있어요. 선택 수가 없는 지시는 크기를 추정하지 않아요.</p></details>`:'<p class="compact-note">이 경기의 맵 자료는 다음 재분석 후 표시돼요.</p>';
+    mapHost.innerHTML=mapData?`<div class="map-toolbar"><div class="map-legend">${civBadge(civs[0],'나',civRandoms[0])}${civBadge(civs[1],'상대',civRandoms[1])}</div><div class="map-focus"><button data-map-focus="all" aria-pressed="true">전체 맵</button><button data-map-focus="mine" aria-pressed="false">내 본진</button><button data-map-focus="theirs" aria-pressed="false">상대 본진</button>${Array.isArray(mapData.command_activity)?'<button id="map-activity" aria-pressed="true">유닛 지시</button>':''}</div></div><canvas id="building-map" width="720" height="420" role="img" aria-label="실제 지형과 양측 건설·이동 지시 위치"></canvas><p id="building-map-info" class="compact-note" aria-live="polite">${Array.isArray(mapData.command_activity)?'원은 최근 30초의 지시 지점, 원의 크기·숫자는 선택 대상 수예요.':'유닛 지시는 이 경기 재분석 후 표시돼요.'}</p><details class="map-note"><summary>지도 표시 기준</summary><p class="compact-note">초록은 나, 빨강은 상대. 시작 건물과 누적 건설 요청 위치예요. 취소·파괴·완료는 반영하지 않아요. 금·돌·열매도 시작 위치예요. 원은 이동·공격·대상 지시를 한 곳이에요. 실제 유닛 위치·이동 경로·생존 병력은 아니며 주민·가축도 포함될 수 있어요. 선택 수가 없는 지시는 크기를 추정하지 않아요.</p></details>`:'<p class="compact-note">이 경기의 맵 자료는 다음 재분석 후 표시돼요.</p>';
     const mapPlayer=mapData?window.SSAPOBuildingMap.mount(root.querySelector('#building-map'),root.querySelector('#building-map-info'),mapData,events,label,fmtTime):null;
     root.querySelectorAll('[data-map-focus]').forEach(b=>b.addEventListener('click',()=>{
       root.querySelectorAll('[data-map-focus]').forEach(t=>t.setAttribute('aria-pressed',String(t===b)));
@@ -213,7 +214,7 @@
       root.querySelector('#timeline-prev').disabled=page===0;
       root.querySelector('#timeline-next').disabled=page>=pages-1;
       const visible=rows.slice(page*size,(page+1)*size);
-      root.querySelector('#timeline-table').innerHTML=visible.length?splitTimeline(visible,civs):'<p class="panel-empty">이 조건의 명령 없음</p>';
+      root.querySelector('#timeline-table').innerHTML=visible.length?splitTimeline(visible,civs,civRandoms):'<p class="panel-empty">이 조건의 명령 없음</p>';
     };
     root.querySelectorAll('[data-side]').forEach(b=>b.addEventListener('click',()=>{
       side=b.dataset.side;page=0;
@@ -256,16 +257,17 @@
   }
   const civNames={Achaemenids:'아케메네스',Armenians:'아르메니아',Athenians:'아테네',Aztecs:'아즈텍',Bengalis:'벵골',Berbers:'베르베르',Bohemians:'보헤미아',Britons:'브리튼',Bulgarians:'불가리아',Burgundians:'부르고뉴',Burmese:'버마',Byzantines:'비잔틴',Celts:'켈트',Chinese:'중국',Cumans:'쿠만',Danes:'덴마크',Dravidians:'드라비다',Ethiopians:'에티오피아',Franks:'프랑크',Georgians:'조지아',Goths:'고트',Gurjaras:'구르자라',Hindustanis:'힌두스탄',Huns:'훈',Incas:'잉카',Italians:'이탈리아',Japanese:'일본',Jurchens:'여진',Khitans:'거란',Khmer:'크메르',Koreans:'한국',Lithuanians:'리투아니아',Macedonians:'마케도니아',Magyars:'마자르',Malay:'말레이',Malians:'말리',Mapuche:'마푸체',Maya:'마야',Mongols:'몽골',Muisca:'무이스카',Persians:'페르시아',Poles:'폴란드',Portuguese:'포르투갈',Puru:'푸루',Romans:'로마',Saracens:'사라센',Saxons:'색슨',Shu:'촉',Sicilians:'시칠리아',Slavs:'슬라브',Spanish:'스페인',Spartans:'스파르타',Tatars:'타타르',Teutons:'튜턴',Thracians:'트라키아',Tupi:'투피',Turks:'투르크',Varangians:'바랑기아',Vietnamese:'베트남',Vikings:'바이킹',Wei:'위',Wu:'오'};
   const civIconFiles={Maya:'mayans'};
-  function civBadge(civ,side){
+  const randomMark='<span class="civ-random" title="랜덤으로 고른 문명"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="13" rx="3"/><circle cx="5.2" cy="5.2" r="1.25"/><circle cx="10.8" cy="10.8" r="1.25"/><circle cx="8" cy="8" r="1.25"/></svg>랜덤</span>';
+  function civBadge(civ,side,random){
     const name=civNames[civ]||civ||'문명 확인 전';
     const icon=Object.hasOwn(civNames,civ)?`<img src="assets/civs/${civIconFiles[civ]||civ.toLowerCase()}.png" alt="" width="28" height="28" loading="lazy">`:'';
-    return `<span class="civ-badge ${side==='나'?'own-civ':'opponent-civ'}" title="${esc(civ||name)}"><small>${esc(side)}</small>${icon}<span>${esc(name)}</span></span>`;
+    return `<span class="civ-badge ${side==='나'?'own-civ':'opponent-civ'}" title="${esc(civ||name)}"><small>${esc(side)}</small>${icon}<span>${esc(name)}</span>${random===true?randomMark:''}</span>`;
   }
   function matchCivs(m){
     const own=m.analysis?.civilization||m.civilization;
     const opponents=m.analysis?.opponents||[];
     const fallback=(m.players||[]).filter(p=>!p.is_self);
-    return `<span class="match-civs">${civBadge(own,'나')}${opponents.length?opponents.map(p=>civBadge(p.civilization,'상대')).join(''):fallback.map(p=>civBadge(p.civilization,'상대')).join('')}</span>`;
+    return `<span class="match-civs">${civBadge(own,'나',m.analysis?.random_civ)}${opponents.length?opponents.map(p=>civBadge(p.civilization,'상대',p.random_civ)).join(''):fallback.map(p=>civBadge(p.civilization,'상대')).join('')}</span>`;
   }
   function renderMatches() {
     const matches=(report.matches||[]).filter(m=>filter==='all'||m.result===filter);

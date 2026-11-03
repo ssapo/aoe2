@@ -7,7 +7,7 @@ ssapo의 **AoE2: DE 1v1 경기 복기 웹앱**. 기본 계정 외에 이름 검�
 - 고정 게임 서버 프로필 ID: **26260702**
 - AoE2 Insights 사용자 ID: **13810994** · https://www.aoe2insights.com/user/13810994/
 - 두 ID는 다르다. 리플 다운로드와 경기 API에는 게임 서버 프로필 ID를 사용한다.
-- 문서 기준: **2026-11-03**. 현재 파싱 개정은 `ANALYSIS_REVISION = 8`, 파생 복기 개정은 `review.revision = 1`. 실제 값은 코드에서 재확인한다.
+- 문서 기준: **2026-11-03**. 현재 파싱 개정은 `ANALYSIS_REVISION = 9`, 파생 복기 개정은 `review.revision = 1`. 실제 값은 코드에서 재확인한다.
 
 ## Claude 및 다음 작업자를 위한 시작 순서
 
@@ -502,3 +502,12 @@ python scripts/build_preview.py /tmp/SSAPO_AoE2_preview.html
 - 원인: `civNames`가 9종만 있어 나머지 문명(Maya·Dravidians·Celts 등)은 영문명·아이콘 없이 표시됐다.
 - aoe2techtree의 문명 아이콘 62종 전체를 추가하고 한글명을 매핑. 데이터의 `Maya`는 아이콘 파일 `mayans.png`로 연결.
 - 검증: Hera 프로필(50경기) 목록을 Playwright로 열어 아이콘 없는 배지 0개·깨진 이미지 0개 확인. Node 검사 5종 통과. 버전 문자열 `20261103-all-civs`.
+
+
+### 2026-11-03 랜덤 문명 표시 (개정 9)
+
+- 리플 DE 헤더의 선수별 `prefer_random`(문명 랜덤 선택 여부)을 `random_civ_flags()`로 읽어 `analysis.random_civ`와 `analysis.opponents[].random_civ`에 저장. 값은 true/false이고, 읽을 수 없으면 필드를 비운다. 추정하지 않는다.
+- 확인 근거: Hera 4경기는 양측 모두 true(랜덤), ssapo #518239882(프랑크 직접 선택)는 양측 false. 경기 기록 API(getRecentMatchHistory)의 `matchhistoryreportresults`·`slotinfo` 메타데이터에는 랜덤 여부가 없어 **리플 분석된 경기에만** 표시된다.
+- 리플 원본은 여전히 저장하지 않는다. 분석 중 메모리에 있는 리플에서 값만 읽는다. 개정을 9로 올려 기존 분석 경기는 예약 수집이 순차 재분석하며 채운다. 직접 수집 Render 서버는 별도 브랜치이므로 함께 갱신해야 그쪽 결과에도 표시된다.
+- 화면: 문명 이름 옆 주사위 아이콘 + `랜덤` 작은 알약 표시. 경기 목록·분석 헤더·지도 범례·타임라인 열 제목에 동일 적용. 직접 고른 문명(false)·미확인은 아무것도 붙이지 않는다. 좁은 화면에서는 배지가 줄바꿈된다.
+- 검증: Python 39개(랜덤 플래그 2개 추가)·Node 5종 통과. 임의로 플래그를 넣은 로컬 사본으로 1200px·390px 목록/분석/타임라인 캡처 확인, 가로 넘침 없음.

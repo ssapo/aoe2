@@ -121,3 +121,25 @@ class CollectorTests(unittest.TestCase):
 
 
 if __name__=='__main__': unittest.main()
+
+
+def test_random_civ_flags_reads_prefer_random(monkeypatch):
+    import types, sys as _sys
+    fake = types.ModuleType('mgz.fast.header')
+    fake.parse = lambda _h: {'de': {'players': [
+        {'profile_id': 199325, 'prefer_random': True},
+        {'profile_id': 26260702, 'prefer_random': False},
+        {'profile_id': -1, 'prefer_random': True},
+        {'profile_id': 5, 'prefer_random': None},
+    ]}}
+    monkeypatch.setitem(_sys.modules, 'mgz.fast.header', fake)
+    assert collect.random_civ_flags(b'x') == {199325: True, 26260702: False}
+
+
+def test_random_civ_flags_unreadable_header_is_empty(monkeypatch):
+    import types, sys as _sys
+    fake = types.ModuleType('mgz.fast.header')
+    def boom(_h): raise RuntimeError('bad')
+    fake.parse = boom
+    monkeypatch.setitem(_sys.modules, 'mgz.fast.header', fake)
+    assert collect.random_civ_flags(b'x') == {}
