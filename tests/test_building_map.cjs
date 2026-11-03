@@ -1,5 +1,15 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');
-const {project,visibleBuildings,mount}=require('../site/building-map.js');
+const {project,visibleBuildings,recentActivity,mount}=require('../site/building-map.js');
+test('command circles expire, rewind, and replace the same group without merging players',()=>{
+ const e=(seconds,side,group,x=30)=>({seconds,side,group,x,y:40,selected_count:12});
+ const data={size:120,command_activity:[e(1,'mine',1),e(10,'mine',1,35),e(10,'theirs',1),e(21,'mine',2),e(15,'mine',3,-1)]};
+ assert.equal(recentActivity(data,0).length,0);
+ assert.equal(recentActivity(data,5)[0].x,30);
+ const active=recentActivity(data,20);assert.equal(active.length,2);assert.equal(active[0].x,35);
+ assert.equal(recentActivity(data,40).length,1);
+ assert.equal(recentActivity(data,60).length,0);
+ assert.equal(recentActivity(data,5)[0].seconds,1);
+});
 test('time seeking uses targets without inventing future buildings',()=>{
  const data={size:120,initial_buildings:[{x:22,y:50,side:'mine',label:'Town Center',initial:true}]};
  const events=[{kind:'BUILD',x:31,y:49,seconds:3.75,side:'mine',label:'House'},{kind:'BUILD',x:31,y:49,seconds:5,side:'mine',label:'House'},{kind:'BUILD',x:88,y:63,seconds:4.55,side:'theirs',label:'House'},{kind:'BUILD',x:-1,y:4,seconds:1,side:'mine',label:'Farm'}];

@@ -6,7 +6,7 @@ from pathlib import Path
 import gzip, json, os, re, secrets, subprocess, sys, tempfile, threading, time, urllib.request
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'scripts'))
-from collect import profile_id
+from collect import profile_id, ANALYSIS_REVISION
 
 class Busy(Exception):pass
 
@@ -67,7 +67,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.headers.get('Origin')!=self.allowed_origin:return self.reply(403,{'error':'Origin not allowed'})
         self.send_response(204);self.send_header('Access-Control-Allow-Origin',self.allowed_origin);self.send_header('Access-Control-Allow-Methods','GET, POST, OPTIONS');self.send_header('Access-Control-Allow-Headers','Content-Type');self.send_header('Vary','Origin');self.end_headers()
     def do_GET(self):
-        if self.path=='/health':return self.reply(200,{'status':'ok'})
+        if self.path=='/health':return self.reply(200,{'status':'ok','analysis_revision':ANALYSIS_REVISION})
         match=re.fullmatch(r'/jobs/([0-9a-f]{32})',self.path)
         if not match:return self.reply(404,{'error':'Not found'})
         row=self.jobs.get(match[1]);self.reply(200,row) if row else self.reply(404,{'error':'수집 결과가 만료됐어요. 다시 수집해 주세요.'})

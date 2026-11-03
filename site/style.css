@@ -174,41 +174,49 @@ body.review-open{overflow:hidden}
 
 [data-number-panel="market"] td{white-space:pre-line;line-height:1.7}
 
-/* Keep playback controls beside the time bar and below the analysis tabs. */
+/* Map-first replay layout; controls remain beside the scrubber while scrolling. */
 .review-body.timeline-active{padding-top:0;overflow-anchor:none}
 #panel-timeline,.timeline-workspace{min-height:100%}
-.timeline-dock{position:sticky;top:0;z-index:4;margin:0 -24px;padding:10px 24px 7px;background:var(--paper);border-bottom:1px solid var(--border);box-shadow:0 3px 8px #24382e0a}
+.timeline-workspace{--replay-accent:#edb85b;--replay-surface:#26231e;--replay-text:#f5f0e7;--replay-muted:#c3bbac;--replay-line:#4d463a}
+.timeline-dock{position:sticky;top:0;z-index:4;margin:0 -24px;padding:10px 24px 7px;background:var(--replay-surface);color:var(--replay-text);border-bottom:1px solid var(--replay-line);box-shadow:0 4px 12px #211d1920}
 .player-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0}
-.player-controls button{min-height:38px;padding:6px 12px;border:1px solid #d5dfcb;border-radius:5px;background:#fff;color:#314c32;font-size:12px}
-.player-controls #record-play{background:var(--green);border-color:var(--green);color:#fff;min-width:72px}
-.player-controls label{display:flex;align-items:center;gap:5px;font-size:11px;white-space:nowrap}
-.player-controls select{font:inherit;min-height:38px;border:1px solid #d5dfcb;border-radius:5px;background:#fff;color:var(--ink);padding:3px 5px}
-.player-controls output{margin-left:auto;font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
-#record-seek{display:block;width:100%;height:32px;padding:0;margin:2px 0 0;accent-color:var(--green);border:0;background:transparent;cursor:pointer;touch-action:pan-y}
-.timeline-stage{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:18px;padding:14px 0 18px;align-items:start}
-.timeline-stage>*,.record-recent{min-width:0}
-.record-recent{display:flex;flex-direction:column;height:clamp(240px,39dvh,360px);border:1px solid var(--border);border-radius:8px;background:#fff;overflow:hidden}
-.record-recent h3,.timeline-history h3{font-size:13px;font-weight:600;margin:0 0 10px}
-.record-recent h3{flex:none;margin:0;padding:9px 12px;border-bottom:1px solid var(--border)}
-#record-events{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;overflow-anchor:none}
-#record-events .compact-note{padding:12px;margin:0}
-#record-events .event-table{margin:0}
+.player-controls button{min-height:38px;padding:6px 12px;border:1px solid var(--replay-line);border-radius:7px;background:#363128;color:var(--replay-text);font-size:12px}
+.player-controls button:hover:not(:disabled){background:#494032}
+.player-controls #record-play{display:grid;place-items:center;flex:none;width:42px;height:42px;padding:0;border:0;border-radius:50%;background:var(--replay-accent);color:#2b2112}
+#record-play svg{width:23px;height:23px;fill:currentColor;grid-area:1/1}
+#record-play .pause-icon,#record-play[aria-pressed=true] .play-icon{display:none}
+#record-play[aria-pressed=true] .pause-icon{display:block}
+.player-controls label{display:flex;align-items:center;gap:5px;font-size:11px;white-space:nowrap;color:var(--replay-muted)}
+.player-controls select{font:inherit;min-height:38px;border:1px solid var(--replay-line);border-radius:7px;background:#363128;color:var(--replay-text);padding:3px 5px;color-scheme:dark}
+.player-controls output{margin-left:auto;font:12px ui-monospace,SFMono-Regular,Consolas,monospace;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--replay-text)}
+#record-seek{display:block;appearance:none;-webkit-appearance:none;width:100%;height:30px;padding:0;margin:2px 0 0;border:0;background:transparent;cursor:pointer;touch-action:pan-y}
+#record-seek::-webkit-slider-runnable-track{height:5px;border-radius:5px;background:linear-gradient(90deg,var(--replay-accent) var(--replay-progress,0%),#5a5143 var(--replay-progress,0%))}
+#record-seek::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:14px;height:14px;margin-top:-4.5px;border:2px solid #fff0d3;border-radius:50%;background:var(--replay-accent);box-shadow:0 1px 5px #0005}
+#record-seek::-moz-range-track{height:5px;border-radius:5px;background:#5a5143}
+#record-seek::-moz-range-progress{height:5px;border-radius:5px;background:var(--replay-accent)}
+#record-seek::-moz-range-thumb{width:11px;height:11px;border:2px solid #fff0d3;border-radius:50%;background:var(--replay-accent)}
+.timeline-stage{padding:14px 0 18px;min-width:0}
+#building-map-host{padding:12px 14px;background:var(--replay-surface);color:var(--replay-text);border:1px solid #403a30;border-radius:12px;box-shadow:0 8px 22px #302a1710}
+#building-map-host #building-map{width:auto;height:auto;max-width:100%;max-height:39dvh;margin-inline:auto;border:1px solid #474739;border-radius:9px}
+#building-map-host .civ-badge small,#building-map-host .compact-note{color:var(--replay-muted)}
+#building-map-host .map-focus button{background:transparent;border:1px solid var(--replay-line);border-radius:6px;color:var(--replay-muted)}
+#building-map-host .map-focus button[aria-pressed=true]{background:#50412a;border-color:#9b7941;color:#ffda96}
+#building-map-host .map-note summary{color:var(--replay-muted)}
+#building-map-host>#building-map-info{min-height:19px;margin-top:8px;font-size:11px}
+.timeline-history h3{font-size:13px;font-weight:600;margin:0 0 10px}
 .timeline-history{border-top:1px solid var(--border);padding-top:16px}
 #timeline-table .event-table thead{position:static}
-@media(max-width:700px){
- .timeline-stage{grid-template-columns:minmax(0,1fr);gap:12px}
- #building-map{width:auto;max-width:100%;max-height:29dvh;margin-inline:auto}
- .record-recent{height:210px}
-}
+@media(max-width:700px){#building-map-host #building-map{max-height:29dvh}}
 @media(max-width:600px){
  .timeline-dock{margin:0 -14px;padding:8px 14px 5px}
  .player-controls{gap:6px}
  .player-controls button{padding:5px 9px;min-height:36px}
- .player-controls #record-play{min-width:64px}
+ .player-controls #record-play{width:38px;height:38px}
  .player-controls select{min-height:36px}
  .player-controls output{font-size:11px}
+ #building-map-host{padding:10px}
 }
-@media(max-width:380px){.player-controls output{flex-basis:100%;margin-left:0;text-align:right}}
+@media(max-width:350px){.player-controls output{flex-basis:100%;margin-left:0;text-align:right}}
 
 /* Shared time axis keeps both players readable on phones. */
 .split-timeline{table-layout:fixed;width:100%;border-collapse:collapse}

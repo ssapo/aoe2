@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MAX_DOWNLOAD = 64 * 1024 * 1024
 MAX_REPLAY = 256 * 1024 * 1024
 AGE_IDS = {101: '봉건', 102: '성주', 103: '왕정'}
-ANALYSIS_REVISION = 7
+ANALYSIS_REVISION = 8
 
 
 def now():
@@ -264,6 +264,9 @@ def analyze_replay(raw, own_id):
         raise ValueError('리플에서 본인 프로필을 확인할 수 없습니다.')
     from mapview import building_map
     map_view = building_map(match, own)
+    if map_view is not None:
+        from movement import command_activity
+        map_view['command_activity'] = command_activity(decoded, match, own)
     own_metrics = command_metrics(match, own)
     from details import detailed_metrics
     own_metrics.update(detailed_metrics(match, own))

@@ -5,7 +5,7 @@ const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 test('record paging keeps the reading position and playback still seeks on either tab',()=>{
   const nodes=new Map();
   const node=()=>({value:'all',hidden:false,textContent:'',innerHTML:'',scrollTop:0,
-    listeners:{},classList:{toggle(){}},setAttribute(){},focus(){},
+    listeners:{},attributes:{},style:{setProperty(){}},classList:{toggle(){}},setAttribute(key,value){this.attributes[key]=value;},focus(){},
     addEventListener(type,fn){this.listeners[type]=fn;}});
   const get=selector=>{if(!nodes.has(selector))nodes.set(selector,node());return nodes.get(selector);};
   const tabs=['summary','timeline'].map(id=>({...node(),dataset:{panel:id}}));
@@ -33,5 +33,8 @@ test('record paging keeps the reading position and playback still seeks on eithe
   assert.equal(get('#record-clock').textContent,'1 / 40');
   get('#record-seek').value='20';get('#record-seek').listeners.input();
   assert.equal(get('#record-clock').textContent,'20 / 40');
+  get('#record-play').listeners.click();assert.equal(get('#record-play').attributes['aria-label'],'일시정지');
+  get('#record-play').listeners.click();assert.equal(get('#record-play').attributes['aria-label'],'재생');
+  assert.equal(nodes.has('#record-events'),false);
   tabs[0].listeners.click();assert.equal(active,false);
 });
