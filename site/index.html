@@ -8,14 +8,16 @@
   <title>AoE2 리플 분석</title>
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="style.css?v=20261103-buildings">
-  <script defer src="collection-watch.js?v=20261103-buildings"></script>
-  <script defer src="building-map.js?v=20261103-buildings"></script>
-  <script defer src="app.js?v=20261103-buildings"></script>
+  <link rel="stylesheet" href="style.css?v=20261103-players">
+  <script defer src="collection-watch.js?v=20261103-players"></script>
+  <script defer src="building-map.js?v=20261103-players"></script>
+  <script defer src="player-search.js?v=20261103-players"></script>
+  <script defer src="app.js?v=20261103-players"></script>
 </head>
 <body>
   <main id="overview">
     <header class="topbar"><h1>AoE2 리플 분석</h1><div class="toolbar"><button class="subtle" id="refresh">새로고침</button><button class="subtle" id="open-settings">계정</button><a id="source-link" href="https://github.com/ssapo/aoe2" target="_blank" rel="noopener noreferrer">GitHub</a></div></header>
+    <section class="player-search" aria-labelledby="player-search-title"><div class="section-heading"><h2 id="player-search-title">유저 찾기</h2><div class="profile-shortcuts"><button data-profile-id="26260702" data-profile-name="ssapo">내 기록</button><button data-profile-id="199325" data-profile-name="Hera">Hera</button></div></div><form id="player-search-form"><input id="player-query" type="search" placeholder="닉네임 또는 게임 프로필 ID" aria-label="닉네임 또는 게임 프로필 ID" maxlength="80" required><button type="submit" id="player-search-submit">검색</button></form><p id="player-search-status" class="compact-note" role="status">RM 1v1 랭킹에 등록된 유저를 검색해요. 동명이인은 ID와 레이팅을 확인해 주세요.</p><div id="player-results"></div><p id="profile-view-note" class="compact-note"></p></section>
     <section class="connection" id="connection" aria-live="polite"></section>
     <section id="collection-feedback" class="collection-feedback" aria-live="polite" hidden><div><strong id="collection-title"></strong><p id="collection-hint"></p></div><button id="collection-dismiss" aria-label="수집 결과 자동 확인 닫기">닫기</button></section>
     <div class="section-heading"><h2><span id="player-name"></span> 요약</h2><span id="updated">연결 대기</span></div>
@@ -23,7 +25,7 @@
     <section id="history"><div class="section-heading"><h2>경기 기록 <span id="match-count" class="count">0</span></h2><div class="filters" role="group" aria-label="경기 결과 필터"><button class="selected" data-filter="all" aria-pressed="true">전체</button><button data-filter="win" aria-pressed="false">승리</button><button data-filter="loss" aria-pressed="false">패배</button></div></div><div id="matches"></div><div id="pagination" class="pagination" hidden><button id="load-more" class="subtle">더 보기</button></div></section>
   <small class="asset-notice">문명 아이콘: <a href="https://github.com/SiegeEngineers/aoe2techtree" target="_blank" rel="noopener noreferrer">AoE2 Tech Tree</a> · Age of Empires II © Microsoft Corporation. 비공식 개인 프로젝트입니다.</small>
 </main>
-  <dialog id="settings-dialog"><div class="dialog-head"><h2>계정 · 수집</h2><button class="close" data-close="settings-dialog" aria-label="닫기">×</button></div><p><b>ssapo</b> · 1v1</p><p><a href="https://www.aoe2insights.com/user/13810994/" target="_blank" rel="noopener noreferrer">AoE2 Insights 프로필</a></p><p><a href="https://github.com/ssapo/aoe2/actions/workflows/update.yml" target="_blank" rel="noopener noreferrer">GitHub 수집 실행</a></p><details><summary>수집 제한</summary><p>GitHub Actions로 약 30분마다 수집. 실행 지연, 리플 미제공, 파서 호환 문제로 일부 분석이 누락될 수 있음. 닉네임과 결과는 공개됨.</p><p>60일간 저장소 활동이 없으면 예약 실행이 중지될 수 있음. 새로고침은 저장된 결과만 다시 읽음.</p></details></dialog>
+  <dialog id="settings-dialog"><div class="dialog-head"><h2>계정 · 수집</h2><button class="close" data-close="settings-dialog" aria-label="닫기">×</button></div><p id="settings-profile"></p><p><a id="settings-profile-link" href="https://www.aoe2insights.com/user/13810994/" target="_blank" rel="noopener noreferrer">AoE2 Insights 프로필</a></p><p id="settings-collection-note"></p><p><a href="https://github.com/ssapo/aoe2/actions/workflows/update.yml" target="_blank" rel="noopener noreferrer">GitHub 수집 실행</a></p><details><summary>수집 제한</summary><p>GitHub Actions로 약 30분마다 수집. 실행 지연, 리플 미제공, 파서 호환 문제로 일부 분석이 누락될 수 있음. 닉네임과 결과는 공개됨.</p><p>60일간 저장소 활동이 없으면 예약 실행이 중지될 수 있음. 새로고침은 저장된 결과만 다시 읽음.</p></details></dialog>
   <dialog id="match-dialog" aria-labelledby="review-title"><div class="dialog-head"><span id="match-subtitle">경기 분석</span><div class="match-navigation"><button id="match-newer" aria-label="더 최근 경기">←</button><button id="match-older" aria-label="더 이전 경기">→</button><button class="close" data-close="match-dialog" aria-label="닫기" autofocus>×</button></div></div><div id="match-detail"></div></dialog>
   <div class="toast" id="toast" role="status" hidden></div>
 </body>

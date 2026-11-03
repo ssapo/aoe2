@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+from functools import lru_cache
 from collections import Counter
 from datetime import datetime, timezone
 import gzip
@@ -281,6 +282,18 @@ def analyze_replay(raw, own_id):
     }
 
 
+@lru_cache(maxsize=1)
+def civilization_names():
+    import aocref
+    data=Path(aocref.__file__).parent/'data/datasets/100.json'
+    return {int(k):v['name'] for k,v in json.loads(data.read_text())['civilizations'].items()}
+
+
+def civilization_name(value):
+    try:return civilization_names().get(int(value), f'문명 ID {value}')
+    except (TypeError,ValueError):return '문명 확인 전'
+
+
 def metadata(match, own_id, aliases):
     results = match.get('matchhistoryreportresults', [])
     own = next((p for p in results if int(p['profile_id']) == own_id), None)
@@ -293,11 +306,11 @@ def metadata(match, own_id, aliases):
         'id': int(match['id']), 'started_at': match.get('startgametime'),
         'finished_at': match.get('completiontime'),
         'map': str(match.get('mapname', 'Unknown')).removesuffix('.rms'),
-        'civilization': f'문명 ID {own.get("civilization_id", "?")}',
+        'civilization': civilization_name(own.get("civilization_id")),
         'result': result, 'rating_before': rating.get('oldrating'), 'rating_after': rating.get('newrating'),
         'match_type_id': match.get('matchtype_id'), 'players_count': len(results),
         'players': [{'profile_id': p['profile_id'], 'name': aliases.get(p['profile_id'], str(p['profile_id'])),
-                     'is_self': int(p['profile_id']) == own_id} for p in results],
+                     'is_self': int(p['profile_id']) == own_id, 'civilization': civilization_name(p.get('civilization_id'))} for p in results],
         'analysis_status': 'pending', 'analysis': None, 'attempts': 0,
         'source_url': f'https://www.aoe2insights.com/match/{int(match["id"])}/',
     }
@@ -396,7 +409,7 @@ def main():
         old[row['id']] = row
     output = {
         'schema_version': 1, 'updated_at': now(), 'last_checked_at': checked_at, 'sync_error': None,
-        'profile': {'id': own_id, 'insights_user_id': config.get('insights_user_id'), 'name': aliases.get(own_id, str(own_id))},
+        'profile': {'id': own_id, 'insights_user_id': config.get('insights_user_id') if own_id == config.get('profile_id') else None, 'name': aliases.get(own_id, str(own_id))},
         'matches': sorted([m for m in old.values() if not config.get('only_1v1') or m.get('players_count') == 2], key=lambda m: m.get('started_at') or 0, reverse=True)[:200],
     }
     write_report(args.output, output)

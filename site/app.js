@@ -5,6 +5,10 @@
   const repo = 'ssapo/aoe2';
   let report = {profile:null, matches:[]}, filter = 'all', visible = 12;
   let toastTimer;
+  let selectedProfile=window.SSAPOPlayers.profileId(new URL(location.href).searchParams.get('profile'))||26260702;
+  let selectedName=selectedProfile===26260702?'ssapo':selectedProfile===199325?'Hera':`프로필 ${selectedProfile}`;
+  let catalog=null,searchSequence=0;
+  const dataPath=(id,file)=>id===26260702?`data/${file}`:`data/profiles/${id}/${file}`;
   const fmtTime = (s) => Number.isFinite(s) ? `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}` : '—';
   const date = (stamp) => stamp ? new Date(typeof stamp === 'number' ? stamp*1000 : stamp).toLocaleString('ko-KR',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '아직 수집 전';
   const number = (n) => Number.isFinite(n) ? n.toLocaleString('ko-KR') : '—';
@@ -210,7 +214,7 @@
     const known = matches.filter(m=>['win','loss'].includes(m.result));
     const wins = known.filter(m=>m.result==='win').length;
     const latestRated = matches.find(m=>Number.isFinite(m.rating_after));
-    $('#player-name').textContent = report.profile?.name || 'ssapo';
+    $('#player-name').textContent = report.profile?.name || selectedName;
     $('#stat-games').textContent = number(matches.length);
     $('#stat-win').textContent = known.length ? `${Math.round(wins/known.length*100)}%` : '—';
     $('#stat-record').textContent = known.length ? `${wins}승 ${known.length-wins}패 · 저장된 경기 기준` : '결과 확인 경기 기준';
@@ -223,6 +227,7 @@
     const c = $('#connection');
     c.className = 'connection'+(report.sync_error?' error':'');
     if(report.sync_error) c.innerHTML=`<div class="text"><strong>수집 실패</strong><p>${esc(report.sync_error)} 마지막 확인: ${esc(date(report.last_checked_at))}</p></div><button class="connect">연결 확인</button>`;
+    else if(report.pending_profile)c.innerHTML=`<div class="text"><strong>${esc(selectedName)} · 아직 저장된 경기 없음</strong><p>GitHub 수집 실행에서 profile_id에 ${selectedProfile}을 입력해 주세요. 수집 후 이 화면에서 확인할 수 있어요.</p></div><button class="connect">계정 정보</button>`;
     else if(report.profile?.id) c.innerHTML=`<div class="text"><strong>${esc(report.profile.name)}</strong><p>약 30분마다 수집해요. 새로고침은 저장된 기록을 다시 불러와요.</p></div><button class="connect">계정 정보</button>`;
     else c.innerHTML='<div class="text"><strong>계정 연결 대기</strong><p>ssapo · 최초 수집 필요.</p></div><button class="connect">계정 정보</button>';
     const collectLink=document.createElement('a');
@@ -231,7 +236,7 @@
     collectLink.target='_blank';collectLink.rel='noopener noreferrer';
     collectLink.addEventListener('click',()=>{
       if(location.protocol==='file:'||window.SSAPO_BOOTSTRAP){toast('자동 결과 확인은 운영 사이트에서 지원. GitHub에서 Run workflow 실행.');return;}
-      collectionWatch.start();
+      toast(`추가 수집 ID: ${selectedProfile} · GitHub의 profile_id 입력란에 넣어주세요.`);collectionWatch.start();
     });
     c.insertBefore(collectLink,c.querySelector('.connect'));
     c.querySelector('.connect')?.addEventListener('click',openSettings);
@@ -266,7 +271,13 @@
     }
     $('#pagination').hidden=matches.length<=visible;
   }
-  function openSettings() { $('#settings-dialog').showModal(); }
+  function openSettings() {
+    $('#settings-profile').textContent=`${report.profile?.name||selectedName} · ID ${selectedProfile} · 1v1`;
+    $('#settings-profile-link').textContent=selectedProfile===26260702?'AoE2 Insights 프로필':'AoE II Companion 프로필';
+    $('#settings-profile-link').href=selectedProfile===26260702?'https://www.aoe2insights.com/user/13810994/':`https://www.aoe2companion.com/players/${selectedProfile}`;
+    $('#settings-collection-note').textContent=`추가 수집: Run workflow의 profile_id에 ${selectedProfile} 입력. 비워두면 ssapo와 Hera만 수집해요.`;
+    $('#settings-dialog').showModal();
+  }
   function reviewSignals(match) {
     const a=match.analysis, other=a?.opponents?.length===1?a.opponents[0]:null;
     if(!other)return [];
@@ -374,7 +385,7 @@
     const result=m.result==='win'?'승리':m.result==='loss'?'패배':'결과 미확인';
     const opponent=other?.name||(m.players||[]).filter(p=>!p.is_self).map(p=>p.name).join(', ')||'상대 정보 없음';
     const header=`<header class="review-header"><div class="review-heading-row"><span class="outcome ${m.result==='loss'?'loss':''}">${result}</span><h2 id="review-title">${esc(m.map)}</h2></div>${matchCivs(m)}<p class="review-opponent">vs ${esc(opponent)}</p><div class="review-meta"><span>${esc(date(m.started_at))}${a?' · '+fmtTime(a.duration_game_seconds):''}</span><span class="review-rating">${number(m.rating_before)} → ${number(m.rating_after)}</span></div></header>`;
-    const links=`<footer class="review-footer"><a href="https://aoe.ms/replay/?gameId=${Number(m.id)}&amp;profileId=26260702" target="_blank" rel="noopener noreferrer">리플 다운로드 ↗</a><a href="https://www.aoe2insights.com/match/${Number(m.id)}/" target="_blank" rel="noopener noreferrer">AoE2 Insights ↗</a><a href="https://aoe2.gg/matches/${Number(m.id)}?tab=insights" target="_blank" rel="noopener noreferrer">AoE2.GG ↗</a></footer>`;
+    const links=`<footer class="review-footer"><a href="https://aoe.ms/replay/?gameId=${Number(m.id)}&amp;profileId=${Number(report.profile?.id||selectedProfile)}" target="_blank" rel="noopener noreferrer">리플 다운로드 ↗</a><a href="https://www.aoe2insights.com/match/${Number(m.id)}/" target="_blank" rel="noopener noreferrer">AoE2 Insights ↗</a><a href="https://aoe2.gg/matches/${Number(m.id)}?tab=insights" target="_blank" rel="noopener noreferrer">AoE2.GG ↗</a></footer>`;
     let workspace;
     if(!a){
       workspace=header+`<div class="review-body"><p class="panel-empty">${esc(m.analysis_note||'리플 미확보 또는 분석 대기.')}</p></div>`+links;
@@ -394,31 +405,59 @@
   }
   let loadRequest=null;
   function load() {
-    if(!loadRequest)loadRequest=loadReport().finally(()=>{loadRequest=null;});
-    return loadRequest;
+    if(loadRequest?.id===selectedProfile)return loadRequest.promise;
+    const job={id:selectedProfile};job.promise=loadReport(job.id).finally(()=>{if(loadRequest===job)loadRequest=null;});loadRequest=job;return job.promise;
   }
-  async function loadReport() {
+  async function loadReport(id) {
     $('#refresh').disabled=true;
     try {
-      if(window.SSAPO_BOOTSTRAP) {
-        report=structuredClone(window.SSAPO_BOOTSTRAP);render();return true;
-      }
-      const response=await fetch(`data/report.json?t=${Date.now()}`,{cache:'no-store'});
+      if(window.SSAPO_BOOTSTRAP&&id===26260702){if(id!==selectedProfile)return false;report=structuredClone(window.SSAPO_BOOTSTRAP);render();return true;}
+      const response=await fetch(`${dataPath(id,'report.json')}?t=${Date.now()}`,{cache:'no-store'});
+      if(id!==selectedProfile)return false;
+      if(response.status===404&&id!==26260702){report={schema_version:1,profile:{id,name:selectedName},matches:[],pending_profile:true};render();return true;}
       if(!response.ok)throw Error(`HTTP ${response.status}`);
       const incoming=await response.json();
-      if(incoming.schema_version!==1||!Array.isArray(incoming.matches))throw Error('결과 파일 형식이 맞지 않습니다.');
-      report=incoming;render();return true;
+      if(id!==selectedProfile)return false;
+      if(incoming.schema_version!==1||!Array.isArray(incoming.matches)||incoming.profile?.id!==id)throw Error('Profile report mismatch');
+      report=incoming;selectedName=incoming.profile.name||selectedName;render();return true;
     } catch(error) {
-      // Keep the last successfully loaded report. Never substitute fictional data.
-      report={...report,sync_error:location.protocol==='file:'?'로컬 데이터 조회 제한. GitHub Pages에서 실행.':'결과 파일을 읽지 못했습니다. 잠시 후 다시 확인해 주세요.'};
-      render();
-      console.warn('Report loading failed:',error.message);
-      return false;
-    } finally {$('#refresh').disabled=false;}
+      if(id!==selectedProfile)return false;
+      report={...report,sync_error:'결과 파일을 읽지 못했어요. 잠시 후 다시 확인해 주세요.'};render();console.warn('Report loading failed:',error.message);return false;
+    } finally {if(id===selectedProfile)$('#refresh').disabled=false;}
   }
+  async function selectProfile(id,name,writeUrl=true){
+    id=window.SSAPOPlayers.profileId(id);if(!id)return;
+    collectionWatch.stop();$('#collection-feedback').hidden=true;
+    $('#match-dialog').close();document.body.classList.remove('review-open');
+    selectedProfile=id;selectedName=name||(id===26260702?'ssapo':id===199325?'Hera':`프로필 ${id}`);
+    report={profile:{id,name:selectedName},matches:[]};filter='all';visible=12;syncFilter();
+    if(writeUrl){const u=new URL(location.href);if(id===26260702)u.searchParams.delete('profile');else u.searchParams.set('profile',String(id));history.pushState({},'',u);}
+    $('#profile-view-note').textContent=id===26260702?'ssapo의 기록이에요.':`${selectedName}의 기록이에요. 비교표의 ‘나’는 선택한 유저를 뜻해요.`;
+    render();await load();
+  }
+  document.querySelectorAll('[data-profile-id]').forEach(b=>b.addEventListener('click',()=>selectProfile(b.dataset.profileId,b.dataset.profileName)));
+  window.addEventListener('popstate',()=>selectProfile(window.SSAPOPlayers.profileId(new URL(location.href).searchParams.get('profile'))||26260702,null,false));
+  $('#player-search-form').addEventListener('submit',async e=>{
+    e.preventDefault();const seq=++searchSequence,q=$('#player-query').value.trim();if(!q)return;
+    $('#player-search-submit').disabled=true;$('#player-search-status').textContent='유저를 찾고 있어요…';
+    try{
+      if(!catalog){const r=await fetch('data/players.json');if(!r.ok)throw Error('Index unavailable');const data=await r.json();if(!Array.isArray(data.players))throw Error('Invalid index');catalog=data;}
+      if(seq!==searchSequence)return;
+      const found=window.SSAPOPlayers.search(catalog.players,q),numeric=window.SSAPOPlayers.profileId(q);
+      if(numeric&&!found.length)found.push({id:numeric,name:`프로필 ${numeric}`});
+      $('#player-results').innerHTML=found.map(p=>`<button class="player-result" data-result-id="${p.id}"><strong>${esc(p.name)}</strong><span>ID ${p.id}${Number.isFinite(p.rating)?' · '+number(p.rating)+'점':''}${Number.isFinite(p.rank)?' · '+number(p.rank)+'위':''}</span></button>`).join('');
+      $('#player-results').querySelectorAll('[data-result-id]').forEach(b=>b.addEventListener('click',()=>{const p=found.find(p=>p.id===Number(b.dataset.resultId));selectProfile(p.id,p.name);}));
+      $('#player-search-status').textContent=found.length?`${found.length}명 표시 · RM 1v1 랭킹 명단 ${date(catalog.updated_at)} 갱신${catalog.complete?'':' · 일부 명단만 수집됨'}`:'일치하는 유저가 없어요. 비랭크·미등록 계정은 게임 서버 프로필 ID로 찾아주세요.';
+    }catch(error){
+      if(seq!==searchSequence)return;
+      const id=window.SSAPOPlayers.profileId(q)||(['hera','헤라'].includes(q.toLowerCase())?199325:null);
+      if(id){await selectProfile(id,id===199325?'Hera':null);$('#player-search-status').textContent='이름 명단을 불러오지 못해 프로필 ID로 이동했어요.';}
+      else $('#player-search-status').textContent='검색 명단을 불러오지 못했어요. Hera 바로가기나 숫자 프로필 ID를 이용해 주세요.';
+    }finally{if(seq===searchSequence)$('#player-search-submit').disabled=false;}
+  });
   const collectionWatch=window.createCollectionWatch({
     fetchStatus:async()=>{
-      const r=await fetch(`data/status.json?t=${Date.now()}`,{cache:'no-store'});
+      const r=await fetch(`${dataPath(selectedProfile,'status.json')}?t=${Date.now()}`,{cache:'no-store'});
       if(!r.ok)throw Error(`HTTP ${r.status}`);
       return r.json();
     },
@@ -429,7 +468,7 @@
     visible:()=>!document.hidden,
     onState:(state,detail)=>{
       const messages={
-        waiting:['GitHub에서 실행해 주세요','Run workflow를 열고 실행해 주세요. 사이트로 돌아오면 새 결과를 자동으로 확인해요.'],
+        waiting:['GitHub에서 실행해 주세요','Run workflow를 열고 실행해 주세요. profile_id에 현재 프로필 ID를 입력하고 실행해 주세요. 돌아오면 새 결과를 확인해요.'],
         retrying:['결과를 다시 확인하고 있어요','아직 상태를 불러오지 못했어요. 잠시 후 다시 확인해요.'],
         updated:['새 기록을 불러왔어요','최근 수집 결과로 바뀌었어요. 새 경기가 없으면 목록은 그대로예요.'],
         failed:['수집을 마치지 못했어요',detail||'기존 기록은 그대로 있어요. GitHub에서 실행 결과를 확인해 주세요.'],
@@ -452,5 +491,5 @@
   $('#load-more').addEventListener('click',()=>{visible+=12;renderMatches();});
   document.addEventListener('visibilitychange',()=>{if(!document.hidden){load();collectionWatch.check();}});
   setInterval(()=>{if(!document.hidden)load();},120000);
-  render();load();
+  selectProfile(selectedProfile,selectedName,false);
 })();
