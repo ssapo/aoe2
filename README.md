@@ -431,10 +431,10 @@ python scripts/build_preview.py /tmp/SSAPO_AoE2_preview.html
 - 무료 정적 사이트의 제한에 따라 미수집 계정은 GitHub workflow profile_id 입력으로 최초 생성. 공개 방문자의 검색만으로 서버 분석이 시작되지는 않음.
 - 검색·ID 검증·동명이인·개인정보 제외·경로 분리·이전 계정의 늦은 응답 차단 검사 추가. 브라우저 시각 검증 차단은 기존 제한으로 남음.
 
-### 준비 중: 사이트 내 직접 수집
+### 사이트 내 직접 수집 (Render 연결)
 
-- 운영 반영 전 기능 브랜치. `server/collect_service.py`가 GitHub 토큰 없이 기존 Python 수집기를 실행한다. POST /collect → job_id → GET /jobs/ID → 전체 보고서 반환. GET /health로 무료 서버 시작을 기다린다.
-- `render.yaml`: Python 3.12.11, plan=free, 512MB 무료 웹서비스, 포트는 PORT 또는 10000. 빌드에서 고정 의존성·mgz 패치를 준비한다. Start는 python server/collect_service.py. 서버 배포 전 실제 Render 연결·생성 권한 확인이 필요하며, 유료 플랜·유료 저장소를 만들지 않는다.
+- 기능 브랜치에서 준비한 직접 수집을 사용자가 만든 Render 서버에 연결. `server/collect_service.py`가 GitHub 토큰 없이 기존 Python 수집기를 실행한다. POST /collect → job_id → GET /jobs/ID → 전체 보고서 반환. GET /health로 무료 서버 시작을 기다린다.
+- `render.yaml`: Python 3.12.11, plan=free, 512MB 무료 웹서비스, 포트는 PORT 또는 10000. 빌드에서 고정 의존성·mgz 패치를 준비한다. Start는 python server/collect_service.py. 서버는 사용자가 직접 Free로 배포했고, 유료 플랜·유료 저장소를 만들지 않는다.
 - 프런트 `collection-client.js`를 app.js 전에 로드한다. 배포 후 `site/collection-service.json`의 endpoint를 실제 검증한 HTTPS origin으로 설정한다. 비밀 토큰은 필요 없고, endpoint 빈 값은 미연결 상태다. 빈 설정으로 운영 버튼을 완성했다고 보고하지 않는다.
 - 브라우저는 /health를 최대 2분 확인 후 POST 1회, 상태 조회 후 검증된 선택 계정 보고서만 적용한다. 취소·계정 전환 뒤 늦은 응답은 무시한다. 일반 새로고침에서 오래된 Pages 보고서가 현재 탭의 새 결과를 덮지 않도록 메모리 캐시한다.
 - 직접 수집 결과는 현재 탭 및 서버 메모리에만 임시 보관한다. GitHub 저장소에 쓰지 않는다. Render 재시작·유휴 종료 후 임시 결과가 사라질 수 있다. 기존 GitHub 예약 보고서는 영구 기록 경로로 유지한다.
@@ -442,4 +442,11 @@ python scripts/build_preview.py /tmp/SSAPO_AoE2_preview.html
 - CORS/POST Origin은 https://ssapo.github.io에 고정. 공개 데이터 서버이며 Origin 검사는 사용자 인증이나 완전한 남용 방지를 뜻하지 않는다. 웹서버 프로세스 재시작 시 메모리 제한 상태도 초기화된다.
 - 무료 Render는 유휴 15분 뒤 종료되고 다음 요청 시 약 1분 준비 시간이 있을 수 있다. 무료 시간 소진 시 중지되며 자동으로 유료 인스턴스를 사용하도록 설정하지 않는다. 실제 배포 전 Render 최신 무료 한도를 확인한다.
 - 테스트 추가: 중복 요청 통합·전체 동시 실행 제한·잘못된 계정 결과 차단·잘못된 입력·POST 실패·수집 취소·클라이언트 계정 검증. 현재 Python 36개 + Node 16개 = 52개 통과. 서버 로컬 검사와 배포 후 실제 수집 확인을 구분한다.
-- Render 연결이 확인되면: public feature branch로 Free 웹서비스 생성 → /health 확인 → 실제 계정 1회 수집 검증 → endpoint를 프런트 설정에 기록 → 기존 Pages main에 묶어서 반영 → 공개 버튼 흐름 확인. 현재 외부 서버가 생성됐다고 주장하지 않는다.
+- 배포 경로: public feature branch로 Free 웹서비스 생성 → /health 확인 → 실제 계정 1회 수집 검증 → endpoint를 프런트 설정에 기록 → 기존 Pages main에 묶어서 반영. 서버 주소는 https://ssapo-aoe2-collect.onrender.com 이다.
+
+### 2026-11-03 직접 수집 서버 연결
+
+- 사용자가 배포한 https://ssapo-aoe2-collect.onrender.com 을 collection-service.json에 연결. 운영 화면의 수집 버튼은 GitHub 링크 대신 준비·수집·분석·결과 표시를 같은 사이트에서 진행.
+- Render 서버 코드는 feature/direct-collection 브랜치를 기준으로 배포됨. 서버 코드 변경은 해당 브랜치의 Render 연동 상태와 배포 결과를 확인해야 하며 main만 바꾸고 서버가 갱신됐다고 가정하지 않음. 프런트는 기존 main → GitHub Pages 경로 유지.
+- 배포 전 52개 검사 재확인. 실제 /health, 웹사이트 Origin의 CORS 사전 요청, 수집 POST, 상태 조회, ssapo 계정(26260702)의 경기 9개와 분석 9개 반환을 검증. 계정 설정의 GitHub 실행 링크도 제거했다. 브라우저 시각 검증은 이전 지출 한도 제한으로 이번에도 수행하지 않음.
+- 직접 수집 결과는 현재 브라우저 탭에 유지. Render 재시작으로 서버 임시 결과가 사라질 수 있으며 GitHub 예약 보고서는 별도로 보존된다.
