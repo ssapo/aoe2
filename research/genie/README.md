@@ -16,6 +16,26 @@
    - 명령 디코딩은 실패 0건 (`command_probe`, 518239882 전체 명령 22종 모두 decode OK).
 3. 실제 사망/생존 병력·경제 곡선 추출은 아직 불가능 (2번 해결이 먼저).
 
+## 바로 시작 (새 작업자, 2026-11-04 새 clone으로 검증함)
+
+```sh
+git clone https://github.com/librematch/genie genie && cd genie
+git checkout 91d81be43402f50d89cfb8da8f168fe43878f83d
+R=<aoe2 clone>/research/genie
+git apply $R/experimental-188329-header.patch $R/oracle-cargo.patch $R/experimental-census.patch
+cp $R/*_probe.rs crates/tools/genie-oracle/examples/
+cargo build --release -p genie-oracle --examples --ignore-rust-version   # 1.99 있으면 마지막 옵션 생략
+# 리플 폴더(<dir>/<id>/*.aoe2record)와 dat 폴더 준비 후 (아래 "데이터")
+GENIE=$PWD REPLAYS=<dir> $R/tools/run.sh                                 # 8개 모두 "players: 3" 이면 정상
+GENIE_CIVILIZATIONS=<dat폴더>/civilizations.json \
+  ./target/release/examples/census <dir>/518239882/AgeIIDE_Replay_518239882.aoe2record <dat폴더>/empires2_x2_p1.dat
+# 기대 결과: player 1, 2 모두 "1 checkpoints hold; the checkpoint after 999 syncs differs" (census-result.log와 같음)
+```
+
+첫 작업: 위 census의 999 sync 불일치 원인 찾기 (아래 "다음 할 일" 1). 시작점은 518239882의 500~999 sync 구간.
+`sync_probe`로 그 구간 dt 합(실제 경과 게임 시간)과 census가 진행한 world_time(`RUST_LOG=debug`의 `world_time=`)을 비교해
+시간 진행이 맞는지부터 확인. 맞으면 객체 단위 비교로 넘어간다.
+
 ## 68.9 형식 변경 (`experimental-188329-header.patch`)
 
 모두 `ver == 0x44e666` 일 때만 읽는다(XS 하나는 XS data version으로 분기). 158041 경로는 그대로.
