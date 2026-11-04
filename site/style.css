@@ -300,3 +300,5 @@ body.review-open{overflow:hidden}
 .player-search .connection button{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;width:86px;min-height:38px;padding:7px 10px;font-size:11px;font-weight:600;white-space:nowrap}
 .player-search .compact-note:empty{display:none}
 @media(max-width:600px){.player-search .connection{flex-wrap:wrap}.player-search .connection .text{flex:1 1 100px}.player-search .connection button{width:78px;min-height:38px;padding:7px 8px}}
+
+.connection .profile-context{font-size:10px;color:#65745d;white-space:normal}.connection .text{min-width:0;overflow-wrap:anywhere}

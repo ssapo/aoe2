@@ -265,8 +265,8 @@
     const c = $('#connection');
     c.className = 'connection'+(report.sync_error?' error':'');
     if(report.sync_error) c.innerHTML=`<div class="text"><strong>수집 실패</strong><p>${esc(report.sync_error)} 마지막 확인: ${esc(date(report.last_checked_at))}</p></div><button class="connect">연결 확인</button>`;
-    else if(report.pending_profile)c.innerHTML=`<div class="text"><strong>${esc(selectedName)} · 아직 저장된 경기 없음</strong><p>지금 수집을 누르면 이 계정의 경기와 분석을 가져와요.</p></div><button class="connect">계정 정보</button>`;
-    else if(report.profile?.id) c.innerHTML=`<div class="text"><strong>${esc(report.profile.name)}</strong></div><button class="connect">계정 정보</button>`;
+    else if(report.pending_profile)c.innerHTML=`<div class="text"><strong>${esc(selectedName)}</strong> <small class="profile-context">· 현재 보는 유저</small><p>저장된 경기가 없어요. 지금 수집을 눌러 주세요.</p></div><button class="connect">계정 정보</button>`;
+    else if(report.profile?.id) c.innerHTML=`<div class="text"><strong>${esc(report.profile.name)}</strong> <small class="profile-context">· 현재 보는 유저</small></div><button class="connect">계정 정보</button>`;
     else c.innerHTML='<div class="text"><strong>계정 연결 대기</strong><p>ssapo · 최초 수집 필요.</p></div><button class="connect">계정 정보</button>';
     const collectLink=document.createElement('button');
     collectLink.className='collect-now';collectLink.textContent=collectBusy?'수집 중…':'지금 수집';collectLink.disabled=collectBusy;
