@@ -184,3 +184,27 @@ python <aoe2>/research/genie/tools/object_summary.py object.log
 4. 좌표 차이는 별도 검증: 518470161 player2의499 update 객체별 이동/가축 좌표와 명령을 추적. 원본 값에 맞추려고 좌표나 checksum을 보정하지 않는다.
 
 이번에는 새로운 게임 동작 수정은 없고, 진단 도구·재현 로그를 추가했다. 완성도나 정확한 재생 가능 구간을 더 늘렸다고 보고하지 않는다.
+
+
+## 갱신 단계 대조 (2026-11-05)
+
+`object-trace-diagnostic.patch` 다음에 `phase-observer-diagnostic.patch` 적용.
+`GENIE_TRACE_PHASE=1 GENIE_EXPERIMENT_CAPTURE_SETUP=1 census replay dat 1500` 실행.
+체크포인트가 붙은 틱의 갱신 전 상태 및 Commands/각 플레이어 단계/세계 후처리 단계 직후를 비교한다. 원본 checksum·좌표·타이머를 보정하거나 불일치를 숨기지 않는다.
+
+### 결과
+
+- 518239882 원본 checkpoint world_time: 9490/15990/22490ms. 직전499/999/1499 sync dt 합은9477/15977/22477ms. 원본 시각은 다음 틱dt13ms를 포함한다.
+- 첫 체크포인트는 Commands 이후(원본과 world_time도 같은 상태)에서 양측 모두11개 checksum 단어가 일치. clock+dt, objects 갱신 이전에 기록된다는 기존 비교 방식과 양립한다.
+- 999 sync player1은 **어느 갱신 단계에도 완전 일치가 없음**. word9 17000 vs16445가 그대로 남고, 다음 틱 객체 갱신까지 하면 word7도117212 vs117210으로 어긋난다.
+- 1499 sync player2도 어느 단계에도 완전 일치 없음(word9 차124). 518470161의 초기 좌표 불일치도 단계를 옮겨 해결되지 않는다.
+- 동일한 두 경기에서1500 updates를 observer OFF/ON 각각 실행, census 요약 결과(각 선수 첫 mismatch·중단·통과수)가 정확히 같음. 관찰 코드의 결과 변경은 발견되지 않았다.
+- 이 실험은 한 틱 내 비교 시점 이동만으로 해결되는 가설을 배제한다. 새 엔진 동작 수정은 없고, 정확한 전체 경기 재현도 여전히 안 됨.
+
+### 다음 단계와 필요한 근거
+
+리플의 체크포인트는 객체별 정답이 아닌 합계다. 현재 simulator의 객체별 값을 합산하는 도구만 추가하는 것으로는 어느 retarget timer가 원본과 다른지 특정할 수 없다. 다음 유효한 검증은 (a) 원본 엔진의 객체별 상태/retarget RNG trace를 얻거나 (b) 같은 버전 게임 실행 파일의 retarget/owner-load 코드를 대조하는 것. 원본 실행파일은 아직 이 작업에 제공되지 않았고, repo에서 참조한 aoe2de-exe-re 개발 자료도 공개 접근을 확인하지 못했다. 실행파일이 있어도 분석 성공을 보장하는 것은 아니다.
+
+사용자에게 추가 자료가 필요할 경우 설치 루트의 `AoE2DE_s.exe`(또는 실제 실행파일)를 요청할 수 있다. 공개 git에 바이너리를 올리지 않는다. 새 helper가 Windows game 연동을 완료했다거나 웹에서 원본 엔진을 돌릴 수 있다고 주장하지 않는다.
+
+반복 빌드 주의: 이번 release의 Nickel 설정 파서 최적화와 fat LTO에 긴 시간이 걸렸다. 후속 실험에는 제공된 forced profile 또는 Nickel parser opt-level0/codegen16 설정 등 빠른 빌드 설정을 우선 검토한다. 빌드 소요 시간은 리플 분석 성능이 아니다.

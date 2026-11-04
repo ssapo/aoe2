@@ -1,0 +1,30 @@
+--- a/crates/tools/genie-oracle/src/census.rs
++++ b/crates/tools/genie-oracle/src/census.rs
+@@ -150,7 +150,26 @@
+     let mut elapsed_ms = 0u64;
+     for frame in frames(&chapter, total)? {
+         elapsed_ms += u64::from(frame.dt.get());
+-        run(&mut turns, &mut decoder, from_ref(&frame));
++        if std::env::var_os("GENIE_TRACE_PHASE").is_some() && frame.checkpoint.is_some() {
++            let cp = frame.checkpoint.as_ref().unwrap();
++            let commands: Vec<_> = frame.commands.iter().filter_map(|p| decoder.command(p)).collect();
++            let before_tick = turns.ticks.get();
++            eprintln!("CP_TIME tick={} actual_before_ms={} recorded_ms={} dt={}", before_tick, turns.world_time.millis(), cp.world_time, frame.dt.get());
++            let report = |w: &World, phase: String| {
++                for lane in cp.lanes.iter().filter(|l| l.iter().any(|&x| x != 0)) {
++                    let id = lane[8] as usize;
++                    if let (Some(section), Some(player)) = (sections.get(id), w.players.get(id)) {
++                        let actual = lane_block(section, id as u32, player, &w.parts);
++                        let diff: Vec<_> = actual.iter().zip(lane).enumerate().filter(|(_, (a,b))| a != b).map(|(i,(a,b))| (i,*a,*b)).collect();
++                        eprintln!("PHASE {}", serde_json::json!({"tick_before":before_tick,"player":id,"phase":phase,"actual_ms":w.world_time.millis(),"recorded_ms":cp.world_time,"differences":diff}));
++                    }
++                }
++            };
++            report(&turns, "before".to_string());
++            turns.tick_observed(frame.dt, &commands, &mut |w, step| report(w, format!("{:?}",step)));
++        } else {
++            run(&mut turns, &mut decoder, from_ref(&frame));
++        }
+         census.update(&turns, &sections);
+         if std::env::var_os("GENIE_TRACE_OBJECTS").is_some() && [499, 999, 1499].contains(&census.updates) {
+             for (p, state) in turns.players.iter().enumerate().skip(1) {
