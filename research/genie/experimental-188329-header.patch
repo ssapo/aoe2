@@ -1,5 +1,5 @@
 diff --git a/crates/formats/genie-save/src/generated/world.rs b/crates/formats/genie-save/src/generated/world.rs
-index f3876c52..eba02597 100644
+index f3876c52..c88e80fc 100644
 --- a/crates/formats/genie-save/src/generated/world.rs
 +++ b/crates/formats/genie-save/src/generated/world.rs
 @@ -101,7 +101,7 @@ pub struct PlayerCivilization {
@@ -117,7 +117,18 @@ index f3876c52..eba02597 100644
      pub tech_tree_units: Vec<TechTreeEntry3>,
      /// game: `mTech_tree_techs`
      /// a loop of 13 reads; named by the save's write in the same place (0x1413f15e0)
-@@ -4420,6 +4442,7 @@ pub struct BxsRuntime {
+@@ -4336,6 +4358,10 @@ pub struct BxsData {
+     /// helper 0x140a91060
+     #[br(if(!(version < 3)))]
+     pub unit_id: Option<i32>,
++    /// XS data version 5 (save 68.9; version 4 replays of the same build lack it): 8 bytes after
++    /// `unit_id`, 0 in every replay seen; unidentified.
++    #[br(if(version > 4))]
++    pub extra_v5: Option<[u8; 8]>,
+ }
+ 
+ #[binrw]
+@@ -4420,6 +4446,7 @@ pub struct BxsRuntime {
  #[binrw]
  #[derive(Debug, Clone, Default, PartialEq)]
  #[brw(little)]
@@ -125,7 +136,7 @@ index f3876c52..eba02597 100644
  pub struct WorldPlayerEntry1 {
      /// game: `diplomacy[i]`
      /// read at 0x1415f21be; named by the save's write in the same place (0x141631420, write at 0x1416332f8)
-@@ -4476,6 +4499,10 @@ pub struct WorldPlayerEntry1 {
+@@ -4476,6 +4503,10 @@ pub struct WorldPlayerEntry1 {
      /// game: `(offer[i].status)`
      /// read at 0x1415f2c03; named by the save's write in the same place (0x141631420, write at 0x14163395e)
      pub offer_status: u8,
@@ -136,7 +147,7 @@ index f3876c52..eba02597 100644
  }
  
  /// Read by `FUN_1415f1160` (`WorldPlayer.cpp`) of the build.
-@@ -4547,7 +4574,7 @@ pub struct WorldPlayer {
+@@ -4547,7 +4578,7 @@ pub struct WorldPlayer {
      pub artifact_held_time: f32,
      /// a loop of 18 reads; one entry per player slot (`diplomacy[i]`, `trade[i]`, `offer[i]` for i < 9: arrays of 9 bytes at +0xe12, +0xe1b, +0xe24)
      #[brw(magic = b"\x0b")]
@@ -145,7 +156,7 @@ index f3876c52..eba02597 100644
      pub per_player: Vec<WorldPlayerEntry1>,
      /// game: `fealty`
      /// read at 0x1415f2c69; named by the save's write in the same place (0x141631420, write at 0x1416339c0)
-@@ -4699,6 +4726,11 @@ pub struct WorldPlayer {
+@@ -4699,8 +4730,17 @@ pub struct WorldPlayer {
      pub bxs_runtime: Option<Box<BxsRuntime>>,
      /// unnamed in the binary
      /// the routine's closing marker
@@ -156,16 +167,23 @@ index f3876c52..eba02597 100644
 +    pub extra_v68_9: Option<[u8; 8]>,
      #[brw(magic = b"\x0b")]
      pub end_marker: (),
++    /// Save 68.9: a u32 after the end marker (0 for Gaia and player 1 so far). Gaia's wolf timers
++    /// then read 0 / 1000 / ~1.3e6 ms / 40.0, and a human's `PlayerObjects` marker lines up.
++    #[br(if(ver == 0x44e666))]
++    pub extra_after_end_v68_9: Option<u32>,
  }
-@@ -4774,6 +4806,7 @@ impl Default for WorldPlayer {
+ 
+ impl Default for WorldPlayer {
+@@ -4774,6 +4814,8 @@ impl Default for WorldPlayer {
              using_xs: Default::default(),
              bxs_runtime: Default::default(),
              end_marker: Default::default(),
 +            extra_v68_9: None,
++            extra_after_end_v68_9: None,
          }
      }
  }
-@@ -4979,6 +5012,11 @@ pub struct RgeMasterStaticObject {
+@@ -4979,6 +5021,11 @@ pub struct RgeMasterStaticObject {
      /// game: `mName`
      /// helper 0x140932010
      pub name: SigString,
@@ -177,7 +195,7 @@ index f3876c52..eba02597 100644
  }
  
  impl Default for RgeMasterStaticObject {
-@@ -5034,6 +5072,7 @@ impl Default for RgeMasterStaticObject {
+@@ -5034,6 +5081,7 @@ impl Default for RgeMasterStaticObject {
              damage_sprite_num: Default::default(),
              damage_sprite: Default::default(),
              name: Default::default(),
@@ -185,7 +203,7 @@ index f3876c52..eba02597 100644
          }
      }
  }
-@@ -5079,6 +5118,13 @@ pub struct RgeMasterMovingObject {
+@@ -5079,6 +5127,13 @@ pub struct RgeMasterMovingObject {
      /// game: `&obj_trail_spacing`
      /// read at 0x1410e6190
      pub obj_trail_spacing: u32,
@@ -199,7 +217,7 @@ index f3876c52..eba02597 100644
  }
  
  /// Read by `FUN_141062470` of the build.
-@@ -5248,6 +5294,10 @@ pub struct RgeMasterActionObject {
+@@ -5248,6 +5303,10 @@ pub struct RgeMasterActionObject {
      /// game: `&run_pattern`
      /// helper 0x140c94e10
      pub run_pattern: u8,
@@ -210,7 +228,7 @@ index f3876c52..eba02597 100644
  }
  
  impl Default for RgeMasterActionObject {
-@@ -5263,6 +5313,7 @@ impl Default for RgeMasterActionObject {
+@@ -5263,6 +5322,7 @@ impl Default for RgeMasterActionObject {
              temp_sound_num_2: Default::default(),
              sound_event_event_id: vec![Default::default(); 2],
              run_pattern: Default::default(),
@@ -218,7 +236,7 @@ index f3876c52..eba02597 100644
          }
      }
  }
-@@ -5502,6 +5553,12 @@ pub struct TribeMasterCombatObject {
+@@ -5502,6 +5562,12 @@ pub struct TribeMasterCombatObject {
      /// helper 0x140a90f60
      #[br(if(ver >= 0x426666))]
      pub train_location_entry_mod: Option<i16>,
@@ -231,7 +249,7 @@ index f3876c52..eba02597 100644
  }
  
  impl Default for TribeMasterCombatObject {
-@@ -5542,6 +5599,7 @@ impl Default for TribeMasterCombatObject {
+@@ -5542,6 +5608,7 @@ impl Default for TribeMasterCombatObject {
              volley_yspread: Default::default(),
              volley_start_spread_adjustment: Default::default(),
              train_location_entry_mod: Some(Default::default()),
@@ -239,7 +257,7 @@ index f3876c52..eba02597 100644
          }
      }
  }
-@@ -5652,6 +5710,12 @@ pub struct TribeMasterBuildingObject {
+@@ -5652,6 +5719,12 @@ pub struct TribeMasterBuildingObject {
      /// game: `&open_close_sound_event.mEventId`
      /// helper 0x140b4b760
      pub open_close_sound_event_event_id: u32,
@@ -252,7 +270,7 @@ index f3876c52..eba02597 100644
  }
  
  /// Read by `FUN_14162bef0` of the build.
-@@ -6811,12 +6875,17 @@ pub struct ActiveSpriteList {
+@@ -6811,12 +6884,17 @@ pub struct ActiveSpriteList {
      /// entries until a sprite_kind of 0, that one included
      #[br(parse_with = binrw::helpers::until(|e: &ActiveSpriteListEntry1| e.sprite_kind == 0), args(ver))]
      pub sprite_kind_list: Vec<ActiveSpriteListEntry1>,
@@ -270,18 +288,41 @@ index f3876c52..eba02597 100644
          }
      }
  }
-@@ -8179,6 +8248,10 @@ pub struct RgeCombatObject {
+@@ -7293,6 +7371,10 @@ pub struct RgeMovingObject {
+     /// game: `mSpeedupValue`
+     /// read at 0x1411612bb
+     pub speedup_value: f32,
++    /// Save 68.9: 4 bytes after `speedup_value` (0 so far). Pinned by a kind-30 object (shore
++    /// fish, master 69) whose next object starts exactly 4 bytes later.
++    #[br(if(ver == 0x44e666))]
++    pub extra_v68_9: Option<[u8; 4]>,
+ }
+ 
+ /// Read by `FUN_140a7a2f0` of the build.
+@@ -8102,6 +8184,11 @@ pub struct RgeActionObject {
+     pub command_flag: u8,
+     /// game: `Selected_Group_Info`
+     /// read at 0x14106f16f
++    /// Save 68.9 has 4 bytes fewer here and 4 more at the end of the moving part (a kind-30
++    /// object ends with them); the speed-up pair after then reads (0, NaN) like the moving
++    /// part's own. Whether this field moved there or was dropped is unverified; 0 when absent.
++    #[br(if(ver != 0x44e666))]
++    #[bw(if(rge_moving_object.extra_v68_9.is_none()))]
+     pub selected_group_info: i32,
+     /// game: `mSpeedupBuildingId`
+     /// read at 0x14106f4c9
+@@ -8179,6 +8266,10 @@ pub struct RgeCombatObject {
      /// game: `mObjectTriggerFlags.m_bits`
      /// read at 0x14108af38
      pub object_trigger_flags_bits: u32,
-+    /// Save 68.9: 12 bytes (all 0 on the first combat objects seen) somewhere between
-+    /// `attack_timer` and `previous_master_id`; placed here provisionally (2026-11-04).
++    /// Save 68.9: 12 bytes (all 0 on the combat objects seen) between `object_trigger_flags_bits`
++    /// and `previous_master_id` (TC: flags 0x20300 then 12 zeros then -1); exact order unverified.
 +    #[br(if(ver == 0x44e666))]
 +    pub extra_a_v68_9: Option<[u8; 12]>,
      /// game: `&previousMasterId`
      /// read at 0x14108b4c3
      pub previous_master_id: u16,
-@@ -8191,6 +8264,10 @@ pub struct RgeCombatObject {
+@@ -8191,6 +8282,10 @@ pub struct RgeCombatObject {
      /// game: `&m_abilityActivatedTimeMs`
      /// helper 0x140b4b760
      pub ability_activated_time_ms: u32,
@@ -292,7 +333,7 @@ index f3876c52..eba02597 100644
      /// game: `&mProcessedKill`
      /// helper 0x140ccd170
      pub processed_kill: u8,
-@@ -8218,6 +8295,8 @@ impl Default for RgeCombatObject {
+@@ -8218,6 +8313,8 @@ impl Default for RgeCombatObject {
              special_ability_duration_ms: Default::default(),
              ability_activated_time_ms: Default::default(),
              processed_kill: Default::default(),
@@ -301,7 +342,7 @@ index f3876c52..eba02597 100644
          }
      }
  }
-@@ -8421,6 +8500,10 @@ pub struct UnitAiModule {
+@@ -8421,6 +8518,10 @@ pub struct UnitAiModule {
      /// game: `mDisableRetargeting`
      /// read at 0x140c539d5
      pub disable_retargeting: u8,
@@ -312,7 +353,7 @@ index f3876c52..eba02597 100644
  }
  
  /// Read by `FUN_140c1d860` of the build.
-@@ -8672,6 +8755,9 @@ pub struct TribeCombatObject {
+@@ -8672,6 +8773,9 @@ pub struct TribeCombatObject {
      /// game: `mSkipVolleyAttack`
      /// read at 0x1412251eb
      pub skip_volley_attack: u8,
@@ -322,7 +363,7 @@ index f3876c52..eba02597 100644
  }
  
  impl Default for TribeCombatObject {
-@@ -8731,6 +8817,7 @@ impl Default for TribeCombatObject {
+@@ -8731,6 +8835,7 @@ impl Default for TribeCombatObject {
              local_resource_store: Default::default(),
              conversion_rate: Default::default(),
              skip_volley_attack: Default::default(),
@@ -330,27 +371,7 @@ index f3876c52..eba02597 100644
          }
      }
  }
-@@ -9346,6 +9433,11 @@ pub struct WorldPlayerGaia {
-     /// game: `(mWolfAttackStopTime)`
-     /// read at 0x14167c68c; named by the save's write in the same place (0x14167fc40, write at 0x14168067d)
-     pub wolf_attack_stop_time: u32,
-+    /// Save 68.9: one more u32 among the wolf timers (16 bytes, not 12, between `creatures` and
-+    /// the min distance). Values seen in order: 0, 0, 1000, ~1.3e6; which one is new is not
-+    /// pinned, so it is put last provisionally.
-+    #[br(if(ver == 0x44e666))]
-+    pub extra_wolf_v68_9: Option<u32>,
-     /// game: `(mMinVillagerDistance)`
-     /// read at 0x14167c702; named by the save's write in the same place (0x14167fc40, write at 0x141680813)
-     pub min_villager_distance: u32,
-@@ -9398,6 +9490,7 @@ impl Default for WorldPlayerGaia {
-             wolf_list: [Default::default(); 200],
-             current_wolf: Default::default(),
-             wolf_count: [Default::default(); 40],
-+            extra_wolf_v68_9: None,
-         }
-     }
- }
-@@ -9528,7 +9621,16 @@ pub struct WorldPlayerBase {
+@@ -9528,7 +9633,16 @@ pub struct WorldPlayerBase {
      pub culture: u8,
      /// game: `&civId`
      /// helper 0x14163c630
@@ -367,3 +388,39 @@ index f3876c52..eba02597 100644
      /// game: `&mEquippedSkins`
      /// helper 0x140d46ce0
      pub equipped_skins: LenVec32<i64>,
+@@ -10398,7 +10512,7 @@ pub struct BaseScenarioEntry3 {
+ pub struct BaseScenario {
+     /// game: `&Version`
+     /// the scenario's version (a float) the load gates on
+-    #[br(assert(version == 1.56, "the build writes version 1.56"))]
++    #[br(assert(version == 1.56 || (ver == 0x44e666 && version == 1.59), "unsupported scenario version"))]
+     pub version: f32,
+     /// game: `&MaxPlayers`
+     /// helper 0x140b4b760
+@@ -11925,7 +12039,7 @@ pub struct TriggerSystemEntry5 {
+ #[br(import(ver: u32))]
+ pub struct TriggerSystem {
+     /// the trigger system's version, a double the load gates on (1.4 … 4.5), kept in DAT_143cd8990
+-    #[br(assert(trigger_version == 4.5, "the build writes trigger_version 4.5"))]
++    #[br(assert(trigger_version == 4.5 || (ver == 0x44e666 && trigger_version == 5.0), "unsupported trigger_version"))]
+     pub trigger_version: f64,
+     /// HD TRIBE_Trigger_System::objectives_updated, the uchar after the world pointer
+     pub objectives_updated: u8,
+@@ -12336,6 +12450,9 @@ pub struct World {
+     /// game: `mWaterDefIndex`
+     /// read at 0x1415d6115
+     pub water_def_index: i32,
++    /// Save 68.9: one byte after `water_def_index` (0), the save's last byte.
++    #[br(if(ver == 0x44e666))]
++    pub extra_v68_9: Option<u8>,
+ }
+ 
+ impl Default for World {
+@@ -12418,6 +12535,7 @@ impl Default for World {
+             tutorial_prompt_count: Default::default(),
+             tutorial_prompt: Default::default(),
+             water_def_index: Default::default(),
++            extra_v68_9: None,
+         }
+     }
+ }

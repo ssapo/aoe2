@@ -1,0 +1,117 @@
+diff --git a/crates/engine/genie-import/src/dat/dat_work.rs b/crates/engine/genie-import/src/dat/dat_work.rs
+index b4034340..d6b0ea25 100644
+--- a/crates/engine/genie-import/src/dat/dat_work.rs
++++ b/crates/engine/genie-import/src/dat/dat_work.rs
+@@ -76,6 +76,14 @@ pub(super) fn sound_event(event: u32, sound: i16, sounds: &[Sound]) -> i32 {
+     }
+ }
+ 
++/// EXPERIMENT (save 68.9 data): the tasks of types 154, 155 and 157, which the task finder's
++/// general search leaves out, hold a class below -1 (-1288, -1256, -1448) whose meaning is
++/// unknown. The value is kept as is (no object's class is negative, so no class match picks the
++/// task) instead of being rejected or turned into "any class". Not verified against the game.
++fn special_group(action_kind: i16, class_id: i16) -> Option<ClassId> {
++    (class_id < -1 && matches!(action_kind, 154 | 155 | 157)).then(|| ClassId::of_master(class_id))
++}
++
+ /// A `.dat` task as the task finder reads it (`genie_model::objects::masters::Task`), with the world's
+ /// sound table its sound events read ([`sound_event`]).
+ ///
+@@ -97,7 +105,8 @@ fn dat_task(t: &Task, sounds: &[Sound]) -> Result<work::Task, GenieError> {
+     Ok(work::Task {
+         id: TaskId::of_task(t.id),
+         action_kind: ActionKind::try_from(t.action_kind)?,
+-        object_group: ClassId::of_field(t.class_id)?,
++        object_group: special_group(t.action_kind, t.class_id)
++            .map_or_else(|| ClassId::of_field(t.class_id), |g| Ok(Some(g)))?,
+         object_id: MasterId::of_data(t.unit_id),
+         combat_level: t.enable_targeting,
+         combat_level_flag: TaskFlags::from_bits_retain(t.combat_level_flag),
+diff --git a/crates/formats/genie-save/src/lib.rs b/crates/formats/genie-save/src/lib.rs
+index 83eaaa03..1365293b 100644
+--- a/crates/formats/genie-save/src/lib.rs
++++ b/crates/formats/genie-save/src/lib.rs
+@@ -126,6 +126,30 @@ impl Header {
+         self.file_header.new_save_game_version
+     }
+ 
++    /// Save 68.9 writes each player's civilization as its `civilizations.json` `data_name`
++    /// instead of the number; this sets the number (`civ_id`) from `data_names`, that file's
++    /// `civilization_list` in order (the `.dat`'s civilization order). A save without names is
++    /// left as it is.
++    ///
++    /// # Errors
++    ///
++    /// A name `data_names` does not hold, or an index above 255.
++    pub fn resolve_civ_ids(&mut self, data_names: &[String]) -> Result<(), Error> {
++        for p in &mut self.world.base_world.players {
++            let Some(wp) = p.val.world_player_mut() else { continue };
++            let Some(name) = wp.base.civ_data_name.as_ref() else { continue };
++            let name = String::from_utf8_lossy(&name.bytes).into_owned();
++            let index = data_names.iter().position(|n| *n == name).ok_or_else(|| {
++                GenieError::invalid_input("a civilization name civilizations.json does not hold")
++                    .with("name", &name)
++            })?;
++            wp.base.civ_id = u8::try_from(index).map_err(|_| {
++                GenieError::invalid_input("a civilization index above 255").with("index", index)
++            })?;
++        }
++        Ok(())
++    }
++
+     /// The player sections, Gaia first, with where each starts ([`PlayerSection::ends`] gives
+     /// where it ends).
+     ///
+diff --git a/crates/formats/genie-save/src/objects.rs b/crates/formats/genie-save/src/objects.rs
+index deebaa01..3b8d4ee7 100644
+--- a/crates/formats/genie-save/src/objects.rs
++++ b/crates/formats/genie-save/src/objects.rs
+@@ -37,6 +37,22 @@ impl Player {
+         })
+     }
+ 
++    /// [`Player::world_player`], mutably (to resolve a save 68.9 civilization name).
++    pub fn world_player_mut(&mut self) -> Option<&mut WorldPlayer> {
++        if let Some(p) = self.scenario_editor_phantom_player.as_deref_mut() {
++            return Some(&mut p.world_player_scenario_editor_phantom);
++        }
++        if let Some(p) = self.human_or_coop_player.as_deref_mut() {
++            return Some(&mut p.world_player_human_or_coop);
++        }
++        if let Some(p) = self.gaia_player.as_deref_mut() {
++            return Some(&mut p.world_player_gaia.world_player);
++        }
++        self.computer_player
++            .as_deref_mut()
++            .map(|p| &mut p.world_player_computer)
++    }
++
+     /// The masters, maps and objects (`WorldPlayer` vtable slot 29).
+     #[must_use]
+     pub fn objects(&self) -> Option<&PlayerObjects> {
+diff --git a/crates/tools/genie-oracle/src/census.rs b/crates/tools/genie-oracle/src/census.rs
+index 99849470..b5d4a82c 100644
+--- a/crates/tools/genie-oracle/src/census.rs
++++ b/crates/tools/genie-oracle/src/census.rs
+@@ -112,7 +112,20 @@ pub fn census_run(
+     limit: Option<usize>,
+ ) -> Result<CensusRun, Error> {
+     let chapter = chapters(recording)?[0];
+-    let header = chapter.header()?;
++    let mut header = chapter.header()?;
++    // EXPERIMENT (save 68.9): civilization names to numbers from the file GENIE_CIVILIZATIONS
++    // names (the install's resources/_common/dat/civilizations.json).
++    if let Ok(path) = std::env::var("GENIE_CIVILIZATIONS") {
++        let text = std::fs::read_to_string(&path)
++            .map_err(|e| genie_save::GenieError::io("civilizations.json").with("path", &path).with_source(e))?;
++        let json: serde_json::Value = serde_json::from_str(&text)
++            .map_err(|e| genie_save::GenieError::invalid_input("civilizations.json").with("error", e))?;
++        let names: Vec<String> = json["civilization_list"]
++            .as_array()
++            .map(|l| l.iter().map(|c| c["data_name"].as_str().unwrap_or_default().to_owned()).collect())
++            .unwrap_or_default();
++        header.resolve_civ_ids(&names)?;
++    }
+     let sections = header.players();
+     let (syncs, checkpoints) = recorded_checkpoints(&chapter)?;
+     let total = limit.map_or(syncs, |l| l.min(syncs));

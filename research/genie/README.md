@@ -1,96 +1,107 @@
 # Genie 최신 1v1 호환성 실험 — 미완성, 배포 금지
 
 기준 소스: librematch/genie `91d81be43402f50d89cfb8da8f168fe43878f83d` (원본 지원 build 158041).
-대상: save 68.9 (`new_save_game_version` 0x44e666), build 185872·188329. 리플 8개로 검증 중.
+대상: save 68.9 (`new_save_game_version` 0x44e666), build 185872·188329. 리플 8개로 검증.
 사용자 게임 파일·리플·빌드 산출물·toolchain은 저장소에 넣지 않는다.
 
 ## 현재 상태 (2026-11-04 갱신)
 
-헤더(첫 chapter) 파싱 진행 위치:
+1. **헤더: 8/8 리플이 끝까지 읽히고 바이트 roundtrip 일치** (`header-result.log`, `roundtrip-result.log`).
+   `parse`의 "world가 save 끝에서 끝나는지" 검사 통과, `write` 결과가 원본과 같음. 기존 genie-save/genie-rec 테스트 통과.
+2. **census(시뮬레이션): 끝까지 돌지만 체크포인트가 곧 어긋남** (`census-result.log`).
+   - 518239882: 양 플레이어 모두 첫 체크포인트(499 sync 뒤)는 일치, 999 sync 뒤에서 불일치.
+   - 나머지도 대부분 499 또는 999 sync에서 불일치. 경기 재현 성공이 아니다.
+   - 불일치 단어는 시뮬레이션 값이 기록보다 일관되게 작다(예: word 3 20 vs 26, word 4 100 vs 400).
+     시뮬레이션이 기록보다 "뒤처지는" 모양이라 시간 진행(sync 1회 = update 1회 가정) 문제를 의심 중. 미확인.
+   - 명령 디코딩은 실패 0건 (`command_probe`, 518239882 전체 명령 22종 모두 decode OK).
+3. 실제 사망/생존 병력·경제 곡선 추출은 아직 불가능 (2번 해결이 먼저).
 
-| 리플 | build | 도달 위치 |
-|---|---|---|
-| 518239882, 516956894, 518470161 | 188329 | Gaia 전체 통과 → **플레이어 1 `player_objects`** 에서 실패 |
-| 515741992, 516293031, 516746960, 517426097 | 185872 | Gaia `player_objects`(오브젝트 목록 끝) 에서 실패 |
-| 516495787 | 185872 | 위와 같음 |
+## 68.9 형식 변경 (`experimental-188329-header.patch`)
 
-즉 로비·옵션·지도·Gaia의 WorldPlayer·기술 트리·마스터(유닛 정의) 2750개·Gaia 오브젝트 대부분까지 읽힌다.
-시뮬레이션(census), 사망/생존 병력 추출은 아직 불가능. 파싱 성공이 아니라 "어디까지 읽히는지"의 진척이다.
+모두 `ver == 0x44e666` 일 때만 읽는다(XS 하나는 XS data version으로 분기). 158041 경로는 그대로.
+"확인" = 0이 아닌 값/다른 리플로 위치까지 맞춘 것, "잠정" = 크기만 맞고 값이 0뿐이라 구조체 안 위치를 못 박은 것.
 
-## 이번에 확정한 68.9 형식 변경 (패치에 반영)
-
-모두 `ver == 0x44e666` 일 때만 읽는다. 기존 158041 경로는 그대로다.
-"확인"은 8개 리플 전부에서 위치·값이 일관된 것, "잠정"은 값이 0뿐이라 필드 안 위치를 못 박은 것.
-
-| 구조체 | 변경 | 근거/상태 |
+| 구조체 | 변경 | 상태/근거 |
 |---|---|---|
 | `GameOptionsRead`/`PlayerInfo` | 옵션 v1123, PlayerInfo v15 + 끝 SigString | 이전 작업자 |
-| `GameOptions` 끝 | 빈 SigString 2개 추가 (`extra_v1123`) | 확인. 이전 "지도 marker 1바이트 차이"의 진짜 원인. 0x74f→0x750 차이는 이 8바이트 누락 후 AI 분기 오독 결과였음 |
-| `WorldPlayerBase` | `civ_id: u8` 자리에 SigString(`civ_data_name`, 예 "FRANKISH-CIV", "GAIA") | 확인. 앞 바이트는 DAT `icon_set`(culture). 숫자 civ id는 `civilizations.json`의 `data_name` 순서 = DAT civ 순서로 풀어야 함 (63개 일치 확인). 현재 `civ_id`는 0으로 남음 → **엔진 연결 전 반드시 매핑 필요** |
-| `TechPlayerTree` | description 뒤 SigString 1개 추가 | 확인 (1510개 모두 빈 문자열) |
-| `WorldPlayerEntry1`(per_player 9칸) | 칸당 1바이트 추가 (23→24) | 크기 확인, 칸 안 위치 잠정(끝) |
-| `TechTree` | `number_units` u8 → u16 (`number_units_wide`) | 확인 (269 units). ages/buildings/techs는 u8 유지 |
-| `WorldPlayer` 끝 | end marker 앞 8바이트 | 크기 확인, 의미 미상 |
-| `WorldPlayerGaia` | 늑대 타이머 구간 u32 1개 추가 | 크기 확인, 위치 잠정 |
-| `RgeMasterStaticObject` 끝 | name 뒤 44바이트 | 확인. 궁수 속도가 +44에 위치. 자원 저장 3종·충돌/여유 크기와 비슷한 값 |
-| `RgeMasterMovingObject` 끝 | 2바이트 + f32 | 확인. f32 = DAT `min_collision_size_multiplier`(궁수 1.0, 정찰기병 0.5) |
-| `RgeMasterActionObject` 끝 | 1바이트 | 확인 (궁수·정찰기병 base_armor 10000 정렬) |
-| `TribeMasterCombatObject` 끝 | 19바이트 | 확인. 열 단위 비용 블록(궁수 25/45/1) + i16 2개(TC에서 spawning -1, upgrade graphic 12297과 일치) |
-| `TribeMasterBuildingObject` 끝 | 52바이트 | 확인. TC에서 tech 722, head 621, transform 444, annex 618/619/620/890 + 좌표 4쌍, can_burn과 일치 |
-| `ActiveSpriteList` | 목록 종료 0 뒤 1바이트 | 잠정 |
-| `RgeCombatObject` | `previous_master_id` 앞 12바이트, `processed_kill` 앞 8바이트 | 크기는 Gaia 동물(유닛 1245, 730바이트 객체) 1종으로만 확인. 위치 잠정 |
-| `UnitAiModule` 끝 | 15바이트 (u8 1, 자기 타일 x/y f32, 0 6바이트) | 잠정 |
+| `GameOptions` 끝 | 빈 SigString 2개 (`extra_v1123`) | 확인. 이전 "marker 1바이트 차이"의 실제 원인(8바이트 누락 → AI 분기 오독) |
+| `WorldPlayerBase` | `civ_id: u8` 자리에 SigString `civ_data_name` ("FRANKISH-CIV", "GAIA") | 확인. 앞 바이트는 DAT `icon_set`. 숫자는 `civilizations.json` `data_name` 순서 = DAT civ 순서(63개 일치) |
+| `TechPlayerTree` | description 뒤 SigString 1개 | 확인 |
+| `WorldPlayerEntry1` | 칸당 +1바이트 (23→24) | 크기 확인, 위치 잠정(끝) |
+| `TechTree` | `number_units` u8 → u16 (`number_units_wide`) | 확인 (269 units) |
+| `WorldPlayer` | end marker 앞 8바이트, end marker 뒤 u32 | 크기 확인. 뒤 u32로 Gaia 늑대 타이머가 0/1000/~1.3e6ms/40.0으로, 플레이어 `PlayerObjects` marker가 맞음 |
+| `RgeMasterStaticObject` 끝 | 44바이트 | 확인 (궁수 속도가 +44) |
+| `RgeMasterMovingObject` 끝 | 2바이트 + f32 (`min_collision_size_multiplier`) | 확인 (궁수 1.0, 정찰기병 0.5) |
+| `RgeMasterActionObject` 끝 | 1바이트 | 확인 |
+| `TribeMasterCombatObject` 끝 | 19바이트 (열 단위 비용 블록 + i16 2개) | 확인 (궁수 25/45, TC 275/100, TC upgrade graphic 12297) |
+| `TribeMasterBuildingObject` 끝 | 52바이트 | 확인 (TC: tech 722, head 621, transform 444, annex 4개+좌표, can_burn) |
+| `ActiveSpriteList` | 종료 0 뒤 1바이트 | 잠정 |
+| `RgeMovingObject` 끝 / `RgeActionObject.selected_group_info` | 이동 객체 끝 +4, 액션의 `selected_group_info`(4) 없음 | 확인: kind 30(물고기)은 끝에 4바이트, kind 70/80은 액션 speed-up 쌍이 이동 쪽과 같은 (0, NaN)으로 읽힘. 필드가 옮겨간 건지 빠진 건지는 미상 |
+| `RgeCombatObject` | `previous_master_id` 앞 12바이트, `processed_kill` 앞 8바이트 | 크기 확인(동물·TC), 위치 잠정 |
+| `UnitAiModule` 끝 | 15바이트 (u8 1, 자기 타일 x/y, 0×6) | 잠정 |
 | `TribeCombatObject` 끝 | 1바이트 | 잠정 |
+| `BaseScenario` | version 1.59 허용 (구조 변화 없이 통과) | 확인 |
+| `TriggerSystem` | trigger_version 5.0 허용 (트리거 0개 경기만 확인) | 트리거 있는 경기 미검증 |
+| `BxsData` | XS data version 5면 `unit_id` 뒤 8바이트 (`extra_v5`) | 확인 (v4 리플 4개는 없음, v5 리플 4개는 있음) |
+| `World` 끝 | 1바이트 | 확인 (`water_def_index` 3 다음 마지막 바이트) |
 
-DAT: 63 civs, 1510 techs, roundtrip 93,272,287바이트 일치 (이전 작업). 음수 class task 381개 의미는 아직 미구현.
+## 실험용 엔진 변경 (`experimental-census.patch`, 헤더 패치 위에 적용)
+
+- `Header::resolve_civ_ids` + `Player::world_player_mut` (genie-save): 문명 이름 → 번호.
+  census는 환경변수 `GENIE_CIVILIZATIONS=<…/civilizations.json>`이 있을 때만 적용. 다른 oracle 경로(survey 등)는 아직 미적용.
+  번호 매핑 확인됨(Turks 10, Chinese 6). 단, 매핑 유무와 관계없이 census 결과는 같았다.
+- `dat_work.rs`: action 154/155/157 task의 음수 class(-1288, -1256, -1448; `task_probe` 결과 3종뿐)를
+  "아무 class" 로 바꾸지 않고 값 그대로 보존 (`ClassId::of_master`). 어떤 객체 class와도 같지 않아 class 매칭으로는 안 뽑힌다.
+  154(LOOT)는 엔진이 어차피 kill bonus를 unsupported로 멈춘다. 의미는 미확인. ClassId의 serde는 음수를 거부하므로 **cache 경로(`install::load`)에서는 깨질 수 있음** — census example은 cache 없는 `install::read`라 문제없었다.
 
 ## 다음 할 일 (우선순위)
 
-1. **188329 리플의 플레이어 1 오브젝트 실패** (`518239882` 0x26c5ce, `player_objects` in `HumanOrCoopPlayer`).
-   방법: `tools/dbgrun.sh "ObjectListEntry1 RgeStaticObject"`로 마지막으로 읽힌 오브젝트(kind, master_obj)를 찾고,
-   다음 오브젝트 시작 위치를 바이트 검색으로 찾아 실제 길이와 비교 (Gaia 동물 때와 같은 방법, 아래 "작업 방법").
-   일꾼/건물/정찰기병 등 다양한 오브젝트가 있어 위 "잠정" 필드의 위치를 확정할 좋은 표본이다.
-2. **185872 리플 Gaia 오브젝트 실패**: 같은 방법. 다른 Gaia 오브젝트 종류(물고기·멧돼지 등)의 차이일 가능성.
-3. 잠정 필드 위치 확정: 0이 아닌 값이 나오는 오브젝트로 검증. 값이 0뿐이면 위치를 확정했다고 쓰지 말 것.
-4. 헤더 끝까지 읽히면 `parse`의 "world가 save 끝에서 끝나는지" 검사와 바이트 roundtrip(쓰기 결과 = 원본) 확인.
-5. `civ_data_name` → civ id 매핑 (`civilizations.json` 필요; import 단계에서 읽게 하거나 lobby의 civ와 대조).
-6. 그 다음에 census(시뮬레이션) 연결, 음수 class task 의미 구현, 1v1 전체 경기 checkpoint 대조.
+1. **census 불일치 원인**. 후보:
+   - 체크포인트 시점: census는 "N sync 뒤 체크포인트 = N update 뒤 상태"로 비교. `sync_probe` 결과 518239882는 sync 92503회,
+     dt 합 2,043,060ms(≈1256초×1.7배속). dt는 13~104ms로 매우 불규칙(158041 리플과 분포 비교 필요).
+     census는 51232 update에서 AllDone으로 멈춤. sync 간격·체크포인트 간격(Pregame `checkpoint_interval: 500`) 처리가 새 build에서 바뀌었는지 확인.
+   - 잠정 필드의 위치 오류(유닛 AI·전투 객체) → 0이 아닌 값을 가진 객체로 검증.
+   - 새 마스터 필드(44/19/52바이트 등)의 동작 의미가 엔진에 반영 안 됨.
+   - 518239882에서 player 1의 첫 불일치 시점 전후로 `tick_trace` 계열 도구로 객체 단위 비교.
+2. 문명 매핑을 정식 경로로: `install`이 `civilizations.json`을 읽어 MasterTable에 넣고 모든 header 사용처에서 적용.
+3. 음수 class task 의미 확인 후 ClassId 모델링 정리(serde 포함).
+4. 트리거 있는 경기, AI 플레이어(kind 3, `TribeMainDecisionAi`) 경기로 추가 검증.
+5. 그 다음: 1v1 전체 경기 체크포인트 대조 → 사망/생존 병력, 경제 곡선 추출.
 
 ## 재현
 
-1. `git clone https://github.com/librematch/genie genie-check && git -C genie-check checkout 91d81be4…` (전체 해시는 위).
-2. genie 루트에서 `git apply <this>/experimental-188329-header.patch` 와 `git apply <this>/oracle-cargo.patch`
-   (genie-oracle에 `binrw` 의존성 추가, lobby_probe용).
+1. `git clone https://github.com/librematch/genie genie-check && git -C genie-check checkout 91d81be43402f50d89cfb8da8f168fe43878f83d`
+2. genie 루트에서 `git apply` 순서: `experimental-188329-header.patch` → `oracle-cargo.patch`(genie-oracle에 binrw 의존성) → (선택) `experimental-census.patch`.
 3. `*_probe.rs`를 `crates/tools/genie-oracle/examples/`에 복사.
-4. Rust: 워크스페이스는 1.99.0을 요구하지만 1.97.0에서 `--ignore-rust-version`으로 빌드·실행됨
-   (이 세션은 static.rust-lang.org가 막혀 1.99를 못 받았다). 1.99가 있으면 그 옵션은 빼도 된다.
-5. 실행:
-   - `cargo run --release -p genie-oracle --example header_probe --ignore-rust-version -- <replay>` — 헤더 파싱
-   - `... --example lobby_probe -- <inflated header>` — 로비(SaveGameFileHeader)만 읽고 끝 위치 출력
-   - `... --example civ_probe -- <dat>` / `... --example unit_probe -- <dat> <civ> <unit>` — DAT 값 대조용
-   - 원래 전체 검증: `... --example census -- <replay> <dat>` (헤더가 다 읽혀야 의미 있음)
-6. 도구 (`tools/`, 경로는 환경변수): `GENIE=<genie-check> REPLAYS=<리플 폴더> tools/run.sh` 는 모든 리플의 실패 위치 요약,
-   `GENIE=… tools/dbgrun.sh "구조체 이름들" <replay> [줄수]` 는 해당 구조체 필드에 binrw `dbg`를 임시로 붙여 `offset] field = value` 를 출력하고 파일을 복구한다.
-   `tools/inflate.py <replay>…` 는 헤더를 풀어 `.hdr`로 저장(오프셋은 이 파일 기준). `techtree.py`, `combat_obj.py` 는 가설 검증용 일회성 스크립트.
+4. Rust: 워크스페이스는 1.99.0을 요구하지만 1.97.0에서 `--ignore-rust-version`으로 빌드·실행됨(이 세션은 1.99 다운로드가 막혔음). 1.99가 있으면 옵션 빼도 됨.
+5. 실행 (`cargo run --release -p genie-oracle --ignore-rust-version --example <이름> -- …`):
+   - `header_probe <replay>` 헤더 파싱 / `roundtrip_probe <inflated .hdr>` 파싱→쓰기 바이트 비교
+   - `lobby_probe <.hdr>` 로비만 읽고 끝 위치 / `civ_probe <dat>` / `unit_probe <dat> <civ> <unit>` / `task_probe <dat>` 음수 class task 목록
+   - `command_probe <replay>` 명령 id별 decode 성공/실패 / `sync_probe <replay>` sync dt 분포
+   - `census <replay> <dat>` (문명 매핑: `GENIE_CIVILIZATIONS=…/civilizations.json`)
+6. `tools/`: `GENIE=<genie-check> REPLAYS=<리플 폴더> tools/run.sh` 전 리플 실패 위치 요약,
+   `GENIE=… tools/dbgrun.sh "구조체들" <replay> [줄수]` 구조체 필드에 binrw `dbg`를 임시로 붙여 `offset] field = value` 출력 후 원복,
+   `tools/inflate.py <replay>…` 헤더를 `.hdr`로 풀기(오프셋 기준 파일). `techtree.py`, `combat_obj.py`는 일회성 가설 검증용.
 
-### 데이터 받기
+### 데이터
 
-- 리플: `https://aoe.ms/replay/?gameId=<id>&profileId=26260702` (ZIP). 경기 목록은
-  `https://aoe-api.worldsedgelink.com/community/leaderboard/getRecentMatchHistory?title=age2&profile_ids=[26260702]`.
-  이번에 쓴 8개: 518470161, 518239882, 517426097, 516956894 (188329) / 516746960, 516495787, 516293031, 515741992 (185872).
-  **클라우드 세션에서는 aoe.ms가 막혀 있었다** → 사용자 PC(PowerShell)에서 받아 `%TEMP%\genie-replays\`에 두고 옮겼다.
-- 게임 데이터: `…\AoE2DE\resources\_common\dat\` 의 `empires2_x2_p1.dat`, `dropsites.json`, `linkedTechs.json`, `linkedUnits.json`, `civilizations.json`(새로 필요).
+- 리플: `https://aoe.ms/replay/?gameId=<id>&profileId=26260702` (ZIP). 목록: `https://aoe-api.worldsedgelink.com/community/leaderboard/getRecentMatchHistory?title=age2&profile_ids=[26260702]`.
+  사용 리플: 518470161, 518239882, 517426097, 516956894 (188329) / 516746960, 516495787, 516293031, 515741992 (185872).
+  클라우드 세션에서는 aoe.ms·static.rust-lang.org가 막혀 있었음 → 사용자 PC에서 받아 `%TEMP%\genie-replays\`에 두고 옮김.
+  같은 이유로 GitHub push도 사용자 PC(`%TEMP%\genie-replays\aoe2-push`)에서 git bundle로 함.
+- 게임 데이터 `…\AoE2DE\resources\_common\dat\`: `empires2_x2_p1.dat`, `dropsites.json`, `linkedTechs.json`, `linkedUnits.json`, `unitlines.json`, `civilizations.json`.
 
-## 작업 방법 (다음 작업자용 요령)
+## 작업 요령
 
-- 실패 오프셋 근처를 `.hdr`에서 덤프 → 알려진 값(시간 스탬프, 이름 SigString `60 0a len`, 0x0b/0x16/0x21 marker, DAT 값)을 닻으로 실제 필드 경계를 찾는다.
-- 유닛 정의(master)는 DAT `unit_probe` 값과 대조하면 빠르다 (속도·비용·훈련 시간·사거리 등).
-- 오브젝트는 같은 종류가 연속되는 경우가 많다. kind/owner/master_obj/inside_obj=-1/id 패턴으로 다음 오브젝트 시작을 찾아 실제 길이를 잰 뒤, 필드 합과의 차이를 0이 아닌 값 기준으로 배치한다.
-- 임의 패딩·marker 검색으로 건너뛰기 금지. 0만 있는 구간에 넣은 필드는 README에 "잠정"으로 남긴다.
+- 실패 오프셋을 `.hdr`에서 덤프 → 닻(SigString `60 0a len`, marker 0x0b/0x16/0x21, 타임스탬프, DAT 값)으로 실제 경계 찾기.
+- 마스터는 `unit_probe`의 DAT 값(속도·비용·훈련시간·사거리)과 대조하면 빠르다.
+- 객체는 같은 종류가 연속된다. kind/owner/master_obj/inside_obj=-1/id 패턴으로 다음 객체 시작을 찾아 실제 길이를 잰다.
+- 임의 패딩·marker 검색으로 건너뛰기 금지. 0만 있는 구간에 넣은 필드는 "잠정"으로 남긴다.
+- `dbgrun.sh` 출력을 `head`로 자르면 SIGPIPE로 원복이 안 될 수 있었음 → 현재 버전은 trap으로 원복. 그래도 결과는 파일로 받아서 보기.
 
-## 해석상 주의
+## 해석 주의
 
-- DAT roundtrip 성공은 구조를 손실 없이 읽는다는 뜻이지, 엔진 계산이 맞다는 뜻이 아니다.
+- DAT·헤더 roundtrip 성공은 구조를 손실 없이 읽는다는 뜻이지 엔진 계산이 맞다는 뜻이 아니다.
 - 새 필드 이름 대부분은 값 대조로 붙인 추정이다. 게임 바이너리로 확인한 것이 아니다.
 - 명령상 생산 요청 수 ≠ 생존 일꾼 수, sync object 수 ≠ 군대 수. 기존 로컬 초안(`scripts/turning_point.py`, parser revision 10, 복기 요약 UI)은 이 브랜치에 없고 자동 배포 금지.
 
