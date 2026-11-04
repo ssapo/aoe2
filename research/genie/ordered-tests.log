@@ -1,0 +1,36 @@
+    Blocking waiting for file lock on build directory
+   Compiling genie-import v0.1.0 (/workspace/scratch/acd26b270bae/genie-check/crates/engine/genie-import)
+    Finished `research` profile [unoptimized] target(s) in 54.86s
+     Running unittests src/lib.rs (genie-check/target-ordered/research/deps/genie_import-fc5a185f6e990fe4)
+
+running 27 tests
+test dat::dat_work::tests::the_action_layer_holds_the_kind_40_sections_values ... ok
+test cache::tests::cut_off_bytes_do_not_decode ... ok
+test dat::tests::linked_techs_take_their_groups_kind ... ok
+test cache::tests::tables_encode_and_decode_to_themselves ... ok
+test dat::dat_work::tests::the_missile_layer_holds_the_projectile_sections_values ... ok
+test cache::tests::the_cache_returns_what_it_wrote_and_nothing_for_another_key ... ok
+test cache::tests::second_writes_replace_the_first ... ok
+test dat::tests::task_sound_event_of_0_with_sound_of_files_takes_the_default_event ... ok
+test dat::tests::rows_are_found_by_civ_and_master ... ok
+test dat::tests::the_attribute_fields_parse_in_their_order ... ok
+test dat::tests::the_default_action_is_the_action_kind_of_the_default_task ... ok
+test dat::dat_work::tests::the_moving_layer_holds_the_kind_30_sections_values ... ok
+test install::tests::foreign_bytes_do_not_import ... ok
+test install::tests::missing_or_foreign_dats_fail_with_their_path_or_their_reason ... ok
+test dat::tests::unit_lines_read_each_entrys_keys_as_the_builder_does ... ok
+test install::tests::the_files_are_the_dat_and_the_tables_beside_it_that_are_there ... ok
+test install::tests::the_tables_beside_replace_their_own_where_they_are ... ok
+test key::tests::each_part_of_the_key_changes_it ... ok
+test key::tests::the_hex_form_is_sixty_four_lowercase_digits ... ok
+test key::tests::names_and_contents_stay_apart ... ok
+test tables::tests::table_errors_name_their_entry_and_key ... ok
+test tables::tests::target_object_state_reads_as_state_or_none ... ok
+test install::tests::failed_imports_cache_nothing ... ok
+test install::tests::the_layout_hash_drops_the_descriptions_only ... ok
+test install::tests::civilization_metadata_validated_and_cache_keyed ... ok
+test install::tests::loads_import_once_then_read_the_cache ... ok
+test install::tests::modded_files_get_keys_of_their_own ... ok
+
+test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+

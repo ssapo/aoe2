@@ -1,0 +1,130 @@
+{
+  "tick_window": [
+    500,
+    999
+  ],
+  "ai_events": 1902,
+  "callers": {
+    "crates/engine/genie-core/src/math/rng.rs:225:24": 1000,
+    "crates/engine/genie-core/src/world/schedule.rs:327:38": 500,
+    "crates/engine/genie-core/src/unit_ai/retarget.rs:95:52": 246,
+    "crates/engine/genie-core/src/unit_ai/life.rs:175:60": 1,
+    "crates/engine/genie-core/src/unit_ai/cared.rs:243:20": 13,
+    "crates/engine/genie-core/src/unit_ai/life.rs:177:51": 1,
+    "crates/engine/genie-core/src/unit_ai/idle_animals.rs:74:24": 10,
+    "crates/engine/genie-core/src/unit_ai/idle_animals.rs:90:20": 10,
+    "crates/engine/genie-core/src/unit_ai/retarget.rs:598:62": 85,
+    "crates/engine/genie-core/src/unit_ai/idle_animals.rs:247:20": 32,
+    "crates/engine/genie-core/src/unit_ai/idle_animals.rs:258:29": 4
+  },
+  "player1_last_retarget": {
+    "4338": {
+      "tick": 917,
+      "timer": 1233
+    },
+    "3428": {
+      "tick": 947,
+      "timer": 1134
+    },
+    "3396": {
+      "tick": 980,
+      "timer": 961
+    },
+    "3394": {
+      "tick": 995,
+      "timer": 1230
+    },
+    "3397": {
+      "tick": 998,
+      "timer": 1110
+    },
+    "3398": {
+      "tick": 980,
+      "timer": 1054
+    },
+    "3395": {
+      "tick": 950,
+      "timer": 1112
+    },
+    "4340": {
+      "tick": 944,
+      "timer": 1059
+    }
+  },
+  "note": "Only retarget_check callsite :95 updates retarget_timer. Calls at :598 update look-around timeout instead.",
+  "existing_object_formula_checks": [
+    {
+      "id": 3418,
+      "derived": 1053,
+      "observed": 1053,
+      "equal": true
+    },
+    {
+      "id": 3394,
+      "derived": 1230,
+      "observed": 1230,
+      "equal": true
+    },
+    {
+      "id": 3395,
+      "derived": 1112,
+      "observed": 1112,
+      "equal": true
+    },
+    {
+      "id": 3396,
+      "derived": 961,
+      "observed": 961,
+      "equal": true
+    },
+    {
+      "id": 3397,
+      "derived": 1110,
+      "observed": 1110,
+      "equal": true
+    },
+    {
+      "id": 3398,
+      "derived": 1054,
+      "observed": 1054,
+      "equal": true
+    },
+    {
+      "id": 3661,
+      "derived": 1070,
+      "observed": 1070,
+      "equal": true
+    },
+    {
+      "id": 3428,
+      "derived": 1134,
+      "observed": 1134,
+      "equal": true
+    },
+    {
+      "id": 3416,
+      "derived": 1084,
+      "observed": 1084,
+      "equal": true
+    },
+    {
+      "id": 3424,
+      "derived": 988,
+      "observed": 988,
+      "equal": true
+    },
+    {
+      "id": 4338,
+      "derived": 1233,
+      "observed": 1233,
+      "equal": true
+    },
+    {
+      "id": 4340,
+      "derived": 1059,
+      "observed": 1059,
+      "equal": true
+    }
+  ],
+  "verification_source": "fresh current-object-518239882.log after data/cache fixes"
+}

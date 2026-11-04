@@ -1,0 +1,279 @@
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -183,3 +183,16 @@
+ [workspace.lints.rustdoc]
+ # We run rustdoc with `--document-private-items` so we can document private items
+ private_intra_doc_links = "allow"
++
++[profile.research]
++inherits = "dev"
++opt-level = 0
++debug = false
++debug-assertions = false
++codegen-units = 16
++incremental = true
++lto = false
++
++[profile.research.package."*"]
++opt-level = 0
++codegen-units = 16
+--- a/crates/engine/genie-model/src/objects/masters/task.rs
++++ b/crates/engine/genie-model/src/objects/masters/task.rs
+@@ -27,6 +27,8 @@
+     /// `+0xe`: the action the task makes the unit do.
+     pub action_kind: ActionKind,
+     /// `+0x10`: the target class the task is for, none (−1) for any.
++    #[serde(with = "signed_task_group")]
++    #[cfg_attr(feature = "schema", schemars(with = "Option<i16>"))]
+     pub object_group: Option<ClassId>,
+     /// `+0x12`: the target master, -1 for any.
+     pub object_id: Option<MasterId>,
+@@ -111,3 +113,20 @@
+         }
+     }
+ }
++
++
++/// Cache representation for task groups only: preserve the three observed opaque
++/// negative groups without weakening ClassId's ordinary validation.
++mod signed_task_group {
++    use super::ClassId;
++    use serde::{Deserialize, Deserializer, Serialize, Serializer};
++    pub fn serialize<S: Serializer>(v: &Option<ClassId>, s: S) -> Result<S::Ok, S::Error> {
++        v.map(ClassId::get).serialize(s)
++    }
++    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Option<ClassId>, D::Error> {
++        Option::<i16>::deserialize(d)?.map(|v| {
++            if matches!(v, -1288 | -1256 | -1448) { Ok(ClassId::of_master(v)) }
++            else { ClassId::try_from(v).map_err(serde::de::Error::custom) }
++        }).transpose()
++    }
++}
+--- a/crates/engine/genie-import/src/dat.rs
++++ b/crates/engine/genie-import/src/dat.rs
+@@ -276,6 +276,10 @@
+ /// Every master of every civ of a data file.
+ #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+ pub struct MasterTable {
++    /// Canonical civilization data names in DAT order, loaded from civilizations.json.
++    pub civilization_names: Vec<String>,
++    /// Number of civilization tables in the source DAT.
++    pub civilization_count: usize,
+     rows: BTreeMap<(CivId, MasterId), Row>,
+     /// Each sprite's speed factor (the `.dat` graphic's `speed_multiplier`, sprite `+0xc`).
+     sprite_speed: BTreeMap<SpriteId, SpeedMultiplier>,
+@@ -376,6 +380,7 @@
+                 *row = r;
+             }
+         }
++        table.civilization_count = dat.civs.len();
+         table.terrain = TerrainTable::from_dat(dat);
+         table.sprite_speed = dat
+             .graphics
+@@ -433,6 +438,8 @@
+                     )
+                 })
+                 .collect(),
++            civilization_count: 0,
++            civilization_names: Vec::new(),
+             sprite_speed: BTreeMap::new(),
+             graphics: Graphics::default(),
+             terrain: TerrainTable::default(),
+--- a/crates/engine/genie-import/src/install.rs
++++ b/crates/engine/genie-import/src/install.rs
+@@ -23,11 +23,13 @@
+ use std::path::Path;
+ 
+ /// The tables beside the `.dat` the import reads, each where there is one.
+-pub const BESIDE: [&str; 3] = ["dropsites.json", "linkedTechs.json", "unitlines.json"];
++pub const BESIDE: [&str; 4] = ["dropsites.json", "linkedTechs.json", "unitlines.json", "civilizations.json"];
+ 
+ /// The texts of the tables beside the `.dat` ([`BESIDE`]), each where there is one.
+ #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+ pub struct Beside<'a> {
++    /// Canonical civilization data names, in DAT order.
++    pub civilizations: Option<&'a str>,
+     /// `dropsites.json`'s ([`drop_sites`]).
+     pub drop_sites: Option<&'a str>,
+     /// `linkedTechs.json`'s ([`linked_techs`]).
+@@ -58,7 +60,26 @@
+     if let Some(json) = beside.unit_lines {
+         table.unit_lines = unit_lines(json).map_err(|e| out_of_shape(BESIDE[2], e))?;
+     }
++    if let Some(text) = beside.civilizations {
++        table.civilization_names = civilization_names(text, table.civilization_count)?;
++    }
+     Ok(table)
++}
++
++/// Validate names before caching: no missing/duplicate/blank identities or count mismatch.
++pub fn civilization_names(text: &str, count: usize) -> Result<Vec<String>, GenieError> {
++    let value: Value = serde_json::from_str(text).map_err(|e| out_of_shape("civilizations.json", e))?;
++    let invalid = || GenieError::invalid_input("invalid civilization name list").with("file", "civilizations.json");
++    let list = value.get("civilization_list").and_then(Value::as_array).ok_or_else(invalid)?;
++    if list.len() != count || count > 256 { return Err(invalid()); }
++    let mut names = Vec::with_capacity(count);
++    let mut seen = std::collections::BTreeSet::new();
++    for item in list {
++        let name = item.get("data_name").and_then(Value::as_str).ok_or_else(invalid)?;
++        if name.is_empty() || name.trim() != name || !seen.insert(name.to_owned()) { return Err(invalid()); }
++        names.push(name.to_owned());
++    }
++    Ok(names)
+ }
+ 
+ /// The error of the table beside the `.dat` named `file`, which does not parse.
+@@ -99,7 +120,7 @@
+ struct Files {
+     dat: Vec<u8>,
+     /// Each of [`BESIDE`]'s texts, where there is one.
+-    beside: [Option<String>; 3],
++    beside: [Option<String>; 4],
+ }
+ 
+ #[cfg(feature = "fs")]
+@@ -111,7 +132,7 @@
+                 .with("path", dat.display())
+                 .with_source(e)
+         })?;
+-        let mut beside = [None, None, None];
++        let mut beside = [None, None, None, None];
+         for (text, name) in beside.iter_mut().zip(BESIDE) {
+             let path = dat.with_file_name(name);
+             match read_file(&path) {
+@@ -131,10 +152,11 @@
+ 
+     /// The import of the files ([`load_bytes`]).
+     fn import(&self) -> Result<MasterTable, GenieError> {
+-        let [drop_sites, linked_techs, unit_lines] = self.beside.each_ref().map(Option::as_deref);
++        let [drop_sites, linked_techs, unit_lines, civilizations] = self.beside.each_ref().map(Option::as_deref);
+         load_bytes(
+             &self.dat,
+             Beside {
++                civilizations,
+                 drop_sites,
+                 linked_techs,
+                 unit_lines,
+--- a/crates/engine/genie-import/src/install/tests.rs
++++ b/crates/engine/genie-import/src/install/tests.rs
+@@ -20,7 +20,7 @@
+ fn files(bytes: &[u8]) -> Files {
+     Files {
+         dat: bytes.to_vec(),
+-        beside: [None, None, None],
++        beside: [None, None, None, None],
+     }
+ }
+ 
+@@ -112,7 +112,7 @@
+     let f = Files::read(&dat).unwrap();
+     assert_eq!(
+         (f.dat.as_slice(), f.beside),
+-        (&b"dat"[..], [None, Some("{}".to_owned()), None])
++        (&b"dat"[..], [None, Some("{}".to_owned()), None, None])
+     );
+     remove_dir_all(&dir).unwrap();
+ }
+@@ -124,6 +124,7 @@
+     let table = with_beside(MasterTable::default(), Beside::default()).unwrap();
+     assert_eq!(table, MasterTable::default());
+     let good = Beside {
++        civilizations: None,
+         drop_sites: Some(r#"{"drop_site_list": []}"#),
+         linked_techs: Some(r#"{"LinkedTechs": []}"#),
+         unit_lines: Some(r#"{"UnitLines": []}"#),
+@@ -180,3 +181,19 @@
+         })
+     );
+ }
++
++
++#[test]
++fn civilization_metadata_validated_and_cache_keyed() {
++    use super::civilization_names;
++    let good = r#"{"civilization_list":[{"data_name":"GAIA"},{"data_name":"FRANKISH-CIV"}]}"#;
++    assert_eq!(civilization_names(good,2).unwrap(),vec!["GAIA","FRANKISH-CIV"]);
++    assert!(civilization_names(good,1).is_err());
++    for bad in [r#"{}"#,r#"{"civilization_list":[{"data_name":""}]}"#,r#"{"civilization_list":[{}]}"#] { assert!(civilization_names(bad,1).is_err()); }
++    assert!(civilization_names(r#"{"civilization_list":[{"data_name":"A"},{"data_name":"A"}]}"#,2).is_err());
++    let before=files(b"dat");let mut after=files(b"dat");after.beside[3]=Some(good.to_owned());
++    assert_ne!(before.key(),after.key());
++    let mut table=MasterTable::default();table.civilization_count=2;
++    let table=with_beside(table, Beside{civilizations:Some(good),..Beside::default()}).unwrap();
++    assert_eq!(crate::cache::decode(&crate::cache::encode(&table).unwrap()).unwrap(),table);
++}
+--- a/crates/formats/genie-save/src/lib.rs
++++ b/crates/formats/genie-save/src/lib.rs
+@@ -146,6 +146,26 @@
+             wp.base.civ_id = u8::try_from(index).map_err(|_| {
+                 GenieError::invalid_input("a civilization index above 255").with("index", index)
+             })?;
++        }
++        Ok(())
++    }
++
++    /// Resolve named save players from explicit, fixed lobby civilization choices.
++    /// Random/ambiguous choices are rejected; canonical install metadata is preferred.
++    pub fn resolve_civ_ids_from_lobby(&mut self, count: usize) -> Result<(), Error> {
++        let lobby = self.file_header.game_options_read.game_options.player_info.clone();
++        for (index, p) in self.world.base_world.players.iter_mut().enumerate() {
++            let Some(wp) = p.val.world_player_mut() else { continue };
++            let Some(name) = wp.base.civ_data_name.as_ref() else { continue };
++            if index == 0 && name.bytes == b"GAIA" { wp.base.civ_id = 0; continue; }
++            let choices: Vec<_> = lobby.iter().filter(|p| p.world_player_array_index_including_gaia as usize == index).collect();
++            if choices.len() != 1 { return Err(GenieError::unsupported("ambiguous lobby civilization identity").with("player", index)); }
++            let choice = &choices[0].civilization_choice;
++            let id = choice.specific_civilization_id;
++            if choice.civilization_mode_id != 0 || id <= 0 || id as usize >= count || id > 255 {
++                return Err(GenieError::unsupported("civilization metadata required for non-fixed lobby choice").with("player", index));
++            }
++            wp.base.civ_id = id as u8;
+         }
+         Ok(())
+     }
+--- a/crates/tools/genie-oracle/src/setup.rs
++++ b/crates/tools/genie-oracle/src/setup.rs
+@@ -99,6 +99,15 @@
+ /// The build layer does not evaluate ([`layer`]); what else the slice does not model of the save
+ /// stops every player instead.
+ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> Result<World, GenieError> {
++    let mut resolved = header.clone();
++    if let Some(table) = masters {
++        if !table.civilization_names.is_empty() {
++            resolved.resolve_civ_ids(&table.civilization_names)?;
++        } else if table.civilization_count > 0 {
++            resolved.resolve_civ_ids_from_lobby(table.civilization_count)?;
++        }
++    }
++    let header = &resolved;
+     let build = layer()?;
+     let missile_tuning = &build.tuning.missile;
+     let victory = &header.world.base_world.victory_conditions;
+--- a/crates/tools/genie-oracle/src/census.rs
++++ b/crates/tools/genie-oracle/src/census.rs
+@@ -170,6 +170,15 @@
+         } else {
+             run(&mut turns, &mut decoder, from_ref(&frame));
+         }
++        if let Ok(raw) = std::env::var("GENIE_TRACE_MOTION") {
++            if let Ok(wanted) = raw.parse::<i32>() {
++                for (p, player) in turns.players.iter().enumerate() {
++                    if let Some(u) = player.objects.iter().find(|u| u.id.get() == wanted) {
++                        eprintln!("MOTION {}", serde_json::json!({"tick": turns.ticks.get(), "time_ms":turns.world_time.millis(),"dt_ms":frame.dt.get(),"player":p,"id":wanted,"master":u.life.master_id.get(),"position":u.position().get()}));
++                    }
++                }
++            }
++        }
+         census.update(&turns, &sections);
+         if std::env::var_os("GENIE_TRACE_OBJECTS").is_some() && [499, 999, 1499].contains(&census.updates) {
+             for (p, state) in turns.players.iter().enumerate().skip(1) {
+--- a/crates/tools/genie-oracle/examples/census.rs
++++ b/crates/tools/genie-oracle/examples/census.rs
+@@ -26,6 +26,7 @@
+         [rec, dat, updates] => (rec, dat, Some(updates.parse()?)),
+         _ => return Err("usage: census REC DAT [UPDATES]".into()),
+     };
++    if std::env::var_os("GENIE_TRACE_COMMANDS").is_some() { genie_oracle::trace_commands(true); }
+     let recording = read(rec)?;
+     let masters = install_read(dat.as_ref())?;
+     let run = census_run(&recording, Some(&masters), limit)?;

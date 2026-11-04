@@ -1,0 +1,12 @@
+1500 updates (Limit), 3 checkpoints
+player 0: no stop; 0 checkpoints hold; no checkpoint differs
+player 1: no stop; 0 checkpoints hold; the checkpoint after 499 syncs differs in words [(7, 103876, 103858)]
+player 2: no stop; 3 checkpoints hold; no checkpoint differs
+PIG_COUNT update=499 player=0 ids=[]
+PIG_COUNT update=499 player=1 ids=[]
+PIG_COUNT update=499 player=2 ids=[]
+TIMING update=499 initial_ms=0 elapsed_ms=8853 actual_ms=8853
+PIG_COUNT update=999 player=0 ids=[]
+PIG_COUNT update=999 player=1 ids=[]
+PIG_COUNT update=999 player=2 ids=[]
+TIMING update=999 initial_ms=0 elapsed_ms=15353 actual_ms=15353

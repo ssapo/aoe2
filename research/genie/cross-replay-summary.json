@@ -1,0 +1,81 @@
+[
+  {
+    "game": "515741992",
+    "exit": 0,
+    "seconds": 10.486,
+    "summary": [
+      "1500 updates (Limit), 3 checkpoints",
+      "player 0: no stop; 0 checkpoints hold; no checkpoint differs",
+      "player 1: no stop; 0 checkpoints hold; the checkpoint after 499 syncs differs in words [(7, 103876, 103858)]",
+      "player 2: no stop; 3 checkpoints hold; no checkpoint differs"
+    ]
+  },
+  {
+    "game": "516293031",
+    "exit": 0,
+    "seconds": 12.425,
+    "summary": [
+      "1500 updates (Limit), 3 checkpoints",
+      "player 0: no stop; 0 checkpoints hold; no checkpoint differs",
+      "player 1: no stop; 1 checkpoints hold; the checkpoint after 999 syncs differs in words [(9, 11635, 11794)]",
+      "player 2: no stop; 1 checkpoints hold; the checkpoint after 999 syncs differs in words [(7, 156497, 156522), (9, 16119, 16037)]"
+    ]
+  },
+  {
+    "game": "516495787",
+    "exit": 1,
+    "seconds": 5.705,
+    "summary": [
+      "Error: Unmodelled(GenieError { kind: Unsupported, reason: \"civilization metadata required for non-fixed lobby choice\", at: crates/formats/genie-save/src/lib.rs:166:28, context: [(\"player\", \"2\")] })"
+    ]
+  },
+  {
+    "game": "516746960",
+    "exit": 0,
+    "seconds": 9.927,
+    "summary": [
+      "1500 updates (Limit), 3 checkpoints",
+      "player 0: no stop; 0 checkpoints hold; no checkpoint differs",
+      "player 1: no stop; 0 checkpoints hold; the checkpoint after 499 syncs differs in words [(9, 15116, 15027)]",
+      "player 2: no stop; 1 checkpoints hold; the checkpoint after 999 syncs differs in words [(9, 12467, 12067)]"
+    ]
+  },
+  {
+    "game": "516956894",
+    "exit": 1,
+    "seconds": 5.542,
+    "summary": [
+      "Error: Unmodelled(GenieError { kind: Unsupported, reason: \"civilization metadata required for non-fixed lobby choice\", at: crates/formats/genie-save/src/lib.rs:166:28, context: [(\"player\", \"2\")] })"
+    ]
+  },
+  {
+    "game": "517426097",
+    "exit": 1,
+    "seconds": 5.894,
+    "summary": [
+      "Error: Unmodelled(GenieError { kind: Unsupported, reason: \"civilization metadata required for non-fixed lobby choice\", at: crates/formats/genie-save/src/lib.rs:166:28, context: [(\"player\", \"2\")] })"
+    ]
+  },
+  {
+    "game": "518239882",
+    "exit": 0,
+    "seconds": 10.357,
+    "summary": [
+      "1500 updates (Limit), 3 checkpoints",
+      "player 0: no stop; 0 checkpoints hold; no checkpoint differs",
+      "player 1: no stop; 1 checkpoints hold; the checkpoint after 999 syncs differs in words [(9, 17000, 16445)]",
+      "player 2: no stop; 2 checkpoints hold; the checkpoint after 1499 syncs differs in words [(9, 18273, 18149)]"
+    ]
+  },
+  {
+    "game": "518470161",
+    "exit": 0,
+    "seconds": 12.822,
+    "summary": [
+      "1500 updates (Limit), 3 checkpoints",
+      "player 0: no stop; 0 checkpoints hold; no checkpoint differs",
+      "player 1: no stop; 2 checkpoints hold; the checkpoint after 1499 syncs differs in words [(7, 233572, 233573), (9, 15481, 15629)]",
+      "player 2: no stop; 0 checkpoints hold; the checkpoint after 499 syncs differs in words [(7, 103728, 103619)]"
+    ]
+  }
+]
