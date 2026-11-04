@@ -1,0 +1,20 @@
+--- a/crates/tools/genie-oracle/src/census.rs
++++ b/crates/tools/genie-oracle/src/census.rs
+@@ -152,6 +152,17 @@
+         elapsed_ms += u64::from(frame.dt.get());
+         run(&mut turns, &mut decoder, from_ref(&frame));
+         census.update(&turns, &sections);
++        if std::env::var_os("GENIE_TRACE_OBJECTS").is_some() && [499, 999, 1499].contains(&census.updates) {
++            for (p, state) in turns.players.iter().enumerate().skip(1) {
++                for u in &state.objects {
++                    let a = crate::header_runs::checkpoint_action(turns.parts.actions_of(u.id), turns.parts.production.get(u.id));
++                    let timer = turns.parts.unit_ai.get(u.id).map(|ai| ai.retarget_timer.get()).unwrap_or(0);
++                    let kind = a.and_then(|a| a.kind).map(|k| k.get());
++                    let action_state = a.map(|a| a.state.get()).unwrap_or(0);
++                    eprintln!("OBJECT {}", serde_json::json!({"tick":census.updates,"player":p,"id":u.id.get(),"master":u.life.master_id.get(),"position":u.position().get(),"action_kind":kind,"action_state":action_state,"retarget_ms":timer}));
++                }
++            }
++        }
+         if census.updates == 499 || census.updates == 999 {
+             for (p, state) in turns.players.iter().enumerate() {
+                 let pigs: Vec<_> = state.objects.iter().filter(|u| u.life.master_id.get() == 1245).map(|u| u.id.get()).collect();

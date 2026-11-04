@@ -155,3 +155,32 @@ GENIE_CIVILIZATIONS=<dat폴더>/civilizations.json \
 실행 예: `GENIE_EXPERIMENT_CAPTURE_SETUP=1 ./target/release/examples/census replay.aoe2record empires2_x2_p1.dat 5000`.
 게임 원본 데이터는 공개 브랜치에 추가하지 않음. 이번 환경은 `genie-check/target-current`로 빌드했음(기존 target 캐시 일부가 손실돼 새 target 필요).
 
+
+
+## 후속 작업: 객체별 체크포인트 분해 (2026-11-04)
+
+`capture-timing-diagnostic.patch` 다음에 `object-trace-diagnostic.patch` 적용.
+`GENIE_TRACE_OBJECTS=1`을 추가하면 499/999/1499 update에서 양 플레이어의 각 객체 ID, master, position, action kind/state, retarget_timer를 JSON으로 stderr에 출력한다. 이 출력은 시뮬레이터의 상태이며 원본 게임의 객체별 상태가 아니다.
+
+```sh
+GENIE_TRACE_OBJECTS=1 GENIE_EXPERIMENT_CAPTURE_SETUP=1 ./target/release/examples/census match.aoe2record empires2_x2_p1.dat 1500 > object.log 2>&1
+python <aoe2>/research/genie/tools/object_summary.py object.log
+```
+
+두 경기에서 3시점×2플레이어=12개 word9를 객체별 데이터로 재합산했고 census의 시뮬레이션 합계와 일치했다. action이 없을 때 -1 처리와 u32 wrapping도 확인했다. 로그와 요약 JSON을 함께 저장했다.
+
+### 이번 확인으로 좁혀진 것
+
+- 518239882 player1 999 update의 15개 객체에서 action/state 합 + retarget 합이 정확히17000. 원본 합계16445와 차555는 여전히 남음.
+- 같은 시점 player2는17개 객체, 합계18068로 원본과 일치. 1499에서 처음18273 vs18149(차124).
+- player1의499→999에는 기존 TC/부속 객체와 scout, 집의 retarget timer가 갱신됨. 신규 소유 Pig3개의 타이머는953/1180/983. 정확히 어느 객체의 값이 원본과 다른지는 합계만으로 식별할 수 없다.
+- 518470161 player1은1499에서 좌표 합1, word9 차-148까지 발생. player2는499부터 좌표 합109 차이. 이를 첫 두 체크포인트 성공과 혼동하지 않는다.
+
+### 다음 진입점
+
+1. 소유권 초기화 실험을 켠 상태에서 518239882 player1의500~999 update retarget RNG draw와 소유권 변경/명령 발생 시각을 추가 추적. 최초499에서는 합계가 맞고999에서 timer/action만 다르다는 조건을 활용한다.
+2. `crates/engine/genie-core/src/unit_ai/retarget.rs`의 `retarget_check`, `UnitAi::with_side`, World의 frame seed/reseed 순서, 신규 객체 AI 초기화의 난수 소비를 확인. **원본 객체별 타이머가 없으므로 특정 객체나 RNG가 원인이라고 확정하지 말 것.**
+3. 원본 체크포인트의 world_time도 비교할 것. 이전 진단은 dt 합과 시뮬레이터 시간의 일치만 검증했으며 그것만으로 원본 전체 시간 의미를 입증하지 않는다.
+4. 좌표 차이는 별도 검증: 518470161 player2의499 update 객체별 이동/가축 좌표와 명령을 추적. 원본 값에 맞추려고 좌표나 checksum을 보정하지 않는다.
+
+이번에는 새로운 게임 동작 수정은 없고, 진단 도구·재현 로그를 추가했다. 완성도나 정확한 재생 가능 구간을 더 늘렸다고 보고하지 않는다.
