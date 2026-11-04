@@ -293,3 +293,10 @@ body.review-open{overflow:hidden}
 .flow-overview .field-time-axis{height:18px;margin-top:4px}
 .flow-overview .field-time-hint{margin-top:0}
 .flow-statistics{margin:0 0 16px}.flow-statistics>summary{font-weight:500;padding:8px 0}.flow-statistics .field-control{margin:4px 0 0}
+
+/* Compact account controls beneath the search input. */
+.player-search form{margin:12px 0 10px}
+.player-search .connection{margin:0;padding:10px 12px;align-items:center}
+.player-search .connection button{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;width:86px;min-height:38px;padding:7px 10px;font-size:11px;font-weight:600;white-space:nowrap}
+.player-search .compact-note:empty{display:none}
+@media(max-width:600px){.player-search .connection{flex-wrap:wrap}.player-search .connection .text{flex:1 1 100px}.player-search .connection button{width:78px;min-height:38px;padding:7px 8px}}

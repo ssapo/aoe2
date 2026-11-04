@@ -266,7 +266,7 @@
     c.className = 'connection'+(report.sync_error?' error':'');
     if(report.sync_error) c.innerHTML=`<div class="text"><strong>수집 실패</strong><p>${esc(report.sync_error)} 마지막 확인: ${esc(date(report.last_checked_at))}</p></div><button class="connect">연결 확인</button>`;
     else if(report.pending_profile)c.innerHTML=`<div class="text"><strong>${esc(selectedName)} · 아직 저장된 경기 없음</strong><p>지금 수집을 누르면 이 계정의 경기와 분석을 가져와요.</p></div><button class="connect">계정 정보</button>`;
-    else if(report.profile?.id) c.innerHTML=`<div class="text"><strong>${esc(report.profile.name)}</strong><p>지금 수집은 새 결과를 가져와요. 새로고침은 저장된 기록을 다시 읽어요.</p></div><button class="connect">계정 정보</button>`;
+    else if(report.profile?.id) c.innerHTML=`<div class="text"><strong>${esc(report.profile.name)}</strong></div><button class="connect">계정 정보</button>`;
     else c.innerHTML='<div class="text"><strong>계정 연결 대기</strong><p>ssapo · 최초 수집 필요.</p></div><button class="connect">계정 정보</button>';
     const collectLink=document.createElement('button');
     collectLink.className='collect-now';collectLink.textContent=collectBusy?'수집 중…':'지금 수집';collectLink.disabled=collectBusy;
@@ -481,7 +481,7 @@
     selectedProfile=id;selectedName=name||(id===26260702?'ssapo':id===199325?'Hera':`프로필 ${id}`);
     report={profile:{id,name:selectedName},matches:[]};filter='all';visible=12;syncFilter();
     if(writeUrl){const u=new URL(location.href);if(id===26260702)u.searchParams.delete('profile');else u.searchParams.set('profile',String(id));history.pushState({},'',u);}
-    $('#profile-view-note').textContent=id===26260702?'ssapo의 기록이에요.':`${selectedName}의 기록이에요. 비교표의 ‘나’는 선택한 유저를 뜻해요.`;
+    $('#profile-view-note').textContent=id===26260702?'':'비교표의 ‘나’는 선택한 유저예요.';
     render();await load();
   }
   document.querySelectorAll('[data-profile-id]').forEach(b=>b.addEventListener('click',()=>selectProfile(b.dataset.profileId,b.dataset.profileName)));
