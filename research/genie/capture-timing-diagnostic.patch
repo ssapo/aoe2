@@ -1,0 +1,49 @@
+--- a/crates/tools/genie-oracle/src/census.rs
++++ b/crates/tools/genie-oracle/src/census.rs
+@@ -137,9 +137,28 @@
+     } else {
+         CensusEnd::Recording
+     };
++    for (p, section) in sections.iter().enumerate() {
++        for object in section.live_objects() {
++            if let Some(saved) = object.static_part() {
++                if saved.master_obj == 1245 {
++                    eprintln!("PIG_INITIAL player={} id={} capture={:?}", p, saved.id, object.combat().map(|c| c.rge_combat_object.capture_flag));
++                }
++            }
++        }
++    }
++    let initial_time = turns.world_time.millis();
++    let mut elapsed_ms = 0u64;
+     for frame in frames(&chapter, total)? {
++        elapsed_ms += u64::from(frame.dt.get());
+         run(&mut turns, &mut decoder, from_ref(&frame));
+         census.update(&turns, &sections);
++        if census.updates == 499 || census.updates == 999 {
++            for (p, state) in turns.players.iter().enumerate() {
++                let pigs: Vec<_> = state.objects.iter().filter(|u| u.life.master_id.get() == 1245).map(|u| u.id.get()).collect();
++                eprintln!("PIG_COUNT update={} player={} ids={:?}", census.updates, p, pigs);
++            }
++            eprintln!("TIMING update={} initial_ms={} elapsed_ms={} actual_ms={}", census.updates, initial_time, elapsed_ms, turns.world_time.millis());
++        }
+         if census.players.iter().all(CensusPlayer::done) {
+             end = CensusEnd::AllDone;
+             break;
+--- a/crates/tools/genie-oracle/src/map_and_sight.rs
++++ b/crates/tools/genie-oracle/src/map_and_sight.rs
+@@ -234,8 +234,13 @@
+                     // the save's +0x924 (a map's objects keep what the map gave them, as
+                     // 426048706's Gaia petards their 0); the setup's rule without a combat part
+                     capture: o.combat().map_or_else(
+-                        || Ok(capture_kind(player, m.class, master, roles)),
+-                        |c| CaptureKind::try_from(c.rge_combat_object.capture_flag),
++                        || Ok::<CaptureKind, genie_core::GenieError>(capture_kind(player, m.class, master, roles)),
++                        |c| {
++                            let saved = CaptureKind::try_from(c.rge_combat_object.capture_flag)?;
++                            if std::env::var_os("GENIE_EXPERIMENT_CAPTURE_SETUP").is_some() && header.file_header.new_save_game_version == 0x44e666 {
++                                Ok(capture_kind(player, m.class, master, roles))
++                            } else { Ok(saved) }
++                        },
+                     )?,
+                     // the object's type: the save's factory types 70 and 80, any other below
+                     kind: if o.tribe_combat_object.is_some() {

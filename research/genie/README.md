@@ -129,3 +129,29 @@ GENIE_CIVILIZATIONS=<dat폴더>/civilizations.json \
 
 의미 있는 단위로 이 작업 브랜치에 커밋/푸시. main 반영·배포 브랜치 푸시·배포 workflow 실행은 사용자가 명시할 때만.
 원본 게임 데이터, 빌드 산출물, toolchain은 공개 저장소에 올리지 않는다.
+
+
+## 후속 진단: 시간 합계·가축 소유권 (2026-11-04)
+
+기존 3개 패치 뒤 `capture-timing-diagnostic.patch`를 추가 적용. `capture_probe.rs`도 examples에 복사.
+이 패치는 census의 499/999 update에서 시간·돼지 ID를 출력하며, 선택적 환경변수 `GENIE_EXPERIMENT_CAPTURE_SETUP=1`로 **진단용 초기화 가설**을 시험한다. 환경변수 없으면 기존 capture 해석을 유지한다. 정식 호환 수정이나 검증된 게임 동작으로 취급하지 말 것.
+
+### 관측 결과
+
+- 518239882: 499 sync의 dt 합/엔진 경과 시간 모두 9477ms, 999 sync 모두 15977ms. 단순 dt 누락·배속 곱셈 오류 증거 없음. 체크포인트 시점 자체를 완전히 입증한 것은 아님.
+- 불일치 word2의 3735=1245×3, 6225=1245×5. DAT 참조에서 master1245는 Pig. word6 차이도 3/5, word4 차이도 300/500.
+- 모든 초기 Pig의 저장 capture_flag는 0, baseline 시뮬레이션은 양측 Pig가 계속 1마리씩.
+- `GENIE_EXPERIMENT_CAPTURE_SETUP=1`은 save68.9에서 saved flag 대신 기존 엔진의 capture_kind(player,class,master,roles)를 사용한다. 전체 객체에 적용하는 진단이며 보유 객체 상태를 무시할 수 있어 운영 채택 금지. game-start 전용 여부/원본 load 초기화 순서를 추가 확인해야 함.
+- 518239882 999 sync: 실험 시 양측 Pig가 4/6마리. player1은 word9만 17000 vs16445(차555), player2는 두 체크포인트 전체 일치. 5000 updates까지 실행하면 player2 첫 차이는1499 sync word9(18273 vs18149). player1 첫 차이는 여전히999.
+- 독립 경기518470161: 실험 시 player1은499/999 전체 일치. player2는499 word7(좌표 합)103728 vs103619만 남음. baseline과 실험 로그 모두 첨부.
+
+### 지금 바로 다음 작업
+
+1. 초기 capture_flag가 0으로 저장되는 이유를 원본 로드/초기화 경로나 다른 버전·중간 저장 리플로 확인. 단순 기본값 강제는 정식 해결이 아님.
+2. 518239882 player1 999 sync word9 차555를 객체별 action kind/state/retarget_timer 합으로 분해. 같은 체크포인트의 다른 모든 항목이 맞는다는 점을 이용. player2는1499 word9가 다음 대상.
+3. 518470161 player2 499 sync의 word7 좌표 차109를 이동·정찰/가축 위치로 추적.
+4. 실제 생성 동작/이동이 맞고 첫 체크포인트가 늘어나는지 확인한 후 전체 경기를 재검증. 아직 정확한 전체 재생은 불가능.
+
+실행 예: `GENIE_EXPERIMENT_CAPTURE_SETUP=1 ./target/release/examples/census replay.aoe2record empires2_x2_p1.dat 5000`.
+게임 원본 데이터는 공개 브랜치에 추가하지 않음. 이번 환경은 `genie-check/target-current`로 빌드했음(기존 target 캐시 일부가 손실돼 새 target 필요).
+

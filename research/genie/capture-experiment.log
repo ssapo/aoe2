@@ -1,0 +1,28 @@
+PIG_INITIAL player=0 id=3663 capture=Some(0)
+PIG_INITIAL player=0 id=3664 capture=Some(0)
+PIG_INITIAL player=0 id=3665 capture=Some(0)
+PIG_INITIAL player=0 id=3666 capture=Some(0)
+PIG_INITIAL player=0 id=3667 capture=Some(0)
+PIG_INITIAL player=0 id=3668 capture=Some(0)
+PIG_INITIAL player=0 id=3669 capture=Some(0)
+PIG_INITIAL player=0 id=3670 capture=Some(0)
+PIG_INITIAL player=0 id=3671 capture=Some(0)
+PIG_INITIAL player=0 id=3672 capture=Some(0)
+PIG_INITIAL player=0 id=3673 capture=Some(0)
+PIG_INITIAL player=0 id=3674 capture=Some(0)
+PIG_INITIAL player=0 id=3675 capture=Some(0)
+PIG_INITIAL player=0 id=3676 capture=Some(0)
+PIG_INITIAL player=1 id=3661 capture=Some(0)
+PIG_INITIAL player=2 id=3662 capture=Some(0)
+PIG_COUNT update=499 player=0 ids=[3676, 3675, 3674, 3673, 3672, 3671, 3670, 3669, 3668, 3667, 3666, 3665, 3664, 3663]
+PIG_COUNT update=499 player=1 ids=[3661]
+PIG_COUNT update=499 player=2 ids=[3662]
+TIMING update=499 initial_ms=0 elapsed_ms=9477 actual_ms=9477
+PIG_COUNT update=999 player=0 ids=[3676, 3675, 3672, 3671, 3670, 3669]
+PIG_COUNT update=999 player=1 ids=[3661, 3667, 3665, 3663]
+PIG_COUNT update=999 player=2 ids=[3662, 3668, 3666, 3664, 3673, 3674]
+TIMING update=999 initial_ms=0 elapsed_ms=15977 actual_ms=15977
+1000 updates (Limit), 2 checkpoints
+player 0: no stop; 0 checkpoints hold; no checkpoint differs
+player 1: no stop; 1 checkpoints hold; the checkpoint after 999 syncs differs in words [(9, 17000, 16445)]
+player 2: no stop; 2 checkpoints hold; no checkpoint differs
