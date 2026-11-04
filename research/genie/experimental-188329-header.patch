@@ -1,0 +1,38 @@
+--- a/crates/formats/genie-save/src/generated/world.rs
++++ b/crates/formats/genie-save/src/generated/world.rs
+@@ -101,7 +101,7 @@
+ pub struct PlayerInfo {
+     /// game: `&version`
+     /// PlayerInfo's own version
+-    #[br(assert(version == 14, "the build writes version 14"))]
++    #[br(assert(version == 14 || (ver == 0x44e666 && version == 15), "unsupported player info version"))]
+     pub version: i32,
+     /// game: `&mScenarioPlayerIndex`
+     /// read by 0x1413109a0, a routine of one read
+@@ -164,6 +164,9 @@
+     /// game: `&mPlayerPlatform`
+     /// read at 0x14131d8d4
+     pub player_platform: u32,
++    /// Opaque extra string observed in save 68.9 PlayerInfo v15; semantics unverified.
++    #[br(if(version >= 15))]
++    pub extra_v15: Option<SigString>,
+ }
+ 
+ impl Default for PlayerInfo {
+@@ -190,6 +193,7 @@
+             slot_color_override: Default::default(),
+             handicap: Default::default(),
+             player_platform: Default::default(),
++            extra_v15: None,
+         }
+     }
+ }
+@@ -699,7 +703,7 @@
+ pub struct GameOptionsRead {
+     /// game: `&version`
+     /// GameOptions' `&version`, passed to the serializer
+-    #[br(assert(version == 1122.0, "the build writes version 1122.0"))]
++    #[br(assert(version == 1122.0 || (ver == 0x44e666 && version == 1123.0), "unsupported game options version"))]
+     pub version: f32,
+     /// unnamed in the binary
+     /// read by 0x141305310

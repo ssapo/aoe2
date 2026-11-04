@@ -1,0 +1,25 @@
+   Compiling genie-save v0.1.0 (/workspace/scratch/acd26b270bae/genie-check/crates/formats/genie-save)
+   Compiling genie-rec v0.1.1 (/workspace/scratch/acd26b270bae/genie-check/crates/formats/genie-rec)
+   Compiling genie-import v0.1.0 (/workspace/scratch/acd26b270bae/genie-check/crates/engine/genie-import)
+   Compiling genie-command-codec v0.1.0 (/workspace/scratch/acd26b270bae/genie-check/crates/engine/genie-command-codec)
+   Compiling genie-oracle v0.1.0 (/workspace/scratch/acd26b270bae/genie-check/crates/tools/genie-oracle)
+warning: missing documentation for the crate
+ --> crates/tools/genie-oracle/examples/header_probe.rs:1:1
+  |
+1 | / fn main() -> Result<(), Box<dyn std::error::Error>> {
+2 | |  let bytes=std::fs::read(std::env::args().nth(1).unwrap())?;
+3 | |  let chapters=genie_rec::de::chapters(&bytes)?;
+4 | |  println!("chapters: {}",chapters.len());
+... |
+8 | |  Ok(())
+9 | | }
+  | |_^
+  |
+  = note: requested on the command line with `-W missing-docs`
+
+warning: `genie-oracle` (example "header_probe") generated 1 warning
+    Finished `release` profile [optimized] target(s) in 33.57s
+     Running `genie-check/target/release/examples/header_probe genie-check/AgeIIDE_Replay_518239882.aoe2record`
+chapters: 1
+save version: SaveVersion { major: 68, minor: 58982, build: 188329 }
+Error: GenieError { kind: InvalidInput, reason: "a save that does not read", at: crates/formats/genie-save/src/lib.rs:200:25, context: [("binrw", " 0: Error: the build writes header 3735936685 at 0x74f\n           While parsing field 'map' in BaseWorld\n     at crates/formats/genie-save/src/generated/world.rs:11559\n 1: While parsing field 'base_world' in World\n     at crates/formats/genie-save/src/generated/world.rs:12119\n"), ("chapter", "0x0")] }
