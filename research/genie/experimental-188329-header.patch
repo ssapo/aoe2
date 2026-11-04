@@ -1,6 +1,8 @@
+diff --git a/crates/formats/genie-save/src/generated/world.rs b/crates/formats/genie-save/src/generated/world.rs
+index f3876c52..eba02597 100644
 --- a/crates/formats/genie-save/src/generated/world.rs
 +++ b/crates/formats/genie-save/src/generated/world.rs
-@@ -101,7 +101,7 @@
+@@ -101,7 +101,7 @@ pub struct PlayerCivilization {
  pub struct PlayerInfo {
      /// game: `&version`
      /// PlayerInfo's own version
@@ -9,7 +11,7 @@
      pub version: i32,
      /// game: `&mScenarioPlayerIndex`
      /// read by 0x1413109a0, a routine of one read
-@@ -164,6 +164,9 @@
+@@ -164,6 +164,9 @@ pub struct PlayerInfo {
      /// game: `&mPlayerPlatform`
      /// read at 0x14131d8d4
      pub player_platform: u32,
@@ -19,7 +21,7 @@
  }
  
  impl Default for PlayerInfo {
-@@ -190,6 +193,7 @@
+@@ -190,6 +193,7 @@ impl Default for PlayerInfo {
              slot_color_override: Default::default(),
              handicap: Default::default(),
              player_platform: Default::default(),
@@ -27,7 +29,27 @@
          }
      }
  }
-@@ -699,7 +703,7 @@
+@@ -584,6 +588,11 @@ pub struct GameOptions {
+     /// read by 0x1412dd230, a routine of one read
+     #[br(count = size_pompeii as usize)]
+     pub civ_2: Vec<u32>,
++    /// Two strings appended in options v1123 (save 68.9), empty in every replay seen so far
++    /// (builds 185872, 188329); their meaning is unverified. Gated on the save version because a
++    /// field named `version` shadows the options version here; GameOptionsRead pins 68.9 to v1123.
++    #[br(if(ver == 0x44e666))]
++    pub extra_v1123: Option<[SigString; 2]>,
+ }
+ 
+ impl Default for GameOptions {
+@@ -687,6 +696,7 @@ impl Default for GameOptions {
+             civ: Default::default(),
+             size_pompeii: Default::default(),
+             civ_2: Default::default(),
++            extra_v1123: None,
+         }
+     }
+ }
+@@ -699,7 +709,7 @@ impl Default for GameOptions {
  pub struct GameOptionsRead {
      /// game: `&version`
      /// GameOptions' `&version`, passed to the serializer
@@ -36,3 +58,312 @@
      pub version: f32,
      /// unnamed in the binary
      /// read by 0x141305310
+@@ -813,6 +823,7 @@ pub struct TribePlayerTechEntry2 {
+ #[binrw]
+ #[derive(Debug, Clone, PartialEq)]
+ #[brw(little)]
++#[br(import(ver: u32))]
+ pub struct TechPlayerTree {
+     /// HD Tech_Player_Tree::research_done (float, +0)
+     pub research_done: f32,
+@@ -831,6 +842,10 @@ pub struct TechPlayerTree {
+     pub name_override: SigString,
+     /// a state's +0x28: shown instead of the tech's description (FUN_1414ab460), set by a trigger (FUN_1415c3f20 case 8)
+     pub description_override: SigString,
++    /// Save 68.9: a third string after the two overrides, empty in all 1510 entries of the
++    /// replays seen; likely another text override, unverified.
++    #[br(if(ver == 0x44e666))]
++    pub extra_override_v68_9: Option<SigString>,
+     /// game: `(tech_player_tree[index].mStackTech)`
+     /// read at 0x1413c3621; named by the save's write in the same place (0x1413d1a60, write at 0x1413d205e)
+     pub tech_player_tree_stack_tech: u8,
+@@ -877,6 +892,7 @@ impl Default for TechPlayerTree {
+             tech_player_tree_allow_multiple_research: Default::default(),
+             name_override: Default::default(),
+             description_override: Default::default(),
++            extra_override_v68_9: None,
+             tech_player_tree_stack_tech: Default::default(),
+             tech_player_tree_research_cap: Default::default(),
+             tech_player_tree_pending_count: Default::default(),
+@@ -901,7 +917,7 @@ pub struct TribePlayerTech {
+     /// HD TRIBE_Player_Tech::tech_player_tree_num (int16), the count of the tech states
+     pub tech_player_tree_num: i16,
+     /// HD TRIBE_Player_Tech::tech_player_tree, one state per tech
+-    #[br(count = tech_player_tree_num.max(0) as usize)]
++    #[br(count = tech_player_tree_num.max(0) as usize, args { inner: (ver,) })]
+     pub tech_player_tree: Vec<TechPlayerTree>,
+ }
+ 
+@@ -1336,7 +1352,13 @@ pub struct TechTree {
+     pub number_buildings: u8,
+     /// game: `mNumber_units`
+     /// read at 0x1413e9b35
++    #[br(if(ver != 0x44e666))]
++    #[bw(if(number_units_wide.is_none()))]
+     pub number_units: u8,
++    /// Save 68.9 widens the unit count to u16 (269 units in the replays seen, above u8);
++    /// the age, building and tech counts stay u8 and number_grps i32.
++    #[br(if(ver == 0x44e666))]
++    pub number_units_wide: Option<u16>,
+     /// game: `mNumber_techs`
+     /// read at 0x1413e9cd5
+     pub number_techs: u8,
+@@ -1353,7 +1375,7 @@ pub struct TechTree {
+     pub tech_tree_buildings: Vec<TechTreeEntry2>,
+     /// game: `mTech_tree_units`
+     /// a loop of 11 reads; named by the save's write in the same place (0x1413f15e0)
+-    #[br(count = number_units as usize)]
++    #[br(count = number_units_wide.map_or(number_units as usize, usize::from))]
+     pub tech_tree_units: Vec<TechTreeEntry3>,
+     /// game: `mTech_tree_techs`
+     /// a loop of 13 reads; named by the save's write in the same place (0x1413f15e0)
+@@ -4420,6 +4442,7 @@ pub struct BxsRuntime {
+ #[binrw]
+ #[derive(Debug, Clone, Default, PartialEq)]
+ #[brw(little)]
++#[br(import(ver: u32))]
+ pub struct WorldPlayerEntry1 {
+     /// game: `diplomacy[i]`
+     /// read at 0x1415f21be; named by the save's write in the same place (0x141631420, write at 0x1416332f8)
+@@ -4476,6 +4499,10 @@ pub struct WorldPlayerEntry1 {
+     /// game: `(offer[i].status)`
+     /// read at 0x1415f2c03; named by the save's write in the same place (0x141631420, write at 0x14163395e)
+     pub offer_status: u8,
++    /// Save 68.9: one more byte per slot (24 bytes, not 23); 0 in every replay seen, so its
++    /// place inside the entry is not pinned yet (put last provisionally).
++    #[br(if(ver == 0x44e666))]
++    pub extra_v68_9: Option<u8>,
+ }
+ 
+ /// Read by `FUN_1415f1160` (`WorldPlayer.cpp`) of the build.
+@@ -4547,7 +4574,7 @@ pub struct WorldPlayer {
+     pub artifact_held_time: f32,
+     /// a loop of 18 reads; one entry per player slot (`diplomacy[i]`, `trade[i]`, `offer[i]` for i < 9: arrays of 9 bytes at +0xe12, +0xe1b, +0xe24)
+     #[brw(magic = b"\x0b")]
+-    #[br(count = 9)]
++    #[br(count = 9, args { inner: (ver,) })]
+     pub per_player: Vec<WorldPlayerEntry1>,
+     /// game: `fealty`
+     /// read at 0x1415f2c69; named by the save's write in the same place (0x141631420, write at 0x1416339c0)
+@@ -4699,6 +4726,11 @@ pub struct WorldPlayer {
+     pub bxs_runtime: Option<Box<BxsRuntime>>,
+     /// unnamed in the binary
+     /// the routine's closing marker
++    /// Save 68.9: 8 bytes before the end marker, zero for Gaia in every replay seen; kept raw.
++    /// Placed after the AI part, which a human/Gaia player does not have, so the order against
++    /// that part is unverified.
++    #[br(if(ver == 0x44e666))]
++    pub extra_v68_9: Option<[u8; 8]>,
+     #[brw(magic = b"\x0b")]
+     pub end_marker: (),
+ }
+@@ -4774,6 +4806,7 @@ impl Default for WorldPlayer {
+             using_xs: Default::default(),
+             bxs_runtime: Default::default(),
+             end_marker: Default::default(),
++            extra_v68_9: None,
+         }
+     }
+ }
+@@ -4979,6 +5012,11 @@ pub struct RgeMasterStaticObject {
+     /// game: `mName`
+     /// helper 0x140932010
+     pub name: SigString,
++    /// Save 68.9: 44 bytes after the name, before the animated part's speed (archer speed found at
++    /// +44). Seen as i16 4, 11, 19, bytes 2 2 1 0..., then floats like (0.2, 0.2, 2.0, 0.2, 0.2):
++    /// size/clearance-like values copied from the unit. Kept raw; meaning unverified.
++    #[br(if(ver == 0x44e666))]
++    pub extra_v68_9: Option<[u8; 44]>,
+ }
+ 
+ impl Default for RgeMasterStaticObject {
+@@ -5034,6 +5072,7 @@ impl Default for RgeMasterStaticObject {
+             damage_sprite_num: Default::default(),
+             damage_sprite: Default::default(),
+             name: Default::default(),
++            extra_v68_9: None,
+         }
+     }
+ }
+@@ -5079,6 +5118,13 @@ pub struct RgeMasterMovingObject {
+     /// game: `&obj_trail_spacing`
+     /// read at 0x1410e6190
+     pub obj_trail_spacing: u32,
++    /// Save 68.9: two bytes (0 so far) then an f32 before the action part's search radius. The f32
++    /// equals the DAT `min_collision_size_multiplier` (archer 1.0, scout cavalry 0.5); the two
++    /// bytes are unidentified.
++    #[br(if(ver == 0x44e666))]
++    pub extra_v68_9: Option<[u8; 2]>,
++    #[br(if(ver == 0x44e666))]
++    pub min_collision_size_multiplier: Option<f32>,
+ }
+ 
+ /// Read by `FUN_141062470` of the build.
+@@ -5248,6 +5294,10 @@ pub struct RgeMasterActionObject {
+     /// game: `&run_pattern`
+     /// helper 0x140c94e10
+     pub run_pattern: u8,
++    /// Save 68.9: one byte after `run_pattern`, before the combat part's base armor (0 on archer
++    /// and scout cavalry); unidentified.
++    #[br(if(ver == 0x44e666))]
++    pub extra_v68_9: Option<u8>,
+ }
+ 
+ impl Default for RgeMasterActionObject {
+@@ -5263,6 +5313,7 @@ impl Default for RgeMasterActionObject {
+             temp_sound_num_2: Default::default(),
+             sound_event_event_id: vec![Default::default(); 2],
+             run_pattern: Default::default(),
++            extra_v68_9: None,
+         }
+     }
+ }
+@@ -5502,6 +5553,12 @@ pub struct TribeMasterCombatObject {
+     /// helper 0x140a90f60
+     #[br(if(ver >= 0x426666))]
+     pub train_location_entry_mod: Option<i16>,
++    /// Save 68.9: 19 bytes after `train_location_entry_mod`. On archer and scout cavalry they read
++    /// as a cost block laid out by column (3 x i16 amounts, 3 x i16 resource kinds, 3 x u8 flags:
++    /// archer 25/45/1 of 1/3/4, scout 80/0/1 of 0/-1/4) then two i16 (12262, 12263 on both).
++    /// Kept raw; meaning unverified.
++    #[br(if(ver == 0x44e666))]
++    pub extra_v68_9: Option<[u8; 19]>,
+ }
+ 
+ impl Default for TribeMasterCombatObject {
+@@ -5542,6 +5599,7 @@ impl Default for TribeMasterCombatObject {
+             volley_yspread: Default::default(),
+             volley_start_spread_adjustment: Default::default(),
+             train_location_entry_mod: Some(Default::default()),
++            extra_v68_9: None,
+         }
+     }
+ }
+@@ -5652,6 +5710,12 @@ pub struct TribeMasterBuildingObject {
+     /// game: `&open_close_sound_event.mEventId`
+     /// helper 0x140b4b760
+     pub open_close_sound_event_event_id: u32,
++    /// Save 68.9: 52 bytes after the sounds. On the Town Center (RTWC) they match the DAT
++    /// building: u8 0, i16 tech 722, i16 -1, i16 head unit 621, i16 transform unit 444, i16 -1,
++    /// 4 x i16 annex ids 618/619/620/890, 4 x (f32, f32) annex offsets, u8 can_burn 1.
++    /// Kept raw; the field names are from that one match, not from the game.
++    #[br(if(ver == 0x44e666))]
++    pub extra_v68_9: Option<[u8; 52]>,
+ }
+ 
+ /// Read by `FUN_14162bef0` of the build.
+@@ -6811,12 +6875,17 @@ pub struct ActiveSpriteList {
+     /// entries until a sprite_kind of 0, that one included
+     #[br(parse_with = binrw::helpers::until(|e: &ActiveSpriteListEntry1| e.sprite_kind == 0), args(ver))]
+     pub sprite_kind_list: Vec<ActiveSpriteListEntry1>,
++    /// Save 68.9: one more byte after the list's 0 terminator (0 so far); placement after the
++    /// list rather than before it is provisional.
++    #[br(if(ver == 0x44e666))]
++    pub extra_v68_9: Option<u8>,
+ }
+ 
+ impl Default for ActiveSpriteList {
+     fn default() -> Self {
+         Self {
+             sprite_kind_list: vec![Default::default()],
++            extra_v68_9: None,
+         }
+     }
+ }
+@@ -8179,6 +8248,10 @@ pub struct RgeCombatObject {
+     /// game: `mObjectTriggerFlags.m_bits`
+     /// read at 0x14108af38
+     pub object_trigger_flags_bits: u32,
++    /// Save 68.9: 12 bytes (all 0 on the first combat objects seen) somewhere between
++    /// `attack_timer` and `previous_master_id`; placed here provisionally (2026-11-04).
++    #[br(if(ver == 0x44e666))]
++    pub extra_a_v68_9: Option<[u8; 12]>,
+     /// game: `&previousMasterId`
+     /// read at 0x14108b4c3
+     pub previous_master_id: u16,
+@@ -8191,6 +8264,10 @@ pub struct RgeCombatObject {
+     /// game: `&m_abilityActivatedTimeMs`
+     /// helper 0x140b4b760
+     pub ability_activated_time_ms: u32,
++    /// Save 68.9: 8 bytes before `processed_kill` (seen as 00 ff ff ff ff 00 00 00);
++    /// unidentified.
++    #[br(if(ver == 0x44e666))]
++    pub extra_b_v68_9: Option<[u8; 8]>,
+     /// game: `&mProcessedKill`
+     /// helper 0x140ccd170
+     pub processed_kill: u8,
+@@ -8218,6 +8295,8 @@ impl Default for RgeCombatObject {
+             special_ability_duration_ms: Default::default(),
+             ability_activated_time_ms: Default::default(),
+             processed_kill: Default::default(),
++            extra_a_v68_9: None,
++            extra_b_v68_9: None,
+         }
+     }
+ }
+@@ -8421,6 +8500,10 @@ pub struct UnitAiModule {
+     /// game: `mDisableRetargeting`
+     /// read at 0x140c539d5
+     pub disable_retargeting: u8,
++    /// Save 68.9: 15 bytes after `disable_retargeting`, seen on a Gaia animal as u8 1, f32 28.5,
++    /// f32 56.5 (its own tile, like `state_position`), then 6 zero bytes; unidentified.
++    #[br(if(ver == 0x44e666))]
++    pub extra_v68_9: Option<[u8; 15]>,
+ }
+ 
+ /// Read by `FUN_140c1d860` of the build.
+@@ -8672,6 +8755,9 @@ pub struct TribeCombatObject {
+     /// game: `mSkipVolleyAttack`
+     /// read at 0x1412251eb
+     pub skip_volley_attack: u8,
++    /// Save 68.9: one more byte in the tail (0 so far), placed last provisionally.
++    #[br(if(ver == 0x44e666))]
++    pub extra_v68_9: Option<u8>,
+ }
+ 
+ impl Default for TribeCombatObject {
+@@ -8731,6 +8817,7 @@ impl Default for TribeCombatObject {
+             local_resource_store: Default::default(),
+             conversion_rate: Default::default(),
+             skip_volley_attack: Default::default(),
++            extra_v68_9: None,
+         }
+     }
+ }
+@@ -9346,6 +9433,11 @@ pub struct WorldPlayerGaia {
+     /// game: `(mWolfAttackStopTime)`
+     /// read at 0x14167c68c; named by the save's write in the same place (0x14167fc40, write at 0x14168067d)
+     pub wolf_attack_stop_time: u32,
++    /// Save 68.9: one more u32 among the wolf timers (16 bytes, not 12, between `creatures` and
++    /// the min distance). Values seen in order: 0, 0, 1000, ~1.3e6; which one is new is not
++    /// pinned, so it is put last provisionally.
++    #[br(if(ver == 0x44e666))]
++    pub extra_wolf_v68_9: Option<u32>,
+     /// game: `(mMinVillagerDistance)`
+     /// read at 0x14167c702; named by the save's write in the same place (0x14167fc40, write at 0x141680813)
+     pub min_villager_distance: u32,
+@@ -9398,6 +9490,7 @@ impl Default for WorldPlayerGaia {
+             wolf_list: [Default::default(); 200],
+             current_wolf: Default::default(),
+             wolf_count: [Default::default(); 40],
++            extra_wolf_v68_9: None,
+         }
+     }
+ }
+@@ -9528,7 +9621,16 @@ pub struct WorldPlayerBase {
+     pub culture: u8,
+     /// game: `&civId`
+     /// helper 0x14163c630
++    /// Save 68.9 writes the civilization's `data_name` (civilizations.json) instead, below; the
++    /// reader leaves this 0 there and the id is resolved from that name.
++    #[br(if(ver != 0x44e666))]
++    #[bw(if(civ_data_name.is_none()))]
+     pub civ_id: u8,
++    /// Save 68.9 (builds 185872, 188329): the civilization as its civilizations.json `data_name`
++    /// (e.g. "FRANKISH-CIV", "GAIA") in place of the u8 `civId`; the byte before it stays the DAT
++    /// `icon_set` (culture). Seen on 8 replays; whether ids outside that list appear is unverified.
++    #[br(if(ver == 0x44e666))]
++    pub civ_data_name: Option<SigString>,
+     /// game: `&mEquippedSkins`
+     /// helper 0x140d46ce0
+     pub equipped_skins: LenVec32<i64>,

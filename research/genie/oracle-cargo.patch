@@ -1,0 +1,12 @@
+diff --git a/crates/tools/genie-oracle/Cargo.toml b/crates/tools/genie-oracle/Cargo.toml
+index ab4dccd9..384621d5 100644
+--- a/crates/tools/genie-oracle/Cargo.toml
++++ b/crates/tools/genie-oracle/Cargo.toml
+@@ -23,6 +23,7 @@ genie-json = { version = "0.1.0", path = "../../formats/genie-json" }
+ genie-rec = { version = "0.1.1", path = "../../formats/genie-rec" }
+ genie-save = { version = "0.1.0", path = "../../formats/genie-save" }
+ flate2.workspace = true
++binrw.workspace = true
+ rayon.workspace = true
+ serde_json.workspace = true
+ 
