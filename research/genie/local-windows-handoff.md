@@ -2,6 +2,42 @@
 
 기록일: 2026-11-05 (한국 시간). **다음 AI는 이 문서부터 읽고 작업한다.** 사용자가 이번 단계 전환을 다음 작업자에게 기록해 달라고 요청했다.
 
+## 2026-11-05 진행 기록 (Claude, Cowork 세션)
+
+**실행 환경:** 클라우드 Linux 셸 + 사용자 Windows PC 원격 도구(PowerShell, 화면 캡처/클릭, 파일 접근)가 실제로 연결됨.
+`get_device_info` 결과 platform `win32`, device `ssapo`, 연결 폴더 `C:\Users\ssapo\AppData\Local\Temp\genie-replays`.
+
+**설치본 확인 (읽기 전용, 2026-11-05 10:2x KST):**
+
+| 항목 | 값 |
+| --- | --- |
+| `AoE2DE_s.exe` | 72,176,952 bytes, FileVersion 101.103.57257.0, SHA-256 `1E415AF8…3CA16` (업로드본과 동일), 수정 2026-11-04 12:12 |
+| 게임 로그의 빌드 | `Version = 101.103.57257.0 #(188329)`, Stream `release_13_1_0_build_machine` (`%USERPROFILE%\Games\Age of Empires 2 DE\logs\Age2SessionData.txt`) |
+| Steam appmanifest 813780 | buildid 26272505 (Steam depot 번호, 게임 build 아님) |
+| `resources\_common\dat` | `empires2_x2_p1.dat` 11,963,833 (SHA-256 앞 16자리 D0AEFD92428E2215), `civilizations.json` 58,763 (04E19A8D86262CF9), `unitlines.json` 20,974 (1D124BA1B66A2EE7), `dropsites.json` 31,606 (9EC0DCC98335FE00), `linkedTechs.json` 3,947 (DB2119B3FEFDC4D9), `linkedUnits.json` 809 (987F86EEA316001C). 모두 같은 설치본(2026-11-04 12:12) |
+
+→ 설치 게임 build 188329 = 리플 518239882·518470161·516956894의 build. 185872 리플 4개는 다른 build다.
+
+**게임 실행:** `steam://rungameid/813780`로 정상 실행(로그인 추가 입력 없음). 메인 메뉴 도달, 화면 하단 `버전 101.103.57257.0 (#188329) 26272505`.
+게임 프로필 폴더는 이때 처음 생성됨(이 PC에서 첫 실행으로 보임). Steam ID 폴더 `76561198039927362`.
+리플 8개를 `%USERPROFILE%\Games\Age of Empires 2 DE\76561198039927362\savegame\`에 복사함.
+
+**리플 재생: 아직 안 함.** 사용자가 PC를 쓰는 중이라(다른 창이 앞에 있고 마우스 사용 중) 화면 조작을 보류했다. 사용자가 PC를 비우면 재개.
+메인 메뉴의 `싱글 플레이어` 클릭 1회를 시도했으나 다른 창이 앞에 있어 결과 미확인.
+
+**실행 파일 문자열에서 찾은 상태 수집 후보 (실행 검증 전, 존재만 확인):**
+- 명령행 옵션 표: `WINDOW`, `SKIPINTRO`, `NOVSYNC`, `UNCAPPED_SIMULATION_SPEED`, `LOGDIR`, `LOGCOMMANDS`, `LOGACTION`, `LOGPLAYER`, `LOGSTART`, `EXIT`(지정 게임 시간 뒤 자동 종료), `SCRIPT`/`SCRIPTREPORT`/`TEST_HARNESS_COMM`(testharness), `RUN_REGRESSION_TESTS`, `DEVELOPER`, `ACCURATE_CHECKSUMS` 등. 리테일에서 실제로 먹히는지는 미확인.
+- SyncLogger: `SyncLog`, `%s %s %s.txt`, `Game completed without desync`, `(RandSync) file=%s line=%d`, `cRandSync tracking enabled`, `host-settings.txt`. 체크섬 구성 항목 문자열 `AIExpertCRC, VisibilityCRC, Random1..5, NumSleepingObjects, Attributes, MasterObjIDs, ObjectStates, ObjAttributeAmountHeald`. 켜는 방법은 미확인.
+- 프로필의 `testharness\{regressionsaves,reports}` 폴더가 첫 실행 때 생성됨(비어 있음).
+- CaptureAge 연동: 게임 안에 gRPC API 서버 `localhost:4341`(CaptureAge 인증서 포함, `CadeApiSynchronize`). 메인 메뉴 상태에서는 4341 listen 없음. 공개 API가 아니므로 직접 접속은 보류. CaptureAge 앱이 있으면 군대 가치·킬 등을 사람이 보고 대조하는 용도로는 쓸 수 있음(미확인).
+- 리플 종료 후 게임 자체의 통계 화면(유닛 처치/손실, 타임라인)은 사용자 목표(사상자)와 직접 관련된 원본 값 후보.
+
+**다음 순서 (PC가 비었을 때):**
+1. 게임 창을 앞으로(현재 창 위치 1300,100 크기 1600×1000, 모니터 5120×1440 전체 좌표 기준).
+2. 싱글 플레이어 → 기록된 게임에서 518239882 재생. 열리면 0:30, 1:00, 5:00 화면(인구·주민·자원) 캡처, 관찰 선수 표시.
+3. 끝까지 빠르게 돌려 통계 화면 캡처(처치/손실).
+4. 별도 단계: `-SKIPINTRO -WINDOW` 등으로 명령행 옵션이 리테일에서 먹히는지 `Main.txt`의 `Skipping video due to commandline`으로 확인 → 그 뒤 SyncLog 계열 시험.
+
 ## 먼저 해야 할 일
 
 현재 우선순위는 사용자의 실제 Windows PC에 접근해 AoE2가 실행되고 1v1 리플이 열리는지 확인하는 것이다. 게임을 실행할 수 있는 환경을 확보하고 원본 상태를 얻을 경로를 조사한다. 게임 실행과 자동 상태 추출은 별개의 검증 단계다. 이미 자동 수집기가 완성됐거나, 데스크톱 앱을 켜기만 하면 가능한 것으로 보고하지 않는다.
