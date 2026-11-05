@@ -58,8 +58,80 @@ index d2edcddb..4ee72526 100644
 +        .and_then(|&(_, to)| ObjectId::of_field(to))
 +        .or(Some(id))
 +}
+diff --git a/crates/engine/genie-core/src/gathering/hunt/unit.rs b/crates/engine/genie-core/src/gathering/hunt/unit.rs
+index 0c37a95e..981e6fa5 100644
+--- a/crates/engine/genie-core/src/gathering/hunt/unit.rs
++++ b/crates/engine/genie-core/src/gathering/hunt/unit.rs
+@@ -541,6 +541,18 @@ impl Unit {
+                     "a hunt without a unit AI after its drop-off",
+                 ))?;
+         ai.alert(result, c.dt.seconds());
++        if std::env::var_os("GENIE_LOG_HUNT_SEARCH").is_some() {
++            eprintln!(
++                "HUNT_AFTER_DROP world_ms={} turn={:?} fresh={} unit={} at={:?} class={:?} found={:?}",
++                c.w.world_time.millis(),
++                c.w.player_turn,
++                result.fresh,
++                self.id.get(),
++                self.position().ground(),
++                class,
++                result.id.map(ObjectId::get)
++            );
++        }
+         Ok(result.id)
+     }
+ 
+diff --git a/crates/engine/genie-core/src/unit_ai/unit.rs b/crates/engine/genie-core/src/unit_ai/unit.rs
+index dc286d39..9dfdf3ce 100644
+--- a/crates/engine/genie-core/src/unit_ai/unit.rs
++++ b/crates/engine/genie-core/src/unit_ai/unit.rs
+@@ -501,7 +501,18 @@ impl Unit {
+         // world's dt to its time since the last enemy sighting (`+0x1b4`) before it returns
+         if turn.is_some() && c.w.parts.unit_ai.contains(self.id) && after.is_none() {
+             // the full update's start lets the unit AIs' search cache go
+-            c.w.spatial.forget_search();
++            // diagnostic GENIE_EXPERIMENT_SEARCH_CLEAR: "never", or "tick" (once per update)
++            match std::env::var("GENIE_EXPERIMENT_SEARCH_CLEAR").as_deref() {
++                Ok("never") => {}
++                Ok("tick") => {
++                    static LAST: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(u64::MAX);
++                    let now = u64::from(c.w.world_time.millis());
++                    if LAST.swap(now, std::sync::atomic::Ordering::Relaxed) != now {
++                        c.w.spatial.forget_search();
++                    }
++                }
++                _ => c.w.spatial.forget_search(),
++            }
+         }
+         if turn.is_some()
+             && after.is_none()
+diff --git a/crates/engine/genie-core/src/unit_ai/update.rs b/crates/engine/genie-core/src/unit_ai/update.rs
+index 1ecba910..a388125b 100644
+--- a/crates/engine/genie-core/src/unit_ai/update.rs
++++ b/crates/engine/genie-core/src/unit_ai/update.rs
+@@ -409,8 +409,9 @@ impl UnitAi {
+         let kind = civilian_kind(class, roles);
+         let found = match kind {
+             None => {
++                let origin = at.position.ground();
+                 let found = side.closest(&Search {
+-                    at: at.position.ground(),
++                    at: origin,
+                     radius: civilian_search_radius(at.los, at.search_radius),
+                     classes: &CIVILIAN_CARED,
+                     size: at.size,
+@@ -430,6 +431,9 @@ impl UnitAi {
+                     memory: Memory::default(),
+                 })?;
+                 self.alert(found, at.dt_seconds);
++                if std::env::var_os("GENIE_LOG_HUNT_SEARCH").is_some() {
++                    eprintln!("HUNTER_SEARCH origin={origin:?} class={class:?} found={:?}", found.id);
++                }
+                 match (found.id, found.position) {
+                     (Some(id), Some(position)) => Some(Gatherable {
+                         id,
 diff --git a/crates/tools/genie-oracle/src/census.rs b/crates/tools/genie-oracle/src/census.rs
-index b6edc169..1970f429 100644
+index b6edc169..0904afb4 100644
 --- a/crates/tools/genie-oracle/src/census.rs
 +++ b/crates/tools/genie-oracle/src/census.rs
 @@ -148,6 +148,7 @@ pub fn census_run(
@@ -70,7 +142,7 @@ index b6edc169..1970f429 100644
      for frame in frames(&chapter, total)? {
          elapsed_ms += u64::from(frame.dt.get());
          if std::env::var_os("GENIE_TRACE_PHASE").is_some() && frame.checkpoint.is_some() {
-@@ -180,6 +181,32 @@ pub fn census_run(
+@@ -180,6 +181,33 @@ pub fn census_run(
              }
          }
          census.update(&turns, &sections);
@@ -92,7 +164,8 @@ index b6edc169..1970f429 100644
 +                                let a = crate::header_runs::checkpoint_action(turns.parts.actions_of(u.id), turns.parts.production.get(u.id));
 +                                let kind = a.and_then(|a| a.kind).map(|k| k.get());
 +                                let st = a.map(|a| a.state.get()).unwrap_or(0);
-+                                eprintln!("UNIT mark_ms={mark} player={p} id={} master={} pos={:?} action_kind={kind:?} action_state={st} held={:?} hp={:?}", u.id.get(), u.life.master_id.get(), u.position().get(), u.life.amount, u.life.hp);
++                                let goal = turns.parts.actions_of(u.id).list.artifact().and_then(|a| a.goal).map(|g| (g.x(), g.y()));
++                        eprintln!("UNIT mark_ms={mark} player={p} id={} master={} pos={:?} action_kind={kind:?} action_state={st} held={:?} hp={:?} goal={goal:?}", u.id.get(), u.life.master_id.get(), u.position().get(), u.life.amount, u.life.hp);
 +                            }
 +                        }
 +                    }
@@ -103,7 +176,7 @@ index b6edc169..1970f429 100644
          if std::env::var_os("GENIE_TRACE_OBJECTS").is_some() && [499, 999, 1499].contains(&census.updates) {
              for (p, state) in turns.players.iter().enumerate().skip(1) {
                  for u in &state.objects {
-@@ -198,7 +225,7 @@ pub fn census_run(
+@@ -198,7 +226,7 @@ pub fn census_run(
              }
              eprintln!("TIMING update={} initial_ms={} elapsed_ms={} actual_ms={}", census.updates, initial_time, elapsed_ms, turns.world_time.millis());
          }
@@ -112,3 +185,19 @@ index b6edc169..1970f429 100644
              end = CensusEnd::AllDone;
              break;
          }
+@@ -292,6 +320,15 @@ impl Census {
+             ) else {
+                 continue;
+             };
++            if std::env::var_os("GENIE_PRINT_CHECKPOINTS").is_some() {
++                let block = lane_block(section, lane[8], state, &turns.parts);
++                eprintln!(
++                    "CPWORDS syncs={at} world_ms={} player={p} rec={:?} eng={:?}",
++                    turns.world_time.millis(),
++                    lane,
++                    block
++                );
++            }
+             if player.done() {
+                 continue;
+             }
