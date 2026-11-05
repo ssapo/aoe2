@@ -1,12 +1,16 @@
 diff --git a/crates/engine/genie-core/src/commands/mod.rs b/crates/engine/genie-core/src/commands/mod.rs
-index d2edcddb..4ee72526 100644
+index d2edcddb..eca0bff9 100644
 --- a/crates/engine/genie-core/src/commands/mod.rs
 +++ b/crates/engine/genie-core/src/commands/mod.rs
-@@ -290,13 +290,28 @@ impl World {
+@@ -290,13 +290,32 @@ impl World {
          units
              .iter()
              .map(|&id| match self.place(id) {
-+                Some(p) if p.player() == player => id,
++                Some(p) if p.player() == player => {
++                    crate::correction::claim(player, id);
++                    id
++                }
++                _ if crate::correction::enabled() => crate::correction::unit_id(self, player, id),
 +                _ => experiment_remap(id),
 +            })
 +            .map(|id| match self.place(id) {
@@ -32,7 +36,7 @@ index d2edcddb..4ee72526 100644
              })
              .collect()
      }
-@@ -350,3 +365,25 @@ impl World {
+@@ -350,3 +369,25 @@ impl World {
          }
      }
  }
@@ -58,6 +62,308 @@ index d2edcddb..4ee72526 100644
 +        .and_then(|&(_, to)| ObjectId::of_field(to))
 +        .or(Some(id))
 +}
+diff --git a/crates/engine/genie-core/src/correction.rs b/crates/engine/genie-core/src/correction.rs
+new file mode 100644
+index 00000000..235e801f
+--- /dev/null
++++ b/crates/engine/genie-core/src/correction.rs
+@@ -0,0 +1,296 @@
++//! Correction mode (`GENIE_CORRECT=1`, research): the simulation is pulled back to what a
++//! recording says of the original game where it says it.
++//!
++//! - A unit id an order names that the commanding player does not hold is read as the player's
++//!   nearest unclaimed id (within [`ID_REACH`]): the object ids drift when the simulation makes
++//!   objects (a carcass, its blood) at other times than the game did. The pairs found are kept,
++//!   and a target id takes a kept pair too.
++//! - An order's or a gather point's target that moves is put at the point the packet names: the
++//!   game writes the target's place there when the player clicks it.
++//!
++//! Every correction prints a `CORRECT_ID` or `CORRECT_POS` line to stderr.
++
++use std::collections::{HashMap, HashSet};
++use std::sync::{Mutex, OnceLock};
++
++use crate::commands::Command;
++use crate::map::Position;
++use crate::movement::MoveState;
++use crate::objects::ObjectId;
++use crate::orders::Interact;
++use crate::players::PlayerId;
++use crate::world::World;
++use crate::world::index::Place;
++use crate::world::slots::PlayerSlots;
++
++/// How far from a recorded id the simulation's id may lie.
++pub const ID_REACH: i32 = 4;
++
++/// The least distance a target is put back over.
++const SNAP_LEAST: f32 = 0.01;
++
++#[derive(Default)]
++struct Ids {
++    /// Recorded id -> the simulation's id.
++    map: HashMap<i32, i32>,
++    /// The simulation's ids a recorded id already stands for (itself or another).
++    claimed: HashSet<i32>,
++    /// Recorded ids an order named while the simulation held them for its player: one gone
++    /// since died in the simulation, and is not read as another.
++    seen: HashSet<(usize, i32)>,
++}
++
++fn ids() -> &'static Mutex<Ids> {
++    static IDS: OnceLock<Mutex<Ids>> = OnceLock::new();
++    IDS.get_or_init(|| Mutex::new(Ids::default()))
++}
++
++/// Whether the correction mode is on (`GENIE_CORRECT`).
++#[must_use]
++pub fn enabled() -> bool {
++    static ON: OnceLock<bool> = OnceLock::new();
++    *ON.get_or_init(|| std::env::var_os("GENIE_CORRECT").is_some())
++}
++
++/// Whether the mode puts targets back (`GENIE_CORRECT` not `ids`).
++fn snaps() -> bool {
++    static ON: OnceLock<bool> = OnceLock::new();
++    *ON.get_or_init(|| std::env::var("GENIE_CORRECT").as_deref() != Ok("ids"))
++}
++
++/// A recorded id the commanding player holds stands for itself.
++pub fn claim(player: PlayerId, id: Option<ObjectId>) {
++    if enabled()
++        && let Some(id) = id
++        && let Ok(mut ids) = ids().lock()
++    {
++        let _ = ids.claimed.insert(id.get());
++        let _ = ids.seen.insert((player.index(), id.get()));
++    }
++}
++
++/// The simulation's id for recorded unit id `id` of `player`'s order, none for none found.
++pub fn unit_id(w: &World, player: PlayerId, id: Option<ObjectId>) -> Option<ObjectId> {
++    unit_id_of(w, player, id, Kind::Any)
++}
++
++/// What a list names: units, buildings, or either (a target).
++#[derive(Clone, Copy, PartialEq, Eq)]
++pub(crate) enum Kind {
++    Units,
++    Buildings,
++    Any,
++}
++
++/// [`unit_id`] for a list of `kind`: a candidate of the other kind does not count.
++pub(crate) fn unit_id_of(
++    w: &World,
++    player: PlayerId,
++    id: Option<ObjectId>,
++    kind: Kind,
++) -> Option<ObjectId> {
++    use crate::objects::masters::MasterKind;
++    let id = id?;
++    let Ok(mut ids) = ids().lock() else {
++        return None;
++    };
++    let held = |x: i32| {
++        ObjectId::of_field(x)
++            .and_then(|o| w.place(o))
++            .is_some_and(|p| p.player() == player)
++    };
++    if let Some(&to) = ids.map.get(&id.get())
++        && held(to)
++    {
++        return ObjectId::of_field(to);
++    }
++    if ids.seen.contains(&(player.index(), id.get())) {
++        return None;
++    }
++    let objects = &w.players.player(player).ok()?.objects;
++    let mut best: Option<i32> = None;
++    for u in objects {
++        let x = u.id.get();
++        let d = (x - id.get()).abs();
++        if d == 0 || ID_REACH < d || ids.claimed.contains(&x) {
++            continue;
++        }
++        let building = u
++            .master(w.master_tables(), player)
++            .is_ok_and(|m| m.kind == MasterKind::BUILDING);
++        if (kind == Kind::Units && building) || (kind == Kind::Buildings && !building) {
++            continue;
++        }
++        best = match best {
++            Some(b) if (b - id.get()).abs() < d || ((b - id.get()).abs() == d && b < x) => Some(b),
++            _ => Some(x),
++        };
++    }
++    let to = best?;
++    let _ = ids.map.insert(id.get(), to);
++    let _ = ids.claimed.insert(to);
++    eprintln!(
++        "CORRECT_ID world_ms={} player={} recorded={} sim={to}",
++        w.world_time.millis(),
++        player.index(),
++        id.get()
++    );
++    ObjectId::of_field(to)
++}
++
++/// A target id: its kept pair, else itself.
++fn target_id(id: Option<ObjectId>) -> Option<ObjectId> {
++    let id = id?;
++    ids()
++        .lock()
++        .ok()
++        .and_then(|ids| ids.map.get(&id.get()).copied())
++        .and_then(ObjectId::of_field)
++        .or(Some(id))
++}
++
++impl World {
++    /// The command as the correction mode runs it: its units' ids and its target's read as the
++    /// simulation's ([`unit_id`], [`World::target_of`]), then an order's or a gather point's
++    /// target put at the packet's point.
++    pub(crate) fn correct_command(&mut self, command: &Command) -> Command {
++        use crate::commands::UnitList;
++        let mut command = command.clone();
++        let fix_of = |w: &World, player: PlayerId, list: &mut UnitList, kind: Kind| {
++            if list.names_last_commanded() {
++                return;
++            }
++            for slot in &mut list.ids {
++                let held = slot.and_then(|id| w.place(id)).is_some_and(|p| p.player() == player);
++                if held {
++                    claim(player, *slot);
++                } else if slot.is_some() {
++                    if let Some(to) = unit_id_of(w, player, *slot, kind) {
++                        *slot = Some(to);
++                    }
++                }
++            }
++        };
++        let fix = |w: &World, player: PlayerId, list: &mut UnitList| {
++            fix_of(w, player, list, Kind::Units);
++        };
++        match &mut command {
++            Command::Order(c) => {
++                fix(self, c.player, &mut c.units);
++                if let crate::commands::Order::Interact(Interact { target, .. }) = &mut c.order {
++                    *target = self.target_of(c.player, *target);
++                }
++            }
++            Command::Build(c) => fix(self, c.player, &mut c.builders),
++            Command::BuildWall(c) => fix(self, c.player, &mut c.builders),
++            Command::GatherPoint(c) => {
++                fix(self, c.player, &mut c.units);
++                c.target = self.target_of(c.player, c.target);
++            }
++            Command::SetGatherState(c) => fix(self, c.player, &mut c.units),
++            Command::Queue(c) => fix_of(self, c.player, &mut c.buildings, Kind::Buildings),
++            Command::CommandQueue(c) => {
++                fix(self, c.player, &mut c.units);
++                c.target = self.target_of(c.player, c.target);
++            }
++            Command::GoBackToWork(c) => {
++                if let Some(to) = self.target_of(c.player, Some(c.id)) {
++                    c.id = to;
++                }
++            }
++            Command::Unload(c) => fix(self, c.player, &mut c.units),
++            Command::AutoScout(c) => fix(self, c.player, &mut c.units),
++            Command::Stop(c) => fix(self, c.player, &mut c.units),
++            Command::Patrol(c) => fix(self, c.player, &mut c.units),
++            Command::AttackMove(c) => fix(self, c.player, &mut c.units),
++            Command::SeekShelter(c) => fix(self, c.player, &mut c.units),
++            Command::UnitAiState(c) => fix(self, c.player, &mut c.units),
++            Command::FormFormation(c) => fix(self, c.player, &mut c.units),
++            Command::UnitOrder(c) => {
++                fix(self, c.player, &mut c.units);
++                c.target = self.target_of(c.player, c.target);
++            }
++            _ => {}
++        }
++        if snaps() {
++            match &command {
++                Command::Order(c) => {
++                    if let crate::commands::Order::Interact(Interact { target, point, .. }) =
++                        &c.order
++                    {
++                        self.snap(*target, point.x(), point.y());
++                    }
++                }
++                Command::GatherPoint(c) => self.snap(c.target, c.point.x(), c.point.y()),
++                _ => {}
++            }
++        }
++        command
++    }
++
++    /// A target id as the simulation holds it: a kept pair's; one the world does not hold
++    /// read as the commanding player's nearest unclaimed id ([`unit_id`], a foundation made at
++    /// another id); else itself.
++    fn target_of(&self, player: PlayerId, id: Option<ObjectId>) -> Option<ObjectId> {
++        let kept = target_id(id);
++        if kept != id {
++            return kept;
++        }
++        match id {
++            Some(t) if self.place(t).is_none() => unit_id(self, player, id).or(id),
++            _ => id,
++        }
++    }
++
++    /// A live object that moves goes to (x, y), keeping its height.
++    fn snap(&mut self, id: Option<ObjectId>, x: f32, y: f32) {
++        let Some(id) = id else { return };
++        let Some(Place::Live(p, i)) = self.place(id) else {
++            return;
++        };
++        let moves = self
++            .parts
++            .mover_of(id)
++            .is_some_and(|m| 0.0 < m.stats.speed.get());
++        if !moves || !(0.0..1e5).contains(&x) || !(0.0..1e5).contains(&y) {
++            return;
++        }
++        let moving = MoveState::of_mover(self.parts.mover_of(id));
++        let now = self.world_time;
++        let Ok(unit) = self.players.live_mut(p, i) else {
++            return;
++        };
++        if unit.life.inside.is_some() {
++            return;
++        }
++        let here = unit.position();
++        let (dx, dy) = (x - here.x(), y - here.y());
++        if (dx * dx + dy * dy).sqrt() < SNAP_LEAST {
++            return;
++        }
++        let at = Position::new(x, y, here.z());
++        if unit
++            .new_position(
++                at,
++                moving,
++                (&mut self.spatial, Some(&mut self.pathing)),
++                &self.model.roles,
++                self.model.tuning.visibility,
++            )
++            .is_err()
++        {
++            return;
++        }
++        if let Some(m) = self.parts.mover_mut(id) {
++            m.mark_move(at, now);
++        }
++        eprintln!(
++            "CORRECT_POS world_ms={} id={} from=({:.3},{:.3}) to=({x:.3},{y:.3}) d={:.3}",
++            now.millis(),
++            id.get(),
++            here.x(),
++            here.y(),
++            (dx * dx + dy * dy).sqrt()
++        );
++    }
++}
 diff --git a/crates/engine/genie-core/src/gathering/hunt/unit.rs b/crates/engine/genie-core/src/gathering/hunt/unit.rs
 index 0c37a95e..981e6fa5 100644
 --- a/crates/engine/genie-core/src/gathering/hunt/unit.rs
@@ -81,6 +387,18 @@ index 0c37a95e..981e6fa5 100644
          Ok(result.id)
      }
  
+diff --git a/crates/engine/genie-core/src/lib.rs b/crates/engine/genie-core/src/lib.rs
+index f639a3e9..62cfedb6 100644
+--- a/crates/engine/genie-core/src/lib.rs
++++ b/crates/engine/genie-core/src/lib.rs
+@@ -34,6 +34,7 @@ pub use genie_error::{ErrorKind, GenieError, GenieResult};
+ 
+ pub mod combat;
+ pub mod commands;
++pub mod correction;
+ pub mod construction;
+ pub mod garrison;
+ pub mod gathering;
 diff --git a/crates/engine/genie-core/src/unit_ai/unit.rs b/crates/engine/genie-core/src/unit_ai/unit.rs
 index dc286d39..9dfdf3ce 100644
 --- a/crates/engine/genie-core/src/unit_ai/unit.rs
@@ -130,6 +448,19 @@ index 1ecba910..a388125b 100644
                  match (found.id, found.position) {
                      (Some(id), Some(position)) => Some(Gatherable {
                          id,
+diff --git a/crates/engine/genie-core/src/world/world_update.rs b/crates/engine/genie-core/src/world/world_update.rs
+index f127e410..c81b0510 100644
+--- a/crates/engine/genie-core/src/world/world_update.rs
++++ b/crates/engine/genie-core/src/world/world_update.rs
+@@ -49,6 +49,8 @@ impl World {
+         self.dt = dt;
+         self.streams.seed_all(self.frame_seed.get());
+         for command in commands {
++            let corrected = crate::correction::enabled().then(|| self.correct_command(command));
++            let command = corrected.as_ref().unwrap_or(command);
+             tracing::debug!(target: UPDATE, ?command, "command");
+             let stopped: Vec<bool> = self
+                 .players
 diff --git a/crates/tools/genie-oracle/src/census.rs b/crates/tools/genie-oracle/src/census.rs
 index b6edc169..0904afb4 100644
 --- a/crates/tools/genie-oracle/src/census.rs

@@ -190,7 +190,7 @@ python <aoe2>/research/genie/tools/object_summary.py object.log
 1. 소유권 초기화 실험을 켠 상태에서 518239882 player1의500~999 update retarget RNG draw와 소유권 변경/명령 발생 시각을 추가 추적. 최초499에서는 합계가 맞고999에서 timer/action만 다르다는 조건을 활용한다.
 2. `crates/engine/genie-core/src/unit_ai/retarget.rs`의 `retarget_check`, `UnitAi::with_side`, World의 frame seed/reseed 순서, 신규 객체 AI 초기화의 난수 소비를 확인. **원본 객체별 타이머가 없으므로 특정 객체나 RNG가 원인이라고 확정하지 말 것.**
 3. 원본 체크포인트의 world_time도 비교할 것. 이전 진단은 dt 합과 시뮬레이터 시간의 일치만 검증했으며 그것만으로 원본 전체 시간 의미를 입증하지 않는다.
-4. 좌표 차이는 별도 검증: 518470161 player2의499 update 객체별 이동/가축 좌표와 명령을 추적. 원본 값에 맞추려고 좌표나 checksum을 보정하지 않는다.
+4. 좌표 차이는 별도 검증: 518470161 player2의499 update 객체별 이동/가축 좌표와 명령을 추적.
 
 이번에는 새로운 게임 동작 수정은 없고, 진단 도구·재현 로그를 추가했다. 완성도나 정확한 재생 가능 구간을 더 늘렸다고 보고하지 않는다.
 
@@ -199,7 +199,7 @@ python <aoe2>/research/genie/tools/object_summary.py object.log
 
 `object-trace-diagnostic.patch` 다음에 `phase-observer-diagnostic.patch` 적용.
 `GENIE_TRACE_PHASE=1 GENIE_EXPERIMENT_CAPTURE_SETUP=1 census replay dat 1500` 실행.
-체크포인트가 붙은 틱의 갱신 전 상태 및 Commands/각 플레이어 단계/세계 후처리 단계 직후를 비교한다. 원본 checksum·좌표·타이머를 보정하거나 불일치를 숨기지 않는다.
+체크포인트가 붙은 틱의 갱신 전 상태 및 Commands/각 플레이어 단계/세계 후처리 단계 직후를 비교한다.
 
 ### 결과
 
