@@ -1,0 +1,52 @@
+--- a/crates/tools/genie-oracle/src/census.rs	2026-11-05 13:39:29.513711319 +0900
++++ b/crates/tools/genie-oracle/src/census.rs	2026-11-05 13:38:26.826397760 +0900
+@@ -148,6 +148,7 @@
+     }
+     let initial_time = turns.world_time.millis();
+     let mut elapsed_ms = 0u64;
++    let mut dump_prev = u64::from(turns.world_time.millis());
+     for frame in frames(&chapter, total)? {
+         elapsed_ms += u64::from(frame.dt.get());
+         if std::env::var_os("GENIE_TRACE_PHASE").is_some() && frame.checkpoint.is_some() {
+@@ -180,6 +181,32 @@
+             }
+         }
+         census.update(&turns, &sections);
++        // DIAGNOSTIC: GENIE_DUMP_MS=15000,30000 prints each player's non-zero attributes and live
++        // object counts by master at the first update whose world time reaches each mark.
++        if let Ok(raw) = std::env::var("GENIE_DUMP_MS") {
++            let now = u64::from(turns.world_time.millis());
++            for mark in raw.split(',').filter_map(|x| x.trim().parse::<u64>().ok()) {
++                if now >= mark && dump_prev < mark {
++                    for (p, state) in turns.players.iter().enumerate() {
++                        let attrs: Vec<String> = state.attributes.iter().enumerate()
++                            .filter(|(_, a)| format!("{a:?}") != format!("{:?}", genie_core::players::Amount::ZERO))
++                            .map(|(i, a)| format!("{i}={a:?}")).collect();
++                        let mut by_master = std::collections::BTreeMap::<i16, usize>::new();
++                        for u in &state.objects { *by_master.entry(u.life.master_id.get()).or_default() += 1; }
++                        eprintln!("DUMP mark_ms={mark} world_ms={now} update={} player={p} live={} by_master={by_master:?} attrs=[{}]", census.updates, state.objects.len(), attrs.join(" "));
++                        if std::env::var_os("GENIE_DUMP_UNITS").is_some() && p > 0 {
++                            for u in &state.objects {
++                                let a = crate::header_runs::checkpoint_action(turns.parts.actions_of(u.id), turns.parts.production.get(u.id));
++                                let kind = a.and_then(|a| a.kind).map(|k| k.get());
++                                let st = a.map(|a| a.state.get()).unwrap_or(0);
++                                eprintln!("UNIT mark_ms={mark} player={p} id={} master={} pos={:?} action_kind={kind:?} action_state={st} held={:?}", u.id.get(), u.life.master_id.get(), u.position().get(), u.life.amount);
++                            }
++                        }
++                    }
++                }
++            }
++            dump_prev = now;
++        }
+         if std::env::var_os("GENIE_TRACE_OBJECTS").is_some() && [499, 999, 1499].contains(&census.updates) {
+             for (p, state) in turns.players.iter().enumerate().skip(1) {
+                 for u in &state.objects {
+@@ -198,7 +225,7 @@
+             }
+             eprintln!("TIMING update={} initial_ms={} elapsed_ms={} actual_ms={}", census.updates, initial_time, elapsed_ms, turns.world_time.millis());
+         }
+-        if census.players.iter().all(CensusPlayer::done) {
++        if std::env::var_os("GENIE_NO_STOP").is_none() && census.players.iter().all(CensusPlayer::done) {
+             end = CensusEnd::AllDone;
+             break;
+         }
