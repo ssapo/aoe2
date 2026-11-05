@@ -30,14 +30,26 @@ def summarize(metrics, duration):
     timeline = metrics.get('full_timeline')
     if timeline is None:
         return {'available': False}
-    queue = [e for e in timeline if e['kind'] in {'QUEUE', 'DE_QUEUE', 'MULTIQUEUE'}
-             and isinstance(e.get('amount'), int) and not isinstance(e['amount'], bool) and e['amount'] > 0]
+    orders = [e for e in timeline if e['kind'] in {'QUEUE', 'DE_QUEUE', 'MULTIQUEUE'}]
+    def known_amount(e):
+        return isinstance(e.get('amount'), int) and not isinstance(e['amount'], bool)
+    queue = [e for e in orders if known_amount(e) and e['amount'] > 0]
     military = [e for e in queue if e['label'] not in CIVILIAN and not e['label'].startswith('Unit ')]
     villagers = [e for e in queue if e['label'] == 'Villager']
-    unknown = {e['label'] for e in timeline if e['kind'] in {'QUEUE', 'DE_QUEUE', 'MULTIQUEUE'} and (not isinstance(e.get('amount'), int) or isinstance(e.get('amount'), bool))}
-    unknown_military = any(k not in CIVILIAN for k in unknown) or any(e['label'].startswith('Unit ') for e in queue)
+    unknown = [e for e in orders if not known_amount(e)]
+    uncertain_military = [e for e in orders if e['label'] not in CIVILIAN
+                          and (not known_amount(e) or e['amount'] > 0 and e['label'].startswith('Unit '))]
     first = min(military, key=lambda e: e['seconds']) if military else None
-    opening, opening_label = OPENINGS.get(first['label'], ('unit:'+first['label'], first['label'])) if first else ('none', '병력 생산 요청 없음')
+    # Preserve replay order for commands sharing a timestamp. An undecodable earlier
+    # order can be the real first military request, even if a later one is readable.
+    first_key = (first['seconds'], next(i for i,e in enumerate(timeline) if e is first)) if first else None
+    uncertain_ids = {id(e) for e in uncertain_military}
+    uncertain_first = any(first_key is None or (e['seconds'], i) < first_key
+                          for i,e in enumerate(timeline) if id(e) in uncertain_ids)
+    if uncertain_first:
+        first = None
+    opening, opening_label = OPENINGS.get(first['label'], ('unit:'+first['label'], first['label'])) if first else (
+        ('unknown', '첫 병종 확인 불가') if uncertain_first else ('none', '병력 생산 요청 없음'))
     restored = bool(metrics.get('recording_restored'))
     record_start = min((e['seconds'] for e in timeline),default=0) if restored else 0
     if restored:opening_label='재개 기록 · '+opening_label
@@ -47,8 +59,10 @@ def summarize(metrics, duration):
         return next((name for at, name in reversed(starts) if at <= t), '암흑')
     def amount(events, stop=None):
         return sum(e['amount'] for e in events if stop is None or e['seconds'] <= stop)
-    checkpoints = [{'seconds': t, 'villager_requests': None if 'Villager' in unknown else amount(villagers, t),
-                    'military_requests': None if unknown_military else amount(military, t)}
+    def unknown_villagers(events):
+        return any(e['label'] == 'Villager' for e in events)
+    checkpoints = [{'seconds': t, 'villager_requests': None if unknown_villagers(e for e in unknown if e['seconds'] <= t) else amount(villagers, t),
+                    'military_requests': None if any(e['seconds'] <= t for e in uncertain_military) else amount(military, t)}
                    for t in (300, 600, 900, 1200, 1500, 1800) if record_start <= t <= duration]
     phases = []
     for i, (at, name) in enumerate(starts):
@@ -59,14 +73,20 @@ def summarize(metrics, duration):
             return at <= e['seconds'] and (e['seconds'] < end or i==len(starts)-1 and e['seconds']==end)
         subset = [e for e in timeline if in_phase(e)]
         phases.append({'stage': name, 'start': at, 'end': end,
-                       'villager_requests': None if 'Villager' in unknown else sum(e['amount'] for e in villagers if in_phase(e)),
-                       'military_requests': None if unknown_military else sum(e['amount'] for e in military if in_phase(e)),
+                       'villager_requests': None if unknown_villagers(e for e in unknown if in_phase(e)) else sum(e['amount'] for e in villagers if in_phase(e)),
+                       'military_requests': None if any(in_phase(e) for e in uncertain_military) else sum(e['amount'] for e in military if in_phase(e)),
                        'research_kinds': len({e['label'] for e in subset if e['kind'] == 'RESEARCH'}),
                        'building_commands': sum(e['kind'] == 'BUILD' for e in subset)})
     research = [e for e in timeline if e['kind'] == 'RESEARCH' and e['label'] in TC_RESEARCH]
     transition = [(metrics.get('age_commands', {}).get(age), reached(metrics, age)) for age in AGES]
     gaps = []
-    for left, right in zip(villagers, villagers[1:]):
+    # Unknown quantities still contain a villager command: do not bridge across
+    # them and claim that no production request was recorded in that interval.
+    gap_orders = [e for e in orders if e['label'] == 'Villager'
+                  and (not known_amount(e) or e['amount'] > 0)]
+    for left, right in zip(gap_orders, gap_orders[1:]):
+        if not known_amount(left) or not known_amount(right):
+            continue
         start, end = left['seconds'], right['seconds']
         if end-start < 60:
             continue
@@ -80,9 +100,9 @@ def summarize(metrics, duration):
             'first_military_seconds': first['seconds'] if first else None,
             'first_military_unit': first['label'] if first else None,
             'after_feudal_first_military_seconds': round(first['seconds']-feudal,2) if first and feudal is not None and first['seconds'] >= feudal else None,
-            'villager_requests': None if 'Villager' in unknown else amount(villagers),
-            'military_requests': None if unknown_military else amount(military),
-            'military_types': len({e['label'] for e in military}),
+            'villager_requests': None if unknown_villagers(unknown) else amount(villagers),
+            'military_requests': None if uncertain_military else amount(military),
+            'military_types': None if uncertain_military else len({e['label'] for e in military}),
             'research_kinds': len({e['label'] for e in timeline if e['kind'] == 'RESEARCH'}),
             'additional_tc_build_commands': metrics.get('building_orders', {}).get('Town Center', {}).get('commands', 0),
             'checkpoints': checkpoints, 'phases': phases, 'villager_command_gaps': gaps,
@@ -128,7 +148,7 @@ def findings(mine, theirs, my_metrics, their_metrics):
             f'{clock(gap["start"])}–{clock(gap["end"])} · 주민 생산 요청이 {round(gap["seconds"])}초 동안 없었어요. TC가 그만큼 쉬었다는 뜻은 아니에요.',
             '당시 생산 대기열과 인구 제한을 확인해 보세요. 대기열이 비어 있었다면 병력을 움직인 뒤 TC에서 주민을 예약하는 습관을 들여보세요.',2)
         break
-    if mine.get('opening') == theirs.get('opening'):
+    if mine.get('opening') not in {'none', 'unknown', None} and mine.get('opening') == theirs.get('opening'):
         a = next((p['villager_requests'] for p in mine.get('checkpoints',[]) if p['seconds']==900),None)
         b = next((p['villager_requests'] for p in theirs.get('checkpoints',[]) if p['seconds']==900),None)
         if a is not None and b is not None and abs(a-b)>=5:
@@ -199,7 +219,8 @@ def enrich_report(report):
             if data.get('civilization')!=analysis.get('civilization') or data.get('map')!=analysis.get('map'):
                 continue
             summary=summarize(data.get('metrics',{}),data.get('duration_game_seconds',0))
-            if summary.get('available') and summary.get('opening')==a.get('opening') and not summary.get('restored'):
+            if (a.get('opening') not in {'none', 'unknown', None} and summary.get('available')
+                    and summary.get('opening')==a.get('opening') and not summary.get('restored')):
                 earlier.append((data,summary))
         earlier=earlier[:10]
         descriptors=[('봉건 도달',reached(mine,'봉건'),lambda data,s:reached(data.get('metrics',{}),'봉건')),
@@ -219,7 +240,7 @@ def enrich_report(report):
             practice={'title':'다음 판은 봉건 20초 빠르게','current_seconds':own_feudal,'target_seconds':target,
                       'evidence':f'이번 {clock(own_feudal)} → 연습 목표 {clock(target)}. 이번 기록에서 20초 줄여보는 연습 목표예요.',
                       'action':'같은 맵과 빌드로 초반만 세 번 연습해 보세요. 주민 생산, 베틀, 건물 순서를 적어두면 어디서 늦어지는지 찾기 쉬워요.'}
-        analysis['review']={'revision':1,'own':a,'opponent':b,'own_findings':own_findings,
+        analysis['review']={'revision':2,'own':a,'opponent':b,'own_findings':own_findings,
                             'opponent_findings':findings(b,a,theirs,mine),'personal_benchmarks':benchmarks,'practice':practice,
                             'benchmark_basis':'same_map_civilization_first_military_order_prior_up_to_10_matches_min_3',
                             'limits':['주민·군사 수량은 생산 지시량. 실제 생산·생존 수가 아님.',

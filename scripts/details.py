@@ -12,6 +12,7 @@ def detailed_metrics(match, player):
     requested = Counter()
     queue_events, timeline = [], []
     unknown_units = set()
+    unknown_queue_events = []
     market_events = []
     offset = getattr(match, 'restored_at', timedelta()).total_seconds()
     arrivals = {}
@@ -42,6 +43,7 @@ def detailed_metrics(match, player):
             else:
                 row['unknown_amount_commands'] += 1
                 unknown_units.add(label)
+                unknown_queue_events.append({'seconds': at, 'unit': label})
             timeline.append({'seconds': at, 'kind': 'QUEUE', 'label': label, 'amount': amount})
         elif kind in {'BUY', 'SELL'}:
             resource = {0: '식량', 1: '목재', 2: '돌'}.get(payload.get('resource_id'))
@@ -76,7 +78,9 @@ def detailed_metrics(match, player):
                                  if k != label and k not in {'Feudal Age', 'Castle Age', 'Imperial Age'}},
                              'market_previous_120s': [e.copy() for e in market_events if at-120 <= e['seconds'] <= at],
                              'villagers_alive': None,
-                             'unknown_unit_request_amounts': sorted(unknown_units)}
+                             'unknown_unit_request_amounts': sorted(unknown_units),
+                             'unknown_unit_request_amounts_previous_120s': sorted({
+                                 e['unit'] for e in unknown_queue_events if e['seconds'] >= at - 120})}
         if row is not None:
             row['commands'] += 1
             row['last_seconds'] = at

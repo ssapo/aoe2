@@ -22,9 +22,14 @@ test('paging and field selection keep the flow tab and scroll position with one 
     splitTimeline:rows=>JSON.stringify(rows),timelineRows:events=>events,
     setInterval(){return 1;},clearInterval(){}});
   vm.runInContext(code.slice(code.indexOf('  function bindWorkspace('),code.indexOf('  function toast(')),ctx);
-  const mine={full_timeline:Array.from({length:40},(_,i)=>({seconds:i+1,kind:'BUILD',label:'House'}))};
+  const mine={full_timeline:Array.from({length:40},(_,i)=>({seconds:i+1,kind:'BUILD',label:'House'})),
+    unit_orders:{Archer:{first_seconds:1,requested_amount:7,commands:4,unknown_amount_commands:1},
+      Spearman:{first_seconds:2,requested_amount:3,commands:3}}};
   ctx.mine=mine;
   vm.runInContext('bindWorkspace(root,mine,{},null,{},null,{})',ctx);
+  assert.doesNotMatch(get('#production-table').innerHTML,/요청 7/);
+  assert.match(get('#production-table').innerHTML,/요청 —/);
+  assert.match(get('#production-table').innerHTML,/요청 3/);
   tabs[1].listeners.click();assert.equal(active,true);
   body.scrollTop=480;
   get('#timeline-next').listeners.click();

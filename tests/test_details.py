@@ -65,6 +65,21 @@ class DetailTests(unittest.TestCase):
         self.assertEqual(len(result['full_timeline']),110)
         self.assertEqual(result['building_orders']['Farm']['commands'],110)
 
+    def test_unknown_quantities_are_local_to_click_window_and_sequence(self):
+        result=self.metrics([
+            self.action(279,'DE_QUEUE',{'unit':'Villager'}),
+            self.action(280,'DE_QUEUE',{'unit':'Militia','amount':True}),
+            self.action(400,'RESEARCH',{'technology_id':101,'technology':'Feudal Age'}),
+            self.action(400,'DE_QUEUE',{'unit':'Archer'}),
+            self.action(600,'RESEARCH',{'technology_id':102,'technology':'Castle Age'}),
+        ])
+        feudal=result['age_checkpoints']['봉건']
+        self.assertEqual(feudal['unknown_unit_request_amounts'],['Militia','Villager'])
+        self.assertEqual(feudal['unknown_unit_request_amounts_previous_120s'],['Militia'])
+        castle=result['age_checkpoints']['성주']
+        self.assertEqual(castle['unknown_unit_request_amounts'],['Archer','Militia','Villager'])
+        self.assertEqual(castle['unknown_unit_request_amounts_previous_120s'],[])
+
 
 if __name__=='__main__': unittest.main()
 

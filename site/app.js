@@ -33,7 +33,9 @@
   };
   const label = value => names[value] || value;
   const ageList = ['봉건','성주','왕정'];
-  const quantities = counts => Object.entries(counts||{}).filter(([,v])=>v>0).map(([k,v])=>`${label(k)} ${number(v)}`).join(' · ') || '지시 없음';
+  const quantities = (counts,unknown=[]) => [...new Set([...Object.keys(counts||{}),...unknown])]
+    .filter(k=>unknown.includes(k)||counts[k]>0)
+    .map(k=>`${label(k)} ${unknown.includes(k)?'—':number(counts[k])}`).join(' · ') || '지시 없음';
   function compareTable(rows, other) {
     return `<div class="table-scroll"><table class="timeline comparison"><thead><tr><th scope="col">항목</th><th scope="col" title="${esc(report.profile?.name||'ssapo')}">나</th><th scope="col" title="${esc(other?.name||'정보 없음')}${other?.civilization?' · '+esc(other.civilization):''}">상대</th></tr></thead><tbody>${rows.map(([title,left,right])=>`<tr><th scope="row">${esc(title)}</th><td>${esc(left)}</td><td>${esc(right)}</td></tr>`).join('')}</tbody></table></div>`;
   }
@@ -52,8 +54,8 @@
     return `<div class="panel-toolbar"><div class="segments" role="group" aria-label="비교할 시대">${available.map((age,i)=>`<button data-age="${age}" aria-pressed="${i===0}">${age}</button>`).join('')}</div><span class="toolbar-note">나 / 상대 비교</span></div><p class="data-caution">주민 항목은 <b>생산 요청량</b>이에요. 실제 일꾼 수와는 달라요.</p>`+available.map((age,i)=>{
       const left=checkpoint(mine,age),right=checkpoint(theirs,age),diff=ageDifference(mine,theirs,age);
       const requests=p=>Number.isFinite(p.command_seconds)&&p.unit_requests_before_click&&!p.unknown_unit_request_amounts?.includes('Villager')?number(p.unit_requests_before_click.Villager??0):'—';
-      const recent=p=>p.unit_requests_previous_120s?quantities(p.unit_requests_previous_120s):'—';
-      const prior=p=>p.unit_requests_before_click?quantities(Object.fromEntries(Object.entries(p.unit_requests_before_click).filter(([k])=>k!=='Villager'))):'—';
+      const recent=p=>p.unit_requests_previous_120s?quantities(p.unit_requests_previous_120s,p.unknown_unit_request_amounts_previous_120s??p.unknown_unit_request_amounts??[]):'—';
+      const prior=p=>p.unit_requests_before_click?quantities(Object.fromEntries(Object.entries(p.unit_requests_before_click).filter(([k])=>k!=='Villager')),(p.unknown_unit_request_amounts||[]).filter(k=>k!=='Villager')):'—';
       return `<section data-age-panel="${age}" ${i?'hidden':''}><div class="panel-title"><h3>${age} ${diff.reached?'도달':'클릭'}</h3><span class="difference ${diff.delta===null||diff.delta===0?'':diff.delta<0?'ahead':'behind'}">${esc(diff.text)}</span></div>`+compareTable([
         ['시대업을 누른 시각',fmtTime(left.command_seconds),fmtTime(right.command_seconds)],
         ['시대가 바뀐 시각',fmtTime(left.reached_seconds),fmtTime(right.reached_seconds)],
@@ -61,7 +63,7 @@
         ['다른 유닛 생산 요청 · 누적',prior(left),prior(right)],
         ['누르기 전 2분간 생산 요청',recent(left),recent(right)]
       ],other)+'</section>';
-    }).join('')+'<details class="method-note"><summary>기록 기준</summary><p>주민은 시작 인원을 제외한 생산 요청 수량이에요. 취소·실패·사망은 반영하지 않아요. 시대가 바뀐 시각은 시스템 알림으로 확인해요. 처음 버튼을 누른 시각과 연구가 시작된 시각은 다를 수 있어요. —는 기록이 없다는 뜻이에요.</p>'+((mine.recording_restored||theirs.recording_restored)?'<p>재개된 리플의 누적량은 기록 시작 이후만 포함.</p>':'')+'</details>';
+    }).join('')+'<details class="method-note"><summary>기록 기준</summary><p>주민은 시작 인원을 제외한 생산 요청 수량이에요. 취소·실패·사망은 반영하지 않아요. 시대가 바뀐 시각은 시스템 알림으로 확인해요. 처음 버튼을 누른 시각과 연구가 시작된 시각은 다를 수 있어요. —는 기록이 없거나 수량을 확인할 수 없는 항목이에요.</p>'+((mine.recording_restored||theirs.recording_restored)?'<p>재개된 리플의 누적량은 기록 시작 이후만 포함.</p>':'')+'</details>';
   }
   function renderProductionPanel() {
     return `<div class="panel-toolbar"><div class="segments" role="group" aria-label="기록 종류"><button data-category="unit_orders" aria-pressed="true">유닛</button><button data-category="research_orders" aria-pressed="false">업그레이드</button><button data-category="building_orders" aria-pressed="false">건물</button></div></div><div class="search-row"><input id="production-search" type="search" aria-label="생산·연구 기록 검색" placeholder="이름 검색 · 한글 / 영문" autocomplete="off"><span id="production-count" class="toolbar-note" role="status"></span></div><div id="production-table"></div><p id="production-note" class="compact-note"></p>`;
@@ -149,7 +151,7 @@
         .sort((x,y)=>Math.min(mine[category]?.[x]?.first_seconds??Infinity,theirs[category]?.[x]?.first_seconds??Infinity)-Math.min(mine[category]?.[y]?.first_seconds??Infinity,theirs[category]?.[y]?.first_seconds??Infinity));
       const cell=v=>{
         if(!v)return '<span class="no-record">—</span>';
-        const value=category==='unit_orders'?`요청 ${number(v.requested_amount)}`:category==='building_orders'?`${number(v.commands)}회`:fmtTime(v.first_seconds);
+        const value=category==='unit_orders'?`요청 ${v.unknown_amount_commands?'—':number(v.requested_amount)}`:category==='building_orders'?`${number(v.commands)}회`:fmtTime(v.first_seconds);
         const meta=category==='research_orders'?`${number(v.commands)}회 요청`:`첫 요청 ${fmtTime(v.first_seconds)}${category==='unit_orders'?' · '+number(v.commands)+'회':''}`;
         return `<strong class="cell-value">${value}</strong><small class="cell-meta">${meta}</small>${v.negative_amount?`<small class="cell-meta">음수 수량 ${number(v.negative_amount)}</small>`:''}${v.unknown_amount_commands?'<small class="cell-meta">일부 수량 판독 불가</small>':''}`;
       };
