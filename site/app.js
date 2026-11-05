@@ -98,7 +98,7 @@
     return `<details class="basic-comparison"><summary>경제·조작 기록 비교</summary>${compareTable(rows,other)}</details>`;
   }
   function renderMethods() {
-    return `<details class="method-note"><summary>분석에 포함된 기록</summary><p>시대가 바뀐 시각과 건설·생산·연구를 누른 기록을 비교해요. 생산 요청에는 취소되거나 실행되지 않은 것도 포함돼요. 실제 보유 병력이나 완성된 건물 수와는 달라요.</p><p>기술 기록이 없어도 문명 특성으로 무료 지급됐을 수 있어요. eAPM이나 생산 요청이 많다는 이유만으로 더 잘했다고 판단하지는 않아요.</p><p>가축은 직접 이동 등을 명령한 개체를 중복 없이 셌어요. 현재 소유하거나 먹은 수는 아니며, 빼앗긴 가축은 양쪽에 잡힐 수 있어요.</p><p>열매 작업 전환은 같은 군락에 있던 주민에게 다른 일을 시킨 기록으로 추정해요. 괄호는 확인된 작업자 중 전환 요청을 받은 인원이에요. 열매가 다 떨어진 시각이나 모든 자동 채집을 알 수 있는 것은 아니에요.</p><p>실제 주민 수, TC가 쉰 시간, 보유 자원, 교전 손실은 아직 계산하지 않아요. 아래 기록은 리플에서 살펴볼 구간을 찾는 데 써주세요.</p></details>`;
+    return `<details class="method-note"><summary>분석에 포함된 기록</summary><p>시대가 바뀐 시각과 건설·생산·연구를 누른 기록을 비교해요. 생산 요청에는 취소되거나 실행되지 않은 것도 포함돼요. 실제 보유 병력이나 완성된 건물 수와는 달라요.</p><p>기술 기록이 없어도 문명 특성으로 무료 지급됐을 수 있어요. eAPM이나 생산 요청이 많다는 이유만으로 더 잘했다고 판단하지는 않아요.</p><p>가축은 직접 이동 등을 명령한 개체를 중복 없이 셌어요. 현재 소유하거나 먹은 수는 아니며, 빼앗긴 가축은 양쪽에 잡힐 수 있어요.</p><p>열매 작업 전환은 같은 군락에 있던 주민에게 다른 일을 시킨 기록으로 추정해요. 괄호는 확인된 작업자 중 전환 요청을 받은 인원이에요. 열매가 다 떨어진 시각이나 모든 자동 채집을 알 수 있는 것은 아니에요.</p><p>실제 주민 수, TC가 쉰 시간, 교전 손실은 아직 계산하지 않아요. 보유 자원 합계는 수치 탭에서 체크포인트 해석값으로 따로 보여줘요. 아래 기록은 리플에서 살펴볼 구간을 찾는 데 써주세요.</p></details>`;
   }
   function bindWorkspace(root,mine,theirs,other,review,mapData,match) {
     const body=root.querySelector('.review-body');
@@ -133,7 +133,7 @@
     }));
     root.querySelectorAll('[data-numbers]').forEach(b=>b.addEventListener('click',()=>{
       root.querySelectorAll('[data-numbers]').forEach(t=>t.setAttribute('aria-pressed',String(t===b)));
-      root.querySelectorAll('[data-number-panel]').forEach(p=>p.hidden=p.dataset.numberPanel!==b.dataset.numbers);body.scrollTop=0;
+      root.querySelectorAll('[data-number-panel]').forEach(p=>p.hidden=p.dataset.numberPanel!==b.dataset.numbers);
     }));
     root.querySelectorAll('[data-age]').forEach(b=>b.addEventListener('click',()=>{
       root.querySelectorAll('[data-age]').forEach(t=>t.setAttribute('aria-pressed',String(t===b)));
@@ -385,22 +385,24 @@
     const core=[
       ['eAPM',number(mine.eapm),number(theirs.eapm)],
       ...ageList.filter(age=>Number.isFinite(checkpoint(mine,age).reached_seconds)||Number.isFinite(checkpoint(theirs,age).reached_seconds)).map(age=>[`${age} 도달`,fmtTime(checkpoint(mine,age).reached_seconds),fmtTime(checkpoint(theirs,age).reached_seconds)]),
+    ];
+    const requests=[
       ['첫 병력 생산 요청',fmtTime(a.first_military_seconds),fmtTime(b.first_military_seconds)],
       ['봉건 후 첫 병력 요청까지',Number.isFinite(a.after_feudal_first_military_seconds)?`${Math.round(a.after_feudal_first_military_seconds)}초`:'—',Number.isFinite(b.after_feudal_first_military_seconds)?`${Math.round(b.after_feudal_first_military_seconds)}초`:'—'],
       ['15분까지 주민 생산 요청',number(at15(a)),number(at15(b))],
       ['주민 생산 요청 · 전체',number(a.villager_requests),number(b.villager_requests)],
       ['병력 생산 요청 · 전체',number(a.military_requests),number(b.military_requests)],
       ['생산을 요청한 병종',number(a.military_types),number(b.military_types)],
-      ['연구 종류 · 시대업 포함',number(a.research_kinds),number(b.research_kinds)],
+      ['연구 요청 종류 · 시대업 포함',number(a.research_kinds),number(b.research_kinds)],
       ['추가 TC 건설 요청',`${number(a.additional_tc_build_commands)}회`,`${number(b.additional_tc_build_commands)}회`],
       ['주민 생산 요청의 최대 간격',fmtTime(longest(a)),fmtTime(longest(b))]
     ];
     const points=[...new Set([...a.checkpoints,...b.checkpoints].map(p=>p.seconds))].sort((x,y)=>x-y);
-    const point=(s,t)=>{const p=s.checkpoints.find(p=>p.seconds===t);return p?`주민 ${number(p.villager_requests)} · 군사 ${number(p.military_requests)}`:'—';};
-    const phase=s=>`${fmtTime(s.start)}–${fmtTime(s.end)} · 주민 ${number(s.villager_requests)} / 군사 ${number(s.military_requests)} / 연구 ${number(s.research_kinds)} / 건설 ${number(s.building_commands)}`;
+    const point=(s,t)=>{const p=s.checkpoints.find(p=>p.seconds===t);return p?`주민 요청 ${number(p.villager_requests)} · 군사 요청 ${number(p.military_requests)}`:'—';};
+    const phase=s=>`${fmtTime(s.start)}–${fmtTime(s.end)} · 주민 요청 ${number(s.villager_requests)} / 군사 요청 ${number(s.military_requests)} / 연구 요청 ${number(s.research_kinds)}종 / 건설 요청 ${number(s.building_commands)}회`;
     const phases=[...new Set([...a.phases,...b.phases].map(p=>p.stage))];
-    const panels=[['core','핵심'],['checkpoints','5분별'],['phases','시대별'],...((mine.market||theirs.market)?[['market','시장']]:[]),...(review.personal_benchmarks.length?[['benchmark','내 기록']]:[])];
-    let html=`<div class="segments numbers-segments" role="group" aria-label="수치 비교 종류">${panels.map(([id,name],i)=>`<button data-numbers="${id}" aria-pressed="${i===0}">${name}</button>`).join('')}</div><p class="data-caution">주민·군사 수량은 <b>생산 요청</b> 기준이에요. 실제 살아 있는 유닛 수와는 달라요.</p><section data-number-panel="core">${compareTable(core,other)}</section><section data-number-panel="checkpoints" hidden>${compareTable(points.map(t=>[`${Math.round(t/60)}분 누적`,point(a,t),point(b,t)]),other)}</section><section data-number-panel="phases" hidden><p class="compact-note">각자 시대가 바뀐 뒤의 기록이에요. 연구는 종류, 건설은 요청 횟수로 셌어요.</p>${compareTable(phases.map(stage=>{const l=a.phases.find(p=>p.stage===stage),r=b.phases.find(p=>p.stage===stage);return [stage,l?phase(l):'—',r?phase(r):'—'];}),other)}</section>`;
+    const panels=[['core','시대·조작'],['requests','요청 합계'],['checkpoints','5분별 요청'],['phases','시대별 요청'],...((mine.market||theirs.market)?[['market','시장']]:[]),...(review.personal_benchmarks.length?[['benchmark','내 기록']]:[])];
+    let html=`<div class="segments numbers-segments" role="group" aria-label="수치 비교 종류">${panels.map(([id,name],i)=>`<button data-numbers="${id}" aria-pressed="${i===0}">${name}</button>`).join('')}</div><section data-number-panel="core"><p class="compact-note">시대 도달은 게임 알림, eAPM은 명령 기록 기준이에요.</p>${compareTable(core,other)}</section><section data-number-panel="requests" hidden><p class="data-caution">누른 수량의 합계예요. 취소·생산 대기·사망을 반영한 실제 주민·병력 수는 아니에요.</p>${compareTable(requests,other)}</section><section data-number-panel="checkpoints" hidden><p class="data-caution">해당 시각까지의 누적 생산요청이에요. 당시 생존 유닛 수가 아니에요.</p>${compareTable(points.map(t=>[`${Math.round(t/60)}분 누적`,point(a,t),point(b,t)]),other)}</section><section data-number-panel="phases" hidden><p class="compact-note">각자 시대가 바뀐 뒤의 요청 기록이에요. 유닛은 요청 수량, 연구는 요청 종류, 건설은 요청 횟수예요.</p>${compareTable(phases.map(stage=>{const l=a.phases.find(p=>p.stage===stage),r=b.phases.find(p=>p.stage===stage);return [stage,l?phase(l):'—',r?phase(r):'—'];}),other)}</section>`;
     if(mine.market||theirs.market){
       const total=(m,kind,resource)=>m.market?number(m.market.events.filter(e=>e.kind===kind&&e.label===resource).reduce((n,e)=>n+e.amount,0)):'—';
       const rows=['식량','목재','돌'].flatMap(resource=>['BUY','SELL'].map(kind=>[`${resource} ${kind==='BUY'?'구매':'판매'} 요청`,total(mine,kind,resource),total(theirs,kind,resource)]));
