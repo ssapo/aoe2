@@ -1,8 +1,8 @@
 # Genie 최신 1v1 호환성 실험 — 미완성, 배포 금지
 
-## 다음 시작점: 로컬 Windows 원본 게임 검증 (2026-11-05)
+## 다음 시작점 (2026-11-06)
 
-**[local-windows-handoff.md](local-windows-handoff.md)를 가장 먼저 읽으세요.** Windows PC에서 원본 게임으로 518239882를 재생해 화면 값을 얻었고([original-game-518239882.json](original-game-518239882.json)), 엔진과 같은 게임 시간으로 비교했습니다([original-vs-engine-518239882.md](original-vs-engine-518239882.md)). 현재 결론: 양 소유 실험을 켜면 2:55까지 일치, 4:44 차이는 양 사체 객체 생성 시점 차이로 인한 객체 id 밀림이 원인입니다.
+**[local-windows-handoff.md](local-windows-handoff.md)의 맨 위 절만 읽으면 바로 이어서 작업할 수 있습니다** (현재 상태, 환경 만들기, 기본 실행, 다음 할 일, 지켜야 할 것). 상세 근거는 [original-vs-engine-518239882.md](original-vs-engine-518239882.md). 이 README의 나머지는 이전 작업 이력입니다.
 
 ## 최신 작업: 4 → 3 → 2 → 1 (2026-11-05)
 

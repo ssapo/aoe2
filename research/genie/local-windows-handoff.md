@@ -1,12 +1,84 @@
-# 다음 작업: 로컬 Windows에서 원본 리플 재생·데이터 수집 가능 여부 확인
+# 인계: genie 리플 재현 연구 — 여기서 바로 시작
 
-기록일: 2026-11-05 (한국 시간). **다음 AI는 이 문서부터 읽고 작업한다.** 사용자가 이번 단계 전환을 다음 작업자에게 기록해 달라고 요청했다.
+기록일: 2026-11-06 (한국 시간). **다음 작업자는 이 절만 읽으면 바로 이어서 할 수 있다.** 아래 "진행 기록" 이하는 이력이다.
 
-> **최신 (2026-11-05 저녁):** [original-vs-engine-518239882.md](original-vs-engine-518239882.md). 양 소유 실험(`GENIE_EXPERIMENT_CAPTURE_SETUP=1`)을 켜면 2:55까지 원본과 일치. 4:44 차이는 양 사체 객체(1246/1611)가 원본보다 일찍 생겨 주민 객체 id가 밀린 것이 원인 (명령이 엉뚱한 유닛에 가서 멧돼지 유인 실패, 주민 3명 사망). id 2개 보정 실험으로 4:44 인구·주민 일치 확인. 다음 작업: 양치기 다음 양 자동 탐색/사체 생성 시점 맞추기. 새 도구: Interact 명령 클릭 좌표 = 원본 대상 위치 → 원본 화면 없이 대조 가능.
->
-> **밤 추가 2:** 엔진은 걷는 중 충돌 회피(obstruction avoidance)를 구현하지 않았다(genie-core `movement/step.rs` 문서에 명시). 원본 클릭 좌표로 518470161 양 이동 차이(최대 3.6타일)를 확인했다. 가축 사망 시점·id 밀림의 근본 원인 후보 1순위.
->
-> **밤 추가:** 리플 체크포인트(14초마다 선수별 자원 합·객체 수·id 합)로 원본 상태를 화면 없이 대조할 수 있다(`GENIE_PRINT_CHECKPOINTS=1`). 양 사체가 일찍 생긴 원인은 유닛 AI 탐색 캐시를 너무 자주 지우는 것으로 보이며, `GENIE_EXPERIMENT_SEARCH_CLEAR=tick` 으로 518239882 구조 일치가 146초→188초로 늘었다(다른 리플엔 영향 없음). 상세는 같은 비교 문서.
+## 1. 지금 상태 (한 줄씩)
+
+- 518239882(34분, ssapo vs Maerlin)를 원본 게임으로 재생해 화면 값을 확보했다 → [original-game-518239882.json](original-game-518239882.json).
+- 엔진(genie)은 1:09까지 원본과 같다. 양 소유 실험을 켜면 2:55까지 같다.
+- 이후 어긋나는 뿌리는 두 가지다.
+  - 양 사체 생성 시점이 달라 객체 id가 밀린다. 그러면 명령이 엉뚱한 유닛에 간다.
+  - 엔진에 걷는 중 충돌 회피가 없다(genie-core `movement/step.rs` 주석에 "not modelled"로 명시).
+- 원본 정답지 두 가지를 찾았다. 리플 명령의 **클릭 좌표**(대상의 원본 위치)와 **체크포인트**(약 14초마다 선수별 자원 합·객체 수·id 합)다.
+- 보정 모드 `GENIE_CORRECT=ids` 로 518239882는 7:24까지 원본을 주민 2명 차이로 따라간다(보정 없으면 4:44부터 9~10명에 멈춤).
+  - 약 9.6분에 엔진이 "a queued move of an object that does not move"로 선수를 멈춘다.
+- 원본 실행 파일(188329)은 코드 72%가 암호화돼 정적 분석을 하지 않는다. 원본 동작은 싱글 플레이 실험 + 세이브 파일로 확인한다(사용자가 집에서 진행 예정).
+- 상세 근거: [original-vs-engine-518239882.md](original-vs-engine-518239882.md).
+
+## 2. 환경 만들기 (2026-11-06 새 폴더에서 이 순서로 검증함)
+
+```bash
+git clone https://github.com/librematch/genie.git && cd genie
+git checkout 91d81be43402f50d89cfb8da8f168fe43878f83d
+R=<이 저장소>/research/genie
+for p in experimental-188329-header oracle-cargo experimental-census capture-timing-diagnostic \
+         object-trace-diagnostic phase-observer-diagnostic ordered-data-and-trace state-dump-diagnostic; do
+  git apply $R/$p.patch
+done
+cp $R/*_probe.rs crates/tools/genie-oracle/examples/   # unit_probe 등 보조 도구
+cargo build --release -p genie-oracle --example census --ignore-rust-version
+```
+
+- 빌드 시간(CPU 2개): release 6분 25초(처음 한 번), `--profile research` 는 최적화를 꺼서 빌드는 빠르지만 실행이 약 28배 느리다.
+- **실행 속도(release): 41,600 updates(약 17분 경기) 8.7초, 518239882 전체(92,503 updates) 15초.** research 빌드는 같은 41,600 updates에 약 4분.
+  - 결과는 두 빌드가 같다(HUD 비교로 확인).
+- 입력 파일은 저장소에 없다(원본 게임 파일·리플은 올리지 않는다).
+  - 리플: 사용자 PC `%USERPROFILE%\Games\Age of Empires 2 DE\76561198039927362\savegame\` 와 `%TEMP%\genie-replays\<id>\`.
+  - DAT·JSON: 설치 폴더 `resources\_common\dat` 의 `empires2_x2_p1.dat`, `civilizations.json`, `unitlines.json`, `dropsites.json`, `linkedTechs.json`, `linkedUnits.json`. 모두 DAT 옆에 같이 둔다(`civilizations.json` 이 문명 매핑에 쓰인다).
+
+## 3. 기본 실행
+
+```bash
+B=target/release/examples/census
+# 원본 체크포인트와 비교 + HUD 시점 덤프 + 보정 모드
+GENIE_CORRECT=ids GENIE_EXPERIMENT_SEARCH_CLEAR=tick GENIE_EXPERIMENT_CAPTURE_SETUP=1 GENIE_NO_STOP=1 \
+GENIE_PRINT_CHECKPOINTS=1 GENIE_DUMP_MS=15000,30000,69000,175000,284000,326000,444000 \
+  $B <replay.aoe2record> <dat폴더>/empires2_x2_p1.dat 41600 2> run.err > run.out
+python3 $R/tools/hud_compare.py run.err            # 원본 화면 값(518239882)과 비교
+python3 $R/tools/checkpoint_words.py run.err 1     # 선수 1 체크포인트 원본/엔진
+python3 $R/tools/checkpoint_first_diff.py run.err  # 처음 구조(객체 수·id 합)가 갈라진 시점
+```
+
+- 환경 변수 전체 목록과 의미는 비교 문서의 "실행 방법" 표에 있다.
+- `run.out` 끝의 `stops at update N: <이유>` 가 엔진이 선수를 멈춘 지점이다. 그 뒤 값은 고정이다.
+- 명령 목록: `RUST_LOG='genie_core::update=debug'`. 클릭 좌표 비교 예시는 [engine-interact-points-518239882.txt](engine-interact-points-518239882.txt)와 `tools/interact_points.py`.
+
+## 4. 다음 할 일 (우선순위 순)
+
+1. **싱글 플레이 실험 결과 받기**(사용자 진행). 각 실험은 몇 초 간격 세이브 + 리플을 남긴다.
+   - 리플 재생 중 저장이 되는지 확인
+   - 주민 하나가 서 있는 유닛들 사이로 걷기(충돌 회피)
+   - 양 5 + 주민 단체 이동으로 TC 옆 통과
+   - 양치기 여럿이 다음 양 고르기(탐색 캐시)
+   - 움직이는 대상을 다른 유닛으로 계속 우클릭해 위치 기록
+
+   세이브를 엔진 상태와 비교해 충돌 회피·탐색 캐시 규칙을 확정하고 엔진에 넣는다.
+2. **보정 모드 id 짝짓기 개선**: 지금은 ±4 안 가까운 id 추정이다. 체크포인트 word 10(id 합)과 맞는 짝을 고르게 하고, 9.6분 정지 원인(잘못 짝지은 id로 건물에 이동 명령)을 잡는다.
+3. 518239882 전체에서 엔진이 멈추는 다른 이유 처리. 예: 약 21분 "a farmer that found nothing after its drop-off (set_state 0xf3)".
+4. 다른 리플: 516495787, 516956894는 엔진이 초반에 선수를 멈춘다. 516293031은 문명 정보가 없어 시작을 안 한다.
+5. genie 상류 최신(`c4228347`, 43커밋 앞)과 비교해 가져올 수정 확인.
+6. 분석 사이트용: 체크포인트만으로 14초마다 선수별 자원 합·객체 수 곡선을 원본 그대로 그릴 수 있다. 시뮬레이션 없이 바로 쓸 수 있는 정확한 데이터다.
+
+## 5. 지켜야 할 것
+
+- main 병합·main 푸시·배포 workflow는 사용자가 따로 요청할 때만. 연구 브랜치 `research/genie-188329` 에 의미 있는 단위로 커밋·푸시.
+- 커밋 작성자는 `Claude <noreply@anthropic.com>`(사용자 회사 메일 사용 금지).
+- 원본 EXE/DAT/리플·빌드 산출물·toolchain은 저장소에 넣지 않는다. DRM 우회·게임 바이너리 수정·설치 파일 덮어쓰기 금지.
+- 로컬 초안 `turning_point.py`/parser revision 10/승부처 UI를 배포에 섞지 않는다.
+- 사용자 PC에서 게임을 돌리는 건 괜찮다(작은 창으로). 사용자가 PC를 쓰는 중이면 화면을 쓰기 전에 물어본다. SWITCH 출퇴근 앱 창은 건드리지 않는다.
+- 푸시 경로: 클라우드에서 `git bundle` → 사용자 PC `%TEMP%\genie-replays\genie-188329.bundle` → `%TEMP%\genie-replays\aoe2-push` 에서 `git fetch <bundle> HEAD; git merge --ff-only FETCH_HEAD; git push origin research/genie-188329`.
+
+---
 
 ## 2026-11-05 진행 기록 (Claude, Cowork 세션)
 
@@ -91,7 +163,7 @@
 3. 끝까지 빠르게 돌려 통계 화면 캡처(처치/손실).
 4. 별도 단계: `-SKIPINTRO -WINDOW` 등으로 명령행 옵션이 리테일에서 먹히는지 `Main.txt`의 `Skipping video due to commandline`으로 확인 → 그 뒤 SyncLog 계열 시험.
 
-## 먼저 해야 할 일
+## (이력) 이전 작업자가 남긴 할 일
 
 현재 우선순위는 사용자의 실제 Windows PC에 접근해 AoE2가 실행되고 1v1 리플이 열리는지 확인하는 것이다. 게임을 실행할 수 있는 환경을 확보하고 원본 상태를 얻을 경로를 조사한다. 게임 실행과 자동 상태 추출은 별개의 검증 단계다. 이미 자동 수집기가 완성됐거나, 데스크톱 앱을 켜기만 하면 가능한 것으로 보고하지 않는다.
 
@@ -126,7 +198,7 @@ C:\Program Files (x86)\Steam\steamapps\common\AoE2DE
 - SHA-256: `1e415af8b7fbbe6aeb4e1eebf888f43e9d9b8b9129df2bd010d0a7a60dc3ca16`
 - 이전 클라우드 사본: `/workspace/scratch/acd26b270bae/upload/AoE2DE_s.exe`. 새 로컬 작업에도 이 경로가 존재한다고 가정하지 않는다.
 
-위 리소스 버전만으로 리플 build 185872/188329와 호환된다고 판정하지 않는다. 원본 게임은 **아직 실행하지 않았다.** 실행 파일은 형식·버전 리소스·해시만 확인했으며, 원본 retarget/RNG 처리 로직 분석도 아직 수행하지 않았다.
+(이력) 이 시점엔 원본 게임을 실행하기 전이었다. 이후 2026-11-05에 518239882를 원본 게임으로 재생했다(위 "진행 기록").
 
 ## 로컬 확인 순서
 
@@ -173,7 +245,7 @@ Get-ChildItem -LiteralPath $gameData -File |
 - 갱신 단계만 바꾸어 checksum을 맞추는 가설은 검증했고 해결되지 않았다. 원본 객체별 상태나 원본 처리 로직이 다음 비교 근거다.
 - `GENIE_EXPERIMENT_CAPTURE_SETUP=1`은 진단용 가설이다. 정식 게임 동작으로 채택하지 않는다.
 - **전체 1v1 경기 재현, 생존 병력·사상자·전투 자원 손실 추출은 아직 검증되지 않았다.** 가축 변화·총 객체 수·생산 요청량으로 전투 손실을 만들지 않는다.
-- 기존 6개 패치 위에 `ordered-data-and-trace.patch`를 적용한다. 긴 fat LTO release 빌드를 반복하지 말고 문서의 `profile research`를 사용한다. 빌드 시간과 리플 재생 속도를 섞지 않는다.
+- 패치 적용·빌드는 맨 위 "환경 만들기"를 따른다(패치 8개, release 빌드 6분대).
 
 ## 별도로 준비된 분석기 정확도 수정
 
