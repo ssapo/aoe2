@@ -305,9 +305,9 @@ body.review-open{overflow:hidden}
 
 .state-curve{margin:0 0 18px}.state-curve .detail-heading{margin-top:6px}.state-curve .detail-heading small{font-size:11px;font-weight:400;color:var(--muted);margin-left:6px}
 .state-lines{margin:4px 0 10px;padding-left:18px;font-size:12px;line-height:1.8;color:#3f5537}
-.state-charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:8px}
+.state-charts{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
 .state-chart{margin:0;background:#fff;border:1px solid var(--border);border-radius:5px;padding:8px 8px 2px}.state-chart svg{display:block;width:100%;height:auto}
 .state-chart figcaption{display:flex;flex-wrap:wrap;justify-content:space-between;gap:2px 10px;font-size:12px;line-height:1.5}.state-chart figcaption strong{font-weight:600}.state-chart figcaption b{font-weight:500}.state-chart figcaption small{color:var(--muted);font-size:10px}
 .state-chart .mine{color:#2d5e45}.state-chart .theirs{color:#b0624f}
 .state-axis{font-size:9px;fill:#869078}.state-grid{stroke:#e8ebe2;stroke-width:1}
-.state-line{fill:none;stroke-width:1.6}.state-line.mine{stroke:#2d5e45}.state-line.theirs{stroke:#b0624f;stroke-opacity:.85}.state-swing{fill:#b59c67;fill-opacity:.16}
+.state-line{fill:none;stroke-width:1.6}.state-line.mine{stroke:#2d5e45}.state-line.theirs{stroke:#b0624f;stroke-opacity:.85}

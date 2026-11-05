@@ -17,12 +17,12 @@ class StateCurveTests(TestCase):
             return state_curve.state_curve(b'',m,m.players[0])
     def test_points_follow_own_and_opponent_numbers(self):
         c=self.curve([(9500,{1:(600,12),2:(475,11)}),(16000,{1:(500,15),2:(450,17)})])
-        self.assertEqual(c['points'],[[9.5,600,12,475,11],[16.0,500,15,450,17]])
+        self.assertEqual(c['points'],[[9.5,600,475],[16.0,500,450]])
         self.assertEqual(c['source'],'recording_checkpoints')
     def test_own_player_two_is_not_swapped(self):
         with patch.object(state_curve,'read_checkpoints',return_value=[(1000,{1:(1,2),2:(3,4)}),(2000,{1:(5,6),2:(7,8)})]):
             m=match();c=state_curve.state_curve(b'',m,m.players[1])
-        self.assertEqual(c['points'][0],[1.0,3,4,1,2])
+        self.assertEqual(c['points'][0],[1.0,3,1])
     def test_restored_games_shift_time(self):
         c=self.curve([(1000,{1:(1,1),2:(1,1)}),(2000,{1:(1,1),2:(1,1)})],restored=60)
         self.assertEqual([p[0] for p in c['points']],[61.0,62.0])
@@ -32,10 +32,12 @@ class StateCurveTests(TestCase):
         self.assertEqual(s['own_floating_seconds'],300)
         self.assertEqual(s['opponent_floating_seconds'],0)
         self.assertEqual(s['own_mean_resources'],1500)
-    def test_largest_swing_inside_window(self):
-        rows=[(0,{1:(0,10),2:(0,10)}),(30000,{1:(0,10),2:(0,10)}),(60000,{1:(0,30),2:(0,8)}),(200000,{1:(0,0),2:(0,50)})]
-        w=self.curve(rows)['summary']['largest_swing']
-        self.assertEqual((w['from_seconds'],w['to_seconds'],w['change']),(0,60,22))
+    def test_object_changes_do_not_affect_resource_curve(self):
+        a=self.curve([(1000,{1:(600,10),2:(400,20)}),(2000,{1:(500,99),2:(300,1)})])
+        b=self.curve([(1000,{1:(600,900),2:(400,0)}),(2000,{1:(500,0),2:(300,999)})])
+        self.assertEqual(a,b)
+        self.assertNotIn('largest_swing',a['summary'])
+        self.assertEqual(a['columns'],['seconds','own_resources','opponent_resources'])
     def test_not_1v1_or_too_few_points(self):
         self.assertIsNone(self.curve([(1,{1:(1,1),2:(1,1),3:(1,1)})]*3,players=(1,2,3)))
         self.assertIsNone(self.curve([(1,{1:(1,1),2:(1,1)})]))
