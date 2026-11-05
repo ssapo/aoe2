@@ -1,6 +1,68 @@
---- a/crates/tools/genie-oracle/src/census.rs	2026-11-05 13:39:29.513711319 +0900
-+++ b/crates/tools/genie-oracle/src/census.rs	2026-11-05 13:38:26.826397760 +0900
-@@ -148,6 +148,7 @@
+diff --git a/crates/engine/genie-core/src/commands/mod.rs b/crates/engine/genie-core/src/commands/mod.rs
+index d2edcddb..4ee72526 100644
+--- a/crates/engine/genie-core/src/commands/mod.rs
++++ b/crates/engine/genie-core/src/commands/mod.rs
+@@ -290,13 +290,28 @@ impl World {
+         units
+             .iter()
+             .map(|&id| match self.place(id) {
++                Some(p) if p.player() == player => id,
++                _ => experiment_remap(id),
++            })
++            .map(|id| match self.place(id) {
+                 Some(p)
+                     if p.player() == player
+                         || self.settings.flags.contains(OptionFlags::CHEATS_ENABLED) =>
+                 {
+                     id
+                 }
+-                _ => None,
++                other => {
++                    if std::env::var_os("GENIE_LOG_DROPPED").is_some() {
++                        eprintln!(
++                            "DROPPED world_ms={} player={} id={:?} holder={:?}",
++                            self.world_time.millis(),
++                            player.index(),
++                            id.map(ObjectId::get),
++                            other.map(|p| p.player().index())
++                        );
++                    }
++                    None
++                }
+             })
+             .collect()
+     }
+@@ -350,3 +365,25 @@ impl World {
+         }
+     }
+ }
++
++/// Diagnostic only (`GENIE_EXPERIMENT_REMAP_IDS="from:to,..."`): a recorded unit id the
++/// simulation allocated to a different object is read as the id the simulation gave the unit,
++/// unless the commanding player holds the recorded id.
++fn experiment_remap(id: Option<ObjectId>) -> Option<ObjectId> {
++    static MAP: std::sync::OnceLock<Vec<(i32, i32)>> = std::sync::OnceLock::new();
++    let map = MAP.get_or_init(|| {
++        std::env::var("GENIE_EXPERIMENT_REMAP_IDS")
++            .unwrap_or_default()
++            .split(',')
++            .filter_map(|pair| {
++                let (a, b) = pair.split_once(':')?;
++                Some((a.trim().parse().ok()?, b.trim().parse().ok()?))
++            })
++            .collect()
++    });
++    let id = id?;
++    map.iter()
++        .find(|(from, _)| *from == id.get())
++        .and_then(|&(_, to)| ObjectId::of_field(to))
++        .or(Some(id))
++}
+diff --git a/crates/tools/genie-oracle/src/census.rs b/crates/tools/genie-oracle/src/census.rs
+index b6edc169..1970f429 100644
+--- a/crates/tools/genie-oracle/src/census.rs
++++ b/crates/tools/genie-oracle/src/census.rs
+@@ -148,6 +148,7 @@ pub fn census_run(
      }
      let initial_time = turns.world_time.millis();
      let mut elapsed_ms = 0u64;
@@ -8,7 +70,7 @@
      for frame in frames(&chapter, total)? {
          elapsed_ms += u64::from(frame.dt.get());
          if std::env::var_os("GENIE_TRACE_PHASE").is_some() && frame.checkpoint.is_some() {
-@@ -180,6 +181,32 @@
+@@ -180,6 +181,32 @@ pub fn census_run(
              }
          }
          census.update(&turns, &sections);
@@ -25,12 +87,12 @@
 +                        let mut by_master = std::collections::BTreeMap::<i16, usize>::new();
 +                        for u in &state.objects { *by_master.entry(u.life.master_id.get()).or_default() += 1; }
 +                        eprintln!("DUMP mark_ms={mark} world_ms={now} update={} player={p} live={} by_master={by_master:?} attrs=[{}]", census.updates, state.objects.len(), attrs.join(" "));
-+                        if std::env::var_os("GENIE_DUMP_UNITS").is_some() && p > 0 {
-+                            for u in &state.objects {
++                        if std::env::var_os("GENIE_DUMP_UNITS").is_some() {
++                            for u in state.objects.iter().filter(|u| p > 0 || std::env::var_os("GENIE_DUMP_ALL").is_some() || [1245i16, 48, 412, 822, 1139, 1301, 89, 126].contains(&u.life.master_id.get())) {
 +                                let a = crate::header_runs::checkpoint_action(turns.parts.actions_of(u.id), turns.parts.production.get(u.id));
 +                                let kind = a.and_then(|a| a.kind).map(|k| k.get());
 +                                let st = a.map(|a| a.state.get()).unwrap_or(0);
-+                                eprintln!("UNIT mark_ms={mark} player={p} id={} master={} pos={:?} action_kind={kind:?} action_state={st} held={:?}", u.id.get(), u.life.master_id.get(), u.position().get(), u.life.amount);
++                                eprintln!("UNIT mark_ms={mark} player={p} id={} master={} pos={:?} action_kind={kind:?} action_state={st} held={:?} hp={:?}", u.id.get(), u.life.master_id.get(), u.position().get(), u.life.amount, u.life.hp);
 +                            }
 +                        }
 +                    }
@@ -41,7 +103,7 @@
          if std::env::var_os("GENIE_TRACE_OBJECTS").is_some() && [499, 999, 1499].contains(&census.updates) {
              for (p, state) in turns.players.iter().enumerate().skip(1) {
                  for u in &state.objects {
-@@ -198,7 +225,7 @@
+@@ -198,7 +225,7 @@ pub fn census_run(
              }
              eprintln!("TIMING update={} initial_ms={} elapsed_ms={} actual_ms={}", census.updates, initial_time, elapsed_ms, turns.world_time.millis());
          }

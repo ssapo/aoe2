@@ -2,7 +2,7 @@
 
 ## 다음 시작점: 로컬 Windows 원본 게임 검증 (2026-11-05)
 
-**[local-windows-handoff.md](local-windows-handoff.md)를 가장 먼저 읽으세요.** 실행 파일을 새로 받았고 형식·버전·해시를 확인했습니다. 기존 대화는 계속 클라우드 Linux였으므로, 다음 작업자는 실제 Windows 접근부터 검증해야 합니다. 원본 게임 실행과 자동 상태 추출은 아직 수행하지 않았습니다. 아래 연구 결과는 유지하며, 다음 검증의 우선순위를 로컬 원본 재생으로 옮깁니다.
+**[local-windows-handoff.md](local-windows-handoff.md)를 가장 먼저 읽으세요.** Windows PC에서 원본 게임으로 518239882를 재생해 화면 값을 얻었고([original-game-518239882.json](original-game-518239882.json)), 엔진과 같은 게임 시간으로 비교했습니다([original-vs-engine-518239882.md](original-vs-engine-518239882.md)). 현재 결론: 양 소유 실험을 켜면 2:55까지 일치, 4:44 차이는 양 사체 객체 생성 시점 차이로 인한 객체 id 밀림이 원인입니다.
 
 ## 최신 작업: 4 → 3 → 2 → 1 (2026-11-05)
 
