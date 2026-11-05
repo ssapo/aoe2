@@ -1,5 +1,7 @@
 # SSAPO AoE2 리플 분석
 
+> **다음 AI 작업자 (2026-11-05):** 사용자가 원본 `AoE2DE_s.exe`를 제공했다. 다음 단계는 실제 로컬 Windows 연결 확인 → 설치된 게임에서 1v1 리플 재생 확인 → 원본 상태 수집 경로 검증이다. **[로컬 Windows 인계 문서](research/genie/local-windows-handoff.md)를 먼저 읽는다.** 데스크톱 앱을 열었다는 사실만으로 로컬 실행이 연결된 것은 아니며, 원본 게임 실행·자동 수집은 아직 검증하지 않았다. 연구는 `research/genie-188329`, 분석기 예외 처리 수정은 별도 `fix/analysis-evidence-accuracy` 브랜치. main 반영·배포는 사용자 요청 전 금지.
+
 ssapo의 **AoE2: DE 1v1 경기 복기 웹앱**. 기본 계정 외에 이름 검색·프로필 전환도 지원한다. 공개 경기와 리플을 GitHub Actions에서 분석하고, GitHub Pages에서 결과를 보여준다. 방문자는 게임·Python·별도 앱을 설치할 필요가 없다.
 
 - 운영 사이트: https://ssapo.github.io/aoe2/
