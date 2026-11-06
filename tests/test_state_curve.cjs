@@ -43,3 +43,54 @@ test('each player uses actual arrival not age click; restored games omit age tab
 test('negative resources, duplicate timestamps and backwards time are rejected',()=>{
  for(const points of [[[1,-1,2],[2,1,2]],[[1,1,2],[1,2,3]],[[2,1,2],[1,2,3]]])assert.equal(render({points}),'');
 });
+
+const {resourceWindows,windowActions,resourceInsights,renderInsights}=require('../site/state-curve.js');
+const sustained={points:[[290,2000,500],[310,2000,500],[330,2000,500],[350,2000,500],[370,200,500],[390,0,500]]};
+test('resource windows clip at five minutes and compare identical clock ranges',()=>{
+ const [w]=resourceWindows(sustained,1);
+ assert.equal(w.start,300);assert.equal(w.end,370);
+ assert.equal(w.own.mean,2000);assert.equal(w.opponent.mean,500);
+ assert.equal(w.excess,70000);assert.equal(resourceWindows(sustained,2).length,0);
+ const legacy={points:sustained.points.map(p=>[p[0],p[1],999,p[2],42])};
+ assert.deepEqual(resourceWindows(legacy,1),resourceWindows(sustained,1));
+});
+test('short spikes and long data gaps never become sustained windows',()=>{
+ assert.equal(resourceWindows({points:[[300,5000,0],[320,0,0],[340,0,0]]},1).length,0);
+ assert.equal(resourceWindows({points:[[300,5000,0],[330,5000,0],[400,5000,0],[430,5000,0]]},1).length,0);
+ assert.equal(resourceWindows(null,1).length,0);
+ // No extrapolation beyond the final checkpoint.
+ assert.equal(resourceWindows({points:[[300,0,0],[320,9999,0]]},1).length,0);
+});
+test('ranking uses balance above threshold over time, not a single peak',()=>{
+ const points=[[300,4000,0],[330,4000,0],[360,0,0],[390,2000,0]];
+ for(let t=420;t<=600;t+=30)points.push([t,2000,0]);
+ const ws=resourceWindows({points},1);
+ assert.deepEqual(ws.map(w=>w.start),[390,300]);
+});
+test('action context counts commands, separates cancellations and deduplicates age/research',()=>{
+ const full_timeline=[
+  {seconds:300,kind:'QUEUE',amount:5},{seconds:310,kind:'QUEUE',amount:-2},
+  {seconds:311,kind:'QUEUE',amount:null},{seconds:312,kind:'QUEUE',amount:0},
+  {seconds:330,kind:'RESEARCH',label:'Loom'},{seconds:331,kind:'RESEARCH',label:'Loom'},
+  {seconds:340,kind:'BUILD'},{seconds:345,kind:'SELL'},
+  {seconds:370,kind:'QUEUE',amount:1}, // end is exclusive
+  {seconds:380,kind:'RESEARCH',label:'Castle Age'},
+  {seconds:381,kind:'RESEARCH',label:'Castle Age'},
+  {seconds:400,kind:'RESEARCH',label:'Imperial Age'}
+ ];
+ assert.deepEqual(windowActions({full_timeline},300,370),{
+  production:1,cancellations:1,unknown:1,research:1,buildings:1,market:1,
+  ages:[{age:'성주',seconds:380}]
+ });
+ assert.equal(windowActions({timeline:full_timeline},300,370),null);
+});
+test('insights omit empty cards and do not invent spending, losses or legacy missing actions',()=>{
+ assert.equal(renderInsights(null),'');
+ const html=renderInsights(sustained,{timeline:[]});
+ assert.doesNotMatch(html,/생산 명령 0회|사용률|소비량|손실|undefined|NaN/);
+ assert.equal((html.match(/<article /g)||[]).length,1);
+ assert.match(renderInsights(sustained,{full_timeline:[]},null,true),/data-open-panel="numbers"/);
+ assert.doesNotMatch(renderInsights(sustained,{full_timeline:[]},null,true),/생산 명령/);
+ // A restored recording is usable for its observed absolute time window only.
+ assert.equal(resourceInsights(sustained,{recording_restored:true,full_timeline:[]},null)[0][0].start,300);
+});

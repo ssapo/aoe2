@@ -32,6 +32,64 @@
       return value?[{age,start,end:stop,...value}]:[];
     });
   }
+  // Select sustained balances, not spending or lost economic value. Keep all
+  // windows disjoint, stop at missing checkpoints, and compare the same clock.
+  function resourceWindows(curve,index){
+    if(!valid(curve)||![1,2].includes(index))return [];
+    const points=pointsOf(curve),windows=[];
+    let run=null;
+    const finish=()=>{
+      if(run&&run.end-run.start>=60){
+        const own=stats(points,1,run.start,run.end),opponent=stats(points,2,run.start,run.end);
+        windows.push({...run,own,opponent});
+      }
+      run=null;
+    };
+    for(let i=0;i<points.length-1;i++){
+      const a=points[i],b=points[i+1],start=Math.max(300,a[0]);
+      if(b[0]<=start||b[0]-a[0]>MAX_GAP||a[index]<1000){finish();continue;}
+      if(!run)run={start,end:b[0],excess:0};
+      run.end=b[0];run.excess+=(a[index]-1000)*(b[0]-start);
+    }
+    finish();
+    return windows.sort((a,b)=>b.excess-a.excess||(b.end-b.start)-(a.end-a.start)||a.start-b.start);
+  }
+  const ageLabels={'Feudal Age':'봉건','Castle Age':'성주','Imperial Age':'왕정'};
+  function windowActions(metrics,start,end){
+    // The short legacy timeline is truncated: never infer absence from it.
+    if(!Array.isArray(metrics?.full_timeline))return null;
+    const events=metrics.full_timeline.filter(e=>e&&Number.isFinite(e.seconds)&&e.seconds>=start&&e.seconds<end);
+    const production=events.filter(e=>e.kind==='QUEUE'&&Number.isFinite(e.amount)&&e.amount>0).length;
+    const cancellations=events.filter(e=>e.kind==='QUEUE'&&Number.isFinite(e.amount)&&e.amount<0).length;
+    const unknown=events.filter(e=>e.kind==='QUEUE'&&!Number.isFinite(e.amount)).length;
+    const research=new Set(events.filter(e=>e.kind==='RESEARCH'&&!Object.hasOwn(ageLabels,e.label)).map(e=>e.label)).size;
+    const buildings=events.filter(e=>e.kind==='BUILD').length;
+    const market=events.filter(e=>e.kind==='BUY'||e.kind==='SELL').length;
+    const ages=[];
+    for(const e of metrics.full_timeline){
+      if(e&&Number.isFinite(e.seconds)&&e.seconds>=start&&e.seconds<end+30&&e.kind==='RESEARCH'&&Object.hasOwn(ageLabels,e.label)&&!ages.some(a=>a.age===ageLabels[e.label]))ages.push({age:ageLabels[e.label],seconds:e.seconds});
+    }
+    return {production,cancellations,unknown,research,buildings,market,ages};
+  }
+  function resourceInsights(curve,mine,theirs){
+    return [mine,theirs].map((metrics,i)=>resourceWindows(curve,i+1).slice(0,3).map(w=>({...w,actions:windowActions(metrics,w.start,w.end)})));
+  }
+  function renderInsights(curve,mine,theirs,compact=false){
+    const sides=resourceInsights(curve,mine,theirs);
+    if(!sides.some(s=>s.length))return '';
+    const card=(w,i)=>{
+      const a=w.actions,who=i?'상대':'나';
+      const age=a?.ages.map(v=>`${v.age}업 클릭 ${clock(v.seconds)}`).join(' · ');
+      const actions=a?[
+        `생산 명령 ${a.production}회`, `연구 ${a.research}종`, `건설 명령 ${a.buildings}회`,
+        a.cancellations?`생산 취소 ${a.cancellations}회`:'',a.unknown?`수량 불명 ${a.unknown}회`:'',a.market?`시장 명령 ${a.market}회`:''
+      ].filter(Boolean).join(' · '):'';
+      const advice=age?'시대업을 누른 시각과 자원이 줄어든 시점을 비교해 보세요.':a&&!a.production&&!a.unknown?'생산 건물의 대기열과 자원 배분을 확인해 보세요.':'생산 건물을 늘리거나 업그레이드할 여유가 있었는지 살펴보세요.';
+      return `<article class="resource-window ${i?'opponent':'own'}"><header><strong>${who} · 자원을 쌓아둔 구간</strong><span>${clock(w.start)}–${clock(w.end)}</span></header><p>1,000 이상 약 ${clock(w.end-w.start)} · 평균 보유 나 ${w.own.mean.toLocaleString('ko-KR')} / 상대 ${w.opponent.mean.toLocaleString('ko-KR')}</p>${age?`<p class="resource-age">${esc(age)}</p>`:''}${!compact&&actions?`<p>${esc(actions)}</p>`:''}${!compact?`<p class="resource-advice">${advice}</p>`:''}</article>`;
+    };
+    const columns=sides.map((rows,i)=>rows.length?`<div>${card(rows[0],i)}${!compact&&rows.length>1?`<details class="resource-more"><summary>다른 구간 ${rows.length-1}개</summary>${rows.slice(1).map(w=>card(w,i)).join('')}</details>`:''}</div>`:'').join('');
+    return `<section class="resource-insights"><div class="panel-toolbar"><h3 class="detail-heading">자원 운영</h3>${compact?'<button class="subtle" data-open-panel="numbers">자세히 →</button>':''}</div><div class="resource-columns">${columns}</div></section>`;
+  }
   function ageTable(curve,mine,theirs){
     const own=ageStats(curve,mine,1),opp=ageStats(curve,theirs,2);
     const names=['암흑','봉건','성주','왕정'].filter(age=>own.concat(opp).some(p=>p.age===age));
@@ -70,5 +128,5 @@
     const points=curve.points.map(p=>p.length===5?[p[0],p[1],p[3]]:p);
     return `<section class="state-curve"><h3 class="detail-heading">자원 흐름 <small>리플 체크포인트 기준</small></h3>${s.lines.length?`<ul class="state-lines">${s.lines.map(l=>`<li>${esc(l)}</li>`).join('')}</ul>`:''}<div class="state-charts">${chart(points,1,2,'쌓아둔 자원 (식량+나무+금+돌)')}</div>${ageTable(curve,mine,theirs)}<details class="method-note"><summary>이 값은</summary><p>리플 체크포인트의 값을 파서가 보유 자원 합계로 해석한 그래프예요. 평균은 기록 간 시간으로 가중하고, 다음 기록까지 직전 값이 유지됐다고 가정해요. 30초 넘게 비는 구간은 계산과 선 연결에서 제외해요. 자원을 모으는 건 시대업·연구 준비일 수도 있어 낭비로 단정하지 않아요. 누적 채집량이 아니며, 파서의 필드 해석은 공식 명세로 확인된 것은 아니에요.</p></details></section>`;
   }
-  const api={summary,render,valid,stats,ageStats};if(typeof module==='object'&&module.exports)module.exports=api;else global.SSAPOStateCurve=api;
+  const api={summary,render,valid,stats,ageStats,resourceWindows,windowActions,resourceInsights,renderInsights};if(typeof module==='object'&&module.exports)module.exports=api;else global.SSAPOStateCurve=api;
 })(typeof window==='undefined'?globalThis:window);
