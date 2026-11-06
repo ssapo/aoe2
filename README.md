@@ -557,3 +557,7 @@ python scripts/build_preview.py /tmp/SSAPO_AoE2_preview.html
 ## 진행 중: 게임 엔진 기반 1v1 분석
 
 `research/genie-188329` 브랜치에서 최신 리플 호환성을 연구 중입니다. 다른 AI는 [Genie 인계 문서](research/genie/README.md)를 먼저 읽으세요. 재현 명령, 패치, 검증 로그, 다음 작업과 미완성 범위를 포함합니다. 아직 경기 전체 시뮬레이션에 성공하지 않았습니다.
+
+### 2026-11-06 엔진 사망 집계 실험
+
+부정확한 결과도 확인하고 싶다는 사용자 요청으로 연구용 관찰기와 실제 1v1 비교 보고서를 추가했다. [결과와 재현 방법](research/genie/death-experiment/README.md). 실제 웹 분석 통계에 연결하거나 배포하지 않았다.

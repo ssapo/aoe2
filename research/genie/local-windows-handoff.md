@@ -2,6 +2,10 @@
 
 기록일: 2026-11-06 (한국 시간). **다음 작업자는 이 절만 읽으면 바로 이어서 할 수 있다.** 아래 "진행 기록" 이하는 이력이다.
 
+## 사망 집계 실험 추가
+
+[death-experiment/README.md](death-experiment/README.md)에 새 observer 패치·실행 방법·실제 결과가 있다. 기존 8개 패치 뒤 death-observer.patch를 적용한다. 관찰 켬/끔 census stdout 일치 확인. 사망 수는 보정 없음 4/2, ID 보정 1/0이며 정지 이후가 누락돼 원본 손실 39/73과 크게 다르다. 웹사이트에 아직 연결하지 않았다.
+
 ## 1. 지금 상태 (한 줄씩)
 
 - 518239882(34분, ssapo vs Maerlin)를 원본 게임으로 재생해 화면 값을 확보했다 → [original-game-518239882.json](original-game-518239882.json).

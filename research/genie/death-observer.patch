@@ -1,0 +1,92 @@
+--- a/crates/tools/genie-oracle/src/census.rs
++++ b/crates/tools/genie-oracle/src/census.rs
+@@ -13,6 +13,8 @@
+ 
+ use crate::{Decoder, Error, MasterTable, frames, header_slice, lane_block, run};
+ use std::slice::from_ref;
++#[path = "death_observer.rs"]
++mod death_observer;
+ 
+ /// Why a census run ended.
+ #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+@@ -149,6 +151,8 @@
+     let initial_time = turns.world_time.millis();
+     let mut elapsed_ms = 0u64;
+     let mut dump_prev = u64::from(turns.world_time.millis());
++    let mut deaths = std::env::var_os("GENIE_DEATHS").map(|_| death_observer::Observer::default());
++    if let Some(d) = deaths.as_mut() { d.observe(&turns, false); }
+     for frame in frames(&chapter, total)? {
+         elapsed_ms += u64::from(frame.dt.get());
+         if std::env::var_os("GENIE_TRACE_PHASE").is_some() && frame.checkpoint.is_some() {
+@@ -181,6 +185,7 @@
+             }
+         }
+         census.update(&turns, &sections);
++        if let Some(d) = deaths.as_mut() { d.observe(&turns, true); }
+         // DIAGNOSTIC: GENIE_DUMP_MS=15000,30000 prints each player's non-zero attributes and live
+         // object counts by master at the first update whose world time reaches each mark.
+         if let Ok(raw) = std::env::var("GENIE_DUMP_MS") {
+@@ -231,6 +236,7 @@
+             break;
+         }
+     }
++    if deaths.is_some() { eprintln!("DEATH_END ms={} updates={} syncs={syncs}", turns.world_time.millis(), census.updates); }
+     Ok(CensusRun {
+         updates: census.updates,
+         syncs,
+--- /dev/null
++++ b/crates/tools/genie-oracle/src/death_observer.rs
+@@ -0,0 +1,53 @@
++//! Experimental observer. It never writes to the simulated world.
++use std::collections::{BTreeMap, BTreeSet};
++use genie_core::world::World;
++use genie_core::players::PlayerId;
++
++#[derive(Clone, Copy)]
++struct Seen { player: usize, master: i16, class: i16, state: u8 }
++#[derive(Default)]
++pub(super) struct Observer { previous: BTreeMap<i32, Seen>, counted: BTreeSet<i32>, stopped: BTreeSet<usize> }
++fn deaths(before: u8, after: u8) -> bool { before == 2 && (3..=5).contains(&after) }
++impl Observer {
++    pub(super) fn observe(&mut self, w: &World, emit: bool) {
++        let ms = w.world_time.millis();
++        let mut current = BTreeMap::new();
++        for (p, player) in w.players.iter().enumerate() {
++            if player.unsupported.is_some() && self.stopped.insert(p) {
++                eprintln!("DEATH_STOP ms={ms} player={p}");
++            }
++            for u in &player.objects {
++                let Ok(m) = u.master(w.master_tables(), PlayerId::new(u8::try_from(p).expect("player slot fits u8"))) else { continue };
++                // Creatable units only; no buildings, missiles, livestock, or scenery.
++                if m.kind.get() != 70 || m.class.get() == 58 { continue }
++                let now = Seen { player: p, master: u.life.master_id.get(), class: m.class.get(), state: u.life.state.get() };
++                current.insert(u.id.get(), now);
++                if !emit { continue }
++                if let Some(old) = self.previous.get(&u.id.get()) {
++                    if old.player != p {
++                        eprintln!("DEATH_OWNER ms={ms} id={} from={} to={p}",u.id.get(),old.player);
++                    }
++                    if old.player > 0 && deaths(old.state, now.state) && self.counted.insert(u.id.get()) {
++                        eprintln!("DEATH_EVENT ms={ms} player={} id={} master={} class={} degraded={}", old.player,u.id.get(),old.master,old.class,!self.stopped.is_empty());
++                    }
++                }
++            }
++        }
++        if emit {
++            for (id,old) in &self.previous {
++                if old.player > 0 && old.state == 2 && !current.contains_key(id) && !self.counted.contains(id) {
++                    eprintln!("DEATH_UNRESOLVED ms={ms} player={} id={} master={}",old.player,id,old.master);
++                }
++            }
++        }
++        self.previous = current;
++    }
++}
++#[cfg(test)]
++mod tests {
++    use super::deaths;
++    #[test] fn counts_alive_to_dying_not_corpse_cleanup() {
++        assert!(deaths(2,3)); assert!(deaths(2,4)); assert!(deaths(2,5));
++        for (a,b) in [(0,3),(3,4),(4,5),(5,7),(2,7),(2,2)] { assert!(!deaths(a,b)); }
++    }
++}

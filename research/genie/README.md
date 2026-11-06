@@ -1,5 +1,9 @@
 # Genie 최신 1v1 호환성 실험 — 미완성, 배포 금지
 
+## 사망 집계 실험 (2026-11-06)
+
+사용자 요청으로 부정확한 결과도 비교할 수 있게 [사망 집계 실험](death-experiment/README.md)을 추가했다. [비교 보고서 HTML](death-experiment/comparison.html), 원시 로그와 JSON 포함. 엔진 생존→사망 상태를 기록하며 실제 경기의 사망으로 확정하지 않는다.
+
 ## 다음 시작점 (2026-11-06)
 
 **[local-windows-handoff.md](local-windows-handoff.md)의 맨 위 절만 읽으면 바로 이어서 작업할 수 있습니다** (현재 상태, 환경 만들기, 기본 실행, 다음 할 일, 지켜야 할 것). 상세 근거는 [original-vs-engine-518239882.md](original-vs-engine-518239882.md). 이 README의 나머지는 이전 작업 이력입니다.

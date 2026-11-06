@@ -1,0 +1,108 @@
+{
+  "baseline": {
+    "events": [
+      {
+        "ms": 211610,
+        "player": 1,
+        "id": 4356,
+        "master": 216,
+        "class": 4,
+        "degraded": false
+      },
+      {
+        "ms": 261747,
+        "player": 1,
+        "id": 3418,
+        "master": 216,
+        "class": 4,
+        "degraded": false
+      },
+      {
+        "ms": 279023,
+        "player": 1,
+        "id": 3416,
+        "master": 216,
+        "class": 4,
+        "degraded": false
+      },
+      {
+        "ms": 284218,
+        "player": 2,
+        "id": 3426,
+        "master": 122,
+        "class": 4,
+        "degraded": false
+      },
+      {
+        "ms": 326205,
+        "player": 2,
+        "id": 4347,
+        "master": 122,
+        "class": 4,
+        "degraded": false
+      },
+      {
+        "ms": 423950,
+        "player": 1,
+        "id": 4342,
+        "master": 216,
+        "class": 4,
+        "degraded": false
+      }
+    ],
+    "unresolved": [],
+    "ownership": [],
+    "stops": [
+      {
+        "ms": 1406170,
+        "player": 2
+      },
+      {
+        "ms": 1422203,
+        "player": 1
+      },
+      {
+        "ms": 1431371,
+        "player": 0
+      }
+    ],
+    "end": {
+      "ms": 2043060,
+      "updates": 92503,
+      "syncs": 92503
+    }
+  },
+  "corrected": {
+    "events": [
+      {
+        "ms": 437698,
+        "player": 1,
+        "id": 4342,
+        "master": 216,
+        "class": 4,
+        "degraded": false
+      }
+    ],
+    "unresolved": [],
+    "ownership": [],
+    "stops": [
+      {
+        "ms": 600436,
+        "player": 1
+      },
+      {
+        "ms": 603780,
+        "player": 2
+      },
+      {
+        "ms": 612616,
+        "player": 0
+      }
+    ],
+    "end": {
+      "ms": 2043060,
+      "updates": 92503,
+      "syncs": 92503
+    }
+  }
+}
