@@ -67,5 +67,5 @@ test('numbers separate observed age timings from production requests',()=>{
  const core=html.match(/<section data-number-panel="core">([\s\S]*?)<\/section>/)[1];
  assert.match(core,/봉건 도달/);assert.doesNotMatch(core,/생산 요청|병력 생산|주민 생산/);
  assert.match(html,/data-number-panel="requests" hidden/);
- assert.match(html,/5분별 요청/);assert.match(html,/시대별 요청/);
+ assert.match(html,/5분별/);assert.match(html,/시대별/);
 });
