@@ -1,0 +1,62 @@
+--- a/crates/engine/genie-core/src/correction.rs
++++ b/crates/engine/genie-core/src/correction.rs
+@@ -38,6 +38,14 @@
+     /// Recorded ids an order named while the simulation held them for its player: one gone
+     /// since died in the simulation, and is not read as another.
+     seen: HashSet<(usize, i32)>,
++}
++
++impl Ids {
++    /// Preserve an established recorded ID even if the simulator later allocates its raw
++    /// number to something else. Some(None) means the paired object is no longer ours.
++    fn kept_unit(&self, recorded: ObjectId, owns: impl Fn(ObjectId) -> bool) -> Option<Option<ObjectId>> {
++        self.map.get(&recorded.get()).map(|&to| ObjectId::of_field(to).filter(|&id| owns(id)))
++    }
+ }
+ 
+ fn ids() -> &'static Mutex<Ids> {
+@@ -161,6 +169,22 @@
+                 return;
+             }
+             for slot in &mut list.ids {
++                // A/B experiment: keep recorded -> simulated identity before raw ownership.
++                if std::env::var_os("GENIE_CORRECT_KEEP_PAIRS").is_some() {
++                    let kept = slot.and_then(|recorded| {
++                        ids().lock().ok().and_then(|ids| ids.kept_unit(recorded, |candidate| {
++                            w.place(candidate).is_some_and(|place| place.player() == player)
++                        }))
++                    });
++                    if let Some(kept) = kept {
++                        if std::env::var_os("GENIE_LOG_KEPT_PAIRS").is_some() {
++                            eprintln!("CORRECT_KEPT world_ms={} player={} recorded={:?} sim={:?}",
++                                w.world_time.millis(), player.index(), slot.map(ObjectId::get), kept.map(ObjectId::get));
++                        }
++                        *slot = kept;
++                        continue;
++                    }
++                }
+                 let held = slot.and_then(|id| w.place(id)).is_some_and(|p| p.player() == player);
+                 if held {
+                     claim(player, *slot);
+@@ -294,3 +318,21 @@
+         );
+     }
+ }
++
++#[cfg(test)]
++mod pair_tests {
++    use super::*;
++    #[test]
++    fn kept_pair_wins_when_raw_id_later_exists() {
++        let mut ids = Ids::default();
++        let _ = ids.map.insert(4401, 4399);
++        assert_eq!(ids.kept_unit(ObjectId::of_field(4401).unwrap(), |id| [4399, 4401].contains(&id.get())), Some(ObjectId::of_field(4399)));
++    }
++    #[test]
++    fn gone_pair_does_not_fall_back_to_same_number_object() {
++        let mut ids = Ids::default();
++        let _ = ids.map.insert(4401, 4399);
++        assert_eq!(ids.kept_unit(ObjectId::of_field(4401).unwrap(), |id| id.get() == 4401), Some(None));
++        assert_eq!(ids.kept_unit(ObjectId::of_field(4402).unwrap(), |_| true), None);
++    }
++}
