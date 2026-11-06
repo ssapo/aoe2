@@ -37,7 +37,7 @@
     const names=['암흑','봉건','성주','왕정'].filter(age=>own.concat(opp).some(p=>p.age===age));
     if(!names.length)return '';
     const cell=p=>p?`평균 <strong>${p.mean.toLocaleString('ko-KR')}</strong><br>1,000 이상 약 ${clock(p.floating)}<small class="cell-meta">${clock(p.start)}–${clock(p.end)} · 계산 구간 ${clock(p.covered)}</small>`:'—';
-    return `<details class="age-resource-details"><summary>시대별 보유 자원 · 나 / 상대</summary><p class="compact-note">각자의 시대 구간을 비교해요. 같은 경기 시각끼리의 비교는 아니에요.</p><div class="table-scroll"><table class="timeline comparison"><thead><tr><th scope="col">시대</th><th scope="col">나</th><th scope="col">상대</th></tr></thead><tbody>${names.map(age=>`<tr><th scope="row">${age}</th><td>${cell(own.find(p=>p.age===age))}</td><td>${cell(opp.find(p=>p.age===age))}</td></tr>`).join('')}</tbody></table></div></details>`;
+    return `<details class="age-resource-details"><summary>시대별 보유 자원 · 나 / 상대</summary><div class="table-scroll"><table class="timeline comparison"><thead><tr><th scope="col">시대</th><th scope="col">나</th><th scope="col">상대</th></tr></thead><tbody>${names.map(age=>`<tr><th scope="row">${age}</th><td>${cell(own.find(p=>p.age===age))}</td><td>${cell(opp.find(p=>p.age===age))}</td></tr>`).join('')}</tbody></table></div></details>`;
   }
   function niceMax(v){
     if(v<=0)return 1;
@@ -68,7 +68,7 @@
     if(!valid(curve))return '';
     const s=summary(curve);
     const points=curve.points.map(p=>p.length===5?[p[0],p[1],p[3]]:p);
-    return `<section class="state-curve"><h3 class="detail-heading">자원 흐름 <small>리플 체크포인트 기준</small></h3>${s.lines.length?`<ul class="state-lines">${s.lines.map(l=>`<li>${esc(l)}</li>`).join('')}</ul>`:''}<div class="state-charts">${chart(points,1,2,'쌓아둔 자원 (식량+나무+금+돌)')}</div>${ageTable(curve,mine,theirs)}<details class="method-note"><summary>이 값은</summary><p>리플 체크포인트의 값을 파서가 보유 자원 합계로 해석한 그래프예요. 평균은 기록 간 시간으로 가중하고, 다음 기록까지 직전 값이 유지됐다고 가정해요. 30초 넘게 비는 구간은 계산과 선 연결에서 제외해요. 자원을 모으는 건 시대업·연구 준비일 수도 있어 낭비로 단정하지 않아요. 누적 채집량이 아니며, 파서의 필드 해석은 공식 명세로 확인된 것은 아니에요.</p></details></section>`;
+    return `<section class="state-curve"><h3 class="detail-heading">자원 흐름</h3>${s.lines.length?`<ul class="state-lines">${s.lines.map(l=>`<li>${esc(l)}</li>`).join('')}</ul>`:''}<div class="state-charts">${chart(points,1,2,'쌓아둔 자원 (식량+나무+금+돌)')}</div>${ageTable(curve,mine,theirs)}</section>`;
   }
   const api={summary,render,valid,stats,ageStats};if(typeof module==='object'&&module.exports)module.exports=api;else global.SSAPOStateCurve=api;
 })(typeof window==='undefined'?globalThis:window);

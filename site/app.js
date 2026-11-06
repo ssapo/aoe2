@@ -49,7 +49,7 @@
   function renderAgePanel(mine,theirs,other) {
     const available=agesIn(mine,theirs);
     if(!available.length)return '<p class="panel-empty">시대 전환 기록 없음</p>';
-    return `<div class="panel-toolbar"><div class="segments" role="group" aria-label="비교할 시대">${available.map((age,i)=>`<button data-age="${age}" aria-pressed="${i===0}">${age}</button>`).join('')}</div><span class="toolbar-note">나 / 상대 비교</span></div><p class="data-caution">주민 항목은 <b>생산 요청량</b>이에요. 실제 일꾼 수와는 달라요.</p>`+available.map((age,i)=>{
+    return `<div class="panel-toolbar"><div class="segments" role="group" aria-label="비교할 시대">${available.map((age,i)=>`<button data-age="${age}" aria-pressed="${i===0}">${age}</button>`).join('')}</div><span class="toolbar-note">나 / 상대 비교</span></div>`+available.map((age,i)=>{
       const left=checkpoint(mine,age),right=checkpoint(theirs,age),diff=ageDifference(mine,theirs,age);
       const requests=p=>Number.isFinite(p.command_seconds)&&p.unit_requests_before_click&&!p.unknown_unit_request_amounts?.includes('Villager')?number(p.unit_requests_before_click.Villager??0):'—';
       const recent=p=>p.unit_requests_previous_120s?quantities(p.unit_requests_previous_120s):'—';
@@ -61,10 +61,10 @@
         ['다른 유닛 생산 요청 · 누적',prior(left),prior(right)],
         ['누르기 전 2분간 생산 요청',recent(left),recent(right)]
       ],other)+'</section>';
-    }).join('')+'<details class="method-note"><summary>기록 기준</summary><p>주민은 시작 인원을 제외한 생산 요청 수량이에요. 취소·실패·사망은 반영하지 않아요. 시대가 바뀐 시각은 시스템 알림으로 확인해요. 처음 버튼을 누른 시각과 연구가 시작된 시각은 다를 수 있어요. —는 기록이 없다는 뜻이에요.</p>'+((mine.recording_restored||theirs.recording_restored)?'<p>재개된 리플의 누적량은 기록 시작 이후만 포함.</p>':'')+'</details>';
+    }).join('');
   }
   function renderProductionPanel() {
-    return `<div class="panel-toolbar"><div class="segments" role="group" aria-label="기록 종류"><button data-category="unit_orders" aria-pressed="true">유닛</button><button data-category="research_orders" aria-pressed="false">업그레이드</button><button data-category="building_orders" aria-pressed="false">건물</button></div></div><div class="search-row"><input id="production-search" type="search" aria-label="생산·연구 기록 검색" placeholder="이름 검색 · 한글 / 영문" autocomplete="off"><span id="production-count" class="toolbar-note" role="status"></span></div><div id="production-table"></div><p id="production-note" class="compact-note"></p>`;
+    return `<div class="panel-toolbar"><div class="segments" role="group" aria-label="기록 종류"><button data-category="unit_orders" aria-pressed="true">유닛</button><button data-category="research_orders" aria-pressed="false">업그레이드</button><button data-category="building_orders" aria-pressed="false">건물</button></div></div><div class="search-row"><input id="production-search" type="search" aria-label="생산·연구 기록 검색" placeholder="이름 검색 · 한글 / 영문" autocomplete="off"><span id="production-count" class="toolbar-note" role="status"></span></div><div id="production-table"></div>`;
   }
   function timelineRows(events) {
     const rows=new Map();
@@ -87,7 +87,7 @@
       ${field?.total?renderFieldTimeline(field,analysis.duration_game_seconds):''}
       <div class="timeline-stage"><div id="building-map-host"></div></div>
       ${statistics?`<details class="flow-statistics"><summary>진영별 시간·비율</summary>${statistics}</details>`:''}
-      <section class="timeline-history" aria-labelledby="timeline-history-title"><h3 id="timeline-history-title">전체 기록</h3><div class="panel-toolbar"><div class="segments" role="group" aria-label="기록을 볼 선수"><button data-side="both" aria-pressed="true">양측</button><button data-side="mine" aria-pressed="false">나</button><button data-side="theirs" aria-pressed="false">상대</button></div><label class="select-label">명령<select id="timeline-kind"><option value="all">전체</option><option value="QUEUE">생산</option><option value="BUILD">건설</option><option value="RESEARCH">연구</option><option value="BUY">시장 구매</option><option value="SELL">시장 판매</option></select></label><label class="select-label">시간<select id="timeline-range"></select></label></div><div class="timeline-pagination"><span id="timeline-count" role="status"></span><div><button id="timeline-prev" aria-label="이전 명령 페이지">이전</button><span id="timeline-page"></span><button id="timeline-next" aria-label="다음 명령 페이지">다음</button></div></div><div id="timeline-table"></div><p class="compact-note">생산·건설·연구·시장 거래를 요청한 시각이에요. 완료 시각과는 달라요.</p></section>
+      <section class="timeline-history" aria-labelledby="timeline-history-title"><h3 id="timeline-history-title">전체 기록</h3><div class="panel-toolbar"><div class="segments" role="group" aria-label="기록을 볼 선수"><button data-side="both" aria-pressed="true">양측</button><button data-side="mine" aria-pressed="false">나</button><button data-side="theirs" aria-pressed="false">상대</button></div><label class="select-label">명령<select id="timeline-kind"><option value="all">전체</option><option value="QUEUE">생산</option><option value="BUILD">건설</option><option value="RESEARCH">연구</option><option value="BUY">시장 구매</option><option value="SELL">시장 판매</option></select></label><label class="select-label">시간<select id="timeline-range"></select></label></div><div class="timeline-pagination"><span id="timeline-count" role="status"></span><div><button id="timeline-prev" aria-label="이전 명령 페이지">이전</button><span id="timeline-page"></span><button id="timeline-next" aria-label="다음 명령 페이지">다음</button></div></div><div id="timeline-table"></div></section>
     </div>`;
   }
   function renderBasics(mine,theirs,other) {
@@ -97,9 +97,7 @@
     const rows=[['eAPM',number(mine.eapm),number(theirs.eapm)],['첫 농장 건설 요청',fmtTime(mine.first_build_commands?.Farm),fmtTime(theirs.first_build_commands?.Farm)],['농장 건설 요청 횟수',number(mine.building_orders?.Farm?.commands??mine.command_counts?.Farm),number(theirs.building_orders?.Farm?.commands??theirs.command_counts?.Farm)],['직접 조작한 가축 · 누적',controlled(mine),controlled(theirs)],...(hasBerry?[['열매 작업을 바꾼 시점 · 추정',berry(mine),berry(theirs)]]:[])];
     return `<details class="basic-comparison"><summary>경제·조작 기록 비교</summary>${compareTable(rows,other)}</details>`;
   }
-  function renderMethods() {
-    return `<details class="method-note"><summary>분석에 포함된 기록</summary><p>시대가 바뀐 시각과 건설·생산·연구를 누른 기록을 비교해요. 생산 요청에는 취소되거나 실행되지 않은 것도 포함돼요. 실제 보유 병력이나 완성된 건물 수와는 달라요.</p><p>기술 기록이 없어도 문명 특성으로 무료 지급됐을 수 있어요. eAPM이나 생산 요청이 많다는 이유만으로 더 잘했다고 판단하지는 않아요.</p><p>가축은 직접 이동 등을 명령한 개체를 중복 없이 셌어요. 현재 소유하거나 먹은 수는 아니며, 빼앗긴 가축은 양쪽에 잡힐 수 있어요.</p><p>열매 작업 전환은 같은 군락에 있던 주민에게 다른 일을 시킨 기록으로 추정해요. 괄호는 확인된 작업자 중 전환 요청을 받은 인원이에요. 열매가 다 떨어진 시각이나 모든 자동 채집을 알 수 있는 것은 아니에요.</p><p>실제 주민 수, TC가 쉰 시간, 교전 손실은 아직 계산하지 않아요. 보유 자원 합계는 수치 탭에서 체크포인트 해석값으로 따로 보여줘요. 아래 기록은 리플에서 살펴볼 구간을 찾는 데 써주세요.</p></details>`;
-  }
+  function renderMethods() { return ''; }
   function bindWorkspace(root,mine,theirs,other,review,mapData,match) {
     const body=root.querySelector('.review-body');
     const tabs=[...root.querySelectorAll('[role="tab"]')];
@@ -155,7 +153,7 @@
       };
       root.querySelector('#production-count').textContent=`${keys.length}종`;
       root.querySelector('#production-table').innerHTML=keys.length?`<table class="timeline comparison data-table"><thead><tr><th scope="col">항목</th><th scope="col">나</th><th scope="col">상대</th></tr></thead><tbody>${keys.map(k=>`<tr><th scope="row">${esc(label(k))}</th><td>${cell(mine[category]?.[k])}</td><td>${cell(theirs[category]?.[k])}</td></tr>`).join('')}</tbody></table>`:'<p class="panel-empty">'+(query?'검색 결과 없음':'분석된 기록 없음')+'</p>';
-      root.querySelector('#production-note').textContent=category==='unit_orders'?'생산 버튼으로 요청한 수량이에요. 취소되거나 실행되지 않은 요청도 포함돼요.':category==='research_orders'?'연구를 처음 누른 시각이에요. —는 기록이 없다는 뜻이며, 무료로 주어지는 기술일 수도 있어요.':'건설을 요청한 횟수예요. 취소나 반복 요청이 있어 실제 건물 수와 다를 수 있어요.';
+
     };
     root.querySelectorAll('[data-category]').forEach(b=>b.addEventListener('click',()=>{
       category=b.dataset.category;search.value='';
@@ -169,7 +167,7 @@
     const civs=[match.analysis?.civilization||match.civilization,other?.civilization];
     const civRandoms=[match.analysis?.random_civ,other?.random_civ];
     const mapHost=root.querySelector('#building-map-host');
-    mapHost.innerHTML=mapData?`<div class="map-toolbar"><div class="map-legend">${civBadge(civs[0],'나',civRandoms[0])}${civBadge(civs[1],'상대',civRandoms[1])}</div><div class="map-focus"><button data-map-focus="all" aria-pressed="true">전체 맵</button><button data-map-focus="mine" aria-pressed="false">내 본진</button><button data-map-focus="theirs" aria-pressed="false">상대 본진</button>${Array.isArray(mapData.command_activity)?'<button id="map-activity" aria-pressed="true">유닛 지시</button>':''}</div></div><canvas id="building-map" width="720" height="420" role="img" aria-label="실제 지형과 양측 건설·이동 지시 위치"></canvas><p id="building-map-info" class="compact-note" aria-live="polite">${Array.isArray(mapData.command_activity)?'원은 최근 30초의 지시 지점, 원의 크기·숫자는 선택 대상 수예요.':'유닛 지시는 이 경기 재분석 후 표시돼요.'}</p><details class="map-note"><summary>지도 표시 기준</summary><p class="compact-note">초록은 나, 빨강은 상대. 시작 건물과 누적 건설 요청 위치예요. 취소·파괴·완료는 반영하지 않아요. 금·돌·열매도 시작 위치예요. 원은 이동·공격·대상 지시를 한 곳이에요. 실제 유닛 위치·이동 경로·생존 병력은 아니며 주민·가축도 포함될 수 있어요. 선택 수가 없는 지시는 크기를 추정하지 않아요.</p></details>`:'<p class="compact-note">이 경기의 맵 자료는 다음 재분석 후 표시돼요.</p>';
+    mapHost.innerHTML=mapData?`<div class="map-toolbar"><div class="map-legend">${civBadge(civs[0],'나',civRandoms[0])}${civBadge(civs[1],'상대',civRandoms[1])}</div><div class="map-focus"><button data-map-focus="all" aria-pressed="true">전체 맵</button><button data-map-focus="mine" aria-pressed="false">내 본진</button><button data-map-focus="theirs" aria-pressed="false">상대 본진</button>${Array.isArray(mapData.command_activity)?'<button id="map-activity" aria-pressed="true">유닛 지시</button>':''}</div></div><canvas id="building-map" width="720" height="420" role="img" aria-label="실제 지형과 양측 건설·이동 지시 위치"></canvas><p id="building-map-info" class="compact-note" aria-live="polite">${Array.isArray(mapData.command_activity)?'원은 최근 30초의 지시 지점, 원의 크기·숫자는 선택 대상 수예요.':'유닛 지시는 이 경기 재분석 후 표시돼요.'}</p>`:'<p class="compact-note">이 경기의 맵 자료는 다음 재분석 후 표시돼요.</p>';
     const mapPlayer=mapData?window.SSAPOBuildingMap.mount(root.querySelector('#building-map'),root.querySelector('#building-map-info'),mapData,events,label,fmtTime):null;
     root.querySelectorAll('[data-map-focus]').forEach(b=>b.addEventListener('click',()=>{
       root.querySelectorAll('[data-map-focus]').forEach(t=>t.setAttribute('aria-pressed',String(t===b)));
@@ -393,26 +391,26 @@
       ['주민 생산 요청 · 전체',number(a.villager_requests),number(b.villager_requests)],
       ['병력 생산 요청 · 전체',number(a.military_requests),number(b.military_requests)],
       ['생산을 요청한 병종',number(a.military_types),number(b.military_types)],
-      ['연구 요청 종류 · 시대업 포함',number(a.research_kinds),number(b.research_kinds)],
+      ['연구 종류 · 시대업 포함',number(a.research_kinds),number(b.research_kinds)],
       ['추가 TC 건설 요청',`${number(a.additional_tc_build_commands)}회`,`${number(b.additional_tc_build_commands)}회`],
       ['주민 생산 요청의 최대 간격',fmtTime(longest(a)),fmtTime(longest(b))]
     ];
     const points=[...new Set([...a.checkpoints,...b.checkpoints].map(p=>p.seconds))].sort((x,y)=>x-y);
-    const point=(s,t)=>{const p=s.checkpoints.find(p=>p.seconds===t);return p?`주민 요청 ${number(p.villager_requests)} · 군사 요청 ${number(p.military_requests)}`:'—';};
-    const phase=s=>`${fmtTime(s.start)}–${fmtTime(s.end)} · 주민 요청 ${number(s.villager_requests)} / 군사 요청 ${number(s.military_requests)} / 연구 요청 ${number(s.research_kinds)}종 / 건설 요청 ${number(s.building_commands)}회`;
+    const point=(s,t)=>{const p=s.checkpoints.find(p=>p.seconds===t);return p?`주민 ${number(p.villager_requests)} · 군사 ${number(p.military_requests)}`:'—';};
+    const phase=s=>`${fmtTime(s.start)}–${fmtTime(s.end)} · 주민 ${number(s.villager_requests)} / 군사 ${number(s.military_requests)} / 연구 ${number(s.research_kinds)}종 / 건설 ${number(s.building_commands)}회`;
     const phases=[...new Set([...a.phases,...b.phases].map(p=>p.stage))];
-    const panels=[['core','시대·조작'],['requests','요청 합계'],['checkpoints','5분별 요청'],['phases','시대별 요청'],...((mine.market||theirs.market)?[['market','시장']]:[]),...(review.personal_benchmarks.length?[['benchmark','내 기록']]:[])];
-    let html=`<div class="segments numbers-segments" role="group" aria-label="수치 비교 종류">${panels.map(([id,name],i)=>`<button data-numbers="${id}" aria-pressed="${i===0}">${name}</button>`).join('')}</div><section data-number-panel="core"><p class="compact-note">시대 도달은 게임 알림, eAPM은 명령 기록 기준이에요.</p>${compareTable(core,other)}</section><section data-number-panel="requests" hidden><p class="data-caution">누른 수량의 합계예요. 취소·생산 대기·사망을 반영한 실제 주민·병력 수는 아니에요.</p>${compareTable(requests,other)}</section><section data-number-panel="checkpoints" hidden><p class="data-caution">해당 시각까지의 누적 생산요청이에요. 당시 생존 유닛 수가 아니에요.</p>${compareTable(points.map(t=>[`${Math.round(t/60)}분 누적`,point(a,t),point(b,t)]),other)}</section><section data-number-panel="phases" hidden><p class="compact-note">각자 시대가 바뀐 뒤의 요청 기록이에요. 유닛은 요청 수량, 연구는 요청 종류, 건설은 요청 횟수예요.</p>${compareTable(phases.map(stage=>{const l=a.phases.find(p=>p.stage===stage),r=b.phases.find(p=>p.stage===stage);return [stage,l?phase(l):'—',r?phase(r):'—'];}),other)}</section>`;
+    const panels=[['core','핵심'],['requests','생산 기록'],['checkpoints','5분별'],['phases','시대별'],...((mine.market||theirs.market)?[['market','시장']]:[]),...(review.personal_benchmarks.length?[['benchmark','내 기록']]:[])];
+    let html=`<div class="segments numbers-segments" role="group" aria-label="수치 비교 종류">${panels.map(([id,name],i)=>`<button data-numbers="${id}" aria-pressed="${i===0}">${name}</button>`).join('')}</div><section data-number-panel="core">${compareTable(core,other)}</section><section data-number-panel="requests" hidden>${compareTable(requests,other)}</section><section data-number-panel="checkpoints" hidden>${compareTable(points.map(t=>[`${Math.round(t/60)}분 누적`,point(a,t),point(b,t)]),other)}</section><section data-number-panel="phases" hidden>${compareTable(phases.map(stage=>{const l=a.phases.find(p=>p.stage===stage),r=b.phases.find(p=>p.stage===stage);return [stage,l?phase(l):'—',r?phase(r):'—'];}),other)}</section>`;
     if(mine.market||theirs.market){
       const total=(m,kind,resource)=>m.market?number(m.market.events.filter(e=>e.kind===kind&&e.label===resource).reduce((n,e)=>n+e.amount,0)):'—';
       const rows=['식량','목재','돌'].flatMap(resource=>['BUY','SELL'].map(kind=>[`${resource} ${kind==='BUY'?'구매':'판매'} 요청`,total(mine,kind,resource),total(theirs,kind,resource)]));
       const before=(m,age)=>{const p=checkpoint(m,age);if(!m.market||!Number.isFinite(p.command_seconds))return '—';const ev=p.market_previous_120s||[];return `${fmtTime(Math.max(0,p.command_seconds-120))}–${fmtTime(p.command_seconds)}\n`+(ev.length?ev.map(e=>`${fmtTime(e.seconds)} ${esc(e.label)} ${number(e.amount)} ${e.kind==='BUY'?'구매':'판매'}`).join('\n'):'거래 요청 없음');};
-      html+=`<section data-number-panel="market" hidden><p class="compact-note">자원 단위로 합산한 매매 요청이에요. 실제 체결량이나 금 지출·수입은 계산하지 않아요.</p>${compareTable(rows,other)}<h3>시대업 누르기 전 2분</h3>${compareTable(ageList.filter(age=>Number.isFinite(checkpoint(mine,age).command_seconds)||Number.isFinite(checkpoint(theirs,age).command_seconds)).map(age=>[age,before(mine,age),before(theirs,age)]),other)}</section>`;
+      html+=`<section data-number-panel="market" hidden>${compareTable(rows,other)}<h3>시대업 누르기 전 2분</h3>${compareTable(ageList.filter(age=>Number.isFinite(checkpoint(mine,age).command_seconds)||Number.isFinite(checkpoint(theirs,age).command_seconds)).map(age=>[age,before(mine,age),before(theirs,age)]),other)}</section>`;
     }
     if(review.personal_benchmarks.length){
       html+=`<section data-number-panel="benchmark" hidden><p class="compact-note">같은 맵·문명·첫 병종으로 했던 내 경기와 비교해요. 최근 10경기 안에서 비교 가능한 기록만 모았어요.</p><table class="timeline comparison"><thead><tr><th>항목</th><th>이번 경기</th><th>내 과거 중앙값</th></tr></thead><tbody>${review.personal_benchmarks.map(p=>`<tr><th scope="row">${esc(p.label)}</th><td>${fmtTime(p.current_seconds)}<small class="cell-meta">${Math.round(Math.abs(p.delta_seconds))}초 ${p.delta_seconds<0?'빠름':p.delta_seconds>0?'늦음':'차이'}</small></td><td>${fmtTime(p.median_seconds)}<small class="cell-meta">${p.samples}경기</small></td></tr>`).join('')}</tbody></table></section>`;
     }
-    return html+'<details class="method-note"><summary>기록 기준</summary><p>시대가 바뀐 시각은 시스템 알림, 병력·업그레이드는 처음 요청한 시각이에요. 병력 수량에서 주민·어선·교역·수송선과 시작 유닛, 무료로 얻은 유닛은 제외했어요.</p><p>시대업·첫 병력 요청이 20초 이상, 같은 기술 요청이 60초 이상 차이 나면 복기할 항목으로 골랐어요. 같은 첫 병종을 썼을 때 15분 주민 요청이 5 이상, 병력 요청이 10 이상 차이 나는 경우도 보여줘요. 이 기준이 전략의 정답을 뜻하지는 않아요.</p><p>주민 요청 사이에 시간이 길어도 TC가 계속 쉬었다는 뜻은 아니에요. 생산 대기열·취소·인구 제한·피해는 재현하지 못하므로, 실제 TC 유휴시간이나 교전 효율은 이 기록만으로 알 수 없어요.</p></details>';
+    return html;
   }
 
   function renderReview(match) {
