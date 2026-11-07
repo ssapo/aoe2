@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-07T12:37:37.915123+00:00",
-  "last_checked_at": "2026-11-07T12:37:36.765151+00:00",
+  "updated_at": "2026-11-07T13:19:49.964104+00:00",
+  "last_checked_at": "2026-11-07T13:19:48.796071+00:00",
   "sync_error": null,
   "profile": {
     "id": 199325,
@@ -38214,12 +38214,13 @@
           "TC 유휴시간, 교전 손실, 승패의 인과관계는 이 버전에서 계산하지 않습니다. 쌓아둔 자원 합과 오브젝트 수는 게임이 리플에 남긴 값(약 7~15초 간격)이며 유닛 종류별로 나뉘지 않습니다."
         ],
         "review": {
-          "revision": 1,
+          "revision": 2,
           "own": {
             "available": true,
             "opening": "scouts",
-            "opening_label": "정찰 기병",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening_label": "스카웃",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 603.84,
             "first_military_unit": "Scout Cavalry",
             "after_feudal_first_military_seconds": 44.35,
@@ -38306,9 +38307,10 @@
           },
           "opponent": {
             "available": true,
-            "opening": "spears",
-            "opening_label": "창병",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": "archers",
+            "opening_label": "궁사",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 561.15,
             "first_military_unit": "Spearman",
             "after_feudal_first_military_seconds": 26.29,
@@ -38492,7 +38494,7 @@
             "evidence": "이번 9:19 → 연습 목표 8:59. 이번 기록에서 20초 줄여보는 연습 목표예요.",
             "action": "같은 맵과 빌드로 초반만 세 번 연습해 보세요. 주민 생산, 베틀, 건물 순서를 적어두면 어디서 늦어지는지 찾기 쉬워요."
           },
-          "benchmark_basis": "same_map_civilization_first_military_order_prior_up_to_10_matches_min_3",
+          "benchmark_basis": "same_map_civilization_inferred_opening_prior_up_to_10_matches_min_3",
           "limits": [
             "주민·군사 수량은 생산 지시량. 실제 생산·생존 수가 아님.",
             "명령 간격은 TC 실제 유휴시간이 아님. 검증되지 않은 TC 유휴·교전 손실·글로벌 백분위·등급은 생성하지 않음."
@@ -78591,12 +78593,13 @@
           "TC 유휴시간, 교전 손실, 승패의 인과관계는 이 버전에서 계산하지 않습니다. 쌓아둔 자원 합과 오브젝트 수는 게임이 리플에 남긴 값(약 7~15초 간격)이며 유닛 종류별로 나뉘지 않습니다."
         ],
         "review": {
-          "revision": 1,
+          "revision": 2,
           "own": {
             "available": true,
             "opening": "scouts",
-            "opening_label": "정찰 기병",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening_label": "스카웃",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 550.89,
             "first_military_unit": "Scout Cavalry",
             "after_feudal_first_military_seconds": 44.7,
@@ -78674,9 +78677,10 @@
           },
           "opponent": {
             "available": true,
-            "opening": "spears",
-            "opening_label": "창병",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": "scouts",
+            "opening_label": "스카웃",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 558.21,
             "first_military_unit": "Spearman",
             "after_feudal_first_military_seconds": 2.54,
@@ -78797,6 +78801,14 @@
               "evidence": "나 12:46 · 상대 15:01. 연구를 누른 시각이에요.",
               "action": "이 업그레이드가 필요한 병력으로 언제 싸웠는지 보세요. 연구가 끝나기 전에 교전했는지도 확인해 보세요.",
               "priority": 2
+            },
+            {
+              "kind": "investment",
+              "stage": "봉건",
+              "title": "15분까지 주민 생산 요청 비교",
+              "evidence": "나 39 · 상대 44 · 5 차이.",
+              "action": "주민 대신 병력을 준비한 건지, 생산 요청이 취소됐거나 실행되지 않은 건지 살펴보세요.",
+              "priority": 3
             }
           ],
           "opponent_findings": [
@@ -78823,11 +78835,19 @@
               "evidence": "나 15:01 · 상대 12:46. 연구를 누른 시각이에요.",
               "action": "이 업그레이드가 필요한 병력으로 언제 싸웠는지 보세요. 연구가 끝나기 전에 교전했는지도 확인해 보세요.",
               "priority": 2
+            },
+            {
+              "kind": "investment",
+              "stage": "봉건",
+              "title": "15분까지 주민 생산 요청 비교",
+              "evidence": "나 44 · 상대 39 · 5 차이.",
+              "action": "주민 대신 병력을 준비한 건지, 생산 요청이 취소됐거나 실행되지 않은 건지 살펴보세요.",
+              "priority": 3
             }
           ],
           "personal_benchmarks": [],
           "practice": null,
-          "benchmark_basis": "same_map_civilization_first_military_order_prior_up_to_10_matches_min_3",
+          "benchmark_basis": "same_map_civilization_inferred_opening_prior_up_to_10_matches_min_3",
           "limits": [
             "주민·군사 수량은 생산 지시량. 실제 생산·생존 수가 아님.",
             "명령 간격은 TC 실제 유휴시간이 아님. 검증되지 않은 TC 유휴·교전 손실·글로벌 백분위·등급은 생성하지 않음."
@@ -147697,12 +147717,13 @@
           "TC 유휴시간, 교전 손실, 승패의 인과관계는 이 버전에서 계산하지 않습니다. 쌓아둔 자원 합과 오브젝트 수는 게임이 리플에 남긴 값(약 7~15초 간격)이며 유닛 종류별로 나뉘지 않습니다."
         ],
         "review": {
-          "revision": 1,
+          "revision": 2,
           "own": {
             "available": true,
-            "opening": "militia",
-            "opening_label": "민병대",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": "drush",
+            "opening_label": "드러시",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 207.4,
             "first_military_unit": "Militia",
             "after_feudal_first_military_seconds": null,
@@ -147808,7 +147829,8 @@
             "available": true,
             "opening": "archers",
             "opening_label": "궁사",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 647.99,
             "first_military_unit": "Archer",
             "after_feudal_first_military_seconds": 90.0,
@@ -148061,7 +148083,7 @@
             "evidence": "이번 14:20 → 연습 목표 14:00. 이번 기록에서 20초 줄여보는 연습 목표예요.",
             "action": "같은 맵과 빌드로 초반만 세 번 연습해 보세요. 주민 생산, 베틀, 건물 순서를 적어두면 어디서 늦어지는지 찾기 쉬워요."
           },
-          "benchmark_basis": "same_map_civilization_first_military_order_prior_up_to_10_matches_min_3",
+          "benchmark_basis": "same_map_civilization_inferred_opening_prior_up_to_10_matches_min_3",
           "limits": [
             "주민·군사 수량은 생산 지시량. 실제 생산·생존 수가 아님.",
             "명령 간격은 TC 실제 유휴시간이 아님. 검증되지 않은 TC 유휴·교전 손실·글로벌 백분위·등급은 생성하지 않음."
@@ -200932,12 +200954,13 @@
           "TC 유휴시간, 교전 손실, 승패의 인과관계는 이 버전에서 계산하지 않습니다. 쌓아둔 자원 합과 오브젝트 수는 게임이 리플에 남긴 값(약 7~15초 간격)이며 유닛 종류별로 나뉘지 않습니다."
         ],
         "review": {
-          "revision": 1,
+          "revision": 2,
           "own": {
             "available": true,
-            "opening": "militia",
-            "opening_label": "민병대",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": "maa",
+            "opening_label": "무장병사",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 463.28,
             "first_military_unit": "Militia",
             "after_feudal_first_military_seconds": null,
@@ -201041,9 +201064,10 @@
           },
           "opponent": {
             "available": true,
-            "opening": "spears",
-            "opening_label": "창병",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": "castle_then_archers",
+            "opening_label": "성주 → 궁사",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 536.2,
             "first_military_unit": "Spearman",
             "after_feudal_first_military_seconds": 5.2,
@@ -201286,7 +201310,7 @@
             "evidence": "이번 9:17 → 연습 목표 8:57. 이번 기록에서 20초 줄여보는 연습 목표예요.",
             "action": "같은 맵과 빌드로 초반만 세 번 연습해 보세요. 주민 생산, 베틀, 건물 순서를 적어두면 어디서 늦어지는지 찾기 쉬워요."
           },
-          "benchmark_basis": "same_map_civilization_first_military_order_prior_up_to_10_matches_min_3",
+          "benchmark_basis": "same_map_civilization_inferred_opening_prior_up_to_10_matches_min_3",
           "limits": [
             "주민·군사 수량은 생산 지시량. 실제 생산·생존 수가 아님.",
             "명령 간격은 TC 실제 유휴시간이 아님. 검증되지 않은 TC 유휴·교전 손실·글로벌 백분위·등급은 생성하지 않음."
@@ -269397,12 +269421,13 @@
           "TC 유휴시간, 교전 손실, 승패의 인과관계는 이 버전에서 계산하지 않습니다. 쌓아둔 자원 합과 오브젝트 수는 게임이 리플에 남긴 값(약 7~15초 간격)이며 유닛 종류별로 나뉘지 않습니다."
         ],
         "review": {
-          "revision": 1,
+          "revision": 2,
           "own": {
             "available": true,
             "opening": "scouts",
-            "opening_label": "정찰 기병",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening_label": "스카웃",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 770.13,
             "first_military_unit": "Scout Cavalry",
             "after_feudal_first_military_seconds": 87.15,
@@ -269558,8 +269583,9 @@
           "opponent": {
             "available": true,
             "opening": "scouts",
-            "opening_label": "정찰 기병",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening_label": "스카웃",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 553.2,
             "first_military_unit": "Scout Cavalry",
             "after_feudal_first_military_seconds": 43.81,
@@ -269852,7 +269878,7 @@
             "evidence": "이번 11:22 → 연습 목표 11:02. 이번 기록에서 20초 줄여보는 연습 목표예요.",
             "action": "같은 맵과 빌드로 초반만 세 번 연습해 보세요. 주민 생산, 베틀, 건물 순서를 적어두면 어디서 늦어지는지 찾기 쉬워요."
           },
-          "benchmark_basis": "same_map_civilization_first_military_order_prior_up_to_10_matches_min_3",
+          "benchmark_basis": "same_map_civilization_inferred_opening_prior_up_to_10_matches_min_3",
           "limits": [
             "주민·군사 수량은 생산 지시량. 실제 생산·생존 수가 아님.",
             "명령 간격은 TC 실제 유휴시간이 아님. 검증되지 않은 TC 유휴·교전 손실·글로벌 백분위·등급은 생성하지 않음."
@@ -325106,12 +325132,13 @@
           "TC 유휴시간, 교전 손실, 승패의 인과관계는 이 버전에서 계산하지 않습니다. 쌓아둔 자원 합과 오브젝트 수는 게임이 리플에 남긴 값(약 7~15초 간격)이며 유닛 종류별로 나뉘지 않습니다."
         ],
         "review": {
-          "revision": 1,
+          "revision": 2,
           "own": {
             "available": true,
-            "opening": "militia",
-            "opening_label": "민병대",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": "maa_then_archers",
+            "opening_label": "무장병사 → 궁사",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 386.02,
             "first_military_unit": "Militia",
             "after_feudal_first_military_seconds": null,
@@ -325223,8 +325250,9 @@
           "opponent": {
             "available": true,
             "opening": "scouts",
-            "opening_label": "정찰 기병",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening_label": "스카웃",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 478.45,
             "first_military_unit": "Scout Cavalry",
             "after_feudal_first_military_seconds": 45.91,
@@ -325433,7 +325461,7 @@
             "evidence": "이번 8:27 → 연습 목표 8:07. 이번 기록에서 20초 줄여보는 연습 목표예요.",
             "action": "같은 맵과 빌드로 초반만 세 번 연습해 보세요. 주민 생산, 베틀, 건물 순서를 적어두면 어디서 늦어지는지 찾기 쉬워요."
           },
-          "benchmark_basis": "same_map_civilization_first_military_order_prior_up_to_10_matches_min_3",
+          "benchmark_basis": "same_map_civilization_inferred_opening_prior_up_to_10_matches_min_3",
           "limits": [
             "주민·군사 수량은 생산 지시량. 실제 생산·생존 수가 아님.",
             "명령 간격은 TC 실제 유휴시간이 아님. 검증되지 않은 TC 유휴·교전 손실·글로벌 백분위·등급은 생성하지 않음."
@@ -387439,12 +387467,13 @@
           "TC 유휴시간, 교전 손실, 승패의 인과관계는 이 버전에서 계산하지 않습니다. 쌓아둔 자원 합과 오브젝트 수는 게임이 리플에 남긴 값(약 7~15초 간격)이며 유닛 종류별로 나뉘지 않습니다."
         ],
         "review": {
-          "revision": 1,
+          "revision": 2,
           "own": {
             "available": true,
             "opening": "scouts",
-            "opening_label": "정찰 기병",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening_label": "스카웃",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 552.49,
             "first_military_unit": "Scout Cavalry",
             "after_feudal_first_military_seconds": 46.78,
@@ -387556,8 +387585,9 @@
           "opponent": {
             "available": true,
             "opening": "scouts",
-            "opening_label": "정찰 기병",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening_label": "스카웃",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 572.6,
             "first_military_unit": "Scout Cavalry",
             "after_feudal_first_military_seconds": 42.08,
@@ -387761,7 +387791,7 @@
           ],
           "personal_benchmarks": [],
           "practice": null,
-          "benchmark_basis": "same_map_civilization_first_military_order_prior_up_to_10_matches_min_3",
+          "benchmark_basis": "same_map_civilization_inferred_opening_prior_up_to_10_matches_min_3",
           "limits": [
             "주민·군사 수량은 생산 지시량. 실제 생산·생존 수가 아님.",
             "명령 간격은 TC 실제 유휴시간이 아님. 검증되지 않은 TC 유휴·교전 손실·글로벌 백분위·등급은 생성하지 않음."
@@ -419899,12 +419929,13 @@
           "TC 유휴시간, 교전 손실, 승패의 인과관계는 이 버전에서 계산하지 않습니다. 쌓아둔 자원 합과 오브젝트 수는 게임이 리플에 남긴 값(약 7~15초 간격)이며 유닛 종류별로 나뉘지 않습니다."
         ],
         "review": {
-          "revision": 1,
+          "revision": 2,
           "own": {
             "available": true,
             "opening": "scouts",
-            "opening_label": "정찰 기병",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening_label": "스카웃",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 579.05,
             "first_military_unit": "Scout Cavalry",
             "after_feudal_first_military_seconds": 47.87,
@@ -419984,9 +420015,10 @@
           },
           "opponent": {
             "available": true,
-            "opening": "militia",
-            "opening_label": "민병대",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": "maa_then_archers",
+            "opening_label": "무장병사 → 궁사",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 411.67,
             "first_military_unit": "Militia",
             "after_feudal_first_military_seconds": null,
@@ -420072,7 +420104,7 @@
           ],
           "personal_benchmarks": [],
           "practice": null,
-          "benchmark_basis": "same_map_civilization_first_military_order_prior_up_to_10_matches_min_3",
+          "benchmark_basis": "same_map_civilization_inferred_opening_prior_up_to_10_matches_min_3",
           "limits": [
             "주민·군사 수량은 생산 지시량. 실제 생산·생존 수가 아님.",
             "명령 간격은 TC 실제 유휴시간이 아님. 검증되지 않은 TC 유휴·교전 손실·글로벌 백분위·등급은 생성하지 않음."
@@ -464139,12 +464171,13 @@
           "TC 유휴시간, 교전 손실, 승패의 인과관계는 이 버전에서 계산하지 않습니다. 쌓아둔 자원 합과 오브젝트 수는 게임이 리플에 남긴 값(약 7~15초 간격)이며 유닛 종류별로 나뉘지 않습니다."
         ],
         "review": {
-          "revision": 1,
+          "revision": 2,
           "own": {
             "available": true,
-            "opening": "militia",
-            "opening_label": "민병대",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": "maa",
+            "opening_label": "무장병사",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 409.8,
             "first_military_unit": "Militia",
             "after_feudal_first_military_seconds": null,
@@ -464232,8 +464265,9 @@
           "opponent": {
             "available": true,
             "opening": "scouts",
-            "opening_label": "정찰 기병",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening_label": "스카웃",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 581.63,
             "first_military_unit": "Scout Cavalry",
             "after_feudal_first_military_seconds": 51.11,
@@ -464387,7 +464421,7 @@
           ],
           "personal_benchmarks": [],
           "practice": null,
-          "benchmark_basis": "same_map_civilization_first_military_order_prior_up_to_10_matches_min_3",
+          "benchmark_basis": "same_map_civilization_inferred_opening_prior_up_to_10_matches_min_3",
           "limits": [
             "주민·군사 수량은 생산 지시량. 실제 생산·생존 수가 아님.",
             "명령 간격은 TC 실제 유휴시간이 아님. 검증되지 않은 TC 유휴·교전 손실·글로벌 백분위·등급은 생성하지 않음."
@@ -497191,12 +497225,13 @@
           "TC 유휴시간, 교전 손실, 승패의 인과관계는 이 버전에서 계산하지 않습니다. 쌓아둔 자원 합과 오브젝트 수는 게임이 리플에 남긴 값(약 7~15초 간격)이며 유닛 종류별로 나뉘지 않습니다."
         ],
         "review": {
-          "revision": 1,
+          "revision": 2,
           "own": {
             "available": true,
-            "opening": "unit:Champi Scout",
-            "opening_label": "Champi Scout",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": "archers",
+            "opening_label": "궁사",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 427.06,
             "first_military_unit": "Champi Scout",
             "after_feudal_first_military_seconds": null,
@@ -497276,9 +497311,10 @@
           },
           "opponent": {
             "available": true,
-            "opening": "spears",
-            "opening_label": "창병",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": "scouts_then_archers",
+            "opening_label": "스카웃 → 궁사",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 540.61,
             "first_military_unit": "Spearman",
             "after_feudal_first_military_seconds": 9.79,
@@ -497409,7 +497445,7 @@
             "evidence": "이번 9:15 → 연습 목표 8:55. 이번 기록에서 20초 줄여보는 연습 목표예요.",
             "action": "같은 맵과 빌드로 초반만 세 번 연습해 보세요. 주민 생산, 베틀, 건물 순서를 적어두면 어디서 늦어지는지 찾기 쉬워요."
           },
-          "benchmark_basis": "same_map_civilization_first_military_order_prior_up_to_10_matches_min_3",
+          "benchmark_basis": "same_map_civilization_inferred_opening_prior_up_to_10_matches_min_3",
           "limits": [
             "주민·군사 수량은 생산 지시량. 실제 생산·생존 수가 아님.",
             "명령 간격은 TC 실제 유휴시간이 아님. 검증되지 않은 TC 유휴·교전 손실·글로벌 백분위·등급은 생성하지 않음."
@@ -553246,12 +553282,13 @@
           "TC 유휴시간, 교전 손실, 승패의 인과관계는 이 버전에서 계산하지 않습니다. 쌓아둔 자원 합과 오브젝트 수는 게임이 리플에 남긴 값(약 7~15초 간격)이며 유닛 종류별로 나뉘지 않습니다."
         ],
         "review": {
-          "revision": 1,
+          "revision": 2,
           "own": {
             "available": true,
             "opening": "scouts",
-            "opening_label": "정찰 기병",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening_label": "스카웃",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 563.97,
             "first_military_unit": "Scout Cavalry",
             "after_feudal_first_military_seconds": 58.23,
@@ -553353,9 +553390,10 @@
           },
           "opponent": {
             "available": true,
-            "opening": "militia",
-            "opening_label": "민병대",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": "maa",
+            "opening_label": "무장병사",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 450.63,
             "first_military_unit": "Militia",
             "after_feudal_first_military_seconds": null,
@@ -553558,7 +553596,7 @@
           ],
           "personal_benchmarks": [],
           "practice": null,
-          "benchmark_basis": "same_map_civilization_first_military_order_prior_up_to_10_matches_min_3",
+          "benchmark_basis": "same_map_civilization_inferred_opening_prior_up_to_10_matches_min_3",
           "limits": [
             "주민·군사 수량은 생산 지시량. 실제 생산·생존 수가 아님.",
             "명령 간격은 TC 실제 유휴시간이 아님. 검증되지 않은 TC 유휴·교전 손실·글로벌 백분위·등급은 생성하지 않음."
@@ -613214,12 +613252,13 @@
           "TC 유휴시간, 교전 손실, 승패의 인과관계는 이 버전에서 계산하지 않습니다. 쌓아둔 자원 합과 오브젝트 수는 게임이 리플에 남긴 값(약 7~15초 간격)이며 유닛 종류별로 나뉘지 않습니다."
         ],
         "review": {
-          "revision": 1,
+          "revision": 2,
           "own": {
             "available": true,
-            "opening": "militia",
-            "opening_label": "민병대",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": "maa_then_archers",
+            "opening_label": "무장병사 → 궁사",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 466.26,
             "first_military_unit": "Militia",
             "after_feudal_first_military_seconds": null,
@@ -613321,9 +613360,10 @@
           },
           "opponent": {
             "available": true,
-            "opening": "scouts",
-            "opening_label": "정찰 기병",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": "scouts_then_archers",
+            "opening_label": "스카웃 → 궁사",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 561.94,
             "first_military_unit": "Scout Cavalry",
             "after_feudal_first_military_seconds": 54.04,
@@ -613536,7 +613576,7 @@
             "evidence": "이번 8:53 → 연습 목표 8:33. 이번 기록에서 20초 줄여보는 연습 목표예요.",
             "action": "같은 맵과 빌드로 초반만 세 번 연습해 보세요. 주민 생산, 베틀, 건물 순서를 적어두면 어디서 늦어지는지 찾기 쉬워요."
           },
-          "benchmark_basis": "same_map_civilization_first_military_order_prior_up_to_10_matches_min_3",
+          "benchmark_basis": "same_map_civilization_inferred_opening_prior_up_to_10_matches_min_3",
           "limits": [
             "주민·군사 수량은 생산 지시량. 실제 생산·생존 수가 아님.",
             "명령 간격은 TC 실제 유휴시간이 아님. 검증되지 않은 TC 유휴·교전 손실·글로벌 백분위·등급은 생성하지 않음."
@@ -688072,12 +688112,13 @@
           "TC 유휴시간, 교전 손실, 승패의 인과관계는 이 버전에서 계산하지 않습니다. 쌓아둔 자원 합과 오브젝트 수는 게임이 리플에 남긴 값(약 7~15초 간격)이며 유닛 종류별로 나뉘지 않습니다."
         ],
         "review": {
-          "revision": 1,
+          "revision": 2,
           "own": {
             "available": true,
             "opening": "scouts",
-            "opening_label": "정찰 기병",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening_label": "스카웃",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 498.97,
             "first_military_unit": "Scout Cavalry",
             "after_feudal_first_military_seconds": 40.84,
@@ -688202,9 +688243,10 @@
           },
           "opponent": {
             "available": true,
-            "opening": "militia",
-            "opening_label": "민병대",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": "maa_then_archers",
+            "opening_label": "무장병사 → 궁사",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 423.01,
             "first_military_unit": "Militia",
             "after_feudal_first_military_seconds": null,
@@ -688423,7 +688465,7 @@
           ],
           "personal_benchmarks": [],
           "practice": null,
-          "benchmark_basis": "same_map_civilization_first_military_order_prior_up_to_10_matches_min_3",
+          "benchmark_basis": "same_map_civilization_inferred_opening_prior_up_to_10_matches_min_3",
           "limits": [
             "주민·군사 수량은 생산 지시량. 실제 생산·생존 수가 아님.",
             "명령 간격은 TC 실제 유휴시간이 아님. 검증되지 않은 TC 유휴·교전 손실·글로벌 백분위·등급은 생성하지 않음."
@@ -750952,12 +750994,13 @@
           "TC 유휴시간, 교전 손실, 승패의 인과관계는 이 버전에서 계산하지 않습니다. 쌓아둔 자원 합과 오브젝트 수는 게임이 리플에 남긴 값(약 7~15초 간격)이며 유닛 종류별로 나뉘지 않습니다."
         ],
         "review": {
-          "revision": 1,
+          "revision": 2,
           "own": {
             "available": true,
-            "opening": "unit:Mangonel",
-            "opening_label": "Mangonel",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": null,
+            "opening_label": null,
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 913.34,
             "first_military_unit": "Mangonel",
             "after_feudal_first_military_seconds": 257.46,
@@ -751098,9 +751141,10 @@
           },
           "opponent": {
             "available": true,
-            "opening": "scouts",
-            "opening_label": "정찰 기병",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": null,
+            "opening_label": null,
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 1035.22,
             "first_military_unit": "Scout Cavalry",
             "after_feudal_first_military_seconds": 554.67,
@@ -751364,7 +751408,7 @@
             "evidence": "이번 10:55 → 연습 목표 10:35. 이번 기록에서 20초 줄여보는 연습 목표예요.",
             "action": "같은 맵과 빌드로 초반만 세 번 연습해 보세요. 주민 생산, 베틀, 건물 순서를 적어두면 어디서 늦어지는지 찾기 쉬워요."
           },
-          "benchmark_basis": "same_map_civilization_first_military_order_prior_up_to_10_matches_min_3",
+          "benchmark_basis": "same_map_civilization_inferred_opening_prior_up_to_10_matches_min_3",
           "limits": [
             "주민·군사 수량은 생산 지시량. 실제 생산·생존 수가 아님.",
             "명령 간격은 TC 실제 유휴시간이 아님. 검증되지 않은 TC 유휴·교전 손실·글로벌 백분위·등급은 생성하지 않음."
@@ -798925,12 +798969,13 @@
           "TC 유휴시간, 교전 손실, 승패의 인과관계는 이 버전에서 계산하지 않습니다. 쌓아둔 자원 합과 오브젝트 수는 게임이 리플에 남긴 값(약 7~15초 간격)이며 유닛 종류별로 나뉘지 않습니다."
         ],
         "review": {
-          "revision": 1,
+          "revision": 2,
           "own": {
             "available": true,
             "opening": "eagles",
-            "opening_label": "독수리 정찰병",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening_label": "독수리 전사",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 559.52,
             "first_military_unit": "Eagle Scout",
             "after_feudal_first_military_seconds": 3.95,
@@ -799037,8 +799082,9 @@
           "opponent": {
             "available": true,
             "opening": "scouts",
-            "opening_label": "정찰 기병",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening_label": "스카웃",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 585.72,
             "first_military_unit": "Scout Cavalry",
             "after_feudal_first_military_seconds": 75.57,
@@ -799251,7 +799297,7 @@
             "evidence": "이번 9:15 → 연습 목표 8:55. 이번 기록에서 20초 줄여보는 연습 목표예요.",
             "action": "같은 맵과 빌드로 초반만 세 번 연습해 보세요. 주민 생산, 베틀, 건물 순서를 적어두면 어디서 늦어지는지 찾기 쉬워요."
           },
-          "benchmark_basis": "same_map_civilization_first_military_order_prior_up_to_10_matches_min_3",
+          "benchmark_basis": "same_map_civilization_inferred_opening_prior_up_to_10_matches_min_3",
           "limits": [
             "주민·군사 수량은 생산 지시량. 실제 생산·생존 수가 아님.",
             "명령 간격은 TC 실제 유휴시간이 아님. 검증되지 않은 TC 유휴·교전 손실·글로벌 백분위·등급은 생성하지 않음."
@@ -859205,12 +859251,13 @@
           "TC 유휴시간, 교전 손실, 승패의 인과관계는 이 버전에서 계산하지 않습니다. 쌓아둔 자원 합과 오브젝트 수는 게임이 리플에 남긴 값(약 7~15초 간격)이며 유닛 종류별로 나뉘지 않습니다."
         ],
         "review": {
-          "revision": 1,
+          "revision": 2,
           "own": {
             "available": true,
-            "opening": "militia",
-            "opening_label": "민병대",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": "maa",
+            "opening_label": "무장병사",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 466.87,
             "first_military_unit": "Militia",
             "after_feudal_first_military_seconds": null,
@@ -859314,9 +859361,10 @@
           },
           "opponent": {
             "available": true,
-            "opening": "militia",
-            "opening_label": "민병대",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": "maa_then_archers",
+            "opening_label": "무장병사 → 궁사",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 394.36,
             "first_military_unit": "Militia",
             "after_feudal_first_military_seconds": null,
@@ -859475,14 +859523,6 @@
             },
             {
               "kind": "investment",
-              "stage": "봉건",
-              "title": "15분까지 주민 생산 요청 비교",
-              "evidence": "나 34 · 상대 29 · 5 차이.",
-              "action": "주민 대신 병력을 준비한 건지, 생산 요청이 취소됐거나 실행되지 않은 건지 살펴보세요.",
-              "priority": 3
-            },
-            {
-              "kind": "investment",
               "stage": "성주",
               "title": "성주 때 병력 생산 요청 비교",
               "evidence": "나 47 (22:16–46:52) · 상대 204 (22:46–46:52). 각자 성주가 된 뒤의 기록이라 집계 구간은 달라요.",
@@ -859541,14 +859581,6 @@
             },
             {
               "kind": "investment",
-              "stage": "봉건",
-              "title": "15분까지 주민 생산 요청 비교",
-              "evidence": "나 29 · 상대 34 · 5 차이.",
-              "action": "주민 대신 병력을 준비한 건지, 생산 요청이 취소됐거나 실행되지 않은 건지 살펴보세요.",
-              "priority": 3
-            },
-            {
-              "kind": "investment",
               "stage": "성주",
               "title": "성주 때 병력 생산 요청 비교",
               "evidence": "나 204 (22:46–46:52) · 상대 47 (22:16–46:52). 각자 성주가 된 뒤의 기록이라 집계 구간은 달라요.",
@@ -859564,7 +859596,7 @@
             "evidence": "이번 9:20 → 연습 목표 9:00. 이번 기록에서 20초 줄여보는 연습 목표예요.",
             "action": "같은 맵과 빌드로 초반만 세 번 연습해 보세요. 주민 생산, 베틀, 건물 순서를 적어두면 어디서 늦어지는지 찾기 쉬워요."
           },
-          "benchmark_basis": "same_map_civilization_first_military_order_prior_up_to_10_matches_min_3",
+          "benchmark_basis": "same_map_civilization_inferred_opening_prior_up_to_10_matches_min_3",
           "limits": [
             "주민·군사 수량은 생산 지시량. 실제 생산·생존 수가 아님.",
             "명령 간격은 TC 실제 유휴시간이 아님. 검증되지 않은 TC 유휴·교전 손실·글로벌 백분위·등급은 생성하지 않음."
@@ -927916,12 +927948,13 @@
           "TC 유휴시간, 실시간 보유 자원, 교전 손실, 승패의 인과관계는 이 버전에서 계산하지 않습니다."
         ],
         "review": {
-          "revision": 1,
+          "revision": 2,
           "own": {
             "available": true,
             "opening": "skirmishers",
-            "opening_label": "척후병",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening_label": "척후병 중심",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 661.06,
             "first_military_unit": "Skirmisher",
             "after_feudal_first_military_seconds": 120.39,
@@ -928048,9 +928081,10 @@
           },
           "opponent": {
             "available": true,
-            "opening": "spears",
-            "opening_label": "창병",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": "archers",
+            "opening_label": "궁사",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 505.06,
             "first_military_unit": "Spearman",
             "after_feudal_first_military_seconds": 20.94,
@@ -928359,7 +928393,7 @@
             "evidence": "이번 9:00 → 연습 목표 8:40. 이번 기록에서 20초 줄여보는 연습 목표예요.",
             "action": "같은 맵과 빌드로 초반만 세 번 연습해 보세요. 주민 생산, 베틀, 건물 순서를 적어두면 어디서 늦어지는지 찾기 쉬워요."
           },
-          "benchmark_basis": "same_map_civilization_first_military_order_prior_up_to_10_matches_min_3",
+          "benchmark_basis": "same_map_civilization_inferred_opening_prior_up_to_10_matches_min_3",
           "limits": [
             "주민·군사 수량은 생산 지시량. 실제 생산·생존 수가 아님.",
             "명령 간격은 TC 실제 유휴시간이 아님. 검증되지 않은 TC 유휴·교전 손실·글로벌 백분위·등급은 생성하지 않음."
@@ -979235,12 +979269,13 @@
           "TC 유휴시간, 실시간 보유 자원, 교전 손실, 승패의 인과관계는 이 버전에서 계산하지 않습니다."
         ],
         "review": {
-          "revision": 1,
+          "revision": 2,
           "own": {
             "available": true,
             "opening": "scouts",
-            "opening_label": "정찰 기병",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening_label": "스카웃",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 607.02,
             "first_military_unit": "Scout Cavalry",
             "after_feudal_first_military_seconds": 76.2,
@@ -979365,9 +979400,10 @@
           },
           "opponent": {
             "available": true,
-            "opening": "militia",
-            "opening_label": "민병대",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": "maa_then_archers",
+            "opening_label": "무장병사 → 궁사",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 411.62,
             "first_military_unit": "Militia",
             "after_feudal_first_military_seconds": null,
@@ -979538,7 +979574,7 @@
           ],
           "personal_benchmarks": [],
           "practice": null,
-          "benchmark_basis": "same_map_civilization_first_military_order_prior_up_to_10_matches_min_3",
+          "benchmark_basis": "same_map_civilization_inferred_opening_prior_up_to_10_matches_min_3",
           "limits": [
             "주민·군사 수량은 생산 지시량. 실제 생산·생존 수가 아님.",
             "명령 간격은 TC 실제 유휴시간이 아님. 검증되지 않은 TC 유휴·교전 손실·글로벌 백분위·등급은 생성하지 않음."
@@ -1025671,12 +1025707,13 @@
           "TC 유휴시간, 실시간 보유 자원, 교전 손실, 승패의 인과관계는 이 버전에서 계산하지 않습니다."
         ],
         "review": {
-          "revision": 1,
+          "revision": 2,
           "own": {
             "available": true,
-            "opening": "spears",
-            "opening_label": "창병",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": "scouts",
+            "opening_label": "스카웃",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 568.87,
             "first_military_unit": "Spearman",
             "after_feudal_first_military_seconds": 33.23,
@@ -1025782,9 +1025819,10 @@
           },
           "opponent": {
             "available": true,
-            "opening": "spears",
-            "opening_label": "창병",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": "archers",
+            "opening_label": "궁사",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 509.35,
             "first_military_unit": "Spearman",
             "after_feudal_first_military_seconds": 3.68,
@@ -1025917,14 +1025955,6 @@
             },
             {
               "kind": "investment",
-              "stage": "봉건",
-              "title": "15분까지 주민 생산 요청 비교",
-              "evidence": "나 39 · 상대 45 · 6 차이.",
-              "action": "주민 대신 병력을 준비한 건지, 생산 요청이 취소됐거나 실행되지 않은 건지 살펴보세요.",
-              "priority": 3
-            },
-            {
-              "kind": "investment",
               "stage": "성주",
               "title": "성주 때 병력 생산 요청 비교",
               "evidence": "나 26 (19:57–29:42) · 상대 44 (20:49–29:42). 각자 성주가 된 뒤의 기록이라 집계 구간은 달라요.",
@@ -1025975,14 +1026005,6 @@
             },
             {
               "kind": "investment",
-              "stage": "봉건",
-              "title": "15분까지 주민 생산 요청 비교",
-              "evidence": "나 45 · 상대 39 · 6 차이.",
-              "action": "주민 대신 병력을 준비한 건지, 생산 요청이 취소됐거나 실행되지 않은 건지 살펴보세요.",
-              "priority": 3
-            },
-            {
-              "kind": "investment",
               "stage": "성주",
               "title": "성주 때 병력 생산 요청 비교",
               "evidence": "나 44 (20:49–29:42) · 상대 26 (19:57–29:42). 각자 성주가 된 뒤의 기록이라 집계 구간은 달라요.",
@@ -1025998,7 +1026020,7 @@
             "evidence": "이번 8:55 → 연습 목표 8:35. 이번 기록에서 20초 줄여보는 연습 목표예요.",
             "action": "같은 맵과 빌드로 초반만 세 번 연습해 보세요. 주민 생산, 베틀, 건물 순서를 적어두면 어디서 늦어지는지 찾기 쉬워요."
           },
-          "benchmark_basis": "same_map_civilization_first_military_order_prior_up_to_10_matches_min_3",
+          "benchmark_basis": "same_map_civilization_inferred_opening_prior_up_to_10_matches_min_3",
           "limits": [
             "주민·군사 수량은 생산 지시량. 실제 생산·생존 수가 아님.",
             "명령 간격은 TC 실제 유휴시간이 아님. 검증되지 않은 TC 유휴·교전 손실·글로벌 백분위·등급은 생성하지 않음."
@@ -1101399,12 +1101421,13 @@
           "TC 유휴시간, 실시간 보유 자원, 교전 손실, 승패의 인과관계는 이 버전에서 계산하지 않습니다."
         ],
         "review": {
-          "revision": 1,
+          "revision": 2,
           "own": {
             "available": true,
-            "opening": "skirmishers",
-            "opening_label": "척후병",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": "castle_then_archers",
+            "opening_label": "성주 → 궁사",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 610.78,
             "first_military_unit": "Skirmisher",
             "after_feudal_first_military_seconds": 67.86,
@@ -1101538,9 +1101561,10 @@
           },
           "opponent": {
             "available": true,
-            "opening": "militia",
-            "opening_label": "민병대",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": "maa_then_archers",
+            "opening_label": "무장병사 → 궁사",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 410.9,
             "first_military_unit": "Militia",
             "after_feudal_first_military_seconds": null,
@@ -1101767,7 +1101791,7 @@
           ],
           "personal_benchmarks": [],
           "practice": null,
-          "benchmark_basis": "same_map_civilization_first_military_order_prior_up_to_10_matches_min_3",
+          "benchmark_basis": "same_map_civilization_inferred_opening_prior_up_to_10_matches_min_3",
           "limits": [
             "주민·군사 수량은 생산 지시량. 실제 생산·생존 수가 아님.",
             "명령 간격은 TC 실제 유휴시간이 아님. 검증되지 않은 TC 유휴·교전 손실·글로벌 백분위·등급은 생성하지 않음."
@@ -1164183,12 +1164207,13 @@
           "TC 유휴시간, 실시간 보유 자원, 교전 손실, 승패의 인과관계는 이 버전에서 계산하지 않습니다."
         ],
         "review": {
-          "revision": 1,
+          "revision": 2,
           "own": {
             "available": true,
-            "opening": "militia",
-            "opening_label": "민병대",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": "archers",
+            "opening_label": "궁사",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 607.24,
             "first_military_unit": "Militia",
             "after_feudal_first_military_seconds": 22.73,
@@ -1164329,9 +1164354,10 @@
           },
           "opponent": {
             "available": true,
-            "opening": "militia",
-            "opening_label": "민병대",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": "maa",
+            "opening_label": "무장병사",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 428.49,
             "first_military_unit": "Militia",
             "after_feudal_first_military_seconds": null,
@@ -1164525,7 +1164551,7 @@
             "evidence": "이번 9:44 → 연습 목표 9:24. 이번 기록에서 20초 줄여보는 연습 목표예요.",
             "action": "같은 맵과 빌드로 초반만 세 번 연습해 보세요. 주민 생산, 베틀, 건물 순서를 적어두면 어디서 늦어지는지 찾기 쉬워요."
           },
-          "benchmark_basis": "same_map_civilization_first_military_order_prior_up_to_10_matches_min_3",
+          "benchmark_basis": "same_map_civilization_inferred_opening_prior_up_to_10_matches_min_3",
           "limits": [
             "주민·군사 수량은 생산 지시량. 실제 생산·생존 수가 아님.",
             "명령 간격은 TC 실제 유휴시간이 아님. 검증되지 않은 TC 유휴·교전 손실·글로벌 백분위·등급은 생성하지 않음."
@@ -1233924,12 +1233950,13 @@
           "TC 유휴시간, 실시간 보유 자원, 교전 손실, 승패의 인과관계는 이 버전에서 계산하지 않습니다."
         ],
         "review": {
-          "revision": 1,
+          "revision": 2,
           "own": {
             "available": true,
-            "opening": "archers",
-            "opening_label": "궁사",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": "archers_then_scouts",
+            "opening_label": "궁사 → 스카웃",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 642.77,
             "first_military_unit": "Archer",
             "after_feudal_first_military_seconds": 85.6,
@@ -1234042,9 +1234069,10 @@
           },
           "opponent": {
             "available": true,
-            "opening": "militia",
-            "opening_label": "민병대",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": "maa",
+            "opening_label": "무장병사",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 415.08,
             "first_military_unit": "Militia",
             "after_feudal_first_military_seconds": null,
@@ -1234294,7 +1234322,7 @@
             "evidence": "이번 9:17 → 연습 목표 8:57. 이번 기록에서 20초 줄여보는 연습 목표예요.",
             "action": "같은 맵과 빌드로 초반만 세 번 연습해 보세요. 주민 생산, 베틀, 건물 순서를 적어두면 어디서 늦어지는지 찾기 쉬워요."
           },
-          "benchmark_basis": "same_map_civilization_first_military_order_prior_up_to_10_matches_min_3",
+          "benchmark_basis": "same_map_civilization_inferred_opening_prior_up_to_10_matches_min_3",
           "limits": [
             "주민·군사 수량은 생산 지시량. 실제 생산·생존 수가 아님.",
             "명령 간격은 TC 실제 유휴시간이 아님. 검증되지 않은 TC 유휴·교전 손실·글로벌 백분위·등급은 생성하지 않음."
@@ -1274852,12 +1274880,13 @@
           "TC 유휴시간, 실시간 보유 자원, 교전 손실, 승패의 인과관계는 이 버전에서 계산하지 않습니다."
         ],
         "review": {
-          "revision": 1,
+          "revision": 2,
           "own": {
             "available": true,
-            "opening": "militia",
-            "opening_label": "민병대",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": "maa_then_eagles",
+            "opening_label": "무장병사 → 독수리 전사",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 441.69,
             "first_military_unit": "Militia",
             "after_feudal_first_military_seconds": null,
@@ -1274925,7 +1274954,8 @@
             "available": true,
             "opening": "archers",
             "opening_label": "궁사",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 558.28,
             "first_military_unit": "Archer",
             "after_feudal_first_military_seconds": 46.12,
@@ -1275027,7 +1275057,7 @@
           ],
           "personal_benchmarks": [],
           "practice": null,
-          "benchmark_basis": "same_map_civilization_first_military_order_prior_up_to_10_matches_min_3",
+          "benchmark_basis": "same_map_civilization_inferred_opening_prior_up_to_10_matches_min_3",
           "limits": [
             "주민·군사 수량은 생산 지시량. 실제 생산·생존 수가 아님.",
             "명령 간격은 TC 실제 유휴시간이 아님. 검증되지 않은 TC 유휴·교전 손실·글로벌 백분위·등급은 생성하지 않음."
@@ -1300544,12 +1300574,13 @@
           "TC 유휴시간, 실시간 보유 자원, 교전 손실, 승패의 인과관계는 이 버전에서 계산하지 않습니다."
         ],
         "review": {
-          "revision": 1,
+          "revision": 2,
           "own": {
             "available": true,
-            "opening": "unit:Champi Scout",
-            "opening_label": "Champi Scout",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": null,
+            "opening_label": null,
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 436.61,
             "first_military_unit": "Champi Scout",
             "after_feudal_first_military_seconds": null,
@@ -1300610,9 +1300641,10 @@
           },
           "opponent": {
             "available": true,
-            "opening": "none",
-            "opening_label": "병력 생산 요청 없음",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": null,
+            "opening_label": null,
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": null,
             "first_military_unit": null,
             "after_feudal_first_military_seconds": null,
@@ -1300675,7 +1300707,7 @@
           ],
           "personal_benchmarks": [],
           "practice": null,
-          "benchmark_basis": "same_map_civilization_first_military_order_prior_up_to_10_matches_min_3",
+          "benchmark_basis": "same_map_civilization_inferred_opening_prior_up_to_10_matches_min_3",
           "limits": [
             "주민·군사 수량은 생산 지시량. 실제 생산·생존 수가 아님.",
             "명령 간격은 TC 실제 유휴시간이 아님. 검증되지 않은 TC 유휴·교전 손실·글로벌 백분위·등급은 생성하지 않음."
@@ -1333416,12 +1333448,13 @@
           "TC 유휴시간, 실시간 보유 자원, 교전 손실, 승패의 인과관계는 이 버전에서 계산하지 않습니다."
         ],
         "review": {
-          "revision": 1,
+          "revision": 2,
           "own": {
             "available": true,
-            "opening": "skirmishers",
-            "opening_label": "척후병",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": null,
+            "opening_label": null,
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 789.2,
             "first_military_unit": "Skirmisher",
             "after_feudal_first_military_seconds": 281.94,
@@ -1333494,9 +1333527,10 @@
           },
           "opponent": {
             "available": true,
-            "opening": "unit:Serjeant",
-            "opening_label": "Serjeant",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": "archers",
+            "opening_label": "궁사",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 530.63,
             "first_military_unit": "Serjeant",
             "after_feudal_first_military_seconds": 0.2,
@@ -1333630,7 +1333664,7 @@
           ],
           "personal_benchmarks": [],
           "practice": null,
-          "benchmark_basis": "same_map_civilization_first_military_order_prior_up_to_10_matches_min_3",
+          "benchmark_basis": "same_map_civilization_inferred_opening_prior_up_to_10_matches_min_3",
           "limits": [
             "주민·군사 수량은 생산 지시량. 실제 생산·생존 수가 아님.",
             "명령 간격은 TC 실제 유휴시간이 아님. 검증되지 않은 TC 유휴·교전 손실·글로벌 백분위·등급은 생성하지 않음."
@@ -1401320,12 +1401354,13 @@
           "TC 유휴시간, 실시간 보유 자원, 교전 손실, 승패의 인과관계는 이 버전에서 계산하지 않습니다."
         ],
         "review": {
-          "revision": 1,
+          "revision": 2,
           "own": {
             "available": true,
-            "opening": "militia",
-            "opening_label": "민병대",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": "drush",
+            "opening_label": "드러시",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 319.41,
             "first_military_unit": "Militia",
             "after_feudal_first_military_seconds": null,
@@ -1401480,9 +1401515,10 @@
           },
           "opponent": {
             "available": true,
-            "opening": "unit:Flemish Militia",
-            "opening_label": "Flemish Militia",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": "castle_then_knights",
+            "opening_label": "성주 → 기사",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 546.29,
             "first_military_unit": "Flemish Militia",
             "after_feudal_first_military_seconds": 15.75,
@@ -1401778,7 +1401814,7 @@
             "evidence": "이번 9:43 → 연습 목표 9:23. 이번 기록에서 20초 줄여보는 연습 목표예요.",
             "action": "같은 맵과 빌드로 초반만 세 번 연습해 보세요. 주민 생산, 베틀, 건물 순서를 적어두면 어디서 늦어지는지 찾기 쉬워요."
           },
-          "benchmark_basis": "same_map_civilization_first_military_order_prior_up_to_10_matches_min_3",
+          "benchmark_basis": "same_map_civilization_inferred_opening_prior_up_to_10_matches_min_3",
           "limits": [
             "주민·군사 수량은 생산 지시량. 실제 생산·생존 수가 아님.",
             "명령 간격은 TC 실제 유휴시간이 아님. 검증되지 않은 TC 유휴·교전 손실·글로벌 백분위·등급은 생성하지 않음."
@@ -1473203,12 +1473239,13 @@
           "TC 유휴시간, 실시간 보유 자원, 교전 손실, 승패의 인과관계는 이 버전에서 계산하지 않습니다."
         ],
         "review": {
-          "revision": 1,
+          "revision": 2,
           "own": {
             "available": true,
-            "opening": "spears",
-            "opening_label": "창병",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": "archers",
+            "opening_label": "궁사",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 532.5,
             "first_military_unit": "Spearman",
             "after_feudal_first_military_seconds": 1.86,
@@ -1473342,9 +1473379,10 @@
           },
           "opponent": {
             "available": true,
-            "opening": "militia",
-            "opening_label": "민병대",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": "maa_then_archers",
+            "opening_label": "무장병사 → 궁사",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 419.34,
             "first_military_unit": "Militia",
             "after_feudal_first_military_seconds": null,
@@ -1473600,7 +1473638,7 @@
           ],
           "personal_benchmarks": [],
           "practice": null,
-          "benchmark_basis": "same_map_civilization_first_military_order_prior_up_to_10_matches_min_3",
+          "benchmark_basis": "same_map_civilization_inferred_opening_prior_up_to_10_matches_min_3",
           "limits": [
             "주민·군사 수량은 생산 지시량. 실제 생산·생존 수가 아님.",
             "명령 간격은 TC 실제 유휴시간이 아님. 검증되지 않은 TC 유휴·교전 손실·글로벌 백분위·등급은 생성하지 않음."
@@ -1532457,12 +1532495,13 @@
           "TC 유휴시간, 실시간 보유 자원, 교전 손실, 승패의 인과관계는 이 버전에서 계산하지 않습니다."
         ],
         "review": {
-          "revision": 1,
+          "revision": 2,
           "own": {
             "available": true,
-            "opening": "militia",
-            "opening_label": "민병대",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": "maa",
+            "opening_label": "무장병사",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 429.3,
             "first_military_unit": "Militia",
             "after_feudal_first_military_seconds": null,
@@ -1532591,7 +1532630,8 @@
             "available": true,
             "opening": "archers",
             "opening_label": "궁사",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 558.69,
             "first_military_unit": "Archer",
             "after_feudal_first_military_seconds": 53.13,
@@ -1532817,7 +1532857,7 @@
             "evidence": "이번 9:15 → 연습 목표 8:55. 이번 기록에서 20초 줄여보는 연습 목표예요.",
             "action": "같은 맵과 빌드로 초반만 세 번 연습해 보세요. 주민 생산, 베틀, 건물 순서를 적어두면 어디서 늦어지는지 찾기 쉬워요."
           },
-          "benchmark_basis": "same_map_civilization_first_military_order_prior_up_to_10_matches_min_3",
+          "benchmark_basis": "same_map_civilization_inferred_opening_prior_up_to_10_matches_min_3",
           "limits": [
             "주민·군사 수량은 생산 지시량. 실제 생산·생존 수가 아님.",
             "명령 간격은 TC 실제 유휴시간이 아님. 검증되지 않은 TC 유휴·교전 손실·글로벌 백분위·등급은 생성하지 않음."
@@ -1548530,12 +1548570,13 @@
           "TC 유휴시간, 실시간 보유 자원, 교전 손실, 승패의 인과관계는 이 버전에서 계산하지 않습니다."
         ],
         "review": {
-          "revision": 1,
+          "revision": 2,
           "own": {
             "available": true,
             "opening": "scouts",
-            "opening_label": "정찰 기병",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening_label": "스카웃",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 581.63,
             "first_military_unit": "Scout Cavalry",
             "after_feudal_first_military_seconds": 51.11,
@@ -1548625,9 +1548666,10 @@
           },
           "opponent": {
             "available": true,
-            "opening": "spears",
-            "opening_label": "창병",
-            "opening_basis": "first_positive_military_queue_family_not_strategy_confirmation",
+            "opening": "scouts",
+            "opening_label": "스카웃",
+            "opening_revision": 2,
+            "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 568.44,
             "first_military_unit": "Spearman",
             "after_feudal_first_military_seconds": 35.36,
@@ -1548753,7 +1548795,7 @@
           ],
           "personal_benchmarks": [],
           "practice": null,
-          "benchmark_basis": "same_map_civilization_first_military_order_prior_up_to_10_matches_min_3",
+          "benchmark_basis": "same_map_civilization_inferred_opening_prior_up_to_10_matches_min_3",
           "limits": [
             "주민·군사 수량은 생산 지시량. 실제 생산·생존 수가 아님.",
             "명령 간격은 TC 실제 유휴시간이 아님. 검증되지 않은 TC 유휴·교전 손실·글로벌 백분위·등급은 생성하지 않음."
@@ -1549372,7 +1549414,7 @@
       ],
       "analysis_status": "unavailable",
       "analysis": null,
-      "attempts": 2,
+      "attempts": 3,
       "source_url": "https://www.aoe2insights.com/match/332632300/",
       "analysis_note": "공개 리플을 확보하지 못했습니다."
     },
@@ -1549403,7 +1549445,7 @@
       ],
       "analysis_status": "unavailable",
       "analysis": null,
-      "attempts": 2,
+      "attempts": 3,
       "source_url": "https://www.aoe2insights.com/match/329184689/",
       "analysis_note": "공개 리플을 확보하지 못했습니다."
     },
