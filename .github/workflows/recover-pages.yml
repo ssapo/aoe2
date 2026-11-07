@@ -28,7 +28,7 @@ jobs:
                 throw e;
               }
             }
-            if (!active.has(await status())) return;
+            if ((await status()) === 'missing') return;
             await github.request('POST /repos/{owner}/{repo}/pages/deployments/{deploymentId}/cancel', params);
             for (let n = 0; n < 20; n++) {
               if (!active.has(await status())) return;
