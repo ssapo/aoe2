@@ -55,6 +55,8 @@ jobs:
         timeout-minutes: 6
         continue-on-error: true
         run: python scripts/player_index.py
+      - name: Build ranked benchmarks
+        run: python scripts/ranked_benchmarks.py
       - name: Keep report history
         run: |
           git config user.name 'github-actions[bot]'

@@ -4,6 +4,20 @@
   const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const repo = 'ssapo/aoe2';
   let report = {profile:null, matches:[]}, filter = 'all', visible = 12;
+  let rankedData=null,rankedLoad=null,rankedLoadedAt=0;
+  async function loadRankedBenchmarks(){
+    if(rankedLoad)return rankedLoad;
+    if(Date.now()-rankedLoadedAt<120000)return rankedData;
+    rankedLoad=(async()=>{
+      try{
+        const response=await fetch('data/ranked-benchmarks.json',{cache:'no-store',signal:AbortSignal.timeout(5000)});
+        if(response.ok){const data=await response.json();if(data.schema_version===1&&Array.isArray(data.samples))rankedData=data;}
+      }catch{}
+      finally{rankedLoadedAt=Date.now();rankedLoad=null;}
+      return rankedData;
+    })();
+    return rankedLoad;
+  }
   let toastTimer;
   let selectedProfile=window.SSAPOPlayers.profileId(new URL(location.href).searchParams.get('profile'))||26260702;
   let selectedName=selectedProfile===26260702?'ssapo':selectedProfile===199325?'Hera':`프로필 ${selectedProfile}`;
@@ -46,15 +60,17 @@
     const delta=Number.isFinite(a)&&Number.isFinite(b)?Math.floor(a)-Math.floor(b):null;
     return {a,b,reached,delta,text:delta===null?'비교 기록 부족':delta===0?'같은 시각':`${Math.abs(delta)}초 ${delta<0?'빠름':'늦음'}`};
   }
-  function renderAgePanel(mine,theirs,other) {
+  function renderAgePanel(mine,theirs,other,ranked) {
     const available=agesIn(mine,theirs);
     if(!available.length)return '<p class="panel-empty">시대 전환 기록 없음</p>';
     return `<div class="panel-toolbar"><div class="segments" role="group" aria-label="비교할 시대">${available.map((age,i)=>`<button data-age="${age}" aria-pressed="${i===0}">${age}</button>`).join('')}</div><span class="toolbar-note">나 / 상대 비교</span></div>`+available.map((age,i)=>{
       const left=checkpoint(mine,age),right=checkpoint(theirs,age),diff=ageDifference(mine,theirs,age);
+      const reference=ranked?.ages?.find(r=>r.age===age);
+      const rankedLine=reference?`<p class="ranked-age-reference">내 도달 ${fmtTime(reference.value)} · ${ranked.minRating}+ 중앙값 <strong>${fmtTime(reference.reference.median)}</strong><small>${Math.round(Math.abs(reference.delta))}초 ${reference.delta>0?'늦음':reference.delta<0?'빠름':'차이'} · ${reference.reference.players}명 / ${reference.reference.matches}경기 · ${reference.reference.sameCiv?'같은 문명':'문명 혼합'}</small></p>`:'';
       const requests=p=>Number.isFinite(p.command_seconds)&&p.unit_requests_before_click&&!p.unknown_unit_request_amounts?.includes('Villager')?number(p.unit_requests_before_click.Villager??0):'—';
       const recent=p=>p.unit_requests_previous_120s?quantities(p.unit_requests_previous_120s):'—';
       const prior=p=>p.unit_requests_before_click?quantities(Object.fromEntries(Object.entries(p.unit_requests_before_click).filter(([k])=>k!=='Villager'))):'—';
-      return `<section data-age-panel="${age}" ${i?'hidden':''}><div class="panel-title"><h3>${age} ${diff.reached?'도달':'클릭'}</h3><span class="difference ${diff.delta===null||diff.delta===0?'':diff.delta<0?'ahead':'behind'}">${esc(diff.text)}</span></div>`+compareTable([
+      return `<section data-age-panel="${age}" ${i?'hidden':''}><div class="panel-title"><h3>${age} ${diff.reached?'도달':'클릭'}</h3><span class="difference ${diff.delta===null||diff.delta===0?'':diff.delta<0?'ahead':'behind'}">${esc(diff.text)}</span></div>${rankedLine}`+compareTable([
         ['시대업을 누른 시각',fmtTime(left.command_seconds),fmtTime(right.command_seconds)],
         ['시대가 바뀐 시각',fmtTime(left.reached_seconds),fmtTime(right.reached_seconds)],
         ['주민 생산 요청 · 누적',requests(left),requests(right)],
@@ -433,6 +449,7 @@
     const opponent=other?.name||(m.players||[]).filter(p=>!p.is_self).map(p=>p.name).join(', ')||'상대 정보 없음';
     const header=`<header class="review-header"><div class="review-heading-row"><span class="outcome ${m.result==='loss'?'loss':''}">${result}</span><h2 id="review-title">${esc(m.map)}</h2></div>${matchCivs(m)}<p class="review-opponent">vs ${esc(opponent)}</p><div class="review-meta"><span>${esc(date(m.started_at))}${a?' · '+fmtTime(a.duration_game_seconds):''}</span><span class="review-rating">${number(m.rating_before)} → ${number(m.rating_after)}</span></div></header>`;
     const links=`<footer class="review-footer"><a href="https://aoe.ms/replay/?gameId=${Number(m.id)}&amp;profileId=${Number(report.profile?.id||selectedProfile)}" target="_blank" rel="noopener noreferrer">리플 다운로드 ↗</a><a href="https://www.aoe2insights.com/match/${Number(m.id)}/" target="_blank" rel="noopener noreferrer">AoE2 Insights ↗</a><a href="https://aoe2.gg/matches/${Number(m.id)}?tab=insights" target="_blank" rel="noopener noreferrer">AoE2.GG ↗</a></footer>`;
+    const ranked=window.SSAPORankedBenchmarks?.compare(m,selectedProfile,rankedData,window.SSAPOStateCurve);
     let workspace;
     if(!a){
       workspace=header+`<div class="review-body"><p class="panel-empty">${esc(m.analysis_note||'리플 미확보 또는 분석 대기.')}</p></div>`+links;
@@ -442,7 +459,7 @@
         return `<button class="highlight ${d.delta===null||d.delta===0?'':d.delta<0?'ahead':'behind'}" data-open-panel="ages" data-open-age="${age}"><span>${age} ${d.reached?'도달':'클릭'}</span><strong>${esc(d.text)}</strong><small>나 ${fmtTime(d.a)} · 상대 ${fmtTime(d.b)}</small></button>`;
       }).join('');
       const tabs=[['summary','복기'],['numbers','수치'],['ages','시대업'],['production','생산·연구'],['timeline','경기 흐름']];
-      workspace=header+`<nav class="review-tabs" role="tablist" aria-label="경기 분석 항목">${tabs.map(([id,title],i)=>`<button role="tab" id="tab-${id}" aria-controls="panel-${id}" aria-selected="${i===0}" tabindex="${i===0?0:-1}" data-panel="${id}">${title}</button>`).join('')}</nav><div class="review-body"><section id="panel-summary" role="tabpanel" aria-labelledby="tab-summary" tabindex="0"><div class="highlights">${highlights||'<p class="compact-note">비교할 시대 전환 기록 없음</p>'}</div>${window.SSAPOStateCurve?.renderInsights(a.state_curve,mine,theirs,true)||''}${renderReview(m)}${renderBasics(mine,theirs,other)}</section><section id="panel-numbers" role="tabpanel" aria-labelledby="tab-numbers" tabindex="0" hidden>${window.SSAPOStateCurve?.renderInsights(a.state_curve,mine,theirs)||''}${window.SSAPOStateCurve?.render(a.state_curve,mine,theirs)||''}${renderNumbersPanel(a.review,mine,theirs,other)}</section><section id="panel-ages" role="tabpanel" aria-labelledby="tab-ages" tabindex="0" hidden>${renderAgePanel(mine,theirs,other)}</section><section id="panel-production" role="tabpanel" aria-labelledby="tab-production" tabindex="0" hidden>${renderProductionPanel()}</section><section id="panel-timeline" role="tabpanel" aria-labelledby="tab-timeline" tabindex="0" hidden>${renderTimelinePanel(a)}</section></div>`+links;
+      workspace=header+`<nav class="review-tabs" role="tablist" aria-label="경기 분석 항목">${tabs.map(([id,title],i)=>`<button role="tab" id="tab-${id}" aria-controls="panel-${id}" aria-selected="${i===0}" tabindex="${i===0?0:-1}" data-panel="${id}">${title}</button>`).join('')}</nav><div class="review-body"><section id="panel-summary" role="tabpanel" aria-labelledby="tab-summary" tabindex="0"><div class="highlights">${highlights||'<p class="compact-note">비교할 시대 전환 기록 없음</p>'}</div>${window.SSAPORankedBenchmarks?.render(ranked,true)||''}${renderReview(m)}${renderBasics(mine,theirs,other)}</section><section id="panel-numbers" role="tabpanel" aria-labelledby="tab-numbers" tabindex="0" hidden>${window.SSAPORankedBenchmarks?.render(ranked)||''}${window.SSAPOStateCurve?.render(a.state_curve,mine,theirs)||''}${renderNumbersPanel(a.review,mine,theirs,other)}</section><section id="panel-ages" role="tabpanel" aria-labelledby="tab-ages" tabindex="0" hidden>${renderAgePanel(mine,theirs,other,ranked)}</section><section id="panel-production" role="tabpanel" aria-labelledby="tab-production" tabindex="0" hidden>${renderProductionPanel()}</section><section id="panel-timeline" role="tabpanel" aria-labelledby="tab-timeline" tabindex="0" hidden>${renderTimelinePanel(a)}</section></div>`+links;
     }
     $('#match-detail').innerHTML=`<div class="review-workspace">${workspace}</div>`;
     if(a)bindWorkspace($('#match-detail .review-workspace'),mine,theirs,other,a.review,a.map_view,m);
@@ -456,14 +473,16 @@
     const job={id:selectedProfile};job.promise=loadReport(job.id).finally(()=>{if(loadRequest===job)loadRequest=null;});loadRequest=job;return job.promise;
   }
   async function loadReport(id) {
+    const rankedJob=loadRankedBenchmarks();
     $('#refresh').disabled=true;
     try {
-      if(window.SSAPO_BOOTSTRAP&&id===26260702){if(id!==selectedProfile)return false;report=structuredClone(window.SSAPO_BOOTSTRAP);render();return true;}
+      if(window.SSAPO_BOOTSTRAP&&id===26260702){await rankedJob;if(id!==selectedProfile)return false;report=structuredClone(window.SSAPO_BOOTSTRAP);render();return true;}
       const response=await fetch(`${dataPath(id,'report.json')}?t=${Date.now()}`,{cache:'no-store'});
       if(id!==selectedProfile)return false;
       if(response.status===404&&id!==26260702){report=liveReports.get(id)||{schema_version:1,profile:{id,name:selectedName},matches:[],pending_profile:true};render();return true;}
       if(!response.ok)throw Error(`HTTP ${response.status}`);
       const incoming=await response.json();
+      await rankedJob;
       if(id!==selectedProfile)return false;
       if(incoming.schema_version!==1||!Array.isArray(incoming.matches)||incoming.profile?.id!==id)throw Error('Profile report mismatch');
       const live=liveReports.get(id);report=live&&Date.parse(live.last_checked_at)>=Date.parse(incoming.last_checked_at)?live:incoming;selectedName=report.profile.name||selectedName;render();return true;

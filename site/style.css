@@ -312,6 +312,13 @@ body.review-open{overflow:hidden}
 .state-axis{font-size:9px;fill:#869078}.state-grid{stroke:#e8ebe2;stroke-width:1}
 .state-line{fill:none;stroke-width:1.6}.state-line.mine{stroke:#2d5e45}.state-line.theirs{stroke:#b0624f;stroke-opacity:.85}
 .resource-insights{margin-bottom:18px}.resource-insights .panel-toolbar{margin-bottom:6px}.resource-insights .detail-heading{margin:0}
+.ranked-benchmarks{margin-bottom:18px}.ranked-benchmarks .panel-toolbar{margin-bottom:7px}.ranked-benchmarks .detail-heading{margin:0}
+.ranked-basis{margin:0;color:#64715c;font-size:11px;line-height:1.6}.ranked-gap small{display:block;font-size:11px;font-weight:400;letter-spacing:0;margin-top:3px}
+.resource-metrics .ranked-gap{font-size:23px}.ranked-resource .resource-metrics{grid-template-columns:1.2fr 1fr 1fr}
+.ranked-quick{margin-top:8px;display:grid;gap:6px;font-size:12px}.ranked-quick>div{display:flex;flex-wrap:wrap;gap:4px 9px;align-items:baseline}.ranked-quick>div>span:last-child{color:var(--muted)}
+.ranked-details{margin-top:8px;font-size:12px}.ranked-details>summary{padding:7px 0;cursor:pointer;font-weight:600}.ranked-sources p{color:var(--muted);line-height:1.8;margin:4px 0}.ranked-table td:last-child{white-space:nowrap}
+.ranked-age-reference{margin:0 0 10px;padding:8px 10px;background:#f2f6ed;border-radius:5px;font-size:12px}.ranked-age-reference small{display:block;color:var(--muted);margin-top:3px}
+.ranked-table thead span,.ranked-table .cell-meta span{display:block;white-space:nowrap}.ranked-table .cell-meta{font-size:9px;line-height:1.6}
 /* Resource review: one primary player, opponent as context. */
 .resource-window{padding:14px 16px;background:#f6f8f3;border:1px solid #dbe4d5;border-radius:10px;color:#263e30}
 .resource-window header{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:#596853}
