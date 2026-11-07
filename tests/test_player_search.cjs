@@ -7,7 +7,7 @@ test('profile paths accept only bounded positive integers',()=>{for(const x of [
 test('late account response cannot overwrite the newly selected profile',async()=>{
  const fs=require('node:fs'),vm=require('node:vm'),code=fs.readFileSync(require('node:path').join(__dirname,'../site/app.js'),'utf8');
  const pending=new Map(),controls={disabled:false};
- const ctx=vm.createContext({window:{},console,Date,render(){},$:()=>controls,fetch:url=>new Promise(resolve=>pending.set(url,resolve))});
+ const ctx=vm.createContext({window:{},console,Date,loadRankedBenchmarks:async()=>null,render(){},$:()=>controls,fetch:url=>new Promise(resolve=>pending.set(url,resolve))});
  vm.runInContext("let selectedProfile=199325,selectedName='Hera',report={matches:[]};const liveReports=new Map();const dataPath=(id,file)=>`data/profiles/${id}/${file}`;",ctx);
  vm.runInContext(code.slice(code.indexOf('  let loadRequest=null;'),code.indexOf('  async function selectProfile(')),ctx);
  const first=vm.runInContext('load()',ctx);vm.runInContext('selectedProfile=123;selectedName="Other";',ctx);const second=vm.runInContext('load()',ctx);
