@@ -1,8 +1,10 @@
 from pathlib import Path
 import sys
 import unittest
+import json
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
 from review import summarize,findings,enrich_report
+from opening import classify
 
 def event(t,label,amount=1,kind='QUEUE'):
     return {'seconds':t,'label':label,'amount':amount,'kind':kind}
@@ -11,6 +13,15 @@ def metrics(events,feudal=600,castle=1300,**extra):
             'age_commands':{'봉건':feudal-130,'성주':castle-160},**extra}
 
 class ReviewTests(unittest.TestCase):
+    def test_opening_sequence_is_independent_of_first_unit_and_later_totals(self):
+        cases=json.loads((Path(__file__).parent/'fixtures/openings.json').read_text())
+        for case in cases:
+            with self.subTest(case['name']):
+                self.assertEqual(classify(case['metrics'],case['duration'])['opening'],case['opening'])
+        own=summarize(cases[0]['metrics'],1600)
+        self.assertEqual(own['first_military_unit'],'Spearman')
+        self.assertEqual(own['opening'],'scouts')
+
     def test_order_quantities_are_not_action_count_or_living_population(self):
         m=metrics([event(10,'Villager',5),event(20,'Villager',-2),event(30,'Fishing Ship',2),event(700,'Scout Cavalry',3),event(1500,'Villager',1)])
         r=summarize(m,1500)
@@ -28,7 +39,7 @@ class ReviewTests(unittest.TestCase):
         self.assertIsNone(r['villager_requests'])
         self.assertIsNone(r['checkpoints'][0]['villager_requests'])
         self.assertFalse(summarize({'timeline':[e]},1200)['available'])
-        self.assertNotEqual(summarize(metrics([event(700,'Kona')]),1200)['opening'],summarize(metrics([event(700,'Condottiero')]),1200)['opening'])
+        self.assertNotEqual(summarize(metrics([event(700,'Kona')]),1200)['first_military_unit'],summarize(metrics([event(700,'Condottiero')]),1200)['first_military_unit'])
 
     def test_first_military_delay_is_split_from_age_arrival_delay(self):
         m=metrics([event(686,'Scout Cavalry')],feudal=603)
@@ -51,7 +62,7 @@ class ReviewTests(unittest.TestCase):
     def test_personal_median_excludes_current_future_and_other_map(self):
         def row(i,time,feudal,mapname='Arabia'):
             return {'id':i,'started_at':time,'analysis':{'map':mapname,'civilization':'Franks','duration_game_seconds':1600,
-                'metrics':metrics([event(feudal+60,'Scout Cavalry')],feudal=feudal),
+                'metrics':metrics([event(feudal+60,'Scout Cavalry',2)],feudal=feudal),
                 'opponents':[{'metrics':metrics([event(700,'Scout Cavalry')])}]}}
         current=row(5,5,620)
         report={'matches':[row(6,6,100),current,row(1,1,600),row(2,2,640),row(3,3,660),row(4,4,100,'Arena')]}

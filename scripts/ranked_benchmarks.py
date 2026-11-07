@@ -3,6 +3,7 @@ import json
 import math
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from opening import classify
 
 ROOT = Path(__file__).resolve().parents[1]
 TIMES = (300, 600, 900, 1200, 1500, 1800)
@@ -66,7 +67,7 @@ def resource_mean(curve, side, start, end):
 def observation(match, analysis, side, player, rating):
     metrics = analysis['metrics'] if side == 0 else analysis['opponents'][0]['metrics']
     summary = analysis.get('review', {}).get('own' if side == 0 else 'opponent', {})
-    if metrics.get('recording_restored') or not summary.get('available') or not summary.get('opening'):
+    if metrics.get('recording_restored') or not summary.get('available'):
         return None
     ages = {age: row['reached_seconds'] for age, row in metrics.get('age_checkpoints', {}).items()
             if age in AGES and finite(row.get('reached_seconds')) and row['reached_seconds'] <= analysis.get('duration_game_seconds', 0)}
@@ -90,7 +91,7 @@ def observation(match, analysis, side, player, rating):
     return {'match_id': match['id'], 'profile_id': player['profile_id'], 'name': player['name'],
             'rating': rating, 'started_at': match['started_at'], 'map': match['map'],
             'civilization': analysis.get('civilization') if side == 0 else analysis['opponents'][0].get('civilization'),
-            'opening': summary['opening'], 'opening_label': summary['opening_label'],
+            **classify(metrics, analysis.get('duration_game_seconds', 0)),
             'ages': ages, 'checkpoints': checkpoints}
 
 
@@ -101,12 +102,16 @@ def build(reports, index, now=None, existing=None):
     samples = {}
     # Keep compact observations when a source report rolls out of its history.
     # Recheck eligibility and age on every build; newly parsed rows replace old ones.
-    if (existing or {}).get('method_revision') == 1:
+    if (existing or {}).get('method_revision') in (1, 2):
         for row in existing.get('samples', []):
             try:
                 started = datetime.fromisoformat(row['started_at'])
                 if row['profile_id'] in ranked and cutoff <= started <= now:
-                    samples[(row['match_id'], row['profile_id'])] = {**row, 'rating': ranked[row['profile_id']]['rating']}
+                    # v1 resource/age calculations are unchanged; only discard the old first-unit classification.
+                    kept = {**row, 'rating': ranked[row['profile_id']]['rating']}
+                    if existing.get('method_revision') == 1:
+                        kept.update(opening=None, opening_label=None)
+                    samples[(row['match_id'], row['profile_id'])] = kept
             except (ValueError, TypeError, KeyError):
                 continue
     for report in reports:
@@ -134,7 +139,7 @@ def build(reports, index, now=None, existing=None):
                     row['started_at'] = started.isoformat()
                     row['recording_profile_id'] = report['profile']['id']
                     samples[(match['id'], pid)] = row
-    return {'schema_version': 1, 'method_revision': 1, 'generated_at': now.isoformat(), 'ranking_updated_at': index.get('updated_at'),
+    return {'schema_version': 1, 'method_revision': 2, 'generated_at': now.isoformat(), 'ranking_updated_at': index.get('updated_at'),
             'min_rating': MIN_RATING, 'days': 30,
             'samples': sorted(samples.values(), key=lambda r: (r['started_at'], r['match_id'], r['profile_id']), reverse=True)}
 

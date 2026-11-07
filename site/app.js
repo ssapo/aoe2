@@ -66,7 +66,7 @@
     return `<div class="panel-toolbar"><div class="segments" role="group" aria-label="비교할 시대">${available.map((age,i)=>`<button data-age="${age}" aria-pressed="${i===0}">${age}</button>`).join('')}</div><span class="toolbar-note">나 / 상대 비교</span></div>`+available.map((age,i)=>{
       const left=checkpoint(mine,age),right=checkpoint(theirs,age),diff=ageDifference(mine,theirs,age);
       const reference=ranked?.ages?.find(r=>r.age===age);
-      const rankedLine=reference?`<p class="ranked-age-reference">내 도달 ${fmtTime(reference.value)} · ${ranked.minRating}+ 중앙값 <strong>${fmtTime(reference.reference.median)}</strong><small>${Math.round(Math.abs(reference.delta))}초 ${reference.delta>0?'늦음':reference.delta<0?'빠름':'차이'} · ${reference.reference.players}명 / ${reference.reference.matches}경기 · ${reference.reference.sameCiv?'같은 문명':'문명 혼합'}</small></p>`:'';
+      const rankedLine=reference?`<p class="ranked-age-reference">${ranked.minRating}+ 기준 ${fmtTime(reference.reference.median)} · ${Math.round(Math.abs(reference.delta))}초 ${reference.delta>0?'늦음':reference.delta<0?'빠름':'차이 없음'}</p>`:'';
       const requests=p=>Number.isFinite(p.command_seconds)&&p.unit_requests_before_click&&!p.unknown_unit_request_amounts?.includes('Villager')?number(p.unit_requests_before_click.Villager??0):'—';
       const recent=p=>p.unit_requests_previous_120s?quantities(p.unit_requests_previous_120s):'—';
       const prior=p=>p.unit_requests_before_click?quantities(Object.fromEntries(Object.entries(p.unit_requests_before_click).filter(([k])=>k!=='Villager'))):'—';
@@ -370,10 +370,18 @@
     const render=f=>findingCard(f,title==='상대');
     return `<section class="signal-group"><h3>${esc(title)}<span>${items.length}</span></h3>${items.length?items.slice(0,2).map(render).join(''):'<p class="compact-note">이 시대에 비교할 기록이 충분하지 않아요.</p>'}${items.length>2?`<details class="more-signals"><summary>${items.length-2}개 더 보기</summary>${items.slice(2).map(render).join('')}</details>`:''}</section>`;
   }
+  function renderOpenings(match) {
+    const a=match.analysis;
+    return `<section class="opening-pair" aria-label="첫 유닛과 오프닝">${[['나',a.metrics,a.review?.own],['상대',a.opponents?.[0]?.metrics,a.review?.opponent]].map(([title,metrics,summary])=>{
+      const opening=window.SSAPOOpening?.classify(metrics,a.duration_game_seconds);
+      const first=summary?.first_military_unit,at=summary?.first_military_seconds;
+      return `<div class="opening-player"><h3>${title}</h3>${first?`<p><span>첫 유닛</span><b>${esc(label(first))}</b><time>${fmtTime(at)}</time></p>`:''}${opening?.opening_label?`<p><span>오프닝</span><strong>${esc(opening.opening_label)}</strong></p>`:''}</div>`;
+    }).join('')}</section>`;
+  }
   function renderEvidenceReview(match) {
     const review=match.analysis.review;
     const stages=['전체','암흑','봉건','성주','왕정'].filter(s=>s==='전체'||[...review.own_findings,...review.opponent_findings].some(f=>f.stage===s));
-    return `${review.practice?`<details class="practice-card"><summary><strong>${esc(review.practice.title)}</strong><span>이번 ${fmtTime(review.practice.current_seconds)} → 목표 ${fmtTime(review.practice.target_seconds)}</span></summary><p>${esc(review.practice.evidence)}</p><p>${esc(review.practice.action)}</p></details>`:''}<div class="opening-pair"><span>나 · ${esc(review.own.opening_label)}</span><span>상대 · ${esc(review.opponent.opening_label)}</span></div><div class="panel-toolbar"><div class="segments stage-segments" role="group" aria-label="복기할 시대">${stages.map((s,i)=>`<button data-review-stage="${s}" aria-pressed="${i===0}">${s}</button>`).join('')}</div><button class="subtle" data-open-panel="numbers">수치 비교 →</button></div><div class="signal-columns"><div id="own-findings">${findingSide('나',review.own_findings)}</div><div id="opponent-findings">${findingSide('상대',review.opponent_findings)}</div></div>`;
+    return `${review.practice?`<details class="practice-card"><summary><strong>${esc(review.practice.title)}</strong><span>이번 ${fmtTime(review.practice.current_seconds)} → 목표 ${fmtTime(review.practice.target_seconds)}</span></summary><p>${esc(review.practice.evidence)}</p><p>${esc(review.practice.action)}</p></details>`:''}${renderOpenings(match)}<div class="panel-toolbar"><div class="segments stage-segments" role="group" aria-label="복기할 시대">${stages.map((s,i)=>`<button data-review-stage="${s}" aria-pressed="${i===0}">${s}</button>`).join('')}</div><button class="subtle" data-open-panel="numbers">수치 비교 →</button></div><div class="signal-columns"><div id="own-findings">${findingSide('나',review.own_findings)}</div><div id="opponent-findings">${findingSide('상대',review.opponent_findings)}</div></div>`;
   }
   function renderFieldTimeline(field,duration) {
     const {end,lanes}=window.SSAPOFieldControl.timeline(field,duration);

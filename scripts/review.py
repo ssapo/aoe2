@@ -1,11 +1,12 @@
 """Evidence-linked coaching from recorded orders, not a game-state simulation."""
 from statistics import median
+from opening import classify
 
 AGES = ('봉건', '성주', '왕정')
 STAGES = ('암흑', '봉건', '성주', '왕정')
 CIVILIAN = {'Villager', 'Fishing Ship', 'Trade Cart', 'Trade Cog', 'Transport Ship', 'Fishing Boat'}
 TC_RESEARCH = {'Loom', 'Wheelbarrow', 'Hand Cart', 'Town Watch', 'Town Patrol', 'Feudal Age', 'Castle Age', 'Imperial Age'}
-OPENINGS = {
+FIRST_UNIT_FAMILIES = {
     'Scout Cavalry': ('scouts', '정찰 기병'), 'Camel Scout': ('scouts', '정찰 기병'),
     'Archer': ('archers', '궁사'), 'Skirmisher': ('skirmishers', '척후병'),
     'Militia': ('militia', '민병대'), 'Man-at-Arms': ('militia', '보병'),
@@ -37,10 +38,9 @@ def summarize(metrics, duration):
     unknown = {e['label'] for e in timeline if e['kind'] in {'QUEUE', 'DE_QUEUE', 'MULTIQUEUE'} and (not isinstance(e.get('amount'), int) or isinstance(e.get('amount'), bool))}
     unknown_military = any(k not in CIVILIAN for k in unknown) or any(e['label'].startswith('Unit ') for e in queue)
     first = min(military, key=lambda e: e['seconds']) if military else None
-    opening, opening_label = OPENINGS.get(first['label'], ('unit:'+first['label'], first['label'])) if first else ('none', '병력 생산 요청 없음')
+    opening = classify(metrics, duration)
     restored = bool(metrics.get('recording_restored'))
     record_start = min((e['seconds'] for e in timeline),default=0) if restored else 0
-    if restored:opening_label='재개 기록 · '+opening_label
     starts = [(record_start, '기록 구간' if restored else '암흑')] + [(reached(metrics, age), age) for age in AGES if reached(metrics, age) is not None]
     starts.sort()
     def stage_at(t):
@@ -75,8 +75,7 @@ def summarize(metrics, duration):
         gaps.append({'start': start, 'end': end, 'seconds': round(end-start, 2), 'stage': stage_at(start),
                      'review_candidate': start < 1200 and left['amount'] == 1 and not overlaps_age and not nearby_research})
     feudal = reached(metrics, '봉건')
-    return {'available': True, 'opening': opening, 'opening_label': opening_label,
-            'opening_basis': 'first_positive_military_queue_family_not_strategy_confirmation',
+    return {'available': True, **opening,
             'first_military_seconds': first['seconds'] if first else None,
             'first_military_unit': first['label'] if first else None,
             'after_feudal_first_military_seconds': round(first['seconds']-feudal,2) if first and feudal is not None and first['seconds'] >= feudal else None,
@@ -111,7 +110,9 @@ def findings(mine, theirs, my_metrics, their_metrics):
         action = '첫 병종이나 빌드가 다르면 준비 시간도 달라져요. 어떤 병력을 먼저 준비했는지 함께 보세요.'
         phase,priority = phase_at(my_metrics,first),2
         a,b = mine.get('after_feudal_first_military_seconds'), theirs.get('after_feudal_first_military_seconds')
-        if mine['opening'] == theirs['opening'] and mine['opening'] in {'scouts','archers','skirmishers','spears','eagles'} and a is not None and b is not None and (reached(my_metrics,'성주') is None or first<reached(my_metrics,'성주')) and (reached(their_metrics,'성주') is None or other<reached(their_metrics,'성주')):
+        first_family = FIRST_UNIT_FAMILIES.get(mine.get('first_military_unit'), (None,))[0]
+        other_family = FIRST_UNIT_FAMILIES.get(theirs.get('first_military_unit'), (None,))[0]
+        if first_family == other_family and first_family in {'scouts','archers','skirmishers','spears','eagles'} and a is not None and b is not None and (reached(my_metrics,'성주') is None or first<reached(my_metrics,'성주')) and (reached(their_metrics,'성주') is None or other<reached(their_metrics,'성주')):
             prep = round(a-b)
             evidence += f' 봉건이 된 뒤 첫 요청까지 나 {round(a)}초 · 상대 {round(b)}초로 {abs(prep)}초 차이예요.'
             if gap > 0 and abs(prep) < abs(gap)/2:
@@ -128,7 +129,7 @@ def findings(mine, theirs, my_metrics, their_metrics):
             f'{clock(gap["start"])}–{clock(gap["end"])} · 주민 생산 요청이 {round(gap["seconds"])}초 동안 없었어요. TC가 그만큼 쉬었다는 뜻은 아니에요.',
             '당시 생산 대기열과 인구 제한을 확인해 보세요. 대기열이 비어 있었다면 병력을 움직인 뒤 TC에서 주민을 예약하는 습관을 들여보세요.',2)
         break
-    if mine.get('opening') == theirs.get('opening'):
+    if mine.get('opening') and mine.get('opening') == theirs.get('opening'):
         a = next((p['villager_requests'] for p in mine.get('checkpoints',[]) if p['seconds']==900),None)
         b = next((p['villager_requests'] for p in theirs.get('checkpoints',[]) if p['seconds']==900),None)
         if a is not None and b is not None and abs(a-b)>=5:
@@ -199,7 +200,7 @@ def enrich_report(report):
             if data.get('civilization')!=analysis.get('civilization') or data.get('map')!=analysis.get('map'):
                 continue
             summary=summarize(data.get('metrics',{}),data.get('duration_game_seconds',0))
-            if summary.get('available') and summary.get('opening')==a.get('opening') and not summary.get('restored'):
+            if summary.get('available') and summary.get('opening') and summary.get('opening')==a.get('opening') and not summary.get('restored'):
                 earlier.append((data,summary))
         earlier=earlier[:10]
         descriptors=[('봉건 도달',reached(mine,'봉건'),lambda data,s:reached(data.get('metrics',{}),'봉건')),
@@ -219,9 +220,9 @@ def enrich_report(report):
             practice={'title':'다음 판은 봉건 20초 빠르게','current_seconds':own_feudal,'target_seconds':target,
                       'evidence':f'이번 {clock(own_feudal)} → 연습 목표 {clock(target)}. 이번 기록에서 20초 줄여보는 연습 목표예요.',
                       'action':'같은 맵과 빌드로 초반만 세 번 연습해 보세요. 주민 생산, 베틀, 건물 순서를 적어두면 어디서 늦어지는지 찾기 쉬워요.'}
-        analysis['review']={'revision':1,'own':a,'opponent':b,'own_findings':own_findings,
+        analysis['review']={'revision':2,'own':a,'opponent':b,'own_findings':own_findings,
                             'opponent_findings':findings(b,a,theirs,mine),'personal_benchmarks':benchmarks,'practice':practice,
-                            'benchmark_basis':'same_map_civilization_first_military_order_prior_up_to_10_matches_min_3',
+                            'benchmark_basis':'same_map_civilization_inferred_opening_prior_up_to_10_matches_min_3',
                             'limits':['주민·군사 수량은 생산 지시량. 실제 생산·생존 수가 아님.',
                                       '명령 간격은 TC 실제 유휴시간이 아님. 검증되지 않은 TC 유휴·교전 손실·글로벌 백분위·등급은 생성하지 않음.']}
     return report

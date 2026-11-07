@@ -1,0 +1,385 @@
+[
+  {
+    "name": "first spear is not the opening",
+    "metrics": {
+      "full_timeline": [
+        {
+          "seconds": 610,
+          "kind": "QUEUE",
+          "label": "Spearman",
+          "amount": 1
+        },
+        {
+          "seconds": 615,
+          "kind": "BUILD",
+          "label": "Stable"
+        },
+        {
+          "seconds": 650,
+          "kind": "QUEUE",
+          "label": "Scout Cavalry",
+          "amount": 2
+        }
+      ],
+      "age_checkpoints": {
+        "봉건": {
+          "reached_seconds": 600
+        },
+        "성주": {
+          "reached_seconds": 1100
+        }
+      }
+    },
+    "duration": 1600,
+    "opening": "scouts"
+  },
+  {
+    "name": "later defensive spears do not outweigh early scouts",
+    "metrics": {
+      "full_timeline": [
+        {
+          "seconds": 590,
+          "kind": "BUILD",
+          "label": "Stable"
+        },
+        {
+          "seconds": 610,
+          "kind": "QUEUE",
+          "label": "Scout Cavalry",
+          "amount": 2
+        },
+        {
+          "seconds": 650,
+          "kind": "QUEUE",
+          "label": "Spearman",
+          "amount": 10
+        },
+        {
+          "seconds": 700,
+          "kind": "QUEUE",
+          "label": "Scout Cavalry",
+          "amount": 3
+        }
+      ],
+      "age_checkpoints": {
+        "봉건": {
+          "reached_seconds": 600
+        },
+        "성주": {
+          "reached_seconds": 1100
+        }
+      }
+    },
+    "duration": 1600,
+    "opening": "scouts"
+  },
+  {
+    "name": "spear investment before counter scouts",
+    "metrics": {
+      "full_timeline": [
+        {
+          "seconds": 610,
+          "kind": "QUEUE",
+          "label": "Spearman",
+          "amount": 3
+        },
+        {
+          "seconds": 690,
+          "kind": "BUILD",
+          "label": "Stable"
+        },
+        {
+          "seconds": 720,
+          "kind": "QUEUE",
+          "label": "Scout Cavalry",
+          "amount": 4
+        }
+      ],
+      "age_checkpoints": {
+        "봉건": {
+          "reached_seconds": 600
+        },
+        "성주": {
+          "reached_seconds": 1100
+        }
+      }
+    },
+    "duration": 1600,
+    "opening": "spears_then_scouts"
+  },
+  {
+    "name": "single spear before archer investment",
+    "metrics": {
+      "full_timeline": [
+        {
+          "seconds": 605,
+          "kind": "QUEUE",
+          "label": "Spearman",
+          "amount": 1
+        },
+        {
+          "seconds": 610,
+          "kind": "BUILD",
+          "label": "Archery Range"
+        },
+        {
+          "seconds": 640,
+          "kind": "QUEUE",
+          "label": "Archer",
+          "amount": 3
+        }
+      ],
+      "age_checkpoints": {
+        "봉건": {
+          "reached_seconds": 600
+        },
+        "성주": {
+          "reached_seconds": 1100
+        }
+      }
+    },
+    "duration": 1600,
+    "opening": "archers"
+  },
+  {
+    "name": "man at arms into archers",
+    "metrics": {
+      "full_timeline": [
+        {
+          "seconds": 500,
+          "kind": "QUEUE",
+          "label": "Militia",
+          "amount": 3
+        },
+        {
+          "seconds": 610,
+          "kind": "RESEARCH",
+          "label": "Man-at-Arms"
+        },
+        {
+          "seconds": 620,
+          "kind": "BUILD",
+          "label": "Archery Range"
+        },
+        {
+          "seconds": 680,
+          "kind": "QUEUE",
+          "label": "Archer",
+          "amount": 3
+        }
+      ],
+      "age_checkpoints": {
+        "봉건": {
+          "reached_seconds": 600
+        },
+        "성주": {
+          "reached_seconds": 1100
+        }
+      }
+    },
+    "duration": 1600,
+    "opening": "maa_then_archers"
+  },
+  {
+    "name": "militia before feudal is a drush",
+    "metrics": {
+      "full_timeline": [
+        {
+          "seconds": 410,
+          "kind": "QUEUE",
+          "label": "Militia",
+          "amount": 3
+        }
+      ],
+      "age_checkpoints": {
+        "봉건": {
+          "reached_seconds": 600
+        },
+        "성주": {
+          "reached_seconds": 1100
+        }
+      }
+    },
+    "duration": 1600,
+    "opening": "drush"
+  },
+  {
+    "name": "castle transition without feudal army",
+    "metrics": {
+      "full_timeline": [
+        {
+          "seconds": 610,
+          "kind": "QUEUE",
+          "label": "Spearman",
+          "amount": 1
+        },
+        {
+          "seconds": 1140,
+          "kind": "QUEUE",
+          "label": "Knight",
+          "amount": 2
+        }
+      ],
+      "age_checkpoints": {
+        "봉건": {
+          "reached_seconds": 600
+        },
+        "성주": {
+          "reached_seconds": 1100
+        }
+      }
+    },
+    "duration": 1600,
+    "opening": "castle_then_knights"
+  },
+  {
+    "name": "isolated units are not sufficient",
+    "metrics": {
+      "full_timeline": [
+        {
+          "seconds": 610,
+          "kind": "QUEUE",
+          "label": "Spearman",
+          "amount": 1
+        },
+        {
+          "seconds": 650,
+          "kind": "QUEUE",
+          "label": "Scout Cavalry",
+          "amount": 1
+        }
+      ],
+      "age_checkpoints": {
+        "봉건": {
+          "reached_seconds": 600
+        },
+        "성주": {
+          "reached_seconds": 1100
+        }
+      }
+    },
+    "duration": 1600,
+    "opening": null
+  },
+  {
+    "name": "unresolved quantities are not zero",
+    "metrics": {
+      "full_timeline": [
+        {
+          "seconds": 610,
+          "kind": "QUEUE",
+          "label": "Scout Cavalry",
+          "amount": null
+        }
+      ],
+      "age_checkpoints": {
+        "봉건": {
+          "reached_seconds": 600
+        },
+        "성주": {
+          "reached_seconds": 1100
+        }
+      }
+    },
+    "duration": 1600,
+    "opening": null
+  },
+  {
+    "name": "late militia does not rewrite scouts",
+    "metrics": {
+      "full_timeline": [
+        {
+          "seconds": 610,
+          "kind": "QUEUE",
+          "label": "Scout Cavalry",
+          "amount": 3
+        },
+        {
+          "seconds": 1300,
+          "kind": "QUEUE",
+          "label": "Militia",
+          "amount": 20
+        }
+      ],
+      "age_checkpoints": {
+        "봉건": {
+          "reached_seconds": 600
+        },
+        "성주": {
+          "reached_seconds": 1100
+        }
+      }
+    },
+    "duration": 1600,
+    "opening": "scouts"
+  },
+  {
+    "name": "restored recording has no inferred opening",
+    "metrics": {
+      "full_timeline": [
+        {
+          "seconds": 610,
+          "kind": "QUEUE",
+          "label": "Spearman",
+          "amount": 1
+        },
+        {
+          "seconds": 615,
+          "kind": "BUILD",
+          "label": "Stable"
+        },
+        {
+          "seconds": 650,
+          "kind": "QUEUE",
+          "label": "Scout Cavalry",
+          "amount": 2
+        }
+      ],
+      "age_checkpoints": {
+        "봉건": {
+          "reached_seconds": 600
+        },
+        "성주": {
+          "reached_seconds": 1100
+        }
+      },
+      "recording_restored": true
+    },
+    "duration": 1600,
+    "opening": null
+  },
+  {
+    "name": "early stable does not erase a preceding spear buildup",
+    "metrics": {
+      "full_timeline": [
+        {
+          "seconds": 610,
+          "kind": "QUEUE",
+          "label": "Spearman",
+          "amount": 3
+        },
+        {
+          "seconds": 590,
+          "kind": "BUILD",
+          "label": "Stable"
+        },
+        {
+          "seconds": 720,
+          "kind": "QUEUE",
+          "label": "Scout Cavalry",
+          "amount": 4
+        }
+      ],
+      "age_checkpoints": {
+        "봉건": {
+          "reached_seconds": 600
+        },
+        "성주": {
+          "reached_seconds": 1100
+        }
+      }
+    },
+    "duration": 1600,
+    "opening": "spears_then_scouts"
+  }
+]
