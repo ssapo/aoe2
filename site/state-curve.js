@@ -41,7 +41,9 @@
     const finish=()=>{
       if(run&&run.end-run.start>=60){
         const own=stats(points,1,run.start,run.end),opponent=stats(points,2,run.start,run.end);
-        windows.push({...run,own,opponent});
+        const observed=points.filter((p,i)=>i<points.length-1&&p[0]<run.end&&points[i+1][0]>run.start);
+        const peak=col=>Math.max(...observed.map(p=>p[col]));
+        windows.push({...run,own:{...own,peak:peak(1)},opponent:{...opponent,peak:peak(2)}});
       }
       run=null;
     };
@@ -74,21 +76,24 @@
   function resourceInsights(curve,mine,theirs){
     return [mine,theirs].map((metrics,i)=>resourceWindows(curve,i+1).slice(0,3).map(w=>({...w,actions:windowActions(metrics,w.start,w.end)})));
   }
+  const amount=value=>value.toLocaleString('ko-KR');
+  const duration=seconds=>{const n=Math.round(seconds);return `${Math.floor(n/60)}분${n%60?` ${n%60}초`:''}`;};
+  const resourceIcons='<span class="resource-icons" aria-hidden="true"><svg viewBox="0 0 24 24" class="food"><path d="M12 21V4M12 9C4 9 4 2 4 2s8 0 8 7Zm0 6c-8 0-8-7-8-7s8 0 8 7Zm0-3c8 0 8-7 8-7s-8 0-8 7Z"/></svg><svg viewBox="0 0 24 24" class="wood"><path d="m5 18 10-13 5 4-10 13Z"/><ellipse cx="6" cy="19" rx="4" ry="3"/><path d="m11 13 5-6M4 19h4"/></svg><svg viewBox="0 0 24 24" class="gold"><path d="m3 18 4-11h10l4 11Zm4-11 3 4h8M10 11l-3 7"/></svg><svg viewBox="0 0 24 24" class="stone"><path d="m3 18 2-10 8-5 7 6 1 9-9 3Zm2-10 8 4 7-3M13 12l-1 9"/></svg></span>';
   function renderInsights(curve,mine,theirs,compact=false){
-    const sides=resourceInsights(curve,mine,theirs);
-    if(!sides.some(s=>s.length))return '';
-    const card=(w,i)=>{
-      const a=w.actions,who=i?'상대':'나';
-      const age=a?.ages.map(v=>`${v.age}업 클릭 ${clock(v.seconds)}`).join(' · ');
+    const [own,opponent]=resourceInsights(curve,mine,theirs);
+    if((compact&&!own.length)||(!own.length&&!opponent.length))return '';
+    const card=w=>{
+      const a=w.actions,age=a?.ages.map(v=>`${v.age}업 ${clock(v.seconds)}`).join(' · ');
       const actions=a?[
-        `생산 명령 ${a.production}회`, `연구 ${a.research}종`, `건설 명령 ${a.buildings}회`,
-        a.cancellations?`생산 취소 ${a.cancellations}회`:'',a.unknown?`수량 불명 ${a.unknown}회`:'',a.market?`시장 명령 ${a.market}회`:''
-      ].filter(Boolean).join(' · '):'';
-      const advice=age?'시대업을 누른 시각과 자원이 줄어든 시점을 비교해 보세요.':a&&!a.production&&!a.unknown?'생산 건물의 대기열과 자원 배분을 확인해 보세요.':'생산 건물을 늘리거나 업그레이드할 여유가 있었는지 살펴보세요.';
-      return `<article class="resource-window ${i?'opponent':'own'}"><header><strong>${who} · 자원을 쌓아둔 구간</strong><span>${clock(w.start)}–${clock(w.end)}</span></header><p>1,000 이상 약 ${clock(w.end-w.start)} · 평균 보유 나 ${w.own.mean.toLocaleString('ko-KR')} / 상대 ${w.opponent.mean.toLocaleString('ko-KR')}</p>${age?`<p class="resource-age">${esc(age)}</p>`:''}${!compact&&actions?`<p>${esc(actions)}</p>`:''}${!compact?`<p class="resource-advice">${advice}</p>`:''}</article>`;
+        a.production?`생산 명령 ${a.production}회`:'',a.research?`연구 ${a.research}종`:'',a.buildings?`건설 ${a.buildings}회`:'',
+        a.cancellations?`생산 취소 ${a.cancellations}회`:'',a.unknown?`수량 불명 ${a.unknown}회`:'',a.market?`시장 ${a.market}회`:''
+      ].filter(Boolean):[];
+      const delta=w.own.mean-w.opponent.mean;
+      const comparison=delta===0?'나와 같음':`나보다 ${amount(Math.abs(delta))} ${delta>0?'적음':'많음'}`;
+      return `<article class="resource-window own"><header><div>${resourceIcons}<span>보유 자원 합계</span></div><time>${clock(w.start)}–${clock(w.end)}</time></header><dl class="resource-metrics"><div class="resource-primary"><dt>평균 보유</dt><dd>${amount(w.own.mean)}</dd></div><div><dt><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m3 14 5-5 4 3 5-8M12 4h5v5"/></svg>최대 보유</dt><dd>${amount(w.own.peak)}</dd></div><div><dt><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="M10 5v5l3 2"/></svg>1,000 이상</dt><dd class="resource-duration">${duration(w.end-w.start)}</dd></div></dl><div class="resource-opponent-line"><span>같은 시간 상대 평균</span><strong>${amount(w.opponent.mean)}</strong><span>${comparison}</span></div>${age?`<p class="resource-age">${esc(age)}</p>`:''}${!compact&&actions.length?`<ul class="resource-actions">${actions.map(v=>`<li>${esc(v)}</li>`).join('')}</ul>`:''}</article>`;
     };
-    const columns=sides.map((rows,i)=>rows.length?`<div>${card(rows[0],i)}${!compact&&rows.length>1?`<details class="resource-more"><summary>다른 구간 ${rows.length-1}개</summary>${rows.slice(1).map(w=>card(w,i)).join('')}</details>`:''}</div>`:'').join('');
-    return `<section class="resource-insights"><div class="panel-toolbar"><h3 class="detail-heading">자원 운영</h3>${compact?'<button class="subtle" data-open-panel="numbers">자세히 →</button>':''}</div><div class="resource-columns">${columns}</div></section>`;
+    const opponentRow=w=>`<li><time>${clock(w.start)}–${clock(w.end)}</time><span>상대 평균 <strong>${amount(w.opponent.mean)}</strong> · 최대 ${amount(w.opponent.peak)}</span><span>1,000 이상 ${duration(w.end-w.start)} · 내 평균 ${amount(w.own.mean)}</span></li>`;
+    return `<section class="resource-insights"><div class="panel-toolbar"><h3 class="detail-heading">${own.length?'내 자원 운영':'상대 자원 운영'}</h3>${compact?'<button class="subtle" data-open-panel="numbers">자세히 →</button>':''}</div>${own.length?card(own[0]):''}${!compact&&own.length>1?`<details class="resource-more"><summary>내 다른 구간 ${own.length-1}개</summary>${own.slice(1).map(card).join('')}</details>`:''}${opponent.length&&!compact?`<details class="resource-more resource-opponent-details"><summary>상대가 자원을 모아둔 구간 ${opponent.length}개</summary><ul>${opponent.map(opponentRow).join('')}</ul></details>`:''}</section>`;
   }
   function ageTable(curve,mine,theirs){
     const own=ageStats(curve,mine,1),opp=ageStats(curve,theirs,2);

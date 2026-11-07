@@ -312,11 +312,22 @@ body.review-open{overflow:hidden}
 .state-axis{font-size:9px;fill:#869078}.state-grid{stroke:#e8ebe2;stroke-width:1}
 .state-line{fill:none;stroke-width:1.6}.state-line.mine{stroke:#2d5e45}.state-line.theirs{stroke:#b0624f;stroke-opacity:.85}
 .resource-insights{margin-bottom:18px}.resource-insights .panel-toolbar{margin-bottom:6px}.resource-insights .detail-heading{margin:0}
-.resource-columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.resource-window{padding:10px 12px;background:#f2f6ef;border-left:3px solid #2d5e45;border-radius:4px;overflow-wrap:anywhere}
-.resource-window.opponent{background:#fbf5f0;border-left-color:#b0624f}
-.resource-window header{display:flex;flex-wrap:wrap;gap:3px 12px;justify-content:space-between;font-size:13px}
-.resource-window header span{font-variant-numeric:tabular-nums;color:var(--muted);font-size:12px}
-.resource-window p{margin:5px 0 0;font-size:12px;line-height:1.6}.resource-window .resource-advice{color:#52614e}.resource-age{font-weight:600}
-.resource-more{font-size:12px;margin-top:6px}.resource-more summary{cursor:pointer;padding:5px}.resource-more article{margin-top:6px}
-@media(max-width:600px){.resource-columns{grid-template-columns:minmax(0,1fr);gap:7px}.resource-window{padding:9px 10px}}
+/* Resource review: one primary player, opponent as context. */
+.resource-window{padding:14px 16px;background:#f6f8f3;border:1px solid #dbe4d5;border-radius:10px;color:#263e30}
+.resource-window header{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:#596853}
+.resource-window header>div{display:flex;align-items:center;gap:8px}.resource-window time{font-variant-numeric:tabular-nums}
+.resource-icons{display:inline-flex;gap:3px}.resource-icons svg{width:18px;height:18px;stroke-width:1.5;stroke:currentColor;fill:currentColor;fill-opacity:.18;stroke-linejoin:round;stroke-linecap:round}
+.resource-icons .food{color:#a27a37}.resource-icons .wood{color:#84623f}.resource-icons .gold{color:#bd8c1c}.resource-icons .stone{color:#788085}
+.resource-metrics{display:grid;grid-template-columns:1.25fr 1fr 1.1fr;gap:14px;margin:15px 0 13px;align-items:end}
+.resource-metrics>div{min-width:0}.resource-metrics dt{display:flex;align-items:center;gap:4px;font-size:12px;color:#64715c;white-space:nowrap}
+.resource-metrics dt svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.resource-metrics dd{margin:5px 0 0;font-size:25px;font-weight:650;line-height:1.2;font-variant-numeric:tabular-nums;letter-spacing:-.6px;white-space:nowrap}
+.resource-metrics .resource-primary dd{font-size:36px;color:#28583c}.resource-metrics .resource-duration{font-size:20px;letter-spacing:-.5px}
+.resource-opponent-line{display:flex;flex-wrap:wrap;gap:3px 8px;align-items:baseline;border-top:1px solid #e0e6da;padding-top:10px;font-size:12px;color:#687461}
+.resource-opponent-line strong{font-size:15px;color:#4f5f48;font-variant-numeric:tabular-nums}.resource-opponent-line>span:last-child{margin-left:auto}
+.resource-window .resource-age{margin:9px 0 0;font-size:12px;font-weight:600}.resource-actions{display:flex;flex-wrap:wrap;gap:5px;padding:0;margin:10px 0 0;list-style:none}
+.resource-actions li{padding:3px 7px;background:#eaf0e4;border-radius:4px;font-size:11px;color:#526447}
+.resource-more{font-size:12px;margin-top:8px}.resource-more summary{cursor:pointer;padding:6px 0;color:#617056}.resource-more article{margin-top:7px}
+.resource-opponent-details ul{margin:0;padding:0;list-style:none}.resource-opponent-details li{display:flex;flex-wrap:wrap;gap:4px 10px;padding:9px 0;border-top:1px solid var(--border)}
+.resource-opponent-details li time{font-variant-numeric:tabular-nums;color:var(--muted)}.resource-opponent-details li>span:last-child{flex-basis:100%;color:var(--muted)}
+@media(max-width:420px){.resource-window{padding:12px}.resource-metrics{gap:8px}.resource-metrics .resource-primary dd{font-size:30px}.resource-metrics dd{font-size:22px}.resource-metrics .resource-duration{font-size:17px}.resource-opponent-line>span:last-child{margin-left:0}}

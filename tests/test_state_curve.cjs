@@ -94,3 +94,24 @@ test('insights omit empty cards and do not invent spending, losses or legacy mis
  // A restored recording is usable for its observed absolute time window only.
  assert.equal(resourceInsights(sustained,{recording_restored:true,full_timeline:[]},null)[0][0].start,300);
 });
+
+test('peak is the highest observed balance within the displayed window, not after it',()=>{
+ const c={points:[[290,1800,500],[310,2400,600],[330,1200,700],[350,1700,900],[370,9999,9999],[420,0,0]]};
+ const [w]=resourceWindows(c,1);
+ assert.equal(w.start,300);assert.equal(w.end,370);
+ assert.equal(w.own.peak,2400);assert.equal(w.opponent.peak,900);
+ assert.equal(w.own.mean,1771);
+});
+
+test('compact review prioritizes one own card and compares opponent at the same time',()=>{
+ const c={points:sustained.points.map(p=>[p[0],p[1],1600])};
+ const html=renderInsights(c,{}, {},true);
+ assert.equal((html.match(/<article /g)||[]).length,1);
+ assert.match(html,/resource-icons/);assert.match(html,/평균 보유/);
+ assert.match(html,/최대 보유/);assert.match(html,/1분 10초/);
+ assert.match(html,/같은 시간 상대 평균/);assert.match(html,/나보다 400 적음/);
+ assert.doesNotMatch(html,/resource-columns|resource-advice|상대가 자원을/);
+ const detailed=renderInsights(c,{},{});
+ assert.match(detailed,/<details class="resource-more resource-opponent-details"><summary>/);
+ assert.doesNotMatch(detailed,/resource-opponent-details" open/);
+});
