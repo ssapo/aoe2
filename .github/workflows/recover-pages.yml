@@ -1,0 +1,37 @@
+name: Recover stuck Pages deployment
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/recover-pages.yml']
+permissions:
+  pages: write
+jobs:
+  cancel-stuck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            // Only the timed-out resource-card deployment. Never cancel another release.
+            const deploymentId = '479d26c9f2d2dedd9bc7fc5935e2c26f71424016';
+            const params = { ...context.repo, deploymentId };
+            const active = new Set(['queued', 'deployment_in_progress', 'syncing_files', 'updating_pages']);
+            async function status() {
+              try {
+                const r = await github.request('GET /repos/{owner}/{repo}/pages/deployments/{deploymentId}', params);
+                core.info('Pages status: ' + r.data.status);
+                return r.data.status;
+              } catch (e) {
+                if (e.status === 404) return 'missing';
+                throw e;
+              }
+            }
+            if (!active.has(await status())) return;
+            await github.request('POST /repos/{owner}/{repo}/pages/deployments/{deploymentId}/cancel', params);
+            for (let n = 0; n < 20; n++) {
+              if (!active.has(await status())) return;
+              await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+            throw new Error('The old Pages deployment is still active after cancellation');
