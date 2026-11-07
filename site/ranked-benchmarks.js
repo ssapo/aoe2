@@ -22,6 +22,20 @@
     if(!Array.isArray(metrics?.full_timeline))return null;
     return metrics.full_timeline.some(e=>e.kind==='BUILD'&&e.label==='Town Center'&&finite(e.seconds)&&e.seconds<=at)?'expansion':'single';
   }
+  function ownWindows(curve,duration,state){
+    if(!state?.valid(curve))return [];
+    const points=curve.points.map(p=>p.length===5?[p[0],p[1],p[3]]:p),end=Math.min(finite(duration)?duration:points.at(-1)[0],points.at(-1)[0]),rows=[];
+    for(let start=300;start<end;start+=300){
+      const from=Math.max(start,points[0][0]),stop=Math.min(start+300,end);
+      if(stop-from<60)continue;
+      const segments=points.slice(0,-1).filter((p,i)=>points[i+1][0]-p[0]<=30&&p[0]<stop&&points[i+1][0]>from);
+      const covered=points.slice(0,-1).reduce((sum,p,i)=>sum+(points[i+1][0]-p[0]<=30?Math.max(0,Math.min(stop,points[i+1][0])-Math.max(from,p[0])):0),0);
+      if(covered<(stop-from)*.9)continue;
+      const own=state.stats(points,1,from,stop),opponent=state.stats(points,2,from,stop);
+      if(own&&opponent)rows.push({start:from,end:stop,value:own.mean,peak:Math.max(...segments.map(p=>p[1])),opponent:opponent.mean});
+    }
+    return rows;
+  }
   function select(source,context,pick){
     if(source?.schema_version!==1||!finite(source.min_rating)||source.min_rating<2000||!Array.isArray(source.samples)||!context.opening)return null;
     const candidates=source.samples.filter(s=>s&&s.match_id!==context.matchId&&s.profile_id!==context.profileId&&s.map===context.map&&s.opening===context.opening&&finite(s.rating)&&s.rating>=source.min_rating).map(s=>({sample:s,value:pick(s)})).filter(r=>finite(r.value));
@@ -42,7 +56,7 @@
   }
   function compare(match,profileId,source,state){
     const a=match?.analysis,m=a?.metrics,own=a?.review?.own;
-    const result={resources:[],ages:[],villagers:[],minRating:source?.min_rating||2000};
+    const result={resources:[],ages:[],villagers:[],ownResources:ownWindows(a?.state_curve,a?.duration_game_seconds,state),minRating:source?.min_rating||2000};
     if(!a||!own?.available||m?.recording_restored||source?.schema_version!==1)return result;
     const context={matchId:match.id,profileId,map:match.map,civilization:a.civilization,opening:own.opening};
     const add=(kind,label,value,reference,more={})=>{if(reference)result[kind].push({label,value,reference,delta:value-reference.median,...more});};
@@ -66,18 +80,20 @@
     return result;
   }
   function render(result,compact=false){
-    if(!result||!['resources','ages','villagers'].some(k=>result[k].length))return '';
+    if(!result||!['resources','ages','villagers','ownResources'].some(k=>result[k]?.length))return '';
     const basis=r=>`${r.reference.sameCiv?'같은 문명':'문명 혼합'} · ${r.reference.players}명 / ${r.reference.matches}경기`;
     const gap=(r,time=false)=>r.delta===0?'기준과 같음':`${num(Math.abs(r.delta))}${time?'초':''} ${time?(r.delta>0?'늦음':'빠름'):(r.delta>0?'많음':'적음')}`;
     const hero=[...result.resources].sort((a,b)=>(b.delta>0)-(a.delta>0)||Math.abs(b.delta)-Math.abs(a.delta)||a.at-b.at)[0];
     const heroHtml=hero?`<article class="ranked-resource resource-window"><header><div>${global.SSAPOStateCurve?.resourceIcons||''}<span>보유 자원 합계</span></div><time>${clock(hero.start)}–${clock(hero.end)}</time></header><dl class="resource-metrics"><div class="resource-primary"><dt>내 평균</dt><dd>${num(hero.value)}</dd></div><div><dt>${result.minRating}+ 중앙값</dt><dd>${num(hero.reference.median)}</dd></div><div><dt>기준과 차이</dt><dd class="ranked-gap">${num(Math.abs(hero.delta))}<small>${hero.delta>0?'많음':hero.delta<0?'적음':'같음'}</small></dd></div></dl><p class="ranked-basis">${esc(hero.reference.openingLabel)} · ${basis(hero)}</p></article>`:'';
+    const ownHero=[...(result.ownResources||[])].sort((a,b)=>b.value-a.value||a.start-b.start)[0];
+    const fallbackHtml=!hero&&ownHero?`<article class="ranked-resource resource-window"><header><div>${global.SSAPOStateCurve?.resourceIcons||''}<span>보유 자원 합계</span></div><time>${clock(ownHero.start)}–${clock(ownHero.end)}</time></header><dl class="resource-metrics"><div class="resource-primary"><dt>내 평균</dt><dd>${num(ownHero.value)}</dd></div><div><dt>최대 보유</dt><dd>${num(ownHero.peak)}</dd></div><div><dt>확인 구간</dt><dd class="resource-duration">${Math.round((ownHero.end-ownHero.start)/60*10)/10}분</dd></div></dl><div class="resource-opponent-line"><span>같은 시간 상대 평균</span><strong>${num(ownHero.opponent)}</strong></div></article>`:'';
     const row=(r,time=false)=>`<tr><th scope="row">${esc(r.label)}</th><td>${time?clock(r.value):num(r.value)}</td><td>${time?clock(r.reference.median):num(r.reference.median)}<small class="cell-meta"><span>${r.reference.sameCiv?'같은 문명':'문명 혼합'}</span><span>${r.reference.players}명·${r.reference.matches}경기</span></small></td><td>${gap(r,time)}</td></tr>`;
     const table=(rows,time)=>`<div class="table-scroll"><table class="timeline comparison ranked-table"><thead><tr><th>항목</th><th>나</th><th>${result.minRating}+<span>중앙값</span></th><th>차이</th></tr></thead><tbody>${rows.map(r=>row(r,time)).join('')}</tbody></table></div>`;
     const age=result.ages.find(r=>r.age==='성주')||result.ages[0],villager=result.villagers.find(r=>r.at===900)||result.villagers[0];
-    const quick=[age,villager].filter(Boolean).map(r=>`<div><span>${esc(r.label)}</span><strong>${result.ages.includes(r)?clock(r.value):num(r.value)}</strong><span>기준 ${result.ages.includes(r)?clock(r.reference.median):num(r.reference.median)} · ${gap(r,result.ages.includes(r))}</span></div>`).join('');
-    const details=compact?`<div class="ranked-quick">${quick}</div>`:[['ages','시대업',true],['villagers','시간대별 주민 요청',false],['resources','시간대별 자원',false]].filter(([key])=>result[key].length).map(([key,title,time])=>`<details class="ranked-details"><summary>${title} 비교</summary>${table(result[key],time)}</details>`).join('');
+    const quick=[age,villager].filter(Boolean).map(r=>`<div><span>${esc(r.label)}</span><strong>${result.ages.includes(r)?clock(r.value):num(r.value)}</strong><span>${result.minRating}+ 기준 ${result.ages.includes(r)?clock(r.reference.median):num(r.reference.median)} · ${gap(r,result.ages.includes(r))}</span></div>`).join('');
+    const details=compact?(quick?`<div class="ranked-quick">${quick}</div>`:''):[['ages','시대업',true],['villagers','시간대별 주민 요청',false],['resources','시간대별 자원',false]].filter(([key])=>result[key].length).map(([key,title,time])=>`<details class="ranked-details"><summary>${title} 비교</summary>${table(result[key],time)}</details>`).join('');
     const names=[...new Set(['resources','ages','villagers'].flatMap(k=>result[k].flatMap(r=>r.reference.names)))];
-    return `<section class="ranked-benchmarks"><div class="panel-toolbar"><h3 class="detail-heading">상위권과 비교</h3>${compact?'<button class="subtle" data-open-panel="numbers">자세히 →</button>':''}</div>${heroHtml}${details}${compact?'':`<details class="ranked-details ranked-sources"><summary>비교 선수 · RM 1v1 ${result.minRating}+</summary><p>${names.map(esc).join(' · ')}</p></details>`}</section>`;
+    return `<section class="ranked-benchmarks"><div class="panel-toolbar"><h3 class="detail-heading">${hero||!ownHero?'상위권과 비교':'내 자원 흐름'}</h3>${compact?'<button class="subtle" data-open-panel="numbers">자세히 →</button>':''}</div>${heroHtml||fallbackHtml}${details}${compact||!names.length?'':`<details class="ranked-details ranked-sources"><summary>비교 선수 · RM 1v1 ${result.minRating}+</summary><p>${names.map(esc).join(' · ')}</p></details>`}</section>`;
   }
   const api={select,compare,render,stageAt,tcBand};
   if(typeof module==='object'&&module.exports)module.exports=api;else global.SSAPORankedBenchmarks=api;

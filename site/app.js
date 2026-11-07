@@ -575,7 +575,7 @@
   $('#collection-dismiss').addEventListener('click',()=>{collectionWatch.stop();directCollection.stop();collectionRequestSerial++;collectBusy=false;render();$('#collection-feedback').hidden=true;});
   $('#match-dialog').addEventListener('close',()=>document.body.classList.remove('review-open'));
   $('#open-settings').addEventListener('click',openSettings);
-  $('#refresh').addEventListener('click',()=>{filter='all';visible=12;syncFilter();load().then(ok=>toast(ok?'새로고침 완료':'조회 실패. 연결 상태 확인.'));});
+  $('#refresh').addEventListener('click',()=>window.location.reload());
   document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>document.getElementById(b.dataset.close).close()));
   document.querySelectorAll('dialog').forEach(d=>d.addEventListener('click',e=>{if(e.target===d){const r=d.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)d.close();}}));
   function syncFilter(){document.querySelectorAll('[data-filter]').forEach(b=>{b.classList.toggle('selected',b.dataset.filter===filter);b.setAttribute('aria-pressed',String(b.dataset.filter===filter));});}

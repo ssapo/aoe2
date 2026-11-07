@@ -42,3 +42,17 @@ test('render keeps one hero, no fixed 1000 judgement or false rates, escapes sou
  assert.match(b.render(r,true),/10:03/);
  assert.equal(b.render({resources:[],ages:[],villagers:[]}), '');
 });
+
+test('own resource card survives missing or mismatched reference data without inventing benchmarks',()=>{
+ const points=Array.from({length:61},(_,i)=>[i*10,2000,500]);
+ const match={id:42,map:'Arabia',analysis:{duration_game_seconds:600,state_curve:{points}}};
+ const c=b.compare(match,99,null,state),html=b.render(c,true);
+ assert.equal(c.resources.length,0);assert.equal(c.ownResources[0].value,2000);
+ assert.equal(c.ownResources[0].peak,2000);assert.equal(c.ownResources[0].opponent,500);
+ assert.match(html,/내 자원 흐름/);assert.match(html,/최대 보유/);assert.match(html,/2,000/);
+ assert.doesNotMatch(html,/2000\+|중앙값|1,000 이상|비교 선수|NaN|undefined/);
+ const legacy={...match,analysis:{...match.analysis,state_curve:{points:points.map(p=>[p[0],p[1],null,p[2],999])}}};
+ assert.deepEqual(b.compare(legacy,99,source,state).ownResources,c.ownResources);
+ const gap={...match,analysis:{...match.analysis,state_curve:{points:[[300,2000,500],[600,2000,500]]}}};
+ assert.equal(b.compare(gap,99,null,state).ownResources.length,0);
+});
