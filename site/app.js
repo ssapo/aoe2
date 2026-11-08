@@ -60,7 +60,7 @@
     const delta=Number.isFinite(a)&&Number.isFinite(b)?Math.floor(a)-Math.floor(b):null;
     return {a,b,reached,delta,text:delta===null?'비교 기록 부족':delta===0?'같은 시각':`${Math.abs(delta)}초 ${delta<0?'빠름':'늦음'}`};
   }
-  function renderAgePanel(mine,theirs,other,ranked) {
+  function renderAgePanel(mine,theirs,other,ranked,housing) {
     const available=agesIn(mine,theirs);
     if(!available.length)return '<p class="panel-empty">시대 전환 기록 없음</p>';
     return `<div class="panel-toolbar"><div class="segments" role="group" aria-label="비교할 시대">${available.map((age,i)=>`<button data-age="${age}" aria-pressed="${i===0}">${age}</button>`).join('')}</div><span class="toolbar-note">나 / 상대 비교</span></div>`+available.map((age,i)=>{
@@ -75,8 +75,9 @@
         ['시대가 바뀐 시각',fmtTime(left.reached_seconds),fmtTime(right.reached_seconds)],
         ['주민 생산 요청 · 누적',requests(left),requests(right)],
         ['다른 유닛 생산 요청 · 누적',prior(left),prior(right)],
-        ['누르기 전 2분간 생산 요청',recent(left),recent(right)]
-      ],other)+'</section>';
+        ['누르기 전 2분간 생산 요청',recent(left),recent(right)],
+        ...(age==='봉건'?window.SSAPOHousing?.rows(housing)||[]:[])
+      ],other)+(age==='봉건'?window.SSAPOHousing?.note(housing)||'':'')+'</section>';
     }).join('');
   }
   function renderProductionPanel() {
@@ -465,9 +466,9 @@
       const highlights=agesIn(mine,theirs).map(age=>{
         const d=ageDifference(mine,theirs,age);
         return `<button class="highlight ${d.delta===null||d.delta===0?'':d.delta<0?'ahead':'behind'}" data-open-panel="ages" data-open-age="${age}"><span>${age} ${d.reached?'도달':'클릭'}</span><strong>${esc(d.text)}</strong><small>나 ${fmtTime(d.a)} · 상대 ${fmtTime(d.b)}</small></button>`;
-      }).join('');
+      }).join('')+(window.SSAPOHousing?.highlight(a.housing)||'');
       const tabs=[['summary','복기'],['numbers','수치'],['ages','시대업'],['production','생산·연구'],['timeline','경기 흐름']];
-      workspace=header+`<nav class="review-tabs" role="tablist" aria-label="경기 분석 항목">${tabs.map(([id,title],i)=>`<button role="tab" id="tab-${id}" aria-controls="panel-${id}" aria-selected="${i===0}" tabindex="${i===0?0:-1}" data-panel="${id}">${title}</button>`).join('')}</nav><div class="review-body"><section id="panel-summary" role="tabpanel" aria-labelledby="tab-summary" tabindex="0"><div class="highlights">${highlights||'<p class="compact-note">비교할 시대 전환 기록 없음</p>'}</div>${window.SSAPORankedBenchmarks?.render(ranked,true)||''}${renderReview(m)}${renderBasics(mine,theirs,other)}</section><section id="panel-numbers" role="tabpanel" aria-labelledby="tab-numbers" tabindex="0" hidden>${window.SSAPORankedBenchmarks?.render(ranked)||''}${window.SSAPOStateCurve?.render(a.state_curve,mine,theirs)||''}${renderNumbersPanel(a.review,mine,theirs,other)}</section><section id="panel-ages" role="tabpanel" aria-labelledby="tab-ages" tabindex="0" hidden>${renderAgePanel(mine,theirs,other,ranked)}</section><section id="panel-production" role="tabpanel" aria-labelledby="tab-production" tabindex="0" hidden>${renderProductionPanel()}</section><section id="panel-timeline" role="tabpanel" aria-labelledby="tab-timeline" tabindex="0" hidden>${renderTimelinePanel(a)}</section></div>`+links;
+      workspace=header+`<nav class="review-tabs" role="tablist" aria-label="경기 분석 항목">${tabs.map(([id,title],i)=>`<button role="tab" id="tab-${id}" aria-controls="panel-${id}" aria-selected="${i===0}" tabindex="${i===0?0:-1}" data-panel="${id}">${title}</button>`).join('')}</nav><div class="review-body"><section id="panel-summary" role="tabpanel" aria-labelledby="tab-summary" tabindex="0"><div class="highlights">${highlights||'<p class="compact-note">비교할 시대 전환 기록 없음</p>'}</div>${window.SSAPORankedBenchmarks?.render(ranked,true)||''}${renderReview(m)}${renderBasics(mine,theirs,other)}</section><section id="panel-numbers" role="tabpanel" aria-labelledby="tab-numbers" tabindex="0" hidden>${window.SSAPORankedBenchmarks?.render(ranked)||''}${window.SSAPOStateCurve?.render(a.state_curve,mine,theirs)||''}${renderNumbersPanel(a.review,mine,theirs,other)}</section><section id="panel-ages" role="tabpanel" aria-labelledby="tab-ages" tabindex="0" hidden>${renderAgePanel(mine,theirs,other,ranked,a.housing)}</section><section id="panel-production" role="tabpanel" aria-labelledby="tab-production" tabindex="0" hidden>${renderProductionPanel()}</section><section id="panel-timeline" role="tabpanel" aria-labelledby="tab-timeline" tabindex="0" hidden>${renderTimelinePanel(a)}</section></div>`+links;
     }
     $('#match-detail').innerHTML=`<div class="review-workspace">${workspace}</div>`;
     if(a)bindWorkspace($('#match-detail .review-workspace'),mine,theirs,other,a.review,a.map_view,m);

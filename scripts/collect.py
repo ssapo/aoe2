@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MAX_DOWNLOAD = 64 * 1024 * 1024
 MAX_REPLAY = 256 * 1024 * 1024
 AGE_IDS = {101: '봉건', 102: '성주', 103: '왕정'}
-ANALYSIS_REVISION = 10
+ANALYSIS_REVISION = 11
 
 
 def now():
@@ -296,16 +296,22 @@ def analyze_replay(raw, own_id):
         curve = state_curve(decoded, match, own)
     except Exception:
         curve = None
+    try:
+        from housing import housing
+        housed = housing(decoded, match, own)
+    except Exception:
+        housed = None
     opponents = [{'name': p.name, 'civilization': p.civilization, 'random_civ': randoms.get(p.profile_id), 'metrics': dict(command_metrics(match, p), **detailed_metrics(match, p), food_evidence=food.get(p.number), berry_switches=berry.get(p.number))}
                  for p in match.players if p.number != own.number and p not in (own.team or [])]
     return {
         'parser': 'mgz', 'analysis_revision': ANALYSIS_REVISION, 'duration_game_seconds': seconds(match.duration + match.restored_at),
         'civilization': own.civilization, 'random_civ': randoms.get(own.profile_id), 'map': match.map.name, 'map_view': map_view,
-        'metrics': own_metrics, 'opponents': opponents, 'state_curve': curve,
+        'metrics': own_metrics, 'opponents': opponents, 'state_curve': curve, 'housing': housed,
         'insights': coaching(own_metrics, opponents, len(match.players)),
         'limitations': ['생산 지시량은 양수 amount의 합. 생산 완료·생존 수가 아니며 취소·자원 부족·인구 제한을 반영하지 않습니다. 건설·연구 명령도 실제 완료와 다를 수 있습니다.',
                         '시대 도달 시각은 시스템 알림이 있는 경우에만 표시합니다. 생산 지시량으로 실제 주민 수를 추정하지 않습니다.',
-                        'TC 유휴시간, 교전 손실, 승패의 인과관계는 이 버전에서 계산하지 않습니다. 쌓아둔 자원 합과 오브젝트 수는 게임이 리플에 남긴 값(약 7~15초 간격)이며 유닛 종류별로 나뉘지 않습니다.'],
+                        'TC 유휴시간, 교전 손실, 승패의 인과관계는 이 버전에서 계산하지 않습니다. 쌓아둔 자원 합과 오브젝트 수는 게임이 리플에 남긴 값(약 7~15초 간격)이며 유닛 종류별로 나뉘지 않습니다.',
+                        '봉건 전 인구 막힘은 생산·건설 명령을 다시 돌린 추정입니다. 일꾼 위치, 주민 사망, 식량 부족으로 거절된 생산 요청을 정확히 알 수 없어 시작 시각이 주민 1명분(약 25초) 달라질 수 있습니다.'],
     }
 
 
