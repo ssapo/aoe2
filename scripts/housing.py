@@ -16,7 +16,8 @@ Values come from the DE data file (train and research times, civilization bonuse
 them). Not known from the recording: where a builder stands (estimated from its last ordered
 point at 0.8 tiles/s), villagers dying, the food at a queue order (estimated from the
 checkpoints' stockpile sums, split by what the villagers were sent to gather). Each block is
-therefore an estimate, and short ones are not reported.
+therefore an estimate, and short ones are not reported. A player who starts without a Town
+Center (Steppe, nomad) is left out: the map sets that start's population cap.
 """
 import io
 import math
@@ -465,6 +466,8 @@ def player_housing(orders, player, civ, until, checkpoints=(), objects=None):
     tcs = [o for o in player.objects if getattr(o, 'object_id', None) in TC_IDS]
     home = (tcs[0].position.x, tcs[0].position.y) if tcs else (player.position.x, player.position.y)
     pop = sum(1 for o in player.objects if o.class_id == 70 and o.name and o.name not in LIVESTOCK)
+    if not tcs or pop > tc_pop * len(tcs):
+        return None       # a start without a Town Center (Steppe, nomad): its population cap is not known
     where = {o.instance_id: (o.position.x, o.position.y) for o in player.objects if o.class_id == 70}
     builders, last = Builders(where, home), []
     tc_ids = {o.instance_id for o in tcs}

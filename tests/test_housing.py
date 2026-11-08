@@ -77,6 +77,12 @@ class HousingTests(TestCase):
         r = H.player_housing(orders, player(), 'Franks', 40)
         self.assertEqual(r['blocks'][0], {'from_seconds': 25.0, 'to_seconds': 40.0, 'seconds': 15.0, 'population': '5/5'})
 
+    def test_start_without_town_center_is_left_out(self):
+        p = player()
+        p.objects = [o for o in p.objects if o.class_id != 80]
+        self.assertIsNone(H.player_housing([queue(0, 3)], p, 'Britons', 200))
+        self.assertIsNone(H.player_housing([queue(0, 3)], player(villagers=6), 'Britons', 200))
+
     def test_short_blocks_are_dropped(self):
         orders = [queue(0, 3)]
         r = H.player_housing(orders, player(), 'Franks', 25 + H.MIN_BLOCK - 1)
