@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-09T02:02:20.298057+00:00",
-  "last_checked_at": "2026-11-09T02:02:10.085727+00:00",
+  "updated_at": "2026-11-09T09:52:59.302928+00:00",
+  "last_checked_at": "2026-11-09T09:52:54.467725+00:00",
   "sync_error": null,
   "profile": {
     "id": 199325,
@@ -325640,7 +325640,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 10,
+        "analysis_revision": 12,
         "duration_game_seconds": 2159.21,
         "civilization": "Saracens",
         "random_civ": true,
@@ -387586,6 +387586,24 @@
             "opponent_floating_seconds": 462
           }
         },
+        "housing": {
+          "source": "replayed_orders",
+          "min_block_seconds": 10.0,
+          "own": {
+            "until_seconds": 374.3,
+            "blocks": [],
+            "refused_queue": 5,
+            "blocked_seconds": 0,
+            "feudal_clicked": true
+          },
+          "opponent": {
+            "until_seconds": 393.8,
+            "blocks": [],
+            "refused_queue": 5,
+            "blocked_seconds": 0,
+            "feudal_clicked": true
+          }
+        },
         "insights": [
           {
             "kind": "strength",
@@ -387605,7 +387623,8 @@
         "limitations": [
           "생산 지시량은 양수 amount의 합. 생산 완료·생존 수가 아니며 취소·자원 부족·인구 제한을 반영하지 않습니다. 건설·연구 명령도 실제 완료와 다를 수 있습니다.",
           "시대 도달 시각은 시스템 알림이 있는 경우에만 표시합니다. 생산 지시량으로 실제 주민 수를 추정하지 않습니다.",
-          "TC 유휴시간, 교전 손실, 승패의 인과관계는 이 버전에서 계산하지 않습니다. 쌓아둔 자원 합과 오브젝트 수는 게임이 리플에 남긴 값(약 7~15초 간격)이며 유닛 종류별로 나뉘지 않습니다."
+          "TC 유휴시간, 교전 손실, 승패의 인과관계는 이 버전에서 계산하지 않습니다. 쌓아둔 자원 합과 오브젝트 수는 게임이 리플에 남긴 값(약 7~15초 간격)이며 유닛 종류별로 나뉘지 않습니다.",
+          "봉건 전 인구 막힘은 생산·건설 명령을 다시 돌린 추정입니다. 일꾼 위치, 주민 사망, 식량 부족으로 거절된 생산 요청을 정확히 알 수 없어 시작 시각이 주민 1명분(약 25초) 달라질 수 있습니다."
         ],
         "review": {
           "revision": 2,
@@ -387970,7 +387989,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 10,
+        "analysis_revision": 12,
         "duration_game_seconds": 951.57,
         "civilization": "Jurchens",
         "random_civ": true,
@@ -420055,6 +420074,24 @@
             "opponent_floating_seconds": 0
           }
         },
+        "housing": {
+          "source": "replayed_orders",
+          "min_block_seconds": 10.0,
+          "own": {
+            "until_seconds": 397.4,
+            "blocks": [],
+            "refused_queue": 11,
+            "blocked_seconds": 0,
+            "feudal_clicked": true
+          },
+          "opponent": {
+            "until_seconds": 401.1,
+            "blocks": [],
+            "refused_queue": 1,
+            "blocked_seconds": 0,
+            "feudal_clicked": true
+          }
+        },
         "insights": [
           {
             "kind": "review",
@@ -420067,7 +420104,8 @@
         "limitations": [
           "생산 지시량은 양수 amount의 합. 생산 완료·생존 수가 아니며 취소·자원 부족·인구 제한을 반영하지 않습니다. 건설·연구 명령도 실제 완료와 다를 수 있습니다.",
           "시대 도달 시각은 시스템 알림이 있는 경우에만 표시합니다. 생산 지시량으로 실제 주민 수를 추정하지 않습니다.",
-          "TC 유휴시간, 교전 손실, 승패의 인과관계는 이 버전에서 계산하지 않습니다. 쌓아둔 자원 합과 오브젝트 수는 게임이 리플에 남긴 값(약 7~15초 간격)이며 유닛 종류별로 나뉘지 않습니다."
+          "TC 유휴시간, 교전 손실, 승패의 인과관계는 이 버전에서 계산하지 않습니다. 쌓아둔 자원 합과 오브젝트 수는 게임이 리플에 남긴 값(약 7~15초 간격)이며 유닛 종류별로 나뉘지 않습니다.",
+          "봉건 전 인구 막힘은 생산·건설 명령을 다시 돌린 추정입니다. 일꾼 위치, 주민 사망, 식량 부족으로 거절된 생산 요청을 정확히 알 수 없어 시작 시각이 주민 1명분(약 25초) 달라질 수 있습니다."
         ],
         "review": {
           "revision": 2,
