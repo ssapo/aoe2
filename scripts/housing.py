@@ -73,7 +73,7 @@ def read_orders(decoded, restored):
     while True:
         start = handle.tell()
         head = handle.read(9)
-        flags = ''
+        flags, cancel = '', None
         if len(head) == 9 and struct.unpack_from('<I', head)[0] == fast.Operation.ACTION.value \
                 and head[8] in offsets:
             body = handle.read(struct.unpack_from('<I', head, 4)[0] - 1)
@@ -82,6 +82,9 @@ def read_orders(decoded, restored):
                 flags += 'q'
             if d is not None and len(body) > d and body[d]:
                 flags += 'd'
+        elif len(head) == 9 and struct.unpack_from('<I', head)[0] == fast.Operation.ACTION.value \
+                and head[8] == fast.Action.SPECIAL.value:
+            cancel = _cancel(handle.read(struct.unpack_from('<I', head, 4)[0] - 1))
         handle.seek(start)
         try:
             kind, value = fast.operation(handle)
@@ -93,7 +96,24 @@ def read_orders(decoded, restored):
             action, payload = value
             if action in wanted:
                 rows.append((clock / 1000 + restored, payload.get('player_id'), action.name, payload, flags))
+            elif cancel is not None:
+                rows.append((clock / 1000 + restored, payload.get('player_id'), 'CANCEL', cancel, ''))
     return rows
+
+
+def _cancel(body):
+    """UNIT_ORDER (0x75) action 4: a building's queue gives back the unit at an index.
+
+    genie `commands/unit_order.rs`: the unit index at +0x18, the action at +0x1c, shift (up to
+    five of the kind) at +0x1d, the ids from +0x21 with their count at +0x4. The body starts one
+    byte into the command; mgz's own SPECIAL parse reads the ids one byte off."""
+    if len(body) < 36 or body[27] != 4:
+        return None
+    count = struct.unpack_from('<i', body, 3)[0]
+    if not 0 < count <= 60 or len(body) < 32 + 4 * count:
+        return None
+    return {'object_ids': list(struct.unpack_from(f'<{count}I', body, 32)),
+            'index': struct.unpack_from('<i', body, 23)[0], 'batch': 5 if body[28] else 1}
 
 
 def _point(payload):
@@ -322,6 +342,11 @@ class Economy:
         for k in ('food', 'wood'):
             self.stock[k] = max(0.0, self.stock[k] + diff * self.stock[k] / fw)
 
+    def refund(self, cost):
+        for k, v in cost.items():
+            self.stock[k] += v
+            self.spent_since -= v
+
     def pay(self, cost, count=1):
         """How many of `count` the stock pays (each costing `cost`), paying them."""
         paid = 0
@@ -394,7 +419,40 @@ class Production:
         return sum(c for when, c in self.caps if when <= t)
 
     def add(self, building, item):
-        self.state.setdefault(building, {'q': [], 'busy_until': None, 'unit': None, 'wait_from': None})['q'].append(item)
+        self.state.setdefault(building, {'q': [], 'busy_until': None, 'unit': None, 'item': None, 'wait_from': None})['q'].append(item)
+
+    def cancel(self, building, index, batch):
+        """The queue gives back the entry at unit `index` (0: the one being made or waiting),
+        up to `batch` of its kind; the items given back."""
+        s = self.state.get(building)
+        if s is None or index < 0:
+            return []
+        busy = s['busy_until'] is not None
+        line = ([s['item']] if busy else []) + s['q']
+        if index >= len(line):
+            return []
+        target = line[index]
+        gone = [target]
+        if target[0] == 'unit':
+            for item in line[index + 1:]:
+                if len(gone) >= batch or item != target:
+                    break
+                gone.append(item)
+        drop = len(gone)
+        if busy and index == 0:
+            if s['unit'] is not None:
+                self.in_training -= 1
+            s['busy_until'], s['unit'], s['item'] = None, None, None
+            drop -= 1
+            start = 0
+        else:
+            start = index - (1 if busy else 0)
+        if start == 0 and s['wait_from'] is not None and drop:
+            self.blocks.append((s['wait_from'], self.t))     # the waiting unit is given back
+            s['wait_from'] = None
+        del s['q'][start:start + drop]
+        self._start()
+        return gone
 
     def drop_units(self, building, count):
         q = self.state.get(building, {}).get('q', [])
@@ -418,7 +476,7 @@ class Production:
                 if s['wait_from'] is not None:
                     self.blocks.append((s['wait_from'], self.t))
                     s['wait_from'] = None
-                s['q'].pop(0)
+                s['item'] = s['q'].pop(0)
                 s['busy_until'] = self.t + seconds
                 s['unit'] = unit if kind == 'unit' else None
                 self.in_training += kind == 'unit'
@@ -440,7 +498,7 @@ class Production:
                         self.pop += 1
                         if self.on_birth:
                             self.on_birth(s['unit'])
-                    s['busy_until'], s['unit'] = None, None
+                    s['busy_until'], s['unit'], s['item'] = None, None, None
             self._start()
             self.timeline.append((self.t, self.pop, self.cap_at(self.t)))   # unrounded: a block starting at a birth reads the new population
         self.t = max(self.t, t)
@@ -553,6 +611,14 @@ def _replay(own, player, civ, until, caps, tcs, home, checkpoints, objects, pop)
             continue
         building = ids[0]
         rate = work if building in tc_ids else 1.0
+        if kind == 'CANCEL':
+            for item, _, what in production.cancel(building, payload['index'], payload['batch']):
+                if item == 'tech':
+                    researched.discard(what)
+                if economy:
+                    cost = UNIT_COST.get(what, {}) if item == 'unit' else TECH_COST.get(what, {})
+                    economy.refund({k: v * (cost_scale.get(what, 1.0) if item == 'unit' else 1.0) for k, v in cost.items()})
+            continue
         if kind == 'DE_QUEUE':
             unit, amount = payload.get('unit_id'), payload.get('amount') or 0
             if unit not in TRAIN:
@@ -575,7 +641,7 @@ def _replay(own, player, civ, until, caps, tcs, home, checkpoints, objects, pop)
             if economy:
                 economy.pay(TECH_COST.get(tech, {}))
             seconds = 0.0 if tech in instant else RESEARCH[tech] * scale.get(tech, 1.0) / rate
-            production.add(building, ('tech', seconds, None))
+            production.add(building, ('tech', seconds, tech))
     production.finish(until)
     return production, refused
 

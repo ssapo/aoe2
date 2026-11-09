@@ -88,6 +88,38 @@ class HousingTests(TestCase):
         r = H.player_housing([queue(0, 2), queue(0.04, 1)], player(), 'Franks', 60)
         self.assertEqual(r['blocks'][0]['population'], '5/5')
 
+    def test_cancelling_the_waiting_unit_ends_the_block_and_loom_runs(self):
+        # 5th villager at 25; the 6th waits; at 40 it is given back (index 0), loom then runs.
+        cancel = (40, 1, 'CANCEL', {'object_ids': [10], 'index': 0, 'batch': 1}, '')
+        loom = (41, 1, 'RESEARCH', {'object_ids': [10], 'technology_id': H.LOOM}, '')
+        r = H.player_housing([queue(0, 2), cancel, loom], player(), 'Franks', 120)
+        self.assertEqual(r['blocks'], [{'from_seconds': 25.0, 'to_seconds': 40.0, 'seconds': 15.0, 'population': '5/5'}])
+        self.assertEqual(r['timeline'][-1][1:], (5, 5))
+
+    def test_cancel_index_counts_the_unit_being_made(self):
+        p = H.Production(4, [(0.0, 50)])
+        for _ in range(3):
+            p.add(10, ('unit', 25.0, 83))
+        p.advance(1)
+        self.assertEqual(p.cancel(10, 1, 1), [('unit', 25.0, 83)])        # a queued one
+        self.assertEqual(len(p.state[10]['q']), 1)
+        self.assertEqual(p.cancel(10, 0, 1), [('unit', 25.0, 83)])        # the one being made
+        self.assertEqual(p.in_training, 1)                                  # the last one started
+        self.assertEqual(p.cancel(10, 5, 1), [])
+        q = H.Production(4, [(0.0, 50)])
+        for _ in range(7):
+            q.add(10, ('unit', 25.0, 83))
+        q.advance(1)
+        self.assertEqual(len(q.cancel(10, 1, 5)), 5)                        # shift: up to five
+        self.assertEqual(len(q.state[10]['q']), 1)
+
+    def test_cancel_packet_bytes(self):
+        # UNIT_ORDER from replay 519700670 at 6:06: the Town Center 4031 gives back unit 1.
+        body = bytes.fromhex('02210001000000ffffffff0000000000000000ffffffff010000000400000100bf0f0000')
+        self.assertEqual(H._cancel(body), {'object_ids': [4031], 'index': 1, 'batch': 1})
+        garrison = bytearray(body); garrison[27] = 5
+        self.assertIsNone(H._cancel(bytes(garrison)))
+
     def test_short_blocks_are_dropped(self):
         orders = [queue(0, 3)]
         r = H.player_housing(orders, player(), 'Franks', 25 + H.MIN_BLOCK - 1)
