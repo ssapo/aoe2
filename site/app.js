@@ -23,6 +23,7 @@
   let selectedName=selectedProfile===26260702?'ssapo':selectedProfile===199325?'Hera':`프로필 ${selectedProfile}`;
   let catalog=null,searchSequence=0,collectBusy=false,collectionRequestSerial=0;
   const liveReports=new Map();
+  const Stored=window.SSAPOReportStore,reportStore=Stored.createStore();
   const dataPath=(id,file)=>id===26260702?`data/${file}`:`data/profiles/${id}/${file}`;
   const fmtTime = (s) => Number.isFinite(s) ? `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}` : '—';
   const date = (stamp) => stamp ? new Date(typeof stamp === 'number' ? stamp*1000 : stamp).toLocaleString('ko-KR',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '아직 수집 전';
@@ -486,18 +487,26 @@
     $('#refresh').disabled=true;
     try {
       if(window.SSAPO_BOOTSTRAP&&id===26260702){await rankedJob;if(id!==selectedProfile)return false;report=structuredClone(window.SSAPO_BOOTSTRAP);render();return true;}
+      const savedJob=reportStore.get(id);
       const response=await fetch(`${dataPath(id,'report.json')}?t=${Date.now()}`,{cache:'no-store'});
       if(id!==selectedProfile)return false;
-      if(response.status===404&&id!==26260702){report=liveReports.get(id)||{schema_version:1,profile:{id,name:selectedName},matches:[],pending_profile:true};render();return true;}
+      if(response.status===404&&id!==26260702){const saved=await savedJob;if(id!==selectedProfile)return false;report=Stored.newest(id,liveReports.get(id),saved)||{schema_version:1,profile:{id,name:selectedName},matches:[],pending_profile:true};render();return true;}
       if(!response.ok)throw Error(`HTTP ${response.status}`);
       const incoming=await response.json();
+      const saved=await savedJob;
       await rankedJob;
       if(id!==selectedProfile)return false;
-      if(incoming.schema_version!==1||!Array.isArray(incoming.matches)||incoming.profile?.id!==id)throw Error('Profile report mismatch');
-      const live=liveReports.get(id);report=live&&Date.parse(live.last_checked_at)>=Date.parse(incoming.last_checked_at)?live:incoming;selectedName=report.profile.name||selectedName;render();return true;
+      if(!Stored.valid(incoming,id))throw Error('Profile report mismatch');
+      // A direct collection's result (this tab or saved in this browser) wins until a newer one is published.
+      report=Stored.newest(id,incoming,liveReports.get(id),saved);selectedName=report.profile.name||selectedName;render();
+      if(report===incoming&&Stored.time(incoming)>Stored.time(saved))reportStore.put(incoming);
+      return true;
     } catch(error) {
       if(id!==selectedProfile)return false;
-      report={...report,sync_error:'결과 파일을 읽지 못했어요. 잠시 후 다시 확인해 주세요.'};render();console.warn('Report loading failed:',error.message);return false;
+      // Keep what was shown or saved: a failed fetch (e.g. during a Pages deploy) must not empty the list.
+      const kept=Stored.newest(id,report,liveReports.get(id),await reportStore.get(id));
+      if(id!==selectedProfile)return false;
+      report={...(kept||report),sync_error:'결과 파일을 읽지 못했어요. 잠시 후 다시 확인해 주세요.'};render();console.warn('Report loading failed:',error.message);return false;
     } finally {if(id===selectedProfile)$('#refresh').disabled=false;}
   }
   async function selectProfile(id,name,writeUrl=true){
@@ -535,12 +544,13 @@
   }
   const directCollection=window.createCollectionClient({
     onState:state=>{
-      const messages={waking:['수집 서버를 준비하고 있어요','서버가 쉬고 있었다면 시작까지 약 1분 걸릴 수 있어요.'],requesting:['수집을 요청하고 있어요','잠시만 기다려 주세요.'],running:['경기와 리플을 분석하고 있어요','완료되면 이 화면에 결과를 표시해요.'],complete:['수집 결과를 불러왔어요','새 결과는 현재 탭에서 유지돼요. 예약 수집 기록은 따로 저장돼요.']};
+      const messages={waking:['수집 서버를 준비하고 있어요','서버가 쉬고 있었다면 시작까지 약 1분 걸릴 수 있어요.'],requesting:['수집을 요청하고 있어요','잠시만 기다려 주세요.'],running:['경기와 리플을 분석하고 있어요','완료되면 이 화면에 결과를 표시해요.'],complete:['수집 결과를 불러왔어요','새 결과는 이 브라우저에 저장돼서 새로고침해도 남아요. 다음 예약 수집이 끝나면 그 결과로 바뀌어요.']};
       collectionMessage(...messages[state]);
     },
     applyReport:async incoming=>{
       if(incoming.profile.id!==selectedProfile)return;
       liveReports.set(selectedProfile,incoming);report=incoming;selectedName=incoming.profile.name||selectedName;render();
+      await reportStore.put(incoming);
     }
   });
   async function requestCollection(){

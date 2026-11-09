@@ -531,6 +531,13 @@ python scripts/build_preview.py /tmp/SSAPO_AoE2_preview.html
 - 테스트 추가: 중복 요청 통합·전체 동시 실행 제한·잘못된 계정 결과 차단·잘못된 입력·POST 실패·수집 취소·클라이언트 계정 검증. 현재 Python 36개 + Node 16개 = 52개 통과. 서버 로컬 검사와 배포 후 실제 수집 확인을 구분한다.
 - 배포 경로: public feature branch로 Free 웹서비스 생성 → /health 확인 → 실제 계정 1회 수집 검증 → endpoint를 프런트 설정에 기록 → 기존 Pages main에 묶어서 반영. 서버 주소는 https://ssapo-aoe2-collect.onrender.com 이다.
 
+### 2026-11-10 새로고침해도 기록 유지
+
+- 문제: 직접 수집 결과가 탭 메모리(`liveReports`)에만 있어서 새로고침하면 Pages의 예전 `report.json`(검색한 프로필은 404 → 빈 목록)으로 돌아갔다. 또 Pages 배포 중 등 결과 파일을 못 읽으면 목록이 빈 채로 오류만 보였다.
+- `site/report-store.js`: 프로필별 최신 보고서를 이 브라우저의 IndexedDB(`ssapo-aoe2`/`reports`)에 저장한다. 15MB급 보고서도 저장된다(실제 Chromium에서 확인). IndexedDB가 없거나 실패하면 조용히 건너뛴다.
+- `loadReport`: 공개 보고서·탭 결과·저장본 중 `last_checked_at`이 가장 늦은 것을 보여준다(같으면 공개본). 공개본이 저장본보다 새로우면 저장본을 공개본으로 바꾼다. 404면 탭 결과나 저장본, 읽기 실패면 보이던 목록이나 저장본을 유지하고 오류 문구만 붙인다.
+- 직접 수집 완료 시 결과를 저장한다. 안내 문구도 "이 브라우저에 저장돼서 새로고침해도 남아요"로 바꿨다. 다른 기기·브라우저에는 공유되지 않는다(서버 저장 아님).
+
 ### 2026-11-03 직접 수집 서버 연결
 
 - 사용자가 배포한 https://ssapo-aoe2-collect.onrender.com 을 collection-service.json에 연결. 운영 화면의 수집 버튼은 GitHub 링크 대신 준비·수집·분석·결과 표시를 같은 사이트에서 진행.
