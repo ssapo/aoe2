@@ -83,6 +83,11 @@ class HousingTests(TestCase):
         self.assertIsNone(H.player_housing([queue(0, 3)], p, 'Britons', 200))
         self.assertIsNone(H.player_housing([queue(0, 3)], player(villagers=6), 'Britons', 200))
 
+    def test_block_reads_population_after_the_birth_it_starts_at(self):
+        # the 5th villager appears at 25.0 and the 6th waits from then: 5/5, not 4/5
+        r = H.player_housing([queue(0, 2), queue(0.04, 1)], player(), 'Franks', 60)
+        self.assertEqual(r['blocks'][0]['population'], '5/5')
+
     def test_short_blocks_are_dropped(self):
         orders = [queue(0, 3)]
         r = H.player_housing(orders, player(), 'Franks', 25 + H.MIN_BLOCK - 1)
@@ -95,7 +100,7 @@ class HousingTests(TestCase):
         incas = H.player_housing([queue(0, 3), build(0, [20], 22.0, 23.0)], player(), 'Incas', 200)
         self.assertEqual(max(cap for _, _, cap in incas['timeline']), 15)
         persians = H.player_housing([queue(0, 1)], player(), 'Persians', 100)
-        self.assertAlmostEqual(persians['timeline'][1][0], round(25 / 1.05, 1))
+        self.assertAlmostEqual(persians['timeline'][1][0], 25 / 1.05)
 
     def test_food_estimate_refuses_unaffordable_queue_orders(self):
         # 200 food: four villagers are paid, the fifth is refused until more is gathered.

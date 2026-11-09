@@ -442,7 +442,7 @@ class Production:
                             self.on_birth(s['unit'])
                     s['busy_until'], s['unit'] = None, None
             self._start()
-            self.timeline.append((round(self.t, 1), self.pop, self.cap_at(self.t)))
+            self.timeline.append((self.t, self.pop, self.cap_at(self.t)))   # unrounded: a block starting at a birth reads the new population
         self.t = max(self.t, t)
         self._start()
 
