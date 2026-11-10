@@ -96,7 +96,7 @@ index d2edcddb..717eaa39 100644
 +        .or(Some(id))
 +}
 diff --git a/crates/engine/genie-core/src/garrison/let_out.rs b/crates/engine/genie-core/src/garrison/let_out.rs
-index e526db7f..515c626e 100644
+index e526db7f..d4937d04 100644
 --- a/crates/engine/genie-core/src/garrison/let_out.rs
 +++ b/crates/engine/genie-core/src/garrison/let_out.rs
 @@ -132,7 +132,10 @@ impl World {
@@ -111,23 +111,30 @@ index e526db7f..515c626e 100644
              return Err(GenieError::unsupported(
                  "an unload whose unit finds no spot (its later rings)",
              ));
-@@ -438,6 +441,16 @@ pub(super) fn let_out_aim(
-             LetOutAim::Target(g)
-         }
-         Some(g) if g.state == GatherPointState::Kept => LetOutAim::Point(g.point.ground()),
-+        // HYPOTHESIS (from the truth log, villager 4375 at 232.1 s; not read in the code): a
-+        // gather point on the building itself still sends the unit to its point
-+        Some(g)
-+            if point.x() == NO_POINT
-+                && g.state == GatherPointState::Point
-+                && g.target == Some(building)
-+                && std::env::var_os("GENIE_EXPERIMENT_UNLOAD_188329").is_some() =>
+diff --git a/crates/engine/genie-core/src/garrison/unit.rs b/crates/engine/genie-core/src/garrison/unit.rs
+index d8742d52..8d4a2c63 100644
+--- a/crates/engine/genie-core/src/garrison/unit.rs
++++ b/crates/engine/genie-core/src/garrison/unit.rs
+@@ -466,7 +466,18 @@ impl Unit {
+         self.enter_sight(c, target, at, building_radius, placed, bm)?;
+         let mut bell = c.w.parts.town_bell_of(id);
+         let ai = c.w.parts.unit_ai.get(id);
+-        self.enter_town_bell((&mut bell, ai), Some(target), at, state, (me, bm), roles)?;
++        // 188329 (0x12bacf0): the back-to-work record's target is the head action's target (else
++        // the AI's first own queued order, not modelled here); a unit that came in without an
++        // action on the building (a new unit whose gather point is its own building) records no
++        // target and the building's place as its point
++        let recorded = if std::env::var_os("GENIE_EXPERIMENT_UNLOAD_188329").is_some()
++            && actions.top_target() != Some(target.id())
 +        {
-+            LetOutAim::Point(g.point.ground())
-+        }
-         _ => LetOutAim::Point(point),
++            None
++        } else {
++            Some(target)
++        };
++        self.enter_town_bell((&mut bell, ai), recorded, at, state, (me, bm), roles)?;
+         c.w.parts.set_town_bell(id, bell);
+         Ok(())
      }
- }
 diff --git a/crates/engine/genie-core/src/gathering/hunt/gathering.rs b/crates/engine/genie-core/src/gathering/hunt/gathering.rs
 index 2df7dd4b..f5744a6e 100644
 --- a/crates/engine/genie-core/src/gathering/hunt/gathering.rs
