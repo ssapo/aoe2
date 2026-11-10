@@ -227,6 +227,239 @@ index 84934264..5b6c494a 100644
              range: q.range,
              range2: FixedDistanceSquared::of(q.range),
          }
+diff --git a/crates/engine/genie-core/src/production/spawn/objects.rs b/crates/engine/genie-core/src/production/spawn/objects.rs
+index 9e0c8f61..17c5e310 100644
+--- a/crates/engine/genie-core/src/production/spawn/objects.rs
++++ b/crates/engine/genie-core/src/production/spawn/objects.rs
+@@ -84,6 +84,10 @@ impl World {
+             gather: toward,
+             walls,
+         };
++        // DIAGNOSTIC: the spawn search's site
++        if std::env::var_os("GENIE_TRACE_SPAWN").is_some() {
++            eprintln!("SPAWNSITE player={:?} site={:?} unit_radius={:?}", p, site, made.radius);
++        }
+         let moving = made.move_stats.ok_or(NOT_MOVING)?;
+         let restriction = self
+             .spatial
+@@ -104,6 +108,40 @@ impl World {
+         };
+         let map = WorldMap { turns: self };
+         let spatial = &self.spatial;
++        if std::env::var_os("GENIE_EXPERIMENT_SPAWN_188329").is_some() {
++            let (cx, cy) = (position.x(), position.y());
++            let (hx, hy) = (site_master.radius.x(), site_master.radius.y());
++            spatial.check_known(Rect::new(cx - hx - 3.0, cy - hy - 3.0, cx + hx + 3.0, cy + hy + 3.0))?;
++            let blocked = moving.restriction_mask.blocked() | 0x4000;
++            let tiles = spatial.tiles();
++            let passable = |x: i32, y: i32| {
++                tiles
++                    .word(crate::map::Tile::new(x, y))
++                    .is_some_and(|w| w & blocked == 0)
++            };
++            let found = crate::production::spawn::search::spawn_point_188329(
++                &site,
++                made.radius,
++                &mut |spot| {
++                    let (x, y) = (spot.x(), spot.y());
++                    let (rx, ry) = (made.radius.x(), made.radius.y());
++                    spatial.check_known(Rect::new(x - rx, y - ry, x + rx, y + ry))?;
++                    placement(
++                        &placing,
++                        &map,
++                        spot,
++                        ZoneTest::Skipped,
++                        &self.model.roles,
++                        &self.model.tuning.spawn,
++                    )
++                },
++                &passable,
++            );
++            if std::env::var_os("GENIE_TRACE_SPAWN").is_some() {
++                eprintln!("SPAWN188329 player={:?} found={:?}", p, found);
++            }
++            return found;
++        }
+         spawn_point(
+             &site,
+             made.radius,
+diff --git a/crates/engine/genie-core/src/production/spawn/search.rs b/crates/engine/genie-core/src/production/spawn/search.rs
+index e5f89e13..9c56d3e3 100644
+--- a/crates/engine/genie-core/src/production/spawn/search.rs
++++ b/crates/engine/genie-core/src/production/spawn/search.rs
+@@ -79,6 +79,172 @@ pub fn spawn_point(
+     ))
+ }
+ 
++/// EXPERIMENT (`GENIE_EXPERIMENT_SPAWN_188329`): the spawn point as build 188329 finds it
++/// (`0x1288c20`). A grid of tiles two around the building holds each tile's steps (`passable`
++/// tiles only, four ways) from the ring of tiles beside the building and the passable tiles under
++/// it. Rings of candidates lie around the building: the unit's radius plus a hundredth out, then
++/// one step (twice the radius plus 1e-4) further each, as many as fit in two tiles; then the same
++/// rings inward. Each ring walks its low-y side from high x down, its high-x side up, its high-y
++/// side from low x up and its low-x side down. A candidate counts on a tile fewer than three
++/// steps away where the placement `test` is free. The first ring with candidates gives the one
++/// nearest the gather point (the first made of equals; without a gather point, the point left of
++/// and above the building by the radii).
++///
++/// Not modelled: with a tile path of two points or more from the building to the gather point
++/// the game orders the candidates first by their tiles' steps from the path's last point but one
++/// (`0x12796a0`), and skips a ring whose best cannot be reached from it.
++pub fn spawn_point_188329(
++    site: &Site,
++    unit: Footprint,
++    test: &mut dyn FnMut(Point) -> Result<Tested, GenieError>,
++    passable: &dyn Fn(i32, i32) -> bool,
++) -> Result<Point, GenieError> {
++    let (cx, cy) = (site.position.x(), site.position.y());
++    let (hx, hy) = (site.radius.x(), site.radius.y());
++    let (rx, ry) = (unit.x(), unit.y());
++    let (x0, y0, x1, y1) = (cx - hx, cy - hy, hx + cx, hy + cy);
++    let wide = ((x1 - x0) + 0.999) as i64 as u32;
++    let high = ((y1 - y0) + 0.999) as i64 as u32;
++    let least = wide.min(high);
++    let grid_w = wide.max(1) + 4;
++    let grid_h = high.max(1) + 4;
++    let (oxf, oyf) = (x0 - 2.0, y0 - 2.0);
++    let (ox, oy) = (oxf as i32, oyf as i32);
++    let (lx, ly) = ((x0 - 1.0) as i64 as u32 as i32, (y0 - 1.0) as i64 as u32 as i32);
++    let (tx, ty) = (x1 as i64 as u32 as i32, y1 as i64 as u32 as i32);
++    let mut steps = vec![10000_i16; (grid_w * grid_h) as usize];
++    let mut queue: std::collections::VecDeque<(u16, u16, i16)> = std::collections::VecDeque::new();
++    let mut seed = |q: &mut std::collections::VecDeque<(u16, u16, i16)>, x: i32, y: i32| {
++        if passable(x, y) {
++            q.push_back(((x - ox) as u16, (y - oy) as u16, 0));
++        }
++    };
++    if passable(lx + 1, ly) || passable(lx, ly + 1) {
++        seed(&mut queue, lx, ly);
++    }
++    for x in lx + 1..tx {
++        seed(&mut queue, x, ly);
++    }
++    if passable(tx - 1, ly) || passable(tx, ly + 1) {
++        seed(&mut queue, tx, ly);
++    }
++    for y in ly + 1..ty {
++        seed(&mut queue, tx, y);
++    }
++    if passable(tx - 1, ty) || passable(tx, ty - 1) {
++        seed(&mut queue, tx, ty);
++    }
++    for x in lx + 1..tx {
++        seed(&mut queue, x, ty);
++    }
++    if passable(lx + 1, ty) || passable(lx, ty - 1) {
++        seed(&mut queue, lx, ty);
++    }
++    for y in ly + 1..ty {
++        seed(&mut queue, lx, y);
++    }
++    for y in ly + 1..ty {
++        for x in lx + 1..tx {
++            seed(&mut queue, x, y);
++        }
++    }
++    while let Some((gx, gy, d)) = queue.pop_front() {
++        let i = (u32::from(gx) + u32::from(gy) * grid_w) as usize;
++        let Some(cell) = steps.get_mut(i) else { continue };
++        if d < *cell {
++            *cell = d;
++            for (dx, dy) in [(1_i16, 0_i16), (-1, 0), (0, -1), (0, 1)] {
++                let (nx, ny) = (gx.wrapping_add(dx as u16), gy.wrapping_add(dy as u16));
++                if u32::from(nx) < grid_w && u32::from(ny) < grid_h {
++                    let j = (u32::from(ny) * grid_w + u32::from(nx)) as usize;
++                    let there = steps.get(j).copied().unwrap_or(-1);
++                    if there != -1 && d + 1 < there && passable(ox + i32::from(nx), oy + i32::from(ny))
++                    {
++                        queue.push_back((nx, ny, d + 1));
++                    }
++                }
++            }
++        }
++    }
++    let gather = site
++        .gather
++        .unwrap_or_else(|| Point::new(cx - (hx + rx), hy + ry + cy));
++    let (off_x, off_y) = (rx + 0.01, ry + 0.01);
++    let (step_x, step_y) = (rx + rx + 1e-4, ry + ry + 1e-4);
++    let widest = rx.max(ry).max(0.1);
++    let out_rings = (2.0 / (widest + widest)) as i64 as u32;
++    let rings = ((least as f32 / (widest + widest)) as i64 as u32).wrapping_add(out_rings);
++    for n in 0..rings {
++        let (dx, dy) = if n < out_rings {
++            (
++                step_x * n as f32 + off_x + hx,
++                n as f32 * step_y + off_y + hy,
++            )
++        } else {
++            let m = n - out_rings;
++            (
++                (off_x + hx) - m as f32 * step_x,
++                (off_y + hy) - m as f32 * step_y,
++            )
++        };
++        let (lo_x, lo_y, hi_x) = (cx - dx, cy - dy, dx + cx);
++        let mut hi_y = cy + dy;
++        let mut found: Vec<Point> = Vec::new();
++        let mut try_at = |x: f32, y: f32, found: &mut Vec<Point>| -> Result<(), GenieError> {
++            let i = ((y - oyf) as i64 as i32)
++                .wrapping_mul(grid_w as i32)
++                .wrapping_add((x - oxf) as i64 as i32) as u32 as usize;
++            if steps.get(i).is_some_and(|&d| d < 3)
++                && test(Point::new(x, y))? == Tested::Free
++            {
++                found.push(Point::new(x, y));
++            }
++            Ok(())
++        };
++        let mut x = hi_x;
++        while lo_x + step_x <= x {
++            try_at(x, lo_y, &mut found)?;
++            x -= step_x;
++        }
++        let mut y = lo_y;
++        loop {
++            y += step_y;
++            if !(y <= hi_y) {
++                break;
++            }
++            try_at(hi_x, y, &mut found)?;
++        }
++        let mut x = lo_x;
++        while x <= hi_x - step_x {
++            try_at(x, hi_y, &mut found)?;
++            x += step_x;
++        }
++        loop {
++            hi_y -= step_y;
++            if !(lo_y <= hi_y) {
++                break;
++            }
++            try_at(lo_x, hi_y, &mut found)?;
++        }
++        let key = |p: &Point| {
++            let (fy, fx) = (gather.y() - p.y(), gather.x() - p.x());
++            fy * fy + fx * fx
++        };
++        let mut best: Option<Point> = None;
++        for p in &found {
++            if best.is_none_or(|b| key(p) < key(&b)) {
++                best = Some(*p);
++            }
++        }
++        if let Some(p) = best {
++            return Ok(p);
++        }
++    }
++    Err(GenieError::unsupported(
++        "a spawn point no ring about the building holds",
++    ))
++}
++
+ /// Where a run's spots lie and which way each tries its next point: above the building (up),
+ /// below it (down), left of it or right of it (out).
+ #[derive(Clone, Copy)]
 diff --git a/crates/engine/genie-core/src/unit_ai/unit.rs b/crates/engine/genie-core/src/unit_ai/unit.rs
 index 9dfdf3ce..09030b99 100644
 --- a/crates/engine/genie-core/src/unit_ai/unit.rs
