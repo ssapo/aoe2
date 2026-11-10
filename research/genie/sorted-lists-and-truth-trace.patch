@@ -251,6 +251,47 @@ index 84934264..5b6c494a 100644
              range: q.range,
              range2: FixedDistanceSquared::of(q.range),
          }
+diff --git a/crates/engine/genie-core/src/pathing/short_path/nodes.rs b/crates/engine/genie-core/src/pathing/short_path/nodes.rs
+index 6b1e956f..bd77ed9d 100644
+--- a/crates/engine/genie-core/src/pathing/short_path/nodes.rs
++++ b/crates/engine/genie-core/src/pathing/short_path/nodes.rs
+@@ -298,6 +298,36 @@ impl Search<'_> {
+         };
+         let low = if e < s { e } else { s };
+         let high = if s < e { e } else { s };
++        if super::build_188329() {
++            // 188329 (`0x1082180`): the edge's crossings of the goal's box (its point ± the sum
++            // of the radius and the half size) come first, the one nearer the edge's start
++            // before the other (`0x107cdd0`: strictly inside the edge); the foot only when
++            // neither is taken
++            let rr = if dx != 0 { self.goal.rrx.get() } else { self.goal.rry.get() };
++            let (near, far) = if s <= e {
++                (gv.wrapping_sub(rr), gv.wrapping_add(rr))
++            } else {
++                (gv.wrapping_add(rr), gv.wrapping_sub(rr))
++            };
++            for v in [near, far] {
++                if low < v && v < high {
++                    let point = if dx != 0 {
++                        FixedPoint::new(v, a.y())
++                    } else {
++                        FixedPoint::new(a.x(), v)
++                    };
++                    let g = g0.wrapping_add(FixedDistance::new((v.wrapping_sub(s)).wrapping_abs()));
++                    if self.goal_test(Corner {
++                        cost: g,
++                        parent,
++                        run,
++                        point,
++                    })? {
++                        return Ok(());
++                    }
++                }
++            }
++        }
+         if low <= gv && gv <= high {
+             let foot = if dx != 0 {
+                 FixedPoint::new(gv, a.y())
 diff --git a/crates/engine/genie-core/src/production/spawn/objects.rs b/crates/engine/genie-core/src/production/spawn/objects.rs
 index 9e0c8f61..17c5e310 100644
 --- a/crates/engine/genie-core/src/production/spawn/objects.rs
@@ -548,7 +589,7 @@ index 8c22fa57..15f31bd7 100644
          let out = list.out_at(i);
          let gone = list.swap_remove(i)?;
 diff --git a/crates/tools/genie-oracle/src/census.rs b/crates/tools/genie-oracle/src/census.rs
-index 0904afb4..65997412 100644
+index 0904afb4..383ebafd 100644
 --- a/crates/tools/genie-oracle/src/census.rs
 +++ b/crates/tools/genie-oracle/src/census.rs
 @@ -146,6 +146,12 @@ pub fn census_run(
@@ -572,7 +613,21 @@ index 0904afb4..65997412 100644
          if let Ok(raw) = std::env::var("GENIE_TRACE_MOTION") {
              if let Ok(wanted) = raw.parse::<i32>() {
                  for (p, player) in turns.players.iter().enumerate() {
-@@ -208,14 +215,17 @@ pub fn census_run(
+@@ -181,6 +188,13 @@ pub fn census_run(
+             }
+         }
+         census.update(&turns, &sections);
++        // DIAGNOSTIC: GENIE_TRACE_RES=1 prints each human player's food, wood, stone and gold after every update.
++        if std::env::var_os("GENIE_TRACE_RES").is_some() {
++            for (p, state) in turns.players.iter().enumerate().skip(1) {
++                let r: Vec<f32> = state.attributes.iter().take(4).map(|a| a.get()).collect();
++                eprintln!("RES {}", serde_json::json!({"ms": turns.world_time.millis(), "player": p, "res": r}));
++            }
++        }
+         // DIAGNOSTIC: GENIE_DUMP_MS=15000,30000 prints each player's non-zero attributes and live
+         // object counts by master at the first update whose world time reaches each mark.
+         if let Ok(raw) = std::env::var("GENIE_DUMP_MS") {
+@@ -208,14 +222,17 @@ pub fn census_run(
              }
              dump_prev = now;
          }
