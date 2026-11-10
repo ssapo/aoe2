@@ -1,0 +1,87 @@
+diff --git a/crates/engine/genie-core/src/objects/object_list.rs b/crates/engine/genie-core/src/objects/object_list.rs
+index a4790a15..bbe4932f 100644
+--- a/crates/engine/genie-core/src/objects/object_list.rs
++++ b/crates/engine/genie-core/src/objects/object_list.rs
+@@ -206,6 +206,14 @@ impl ObjectList {
+         Ok(slot)
+     }
+ 
++    /// EXPERIMENT (188329): the list in ascending id order, as the running game's live list reads
++    /// (ground-truth memory log, 2026-11-10). Nothing moves while an object is out for its update.
++    pub fn sort_by_id(&mut self) {
++        if self.outs.is_empty() {
++            self.units.sort_by_key(|u| u.id);
++        }
++    }
++
+     /// `unit` goes to the end of the list.
+     pub fn push(&mut self, unit: Unit) {
+         self.units.push(unit);
+diff --git a/crates/engine/genie-core/src/unit_ai/unit.rs b/crates/engine/genie-core/src/unit_ai/unit.rs
+index 9dfdf3ce..09030b99 100644
+--- a/crates/engine/genie-core/src/unit_ai/unit.rs
++++ b/crates/engine/genie-core/src/unit_ai/unit.rs
+@@ -560,6 +560,7 @@ impl Unit {
+                     .map_or(Speed::ZERO, |m| m.stats.speed),
+             ),
+         );
++        let self_id_for_trace = self.id;
+         self.with_side(
+             actions,
+             c,
+@@ -573,6 +574,10 @@ impl Unit {
+                         .after_order(after, world_time, player_kind, &at, ai_stream, side)
+                         .map(|()| None),
+                     (Some(dt), None) => {
++                        // DIAGNOSTIC: which object's full AI update the next draws belong to
++                        if std::env::var_os("GENIE_TRACE_AIUPD").is_some() {
++                            eprintln!("AIUPD id={:?} player={:?} draws_before={}", self_id_for_trace, player, ai_stream.draws);
++                        }
+                         ai.update(dt, world_time, player_kind, &at, ai_stream, side)
+                     }
+                     (None, _) => ai
+diff --git a/crates/tools/genie-oracle/src/census.rs b/crates/tools/genie-oracle/src/census.rs
+index 0904afb4..175c3793 100644
+--- a/crates/tools/genie-oracle/src/census.rs
++++ b/crates/tools/genie-oracle/src/census.rs
+@@ -146,6 +146,11 @@ pub fn census_run(
+             }
+         }
+     }
++    let sort_lists = std::env::var_os("GENIE_EXPERIMENT_SORT_LISTS").is_some();
++    if sort_lists {
++        for player in &mut turns.players { player.objects.sort_by_id(); }
++        turns.reindex();
++    }
+     let initial_time = turns.world_time.millis();
+     let mut elapsed_ms = 0u64;
+     let mut dump_prev = u64::from(turns.world_time.millis());
+@@ -171,6 +176,10 @@ pub fn census_run(
+         } else {
+             run(&mut turns, &mut decoder, from_ref(&frame));
+         }
++        if sort_lists {
++            for player in &mut turns.players { player.objects.sort_by_id(); }
++            turns.reindex();
++        }
+         if let Ok(raw) = std::env::var("GENIE_TRACE_MOTION") {
+             if let Ok(wanted) = raw.parse::<i32>() {
+                 for (p, player) in turns.players.iter().enumerate() {
+@@ -208,14 +217,15 @@ pub fn census_run(
+             }
+             dump_prev = now;
+         }
+-        if std::env::var_os("GENIE_TRACE_OBJECTS").is_some() && [499, 999, 1499].contains(&census.updates) {
++        let trace_range = std::env::var("GENIE_TRACE_OBJECTS_RANGE").ok().and_then(|r| { let mut it = r.split('-'); Some((it.next()?.parse::<u64>().ok()?, it.next()?.parse::<u64>().ok()?)) });
++        if (std::env::var_os("GENIE_TRACE_OBJECTS").is_some() && [499, 999, 1499].contains(&census.updates)) || trace_range.is_some_and(|(a, b)| (a..=b).contains(&(census.updates as u64))) {
+             for (p, state) in turns.players.iter().enumerate().skip(1) {
+                 for u in &state.objects {
+                     let a = crate::header_runs::checkpoint_action(turns.parts.actions_of(u.id), turns.parts.production.get(u.id));
+                     let timer = turns.parts.unit_ai.get(u.id).map(|ai| ai.retarget_timer.get()).unwrap_or(0);
+                     let kind = a.and_then(|a| a.kind).map(|k| k.get());
+                     let action_state = a.map(|a| a.state.get()).unwrap_or(0);
+-                    eprintln!("OBJECT {}", serde_json::json!({"tick":census.updates,"player":p,"id":u.id.get(),"master":u.life.master_id.get(),"position":u.position().get(),"action_kind":kind,"action_state":action_state,"retarget_ms":timer}));
++                    eprintln!("OBJECT {}", serde_json::json!({"ms":turns.world_time.millis(),"tick":census.updates,"player":p,"id":u.id.get(),"master":u.life.master_id.get(),"position":u.position().get(),"action_kind":kind,"action_state":action_state,"retarget_ms":timer}));
+                 }
+             }
+         }

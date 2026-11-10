@@ -13,6 +13,8 @@
 - 보정 모드 `GENIE_CORRECT=ids` 로 518239882는 7:24까지 원본을 주민 2명 차이로 따라간다(보정 없으면 4:44부터 9~10명에 멈춤).
   - 약 9.6분에 엔진이 "a queued move of an object that does not move"로 선수를 멈춘다.
 - **2026-11-10 변경(사용자 결정):** 원본 실행 파일(188329)은 파일 상태로는 코드 약 60%가 암호화돼 있지만, 실행 중 메모리에서는 풀려 있다. 사용자가 방침을 바꿔 **실행 중 메모리에서 읽은 코드를 분석해 원본 동작을 확인한다.** 방법·주소 대응표는 [original-188329-code-map.md](original-188329-code-map.md). 싱글 플레이 실험은 보조 수단이다.
+- **2026-11-10 진전:** 원본 개체별 값을 메모리에서 읽는 기록 도구를 만들었고, 그것으로 첫 불일치(16.0초 word 9 차 555)의 원인을 찾았다. **원본은 선수별 개체 목록이 id 오름차순이고 그 순서로 갱신한다.** 정렬 실험(`GENIE_EXPERIMENT_SORT_LISTS=1`)으로 16.0초 체크포인트가 전부 일치한다. 다음 불일치는 16.2초, 소유권이 바뀐 양의 look-around 시점이다. 자세한 내용과 도구 사용법: [truth-log-findings.md](truth-log-findings.md).
+- 빌드 환경: 사용자 PC `%TEMP%\genie-replays\genie`(Rust 1.99.1, VS 2022). Cowork 클라우드에서는 빌드가 권한 심사에 막힌다. PC에서 `cargo build --release -p genie-oracle --example census`(첫 빌드 6분, 이후 3분), 실행 7초.
 - 엔진의 길찾기 3종(long/short/tile pather)에 대응하는 188329 원본 함수를 찾았다. long pather는 방향 제외 표·확장 한도 상수가 엔진과 같다(같은 문서). short/tile pather는 구조가 같아 보이지만 값 대조는 아직이다. 우선 과제는 그대로 걷는 중 충돌 회피와 양 사체 시점이다.
 - 상세 근거: [original-vs-engine-518239882.md](original-vs-engine-518239882.md).
 
