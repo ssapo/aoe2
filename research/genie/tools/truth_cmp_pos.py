@@ -1,7 +1,7 @@
 import json,struct,sys
 def h(x): return struct.pack('>f',x).hex()
 E={}
-for l in open('runs/pos2.err',errors='replace'):
+for l in open(sys.argv[1] if len(sys.argv)>1 else 'runs/pos2.err',errors='replace'):
     if l.startswith('OBJECT'):
         
         try: r=json.loads(l[7:])

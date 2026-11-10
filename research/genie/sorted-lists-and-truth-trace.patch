@@ -1,5 +1,153 @@
+diff --git a/Cargo.lock b/Cargo.lock
+index 06cee5e6..658d6aaa 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -841,6 +841,7 @@ dependencies = [
+ name = "genie-oracle"
+ version = "0.1.0"
+ dependencies = [
++ "binrw",
+  "flate2",
+  "genie-command-codec",
+  "genie-core",
+diff --git a/Cargo.toml b/Cargo.toml
+index e1267700..178e9ee7 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -183,3 +183,16 @@ absolute_paths = "deny"
+ [workspace.lints.rustdoc]
+ # We run rustdoc with `--document-private-items` so we can document private items
+ private_intra_doc_links = "allow"
++
++[profile.research]
++inherits = "dev"
++opt-level = 0
++debug = false
++debug-assertions = false
++codegen-units = 16
++incremental = true
++lto = false
++
++[profile.research.package."*"]
++opt-level = 0
++codegen-units = 16
+diff --git a/crates/engine/genie-core/src/commands/mod.rs b/crates/engine/genie-core/src/commands/mod.rs
+index d2edcddb..717eaa39 100644
+--- a/crates/engine/genie-core/src/commands/mod.rs
++++ b/crates/engine/genie-core/src/commands/mod.rs
+@@ -290,13 +290,32 @@ impl World {
+         units
+             .iter()
+             .map(|&id| match self.place(id) {
++                Some(p) if p.player() == player => {
++                    crate::correction::claim(player, id);
++                    id
++                }
++                _ if crate::correction::enabled() => crate::correction::unit_id(self, player, id),
++                _ => experiment_remap(id),
++            })
++            .map(|id| match self.place(id) {
+                 Some(p)
+                     if p.player() == player
+                         || self.settings.flags.contains(OptionFlags::CHEATS_ENABLED) =>
+                 {
+                     id
+                 }
+-                _ => None,
++                other => {
++                    if std::env::var_os("GENIE_LOG_DROPPED").is_some() {
++                        eprintln!(
++                            "DROPPED world_ms={} player={} id={:?} holder={:?}",
++                            self.world_time.millis(),
++                            player.index(),
++                            id.map(ObjectId::get),
++                            other.map(|p| p.player().index())
++                        );
++                    }
++                    None
++                }
+             })
+             .collect()
+     }
+@@ -350,3 +369,25 @@ impl World {
+         }
+     }
+ }
++
++/// Diagnostic only (`GENIE_EXPERIMENT_REMAP_IDS="from:to,..."`): a recorded unit id the
++/// simulation allocated to a different object is read as the id the simulation gave the unit,
++/// unless the commanding player holds the recorded id.
++fn experiment_remap(id: Option<ObjectId>) -> Option<ObjectId> {
++    static MAP: std::sync::OnceLock<Vec<(i32, i32)>> = std::sync::OnceLock::new();
++    let map = MAP.get_or_init(|| {
++        std::env::var("GENIE_EXPERIMENT_REMAP_IDS")
++            .unwrap_or_default()
++            .split(',')
++            .filter_map(|pair| {
++                let (a, b) = pair.split_once(':')?;
++                Some((a.trim().parse().ok()?, b.trim().parse().ok()?))
++            })
++            .collect()
++    });
++    let id = id?;
++    map.iter()
++        .find(|(from, _)| *from == id.get())
++        .and_then(|&(_, to)| ObjectId::of_field(to))
++        .or(Some(id))
++}
+diff --git a/crates/engine/genie-core/src/gathering/hunt/unit.rs b/crates/engine/genie-core/src/gathering/hunt/unit.rs
+index 0c37a95e..cc7c3f6f 100644
+--- a/crates/engine/genie-core/src/gathering/hunt/unit.rs
++++ b/crates/engine/genie-core/src/gathering/hunt/unit.rs
+@@ -541,6 +541,18 @@ impl Unit {
+                     "a hunt without a unit AI after its drop-off",
+                 ))?;
+         ai.alert(result, c.dt.seconds());
++        if std::env::var_os("GENIE_LOG_HUNT_SEARCH").is_some() {
++            eprintln!(
++                "HUNT_AFTER_DROP world_ms={} turn={:?} fresh={} unit={} at={:?} class={:?} found={:?}",
++                c.w.world_time.millis(),
++                c.w.player_turn,
++                result.fresh,
++                self.id.get(),
++                self.position().ground(),
++                class,
++                result.id.map(ObjectId::get)
++            );
++        }
+         Ok(result.id)
+     }
+ 
+diff --git a/crates/engine/genie-core/src/groups/update/mod.rs b/crates/engine/genie-core/src/groups/update/mod.rs
+index 0e406949..ed5ae5a2 100644
+--- a/crates/engine/genie-core/src/groups/update/mod.rs
++++ b/crates/engine/genie-core/src/groups/update/mod.rs
+@@ -78,7 +78,10 @@ impl UnitGroup {
+     /// moves or waits to move; else idle.
+     #[must_use]
+     pub fn is_idle(&self) -> bool {
+-        if self.flags.contains(GroupFlags::MEMBERS_SENT) {
++        // 188329 0x10dd870 never reads bit 5 of `+0x140`: no "consider idle" shortcut
++        if self.flags.contains(GroupFlags::MEMBERS_SENT)
++            && std::env::var_os("GENIE_EXPERIMENT_AI_ORDER_188329").is_none()
++        {
+             return true;
+         }
+         if self.current_command == GroupCommandKind::MOVE && self.patrols() {
+diff --git a/crates/engine/genie-core/src/lib.rs b/crates/engine/genie-core/src/lib.rs
+index f639a3e9..ce64ea50 100644
+--- a/crates/engine/genie-core/src/lib.rs
++++ b/crates/engine/genie-core/src/lib.rs
+@@ -34,6 +34,7 @@ pub use genie_error::{ErrorKind, GenieError, GenieResult};
+ 
+ pub mod combat;
+ pub mod commands;
++pub mod correction;
+ pub mod construction;
+ pub mod garrison;
+ pub mod gathering;
 diff --git a/crates/engine/genie-core/src/movement/long_walk.rs b/crates/engine/genie-core/src/movement/long_walk.rs
-index f6314358..ee731a21 100644
+index f6314358..9d7b8d8a 100644
 --- a/crates/engine/genie-core/src/movement/long_walk.rs
 +++ b/crates/engine/genie-core/src/movement/long_walk.rs
 @@ -425,6 +425,7 @@ pub(crate) fn short_path_including(
@@ -15,7 +163,7 @@ index f6314358..ee731a21 100644
          ))?;
      let found = pather.search(mesh, &words, &query, &shapes)?;
 +    // DIAGNOSTIC: the short pather's query and answer
-+    if std::env::var_os("GENIE_TRACE_STEER").is_some() || std::env::var_os("GENIE_TRACE_PATHS").is_some() {
++    if crate::movement::trace_steer() || std::env::var_os("GENIE_TRACE_PATHS").is_some() {
 +        eprintln!(
 +            "SHORTPATH walker={:?} target={} target_shape={:?} ignore_shapes={:?} query={:?} result={:?} points={:?}",
 +            walker.id,
@@ -30,8 +178,42 @@ index f6314358..ee731a21 100644
      for p in to_path(&found.points).points {
          let _ = out.push(p);
      }
+diff --git a/crates/engine/genie-core/src/movement/mod.rs b/crates/engine/genie-core/src/movement/mod.rs
+index 21b160d4..75a167cc 100644
+--- a/crates/engine/genie-core/src/movement/mod.rs
++++ b/crates/engine/genie-core/src/movement/mod.rs
+@@ -586,3 +586,11 @@ pub(crate) fn stop_mover(mover: Option<&mut Mover>) -> Result<(), GenieError> {
+ 
+ #[cfg(test)]
+ pub(crate) mod tests;
++
++/// DIAGNOSTIC: the steering traces are on (`GENIE_TRACE_STEER`, or the tool's update window).
++pub static TRACE_STEER_WINDOW: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
++/// DIAGNOSTIC: whether the steering traces print.
++#[must_use]
++pub fn trace_steer() -> bool {
++    TRACE_STEER_WINDOW.load(std::sync::atomic::Ordering::Relaxed) || std::env::var_os("GENIE_TRACE_STEER").is_some()
++}
+diff --git a/crates/engine/genie-core/src/movement/move_to/mod.rs b/crates/engine/genie-core/src/movement/move_to/mod.rs
+index 8ae7fee5..35ac2065 100644
+--- a/crates/engine/genie-core/src/movement/move_to/mod.rs
++++ b/crates/engine/genie-core/src/movement/move_to/mod.rs
+@@ -117,7 +117,12 @@ impl MoveWait {
+     /// (`+0x6c` 0) waits (`set_state` 2, `+0x6c` 1) a second with a stance (`+0x1a9`) below 2, else
+     /// two, then asks again; any other `MoveTo` fails (`set_state` 13). Returns the `MoveTo`'s
+     /// state.
+-    pub const fn give_up(&mut self, patience: Patience, stance: UnitStance) -> MoveTo {
++    pub fn give_up(&mut self, patience: Patience, stance: UnitStance) -> MoveTo {
++        // 188329 (0xb93260): the MoveTo has no wait timer (object 0x70 bytes, no set_state(2) in
++        // its update); the walk giving up (0xb939cb) is set_state(13) at once for every owner
++        if std::env::var_os("GENIE_EXPERIMENT_MOVETO_188329").is_some() {
++            return MoveTo::Failed;
++        }
+         if !matches!(self.state, MoveWaitState::Never) || matches!(patience, Patience::Fails) {
+             return MoveTo::Failed;
+         }
 diff --git a/crates/engine/genie-core/src/movement/step.rs b/crates/engine/genie-core/src/movement/step.rs
-index 75476db0..63a16095 100644
+index 75476db0..76a92fb9 100644
 --- a/crates/engine/genie-core/src/movement/step.rs
 +++ b/crates/engine/genie-core/src/movement/step.rs
 @@ -566,6 +566,15 @@ impl Mover {
@@ -39,7 +221,7 @@ index 75476db0..63a16095 100644
          let level = self.paths.walked()?;
          let waypoint = point_or_zero_of(level, level.waypoint);
 +        // DIAGNOSTIC: the walked level's points
-+        if std::env::var_os("GENIE_TRACE_STEER").is_some() {
++        if crate::movement::trace_steer() {
 +            eprintln!(
 +                "WALKWP at={:08x},{:08x} wp={:08x},{:08x} index={:?} level={:?} range={:?} points={:?}",
 +                position.x().to_bits(), position.y().to_bits(),
@@ -51,7 +233,7 @@ index 75476db0..63a16095 100644
              self.paths.walked_mut()?.flags |= LevelFlags::REACHED | LevelFlags::AT_WAYPOINT;
              return Ok(Next::Again);
 diff --git a/crates/engine/genie-core/src/movement/walk.rs b/crates/engine/genie-core/src/movement/walk.rs
-index ff48ae22..91a75969 100644
+index ff48ae22..d725068d 100644
 --- a/crates/engine/genie-core/src/movement/walk.rs
 +++ b/crates/engine/genie-core/src/movement/walk.rs
 @@ -152,6 +152,17 @@ impl Mover {
@@ -59,7 +241,7 @@ index ff48ae22..91a75969 100644
          let flat = normalize(flat);
          let (turn, clipped) = self.turn_toward(flat, direction, self.turn_dt(dt, movement_tuning));
 +        // DIAGNOSTIC: the steering inputs' bits
-+        if std::env::var_os("GENIE_TRACE_STEER").is_some() {
++        if crate::movement::trace_steer() {
 +            let m = self.moved_at.vector();
 +            eprintln!(
 +                "STEER at={:08x},{:08x} fwd={:08x},{:08x},{:08x} dir={:08x},{:08x},{:08x} turn={:08x} clipped={}",
@@ -159,7 +341,7 @@ index cdaefff8..70eff0eb 100644
      if ua < 0x1a3 {
          if !(-0x1062..=0x40_1062).contains(&ua) || current <= ua {
 diff --git a/crates/engine/genie-core/src/pathing/short_path/main_loop.rs b/crates/engine/genie-core/src/pathing/short_path/main_loop.rs
-index e9cbaaa4..0a23813e 100644
+index e9cbaaa4..02de6c1c 100644
 --- a/crates/engine/genie-core/src/pathing/short_path/main_loop.rs
 +++ b/crates/engine/genie-core/src/pathing/short_path/main_loop.rs
 @@ -208,7 +208,22 @@ impl Search<'_> {
@@ -186,7 +368,22 @@ index e9cbaaa4..0a23813e 100644
          let mut frac = RayFraction::START;
          let reach = n.g.wrapping_add(float_distance(t, p));
          if !self.beats_goal(reach)? {
-@@ -421,7 +436,25 @@ impl Search<'_> {
+@@ -217,6 +232,14 @@ impl Search<'_> {
+         let mut found = self
+             .ctx
+             .raycast(p, t, &mut frac, Callback::Corner(emit.token))?;
++        // 188329 (0x107fe6b..0x107fe94): a corner node's touching ray goes to the start node's
++        // touch handler (0x107cb80); no nudged rays, no axis L
++        if super::build_188329() {
++            if let Some((Meet::Touch, hit)) = found {
++                self.touch_from(n, p, t, frac, hit)?;
++                return Ok(());
++            }
++        }
+         if touches(found) {
+             let b = self.bounds;
+             for dir in NUDGES {
+@@ -421,7 +444,25 @@ impl Search<'_> {
                  if self.pop_test(&n)? {
                      return Ok(None);
                  }
@@ -213,6 +410,18 @@ index e9cbaaa4..0a23813e 100644
                  let mut frac = RayFraction::START;
                  let found = self.ctx.raycast(p, t, &mut frac, Callback::Box)?;
                  match found {
+@@ -518,7 +559,10 @@ impl Search<'_> {
+                 b.y0()
+             },
+         );
+-        let delta = FixedPoint::new(c.x().wrapping_sub(p.x()), c.y().wrapping_sub(p.y()));
++        // 188329 (0x107cd4c, 0x107cd6e): the legs' directions from the base node (the back-off
++        // waypoint when one was made)
++        let from = if super::build_188329() { base.at } else { p };
++        let delta = FixedPoint::new(c.x().wrapping_sub(from.x()), c.y().wrapping_sub(from.y()));
+         let dir_x = AxisDir::of_dx(delta.x());
+         let dir_y = AxisDir::of_dy(delta.y());
+         self.legs(base, c, dir_x, dir_y, delta)?;
 diff --git a/crates/engine/genie-core/src/pathing/short_path/mod.rs b/crates/engine/genie-core/src/pathing/short_path/mod.rs
 index 84934264..5b6c494a 100644
 --- a/crates/engine/genie-core/src/pathing/short_path/mod.rs
@@ -292,6 +501,43 @@ index 6b1e956f..bd77ed9d 100644
          if low <= gv && gv <= high {
              let foot = if dx != 0 {
                  FixedPoint::new(gv, a.y())
+diff --git a/crates/engine/genie-core/src/pathing/short_path/start.rs b/crates/engine/genie-core/src/pathing/short_path/start.rs
+index 916707bf..f1e13afc 100644
+--- a/crates/engine/genie-core/src/pathing/short_path/start.rs
++++ b/crates/engine/genie-core/src/pathing/short_path/start.rs
+@@ -340,6 +340,32 @@ impl Search<'_> {
+             FixedPoint::new(p.x(), c.y())
+         };
+         let sw = self.ctx.sweep(p, m, a)?;
++        if super::build_188329() {
++            // 188329 (0x107c1b8..0x107c2a5): the legs cost their real axis distances, plain
++            // integers: to the sweep's point, or to the turn and from it to the second's point
++            let axis = |u: FixedPoint, v: FixedPoint, x: bool| {
++                FixedDistance::new(if x {
++                    u.x().wrapping_sub(v.x()).wrapping_abs()
++                } else {
++                    u.y().wrapping_sub(v.y()).wrapping_abs()
++                })
++            };
++            let x = a.along_x();
++            let (from_g, parent, sw, from, leg_x) = if sw.found {
++                (b.g, b.idx, sw, p, x)
++            } else {
++                let mid = self.add(b.g.wrapping_add(axis(p, m, x)), b.idx, m, Kind::Waypoint);
++                let sw2 = self.ctx.sweep(m, c, second)?;
++                (mid.g, mid.idx, sw2, m, !x)
++            };
++            let (Some(shape), Some(side), Some(at)) = (sw.shape, sw.side, sw.point) else {
++                return Err(GenieError::unsupported(
++                    "an L toward a shape's centre that meets nothing (stack garbage)",
++                ));
++            };
++            self.side_node(from_g.wrapping_add(axis(from, at, leg_x)), parent, shape, side, at);
++            return Ok(());
++        }
+         let (g, parent, sw) = if sw.found {
+             (
+                 through_float(delta.x().wrapping_abs()).wrapping_add(b.g),
 diff --git a/crates/engine/genie-core/src/production/spawn/objects.rs b/crates/engine/genie-core/src/production/spawn/objects.rs
 index 9e0c8f61..17c5e310 100644
 --- a/crates/engine/genie-core/src/production/spawn/objects.rs
@@ -349,10 +595,10 @@ index 9e0c8f61..17c5e310 100644
              &site,
              made.radius,
 diff --git a/crates/engine/genie-core/src/production/spawn/search.rs b/crates/engine/genie-core/src/production/spawn/search.rs
-index e5f89e13..9c56d3e3 100644
+index e5f89e13..3097f92d 100644
 --- a/crates/engine/genie-core/src/production/spawn/search.rs
 +++ b/crates/engine/genie-core/src/production/spawn/search.rs
-@@ -79,6 +79,172 @@ pub fn spawn_point(
+@@ -79,6 +79,178 @@ pub fn spawn_point(
      ))
  }
  
@@ -454,8 +700,9 @@ index e5f89e13..9c56d3e3 100644
 +    for n in 0..rings {
 +        let (dx, dy) = if n < out_rings {
 +            (
-+                step_x * n as f32 + off_x + hx,
-+                n as f32 * step_y + off_y + hy,
++                // the offset and the half size are summed first (0x128997e), then the steps
++                step_x * n as f32 + (off_x + hx),
++                n as f32 * step_y + (off_y + hy),
 +            )
 +        } else {
 +            let m = n - out_rings;
@@ -471,6 +718,11 @@ index e5f89e13..9c56d3e3 100644
 +            let i = ((y - oyf) as i64 as i32)
 +                .wrapping_mul(grid_w as i32)
 +                .wrapping_add((x - oxf) as i64 as i32) as u32 as usize;
++            if std::env::var_os("GENIE_TRACE_SPAWN").is_some() {
++                let st = steps.get(i).copied();
++                let free = test(Point::new(x, y))? == Tested::Free;
++                eprintln!("SPAWNCAND ring={n} x={x} y={y} steps={st:?} free={free}");
++            }
 +            if steps.get(i).is_some_and(|&d| d < 3)
 +                && test(Point::new(x, y))? == Tested::Free
 +            {
@@ -525,11 +777,131 @@ index e5f89e13..9c56d3e3 100644
  /// Where a run's spots lie and which way each tries its next point: above the building (up),
  /// below it (down), left of it or right of it (out).
  #[derive(Clone, Copy)]
+diff --git a/crates/engine/genie-core/src/unit_ai/actions.rs b/crates/engine/genie-core/src/unit_ai/actions.rs
+index 7a8bacbb..b3c4e2f8 100644
+--- a/crates/engine/genie-core/src/unit_ai/actions.rs
++++ b/crates/engine/genie-core/src/unit_ai/actions.rs
+@@ -467,7 +467,12 @@ impl UnitAi {
+         player_kind: PlayerKind,
+         ai: &mut Well512,
+     ) -> Result<(), GenieError> {
+-        if !self.notifies.is_empty() || self.orders.is_empty() {
++        // 188329 0xd443f0 has no pending-notify guard and requires an idle group.
++        let order_188329 = std::env::var_os("GENIE_EXPERIMENT_AI_ORDER_188329").is_some();
++        if (!order_188329 && !self.notifies.is_empty()) || self.orders.is_empty() {
++            return Ok(());
++        }
++        if order_188329 && at.group.is_some_and(|g| !g.contains(GroupState::IDLE)) {
+             return Ok(());
+         }
+         if (self.current_action.is_some() || at.flags.contains(SurroundingFlags::BUSY))
+@@ -563,6 +568,10 @@ impl UnitAi {
+                 let _ = self.orders.remove(k);
+             }
+             if r == OrderOutcome::Taken {
++                // 188329 0xd386d2 finishes pending notifies after taking an order.
++                if std::env::var_os("GENIE_EXPERIMENT_AI_ORDER_188329").is_some() {
++                    self.end_notifies(Millis::ZERO, at, side, ai)?;
++                }
+                 return Ok(());
+             }
+         }
+diff --git a/crates/engine/genie-core/src/unit_ai/idle_animals.rs b/crates/engine/genie-core/src/unit_ai/idle_animals.rs
+index bf5761c6..6154c635 100644
+--- a/crates/engine/genie-core/src/unit_ai/idle_animals.rs
++++ b/crates/engine/genie-core/src/unit_ai/idle_animals.rs
+@@ -153,7 +153,19 @@ impl UnitAi {
+         let reach = (at.speed * unit_ai_tuning.evade_reach).get();
+         let (dx, dy) = (other.x() - x, other.y() - y);
+         let d = sqrt(dy * dy + dx * dx);
+-        let point = Position::new(x - (dx / d) * reach, y - (dy / d) * reach, z);
++        let mut point = Position::new(x - (dx / d) * reach, y - (dy / d) * reach, z);
++        // 188329 evasiveMoveFrom (0xd26200): the move goes to the point at the walked distance
++        // `reach` along the tile planner's path to that target (0x106e0b0). PARTIAL: the path is
++        // taken as the straight one (its two points); a planned path around something is not
++        // modelled here, nor the second target and the four directions (steps 7 and 8).
++        if std::env::var_os("GENIE_EXPERIMENT_EVADE_188329").is_some() {
++            let (sx, sy) = (point.x() - x, point.y() - y);
++            let seg = sqrt(sx * sx + sy * sy);
++            if reach <= seg {
++                let k = reach / seg;
++                point = Position::new(x + k * sx, y + k * sy, z);
++            }
++        }
+         let _ = self.evasive_move(point, (OrderForce::Forced, BadPoint::Kept), at, ai, side)?;
+         Ok(())
+     }
 diff --git a/crates/engine/genie-core/src/unit_ai/unit.rs b/crates/engine/genie-core/src/unit_ai/unit.rs
-index 9dfdf3ce..09030b99 100644
+index dc286d39..4ddecf51 100644
 --- a/crates/engine/genie-core/src/unit_ai/unit.rs
 +++ b/crates/engine/genie-core/src/unit_ai/unit.rs
-@@ -560,6 +560,7 @@ impl Unit {
+@@ -89,9 +89,13 @@ impl Unit {
+                 building: take(&mut c.building_handover),
+             });
+         }
+-        let mut after = self.ai_run(actions, c, captured.as_ref(), None)?;
++        // 188329: 0x114cf1c checks queued orders before the owner's full update.
++        if std::env::var_os("GENIE_EXPERIMENT_AI_ORDER_188329").is_some() {
++            let _ = self.ai_run(actions, c, captured.as_ref(), None, true)?;
++        }
++        let mut after = self.ai_run(actions, c, captured.as_ref(), None, false)?;
+         while let Some(tail) = after {
+-            after = self.ai_run(actions, c, captured.as_ref(), Some(tail))?;
++            after = self.ai_run(actions, c, captured.as_ref(), Some(tail), false)?;
+         }
+         if let Some((new, main)) = c.taken_over.take() {
+             captured = Some(Captured {
+@@ -471,6 +475,7 @@ impl Unit {
+         c: &mut Step<'_>,
+         captured: Option<&Captured>,
+         after: Option<AfterOrder>,
++        precheck: bool,
+     ) -> Result<Option<AfterOrder>, GenieError> {
+         let busy = actions.top_action_kind().is_some() || c.w.parts.unread.contains(self.id);
+         // the unit's master: its own (a captured unit's copy), else its owner's
+@@ -483,7 +488,7 @@ impl Unit {
+         let class = master.map(|ms| ms.class);
+         // a captured unit's unit AI runs as its new owner's (RGE_Combat_Object::update reads the
+         // owner then): on that player's turn, with its time as it stands
+-        let (turn, player, player_kind) = match captured {
++        let (mut turn, player, player_kind) = match captured {
+             Some(k) if k.main => (
+                 (k.new == c.w.player_turn)
+                     .then(|| c.w.player_time.get(k.new.index()).copied())
+@@ -495,13 +500,31 @@ impl Unit {
+             ),
+             _ => (c.turn, c.player, c.w.players.player(c.player)?.kind),
+         };
++        if precheck {
++            turn = None;
++        } else if turn.is_none()
++            && std::env::var_os("GENIE_EXPERIMENT_AI_ORDER_188329").is_some()
++        {
++            return Ok(None);
++        }
+         let view = OwnerView::of(c, captured.filter(|k| k.main).map(|k| k.new))?;
+         // RGE_Combat_Object::update: on the owner's turn the full update (slot 4), else
+         // FUN_140c68980 for a unit not inside another; a dead unit's full update only adds the
+         // world's dt to its time since the last enemy sighting (`+0x1b4`) before it returns
+         if turn.is_some() && c.w.parts.unit_ai.contains(self.id) && after.is_none() {
+             // the full update's start lets the unit AIs' search cache go
+-            c.w.spatial.forget_search();
++            // diagnostic GENIE_EXPERIMENT_SEARCH_CLEAR: "never", or "tick" (once per update)
++            match std::env::var("GENIE_EXPERIMENT_SEARCH_CLEAR").as_deref() {
++                Ok("never") => {}
++                Ok("tick") => {
++                    static LAST: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(u64::MAX);
++                    let now = u64::from(c.w.world_time.millis());
++                    if LAST.swap(now, std::sync::atomic::Ordering::Relaxed) != now {
++                        c.w.spatial.forget_search();
++                    }
++                }
++                _ => c.w.spatial.forget_search(),
++            }
+         }
+         if turn.is_some()
+             && after.is_none()
+@@ -549,6 +572,7 @@ impl Unit {
                      .map_or(Speed::ZERO, |m| m.stats.speed),
              ),
          );
@@ -537,7 +909,7 @@ index 9dfdf3ce..09030b99 100644
          self.with_side(
              actions,
              c,
-@@ -573,6 +574,10 @@ impl Unit {
+@@ -562,6 +586,10 @@ impl Unit {
                          .after_order(after, world_time, player_kind, &at, ai_stream, side)
                          .map(|()| None),
                      (Some(dt), None) => {
@@ -548,6 +920,41 @@ index 9dfdf3ce..09030b99 100644
                          ai.update(dt, world_time, player_kind, &at, ai_stream, side)
                      }
                      (None, _) => ai
+diff --git a/crates/engine/genie-core/src/unit_ai/update.rs b/crates/engine/genie-core/src/unit_ai/update.rs
+index 1ecba910..35cc518d 100644
+--- a/crates/engine/genie-core/src/unit_ai/update.rs
++++ b/crates/engine/genie-core/src/unit_ai/update.rs
+@@ -113,6 +113,9 @@ impl UnitAi {
+             && self.can_order(at, OrderTest::Any)
+             && at.group.is_none_or(|g| g.contains(GroupState::IDLE))
+             && !at.flags.contains(SurroundingFlags::GARRISONED)
++            // 188329: the full update (0xd42a00) never runs the order queue; 0xd384f0 has the
++            // one caller 0xd4445a, the per-tick check
++            && std::env::var_os("GENIE_EXPERIMENT_AI_ORDER_188329").is_none()
+         {
+             self.run_orders(at, side, player_kind, ai)?;
+         }
+@@ -409,8 +412,9 @@ impl UnitAi {
+         let kind = civilian_kind(class, roles);
+         let found = match kind {
+             None => {
++                let origin = at.position.ground();
+                 let found = side.closest(&Search {
+-                    at: at.position.ground(),
++                    at: origin,
+                     radius: civilian_search_radius(at.los, at.search_radius),
+                     classes: &CIVILIAN_CARED,
+                     size: at.size,
+@@ -430,6 +434,9 @@ impl UnitAi {
+                     memory: Memory::default(),
+                 })?;
+                 self.alert(found, at.dt_seconds);
++                if std::env::var_os("GENIE_LOG_HUNT_SEARCH").is_some() {
++                    eprintln!("HUNTER_SEARCH origin={origin:?} class={class:?} found={:?}", found.id);
++                }
+                 match (found.id, found.position) {
+                     (Some(id), Some(position)) => Some(Gatherable {
+                         id,
 diff --git a/crates/engine/genie-core/src/world/index.rs b/crates/engine/genie-core/src/world/index.rs
 index 8c22fa57..15f31bd7 100644
 --- a/crates/engine/genie-core/src/world/index.rs
@@ -588,35 +995,858 @@ index 8c22fa57..15f31bd7 100644
          let i = place.slot();
          let out = list.out_at(i);
          let gone = list.swap_remove(i)?;
-diff --git a/crates/tools/genie-oracle/src/census.rs b/crates/tools/genie-oracle/src/census.rs
-index 0904afb4..383ebafd 100644
---- a/crates/tools/genie-oracle/src/census.rs
-+++ b/crates/tools/genie-oracle/src/census.rs
-@@ -146,6 +146,12 @@ pub fn census_run(
+diff --git a/crates/engine/genie-core/src/world/world_update.rs b/crates/engine/genie-core/src/world/world_update.rs
+index f127e410..d5e27ea2 100644
+--- a/crates/engine/genie-core/src/world/world_update.rs
++++ b/crates/engine/genie-core/src/world/world_update.rs
+@@ -49,6 +49,8 @@ impl World {
+         self.dt = dt;
+         self.streams.seed_all(self.frame_seed.get());
+         for command in commands {
++            let corrected = crate::correction::enabled().then(|| self.correct_command(command));
++            let command = corrected.as_ref().unwrap_or(command);
+             tracing::debug!(target: UPDATE, ?command, "command");
+             let stopped: Vec<bool> = self
+                 .players
+diff --git a/crates/engine/genie-import/src/dat.rs b/crates/engine/genie-import/src/dat.rs
+index 8b58e128..849f8cc4 100644
+--- a/crates/engine/genie-import/src/dat.rs
++++ b/crates/engine/genie-import/src/dat.rs
+@@ -276,6 +276,10 @@ impl TerrainTable {
+ /// Every master of every civ of a data file.
+ #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+ pub struct MasterTable {
++    /// Canonical civilization data names in DAT order, loaded from civilizations.json.
++    pub civilization_names: Vec<String>,
++    /// Number of civilization tables in the source DAT.
++    pub civilization_count: usize,
+     rows: BTreeMap<(CivId, MasterId), Row>,
+     /// Each sprite's speed factor (the `.dat` graphic's `speed_multiplier`, sprite `+0xc`).
+     sprite_speed: BTreeMap<SpriteId, SpeedMultiplier>,
+@@ -376,6 +380,7 @@ impl MasterTable {
+                 *row = r;
              }
          }
++        table.civilization_count = dat.civs.len();
+         table.terrain = TerrainTable::from_dat(dat);
+         table.sprite_speed = dat
+             .graphics
+@@ -433,6 +438,8 @@ impl MasterTable {
+                     )
+                 })
+                 .collect(),
++            civilization_count: 0,
++            civilization_names: Vec::new(),
+             sprite_speed: BTreeMap::new(),
+             graphics: Graphics::default(),
+             terrain: TerrainTable::default(),
+diff --git a/crates/engine/genie-import/src/dat/dat_work.rs b/crates/engine/genie-import/src/dat/dat_work.rs
+index b4034340..0bf005e5 100644
+--- a/crates/engine/genie-import/src/dat/dat_work.rs
++++ b/crates/engine/genie-import/src/dat/dat_work.rs
+@@ -76,6 +76,14 @@ pub(super) fn sound_event(event: u32, sound: i16, sounds: &[Sound]) -> i32 {
      }
+ }
+ 
++/// EXPERIMENT (save 68.9 data): the tasks of types 154, 155 and 157, which the task finder's
++/// general search leaves out, hold a class below -1 (-1288, -1256, -1448) whose meaning is
++/// unknown. The value is kept as is (no object's class is negative, so no class match picks the
++/// task) instead of being rejected or turned into "any class". Not verified against the game.
++fn special_group(action_kind: i16, class_id: i16) -> Option<ClassId> {
++    (class_id < -1 && matches!(action_kind, 154 | 155 | 157)).then(|| ClassId::of_master(class_id))
++}
++
+ /// A `.dat` task as the task finder reads it (`genie_model::objects::masters::Task`), with the world's
+ /// sound table its sound events read ([`sound_event`]).
+ ///
+@@ -97,7 +105,8 @@ fn dat_task(t: &Task, sounds: &[Sound]) -> Result<work::Task, GenieError> {
+     Ok(work::Task {
+         id: TaskId::of_task(t.id),
+         action_kind: ActionKind::try_from(t.action_kind)?,
+-        object_group: ClassId::of_field(t.class_id)?,
++        object_group: special_group(t.action_kind, t.class_id)
++            .map_or_else(|| ClassId::of_field(t.class_id), |g| Ok(Some(g)))?,
+         object_id: MasterId::of_data(t.unit_id),
+         combat_level: t.enable_targeting,
+         combat_level_flag: TaskFlags::from_bits_retain(t.combat_level_flag),
+diff --git a/crates/engine/genie-import/src/install.rs b/crates/engine/genie-import/src/install.rs
+index 77f51e58..8edbe3be 100644
+--- a/crates/engine/genie-import/src/install.rs
++++ b/crates/engine/genie-import/src/install.rs
+@@ -23,11 +23,13 @@ use std::io::ErrorKind;
+ use std::path::Path;
+ 
+ /// The tables beside the `.dat` the import reads, each where there is one.
+-pub const BESIDE: [&str; 3] = ["dropsites.json", "linkedTechs.json", "unitlines.json"];
++pub const BESIDE: [&str; 4] = ["dropsites.json", "linkedTechs.json", "unitlines.json", "civilizations.json"];
+ 
+ /// The texts of the tables beside the `.dat` ([`BESIDE`]), each where there is one.
+ #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+ pub struct Beside<'a> {
++    /// Canonical civilization data names, in DAT order.
++    pub civilizations: Option<&'a str>,
+     /// `dropsites.json`'s ([`drop_sites`]).
+     pub drop_sites: Option<&'a str>,
+     /// `linkedTechs.json`'s ([`linked_techs`]).
+@@ -58,9 +60,28 @@ fn with_beside(mut table: MasterTable, beside: Beside<'_>) -> Result<MasterTable
+     if let Some(json) = beside.unit_lines {
+         table.unit_lines = unit_lines(json).map_err(|e| out_of_shape(BESIDE[2], e))?;
+     }
++    if let Some(text) = beside.civilizations {
++        table.civilization_names = civilization_names(text, table.civilization_count)?;
++    }
+     Ok(table)
+ }
+ 
++/// Validate names before caching: no missing/duplicate/blank identities or count mismatch.
++pub fn civilization_names(text: &str, count: usize) -> Result<Vec<String>, GenieError> {
++    let value: Value = serde_json::from_str(text).map_err(|e| out_of_shape("civilizations.json", e))?;
++    let invalid = || GenieError::invalid_input("invalid civilization name list").with("file", "civilizations.json");
++    let list = value.get("civilization_list").and_then(Value::as_array).ok_or_else(invalid)?;
++    if list.len() != count || count > 256 { return Err(invalid()); }
++    let mut names = Vec::with_capacity(count);
++    let mut seen = std::collections::BTreeSet::new();
++    for item in list {
++        let name = item.get("data_name").and_then(Value::as_str).ok_or_else(invalid)?;
++        if name.is_empty() || name.trim() != name || !seen.insert(name.to_owned()) { return Err(invalid()); }
++        names.push(name.to_owned());
++    }
++    Ok(names)
++}
++
+ /// The error of the table beside the `.dat` named `file`, which does not parse.
+ fn out_of_shape(file: &str, e: impl Error + Send + Sync + 'static) -> GenieError {
+     GenieError::invalid_input("a table beside the .dat out of shape")
+@@ -99,7 +120,7 @@ fn drop_descriptions(schema: &mut Value) {
+ struct Files {
+     dat: Vec<u8>,
+     /// Each of [`BESIDE`]'s texts, where there is one.
+-    beside: [Option<String>; 3],
++    beside: [Option<String>; 4],
+ }
+ 
+ #[cfg(feature = "fs")]
+@@ -111,7 +132,7 @@ impl Files {
+                 .with("path", dat.display())
+                 .with_source(e)
+         })?;
+-        let mut beside = [None, None, None];
++        let mut beside = [None, None, None, None];
+         for (text, name) in beside.iter_mut().zip(BESIDE) {
+             let path = dat.with_file_name(name);
+             match read_file(&path) {
+@@ -131,10 +152,11 @@ impl Files {
+ 
+     /// The import of the files ([`load_bytes`]).
+     fn import(&self) -> Result<MasterTable, GenieError> {
+-        let [drop_sites, linked_techs, unit_lines] = self.beside.each_ref().map(Option::as_deref);
++        let [drop_sites, linked_techs, unit_lines, civilizations] = self.beside.each_ref().map(Option::as_deref);
+         load_bytes(
+             &self.dat,
+             Beside {
++                civilizations,
+                 drop_sites,
+                 linked_techs,
+                 unit_lines,
+diff --git a/crates/engine/genie-import/src/install/tests.rs b/crates/engine/genie-import/src/install/tests.rs
+index 959aa7e6..b06707dc 100644
+--- a/crates/engine/genie-import/src/install/tests.rs
++++ b/crates/engine/genie-import/src/install/tests.rs
+@@ -20,7 +20,7 @@ fn imported() -> MasterTable {
+ fn files(bytes: &[u8]) -> Files {
+     Files {
+         dat: bytes.to_vec(),
+-        beside: [None, None, None],
++        beside: [None, None, None, None],
+     }
+ }
+ 
+@@ -112,7 +112,7 @@ fn the_files_are_the_dat_and_the_tables_beside_it_that_are_there() {
+     let f = Files::read(&dat).unwrap();
+     assert_eq!(
+         (f.dat.as_slice(), f.beside),
+-        (&b"dat"[..], [None, Some("{}".to_owned()), None])
++        (&b"dat"[..], [None, Some("{}".to_owned()), None, None])
+     );
+     remove_dir_all(&dir).unwrap();
+ }
+@@ -124,6 +124,7 @@ fn the_tables_beside_replace_their_own_where_they_are() {
+     let table = with_beside(MasterTable::default(), Beside::default()).unwrap();
+     assert_eq!(table, MasterTable::default());
+     let good = Beside {
++        civilizations: None,
+         drop_sites: Some(r#"{"drop_site_list": []}"#),
+         linked_techs: Some(r#"{"LinkedTechs": []}"#),
+         unit_lines: Some(r#"{"UnitLines": []}"#),
+@@ -180,3 +181,19 @@ fn the_layout_hash_drops_the_descriptions_only() {
+         })
+     );
+ }
++
++
++#[test]
++fn civilization_metadata_validated_and_cache_keyed() {
++    use super::civilization_names;
++    let good = r#"{"civilization_list":[{"data_name":"GAIA"},{"data_name":"FRANKISH-CIV"}]}"#;
++    assert_eq!(civilization_names(good,2).unwrap(),vec!["GAIA","FRANKISH-CIV"]);
++    assert!(civilization_names(good,1).is_err());
++    for bad in [r#"{}"#,r#"{"civilization_list":[{"data_name":""}]}"#,r#"{"civilization_list":[{}]}"#] { assert!(civilization_names(bad,1).is_err()); }
++    assert!(civilization_names(r#"{"civilization_list":[{"data_name":"A"},{"data_name":"A"}]}"#,2).is_err());
++    let before=files(b"dat");let mut after=files(b"dat");after.beside[3]=Some(good.to_owned());
++    assert_ne!(before.key(),after.key());
++    let mut table=MasterTable::default();table.civilization_count=2;
++    let table=with_beside(table, Beside{civilizations:Some(good),..Beside::default()}).unwrap();
++    assert_eq!(crate::cache::decode(&crate::cache::encode(&table).unwrap()).unwrap(),table);
++}
+diff --git a/crates/engine/genie-model/src/objects/masters/task.rs b/crates/engine/genie-model/src/objects/masters/task.rs
+index a34c2460..21814ba3 100644
+--- a/crates/engine/genie-model/src/objects/masters/task.rs
++++ b/crates/engine/genie-model/src/objects/masters/task.rs
+@@ -27,6 +27,8 @@ pub struct Task {
+     /// `+0xe`: the action the task makes the unit do.
+     pub action_kind: ActionKind,
+     /// `+0x10`: the target class the task is for, none (−1) for any.
++    #[serde(with = "signed_task_group")]
++    #[cfg_attr(feature = "schema", schemars(with = "Option<i16>"))]
+     pub object_group: Option<ClassId>,
+     /// `+0x12`: the target master, -1 for any.
+     pub object_id: Option<MasterId>,
+@@ -111,3 +113,20 @@ impl Default for Task {
+         }
+     }
+ }
++
++
++/// Cache representation for task groups only: preserve the three observed opaque
++/// negative groups without weakening ClassId's ordinary validation.
++mod signed_task_group {
++    use super::ClassId;
++    use serde::{Deserialize, Deserializer, Serialize, Serializer};
++    pub fn serialize<S: Serializer>(v: &Option<ClassId>, s: S) -> Result<S::Ok, S::Error> {
++        v.map(ClassId::get).serialize(s)
++    }
++    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Option<ClassId>, D::Error> {
++        Option::<i16>::deserialize(d)?.map(|v| {
++            if matches!(v, -1288 | -1256 | -1448) { Ok(ClassId::of_master(v)) }
++            else { ClassId::try_from(v).map_err(serde::de::Error::custom) }
++        }).transpose()
++    }
++}
+diff --git a/crates/formats/genie-save/src/generated/world.rs b/crates/formats/genie-save/src/generated/world.rs
+index f3876c52..ae080305 100644
+--- a/crates/formats/genie-save/src/generated/world.rs
++++ b/crates/formats/genie-save/src/generated/world.rs
+@@ -101,7 +101,7 @@ pub struct PlayerCivilization {
+ pub struct PlayerInfo {
+     /// game: `&version`
+     /// PlayerInfo's own version
+-    #[br(assert(version == 14, "the build writes version 14"))]
++    #[br(assert(version == 14 || (ver == 0x44e666 && version == 15), "unsupported player info version"))]
+     pub version: i32,
+     /// game: `&mScenarioPlayerIndex`
+     /// read by 0x1413109a0, a routine of one read
+@@ -164,6 +164,9 @@ pub struct PlayerInfo {
+     /// game: `&mPlayerPlatform`
+     /// read at 0x14131d8d4
+     pub player_platform: u32,
++    /// Opaque extra string observed in save 68.9 PlayerInfo v15; semantics unverified.
++    #[br(if(version >= 15))]
++    pub extra_v15: Option<SigString>,
+ }
+ 
+ impl Default for PlayerInfo {
+@@ -190,6 +193,7 @@ impl Default for PlayerInfo {
+             slot_color_override: Default::default(),
+             handicap: Default::default(),
+             player_platform: Default::default(),
++            extra_v15: None,
+         }
+     }
+ }
+@@ -584,6 +588,11 @@ pub struct GameOptions {
+     /// read by 0x1412dd230, a routine of one read
+     #[br(count = size_pompeii as usize)]
+     pub civ_2: Vec<u32>,
++    /// Two strings appended in options v1123 (save 68.9), empty in every replay seen so far
++    /// (builds 185872, 188329); their meaning is unverified. Gated on the save version because a
++    /// field named `version` shadows the options version here; GameOptionsRead pins 68.9 to v1123.
++    #[br(if(ver == 0x44e666))]
++    pub extra_v1123: Option<[SigString; 2]>,
+ }
+ 
+ impl Default for GameOptions {
+@@ -687,6 +696,7 @@ impl Default for GameOptions {
+             civ: Default::default(),
+             size_pompeii: Default::default(),
+             civ_2: Default::default(),
++            extra_v1123: None,
+         }
+     }
+ }
+@@ -699,7 +709,7 @@ impl Default for GameOptions {
+ pub struct GameOptionsRead {
+     /// game: `&version`
+     /// GameOptions' `&version`, passed to the serializer
+-    #[br(assert(version == 1122.0, "the build writes version 1122.0"))]
++    #[br(assert(version == 1122.0 || (ver == 0x44e666 && version == 1123.0), "unsupported game options version"))]
+     pub version: f32,
+     /// unnamed in the binary
+     /// read by 0x141305310
+@@ -813,6 +823,7 @@ pub struct TribePlayerTechEntry2 {
+ #[binrw]
+ #[derive(Debug, Clone, PartialEq)]
+ #[brw(little)]
++#[br(import(ver: u32))]
+ pub struct TechPlayerTree {
+     /// HD Tech_Player_Tree::research_done (float, +0)
+     pub research_done: f32,
+@@ -831,6 +842,10 @@ pub struct TechPlayerTree {
+     pub name_override: SigString,
+     /// a state's +0x28: shown instead of the tech's description (FUN_1414ab460), set by a trigger (FUN_1415c3f20 case 8)
+     pub description_override: SigString,
++    /// Save 68.9: a third string after the two overrides, empty in all 1510 entries of the
++    /// replays seen; likely another text override, unverified.
++    #[br(if(ver == 0x44e666))]
++    pub extra_override_v68_9: Option<SigString>,
+     /// game: `(tech_player_tree[index].mStackTech)`
+     /// read at 0x1413c3621; named by the save's write in the same place (0x1413d1a60, write at 0x1413d205e)
+     pub tech_player_tree_stack_tech: u8,
+@@ -877,6 +892,7 @@ impl Default for TechPlayerTree {
+             tech_player_tree_allow_multiple_research: Default::default(),
+             name_override: Default::default(),
+             description_override: Default::default(),
++            extra_override_v68_9: None,
+             tech_player_tree_stack_tech: Default::default(),
+             tech_player_tree_research_cap: Default::default(),
+             tech_player_tree_pending_count: Default::default(),
+@@ -901,7 +917,7 @@ pub struct TribePlayerTech {
+     /// HD TRIBE_Player_Tech::tech_player_tree_num (int16), the count of the tech states
+     pub tech_player_tree_num: i16,
+     /// HD TRIBE_Player_Tech::tech_player_tree, one state per tech
+-    #[br(count = tech_player_tree_num.max(0) as usize)]
++    #[br(count = tech_player_tree_num.max(0) as usize, args { inner: (ver,) })]
+     pub tech_player_tree: Vec<TechPlayerTree>,
+ }
+ 
+@@ -1336,7 +1352,13 @@ pub struct TechTree {
+     pub number_buildings: u8,
+     /// game: `mNumber_units`
+     /// read at 0x1413e9b35
++    #[br(if(ver != 0x44e666))]
++    #[bw(if(number_units_wide.is_none()))]
+     pub number_units: u8,
++    /// Save 68.9 widens the unit count to u16 (269 units in the replays seen, above u8);
++    /// the age, building and tech counts stay u8 and number_grps i32.
++    #[br(if(ver == 0x44e666))]
++    pub number_units_wide: Option<u16>,
+     /// game: `mNumber_techs`
+     /// read at 0x1413e9cd5
+     pub number_techs: u8,
+@@ -1353,7 +1375,7 @@ pub struct TechTree {
+     pub tech_tree_buildings: Vec<TechTreeEntry2>,
+     /// game: `mTech_tree_units`
+     /// a loop of 11 reads; named by the save's write in the same place (0x1413f15e0)
+-    #[br(count = number_units as usize)]
++    #[br(count = number_units_wide.map_or(number_units as usize, usize::from))]
+     pub tech_tree_units: Vec<TechTreeEntry3>,
+     /// game: `mTech_tree_techs`
+     /// a loop of 13 reads; named by the save's write in the same place (0x1413f15e0)
+@@ -4336,6 +4358,10 @@ pub struct BxsData {
+     /// helper 0x140a91060
+     #[br(if(!(version < 3)))]
+     pub unit_id: Option<i32>,
++    /// XS data version 5 (save 68.9; version 4 replays of the same build lack it): 8 bytes after
++    /// `unit_id`, 0 in every replay seen; unidentified.
++    #[br(if(version > 4))]
++    pub extra_v5: Option<[u8; 8]>,
+ }
+ 
+ #[binrw]
+@@ -4420,6 +4446,7 @@ pub struct BxsRuntime {
+ #[binrw]
+ #[derive(Debug, Clone, Default, PartialEq)]
+ #[brw(little)]
++#[br(import(ver: u32))]
+ pub struct WorldPlayerEntry1 {
+     /// game: `diplomacy[i]`
+     /// read at 0x1415f21be; named by the save's write in the same place (0x141631420, write at 0x1416332f8)
+@@ -4476,6 +4503,10 @@ pub struct WorldPlayerEntry1 {
+     /// game: `(offer[i].status)`
+     /// read at 0x1415f2c03; named by the save's write in the same place (0x141631420, write at 0x14163395e)
+     pub offer_status: u8,
++    /// Save 68.9: one more byte per slot (24 bytes, not 23); 0 in every replay seen, so its
++    /// place inside the entry is not pinned yet (put last provisionally).
++    #[br(if(ver == 0x44e666))]
++    pub extra_v68_9: Option<u8>,
+ }
+ 
+ /// Read by `FUN_1415f1160` (`WorldPlayer.cpp`) of the build.
+@@ -4547,7 +4578,7 @@ pub struct WorldPlayer {
+     pub artifact_held_time: f32,
+     /// a loop of 18 reads; one entry per player slot (`diplomacy[i]`, `trade[i]`, `offer[i]` for i < 9: arrays of 9 bytes at +0xe12, +0xe1b, +0xe24)
+     #[brw(magic = b"\x0b")]
+-    #[br(count = 9)]
++    #[br(count = 9, args { inner: (ver,) })]
+     pub per_player: Vec<WorldPlayerEntry1>,
+     /// game: `fealty`
+     /// read at 0x1415f2c69; named by the save's write in the same place (0x141631420, write at 0x1416339c0)
+@@ -4699,8 +4730,17 @@ pub struct WorldPlayer {
+     pub bxs_runtime: Option<Box<BxsRuntime>>,
+     /// unnamed in the binary
+     /// the routine's closing marker
++    /// Save 68.9: 8 bytes before the end marker, zero for Gaia in every replay seen; kept raw.
++    /// Placed after the AI part, which a human/Gaia player does not have, so the order against
++    /// that part is unverified.
++    #[br(if(ver == 0x44e666))]
++    pub extra_v68_9: Option<[u8; 8]>,
+     #[brw(magic = b"\x0b")]
+     pub end_marker: (),
++    /// Save 68.9: a u32 after the end marker (0 for Gaia and player 1 so far). Gaia's wolf timers
++    /// then read 0 / 1000 / ~1.3e6 ms / 40.0, and a human's `PlayerObjects` marker lines up.
++    #[br(if(ver == 0x44e666))]
++    pub extra_after_end_v68_9: Option<u32>,
+ }
+ 
+ impl Default for WorldPlayer {
+@@ -4774,6 +4814,8 @@ impl Default for WorldPlayer {
+             using_xs: Default::default(),
+             bxs_runtime: Default::default(),
+             end_marker: Default::default(),
++            extra_v68_9: None,
++            extra_after_end_v68_9: None,
+         }
+     }
+ }
+@@ -4979,6 +5021,11 @@ pub struct RgeMasterStaticObject {
+     /// game: `mName`
+     /// helper 0x140932010
+     pub name: SigString,
++    /// Save 68.9: 44 bytes after the name, before the animated part's speed (archer speed found at
++    /// +44). Seen as i16 4, 11, 19, bytes 2 2 1 0..., then floats like (0.2, 0.2, 2.0, 0.2, 0.2):
++    /// size/clearance-like values copied from the unit. Kept raw; meaning unverified.
++    #[br(if(ver == 0x44e666))]
++    pub extra_v68_9: Option<[u8; 44]>,
+ }
+ 
+ impl Default for RgeMasterStaticObject {
+@@ -5034,6 +5081,7 @@ impl Default for RgeMasterStaticObject {
+             damage_sprite_num: Default::default(),
+             damage_sprite: Default::default(),
+             name: Default::default(),
++            extra_v68_9: None,
+         }
+     }
+ }
+@@ -5079,6 +5127,13 @@ pub struct RgeMasterMovingObject {
+     /// game: `&obj_trail_spacing`
+     /// read at 0x1410e6190
+     pub obj_trail_spacing: u32,
++    /// Save 68.9: two bytes (0 so far) then an f32 before the action part's search radius. The f32
++    /// equals the DAT `min_collision_size_multiplier` (archer 1.0, scout cavalry 0.5); the two
++    /// bytes are unidentified.
++    #[br(if(ver == 0x44e666))]
++    pub extra_v68_9: Option<[u8; 2]>,
++    #[br(if(ver == 0x44e666))]
++    pub min_collision_size_multiplier: Option<f32>,
+ }
+ 
+ /// Read by `FUN_141062470` of the build.
+@@ -5248,6 +5303,10 @@ pub struct RgeMasterActionObject {
+     /// game: `&run_pattern`
+     /// helper 0x140c94e10
+     pub run_pattern: u8,
++    /// Save 68.9: one byte after `run_pattern`, before the combat part's base armor (0 on archer
++    /// and scout cavalry); unidentified.
++    #[br(if(ver == 0x44e666))]
++    pub extra_v68_9: Option<u8>,
+ }
+ 
+ impl Default for RgeMasterActionObject {
+@@ -5263,6 +5322,7 @@ impl Default for RgeMasterActionObject {
+             temp_sound_num_2: Default::default(),
+             sound_event_event_id: vec![Default::default(); 2],
+             run_pattern: Default::default(),
++            extra_v68_9: None,
+         }
+     }
+ }
+@@ -5502,6 +5562,12 @@ pub struct TribeMasterCombatObject {
+     /// helper 0x140a90f60
+     #[br(if(ver >= 0x426666))]
+     pub train_location_entry_mod: Option<i16>,
++    /// Save 68.9: 19 bytes after `train_location_entry_mod`. On archer and scout cavalry they read
++    /// as a cost block laid out by column (3 x i16 amounts, 3 x i16 resource kinds, 3 x u8 flags:
++    /// archer 25/45/1 of 1/3/4, scout 80/0/1 of 0/-1/4) then two i16 (12262, 12263 on both).
++    /// Kept raw; meaning unverified.
++    #[br(if(ver == 0x44e666))]
++    pub extra_v68_9: Option<[u8; 19]>,
+ }
+ 
+ impl Default for TribeMasterCombatObject {
+@@ -5542,6 +5608,7 @@ impl Default for TribeMasterCombatObject {
+             volley_yspread: Default::default(),
+             volley_start_spread_adjustment: Default::default(),
+             train_location_entry_mod: Some(Default::default()),
++            extra_v68_9: None,
+         }
+     }
+ }
+@@ -5652,6 +5719,12 @@ pub struct TribeMasterBuildingObject {
+     /// game: `&open_close_sound_event.mEventId`
+     /// helper 0x140b4b760
+     pub open_close_sound_event_event_id: u32,
++    /// Save 68.9: 52 bytes after the sounds. On the Town Center (RTWC) they match the DAT
++    /// building: u8 0, i16 tech 722, i16 -1, i16 head unit 621, i16 transform unit 444, i16 -1,
++    /// 4 x i16 annex ids 618/619/620/890, 4 x (f32, f32) annex offsets, u8 can_burn 1.
++    /// Kept raw; the field names are from that one match, not from the game.
++    #[br(if(ver == 0x44e666))]
++    pub extra_v68_9: Option<[u8; 52]>,
+ }
+ 
+ /// Read by `FUN_14162bef0` of the build.
+@@ -6811,12 +6884,17 @@ pub struct ActiveSpriteList {
+     /// entries until a sprite_kind of 0, that one included
+     #[br(parse_with = binrw::helpers::until(|e: &ActiveSpriteListEntry1| e.sprite_kind == 0), args(ver))]
+     pub sprite_kind_list: Vec<ActiveSpriteListEntry1>,
++    /// Save 68.9: one more byte after the list's 0 terminator (0 so far); placement after the
++    /// list rather than before it is provisional.
++    #[br(if(ver == 0x44e666))]
++    pub extra_v68_9: Option<u8>,
+ }
+ 
+ impl Default for ActiveSpriteList {
+     fn default() -> Self {
+         Self {
+             sprite_kind_list: vec![Default::default()],
++            extra_v68_9: None,
+         }
+     }
+ }
+@@ -7293,6 +7371,10 @@ pub struct RgeMovingObject {
+     /// game: `mSpeedupValue`
+     /// read at 0x1411612bb
+     pub speedup_value: f32,
++    /// Save 68.9: 4 bytes after `speedup_value` (0 so far). Pinned by a kind-30 object (shore
++    /// fish, master 69) whose next object starts exactly 4 bytes later.
++    #[br(if(ver == 0x44e666))]
++    pub extra_v68_9: Option<[u8; 4]>,
+ }
+ 
+ /// Read by `FUN_140a7a2f0` of the build.
+@@ -8102,6 +8184,11 @@ pub struct RgeActionObject {
+     pub command_flag: u8,
+     /// game: `Selected_Group_Info`
+     /// read at 0x14106f16f
++    /// Save 68.9 has 4 bytes fewer here and 4 more at the end of the moving part (a kind-30
++    /// object ends with them); the speed-up pair after then reads (0, NaN) like the moving
++    /// part's own. Whether this field moved there or was dropped is unverified; 0 when absent.
++    #[br(if(ver != 0x44e666))]
++    #[bw(if(rge_moving_object.extra_v68_9.is_none()))]
+     pub selected_group_info: i32,
+     /// game: `mSpeedupBuildingId`
+     /// read at 0x14106f4c9
+@@ -8179,6 +8266,10 @@ pub struct RgeCombatObject {
+     /// game: `mObjectTriggerFlags.m_bits`
+     /// read at 0x14108af38
+     pub object_trigger_flags_bits: u32,
++    /// Save 68.9: 12 bytes (all 0 on the combat objects seen) between `object_trigger_flags_bits`
++    /// and `previous_master_id` (TC: flags 0x20300 then 12 zeros then -1); exact order unverified.
++    #[br(if(ver == 0x44e666))]
++    pub extra_a_v68_9: Option<[u8; 12]>,
+     /// game: `&previousMasterId`
+     /// read at 0x14108b4c3
+     pub previous_master_id: u16,
+@@ -8191,6 +8282,10 @@ pub struct RgeCombatObject {
+     /// game: `&m_abilityActivatedTimeMs`
+     /// helper 0x140b4b760
+     pub ability_activated_time_ms: u32,
++    /// Save 68.9: 8 bytes before `processed_kill` (seen as 00 ff ff ff ff 00 00 00);
++    /// unidentified.
++    #[br(if(ver == 0x44e666))]
++    pub extra_b_v68_9: Option<[u8; 8]>,
+     /// game: `&mProcessedKill`
+     /// helper 0x140ccd170
+     pub processed_kill: u8,
+@@ -8218,6 +8313,8 @@ impl Default for RgeCombatObject {
+             special_ability_duration_ms: Default::default(),
+             ability_activated_time_ms: Default::default(),
+             processed_kill: Default::default(),
++            extra_a_v68_9: None,
++            extra_b_v68_9: None,
+         }
+     }
+ }
+@@ -8421,6 +8518,10 @@ pub struct UnitAiModule {
+     /// game: `mDisableRetargeting`
+     /// read at 0x140c539d5
+     pub disable_retargeting: u8,
++    /// Save 68.9: 15 bytes after `disable_retargeting`, seen on a Gaia animal as u8 1, f32 28.5,
++    /// f32 56.5 (its own tile, like `state_position`), then 6 zero bytes; unidentified.
++    #[br(if(ver == 0x44e666))]
++    pub extra_v68_9: Option<[u8; 15]>,
+ }
+ 
+ /// Read by `FUN_140c1d860` of the build.
+@@ -8672,6 +8773,9 @@ pub struct TribeCombatObject {
+     /// game: `mSkipVolleyAttack`
+     /// read at 0x1412251eb
+     pub skip_volley_attack: u8,
++    /// Save 68.9: one more byte in the tail (0 so far), placed last provisionally.
++    #[br(if(ver == 0x44e666))]
++    pub extra_v68_9: Option<u8>,
+ }
+ 
+ impl Default for TribeCombatObject {
+@@ -8731,6 +8835,7 @@ impl Default for TribeCombatObject {
+             local_resource_store: Default::default(),
+             conversion_rate: Default::default(),
+             skip_volley_attack: Default::default(),
++            extra_v68_9: None,
+         }
+     }
+ }
+@@ -9528,7 +9633,16 @@ pub struct WorldPlayerBase {
+     pub culture: u8,
+     /// game: `&civId`
+     /// helper 0x14163c630
++    /// Save 68.9 writes the civilization's `data_name` (civilizations.json) instead, below; the
++    /// reader leaves this 0 there and the id is resolved from that name.
++    #[br(if(ver != 0x44e666))]
++    #[bw(if(civ_data_name.is_none()))]
+     pub civ_id: u8,
++    /// Save 68.9 (builds 185872, 188329): the civilization as its civilizations.json `data_name`
++    /// (e.g. "FRANKISH-CIV", "GAIA") in place of the u8 `civId`; the byte before it stays the DAT
++    /// `icon_set` (culture). Seen on 8 replays; whether ids outside that list appear is unverified.
++    #[br(if(ver == 0x44e666))]
++    pub civ_data_name: Option<SigString>,
+     /// game: `&mEquippedSkins`
+     /// helper 0x140d46ce0
+     pub equipped_skins: LenVec32<i64>,
+@@ -10398,7 +10512,7 @@ pub struct BaseScenarioEntry3 {
+ pub struct BaseScenario {
+     /// game: `&Version`
+     /// the scenario's version (a float) the load gates on
+-    #[br(assert(version == 1.56, "the build writes version 1.56"))]
++    #[br(assert(version == 1.56 || (ver == 0x44e666 && version == 1.59), "unsupported scenario version"))]
+     pub version: f32,
+     /// game: `&MaxPlayers`
+     /// helper 0x140b4b760
+@@ -11925,7 +12039,7 @@ pub struct TriggerSystemEntry5 {
+ #[br(import(ver: u32))]
+ pub struct TriggerSystem {
+     /// the trigger system's version, a double the load gates on (1.4 … 4.5), kept in DAT_143cd8990
+-    #[br(assert(trigger_version == 4.5, "the build writes trigger_version 4.5"))]
++    #[br(assert(trigger_version == 4.5 || (ver == 0x44e666 && trigger_version == 5.0), "unsupported trigger_version"))]
+     pub trigger_version: f64,
+     /// HD TRIBE_Trigger_System::objectives_updated, the uchar after the world pointer
+     pub objectives_updated: u8,
+@@ -12336,6 +12450,9 @@ pub struct World {
+     /// game: `mWaterDefIndex`
+     /// read at 0x1415d6115
+     pub water_def_index: i32,
++    /// Save 68.9: one byte after `water_def_index` (0), the save's last byte.
++    #[br(if(ver == 0x44e666))]
++    pub extra_v68_9: Option<u8>,
+ }
+ 
+ impl Default for World {
+@@ -12418,6 +12535,7 @@ impl Default for World {
+             tutorial_prompt_count: Default::default(),
+             tutorial_prompt: Default::default(),
+             water_def_index: Default::default(),
++            extra_v68_9: None,
+         }
+     }
+ }
+diff --git a/crates/formats/genie-save/src/lib.rs b/crates/formats/genie-save/src/lib.rs
+index 83eaaa03..83de9376 100644
+--- a/crates/formats/genie-save/src/lib.rs
++++ b/crates/formats/genie-save/src/lib.rs
+@@ -126,6 +126,50 @@ impl Header {
+         self.file_header.new_save_game_version
+     }
+ 
++    /// Save 68.9 writes each player's civilization as its `civilizations.json` `data_name`
++    /// instead of the number; this sets the number (`civ_id`) from `data_names`, that file's
++    /// `civilization_list` in order (the `.dat`'s civilization order). A save without names is
++    /// left as it is.
++    ///
++    /// # Errors
++    ///
++    /// A name `data_names` does not hold, or an index above 255.
++    pub fn resolve_civ_ids(&mut self, data_names: &[String]) -> Result<(), Error> {
++        for p in &mut self.world.base_world.players {
++            let Some(wp) = p.val.world_player_mut() else { continue };
++            let Some(name) = wp.base.civ_data_name.as_ref() else { continue };
++            let name = String::from_utf8_lossy(&name.bytes).into_owned();
++            let index = data_names.iter().position(|n| *n == name).ok_or_else(|| {
++                GenieError::invalid_input("a civilization name civilizations.json does not hold")
++                    .with("name", &name)
++            })?;
++            wp.base.civ_id = u8::try_from(index).map_err(|_| {
++                GenieError::invalid_input("a civilization index above 255").with("index", index)
++            })?;
++        }
++        Ok(())
++    }
++
++    /// Resolve named save players from explicit, fixed lobby civilization choices.
++    /// Random/ambiguous choices are rejected; canonical install metadata is preferred.
++    pub fn resolve_civ_ids_from_lobby(&mut self, count: usize) -> Result<(), Error> {
++        let lobby = self.file_header.game_options_read.game_options.player_info.clone();
++        for (index, p) in self.world.base_world.players.iter_mut().enumerate() {
++            let Some(wp) = p.val.world_player_mut() else { continue };
++            let Some(name) = wp.base.civ_data_name.as_ref() else { continue };
++            if index == 0 && name.bytes == b"GAIA" { wp.base.civ_id = 0; continue; }
++            let choices: Vec<_> = lobby.iter().filter(|p| p.world_player_array_index_including_gaia as usize == index).collect();
++            if choices.len() != 1 { return Err(GenieError::unsupported("ambiguous lobby civilization identity").with("player", index)); }
++            let choice = &choices[0].civilization_choice;
++            let id = choice.specific_civilization_id;
++            if choice.civilization_mode_id != 0 || id <= 0 || id as usize >= count || id > 255 {
++                return Err(GenieError::unsupported("civilization metadata required for non-fixed lobby choice").with("player", index));
++            }
++            wp.base.civ_id = id as u8;
++        }
++        Ok(())
++    }
++
+     /// The player sections, Gaia first, with where each starts ([`PlayerSection::ends`] gives
+     /// where it ends).
+     ///
+diff --git a/crates/formats/genie-save/src/objects.rs b/crates/formats/genie-save/src/objects.rs
+index deebaa01..72b44a2a 100644
+--- a/crates/formats/genie-save/src/objects.rs
++++ b/crates/formats/genie-save/src/objects.rs
+@@ -37,6 +37,22 @@ impl Player {
+         })
+     }
+ 
++    /// [`Player::world_player`], mutably (to resolve a save 68.9 civilization name).
++    pub fn world_player_mut(&mut self) -> Option<&mut WorldPlayer> {
++        if let Some(p) = self.scenario_editor_phantom_player.as_deref_mut() {
++            return Some(&mut p.world_player_scenario_editor_phantom);
++        }
++        if let Some(p) = self.human_or_coop_player.as_deref_mut() {
++            return Some(&mut p.world_player_human_or_coop);
++        }
++        if let Some(p) = self.gaia_player.as_deref_mut() {
++            return Some(&mut p.world_player_gaia.world_player);
++        }
++        self.computer_player
++            .as_deref_mut()
++            .map(|p| &mut p.world_player_computer)
++    }
++
+     /// The masters, maps and objects (`WorldPlayer` vtable slot 29).
+     #[must_use]
+     pub fn objects(&self) -> Option<&PlayerObjects> {
+diff --git a/crates/tools/genie-oracle/Cargo.toml b/crates/tools/genie-oracle/Cargo.toml
+index ab4dccd9..93f57170 100644
+--- a/crates/tools/genie-oracle/Cargo.toml
++++ b/crates/tools/genie-oracle/Cargo.toml
+@@ -23,6 +23,7 @@ genie-json = { version = "0.1.0", path = "../../formats/genie-json" }
+ genie-rec = { version = "0.1.1", path = "../../formats/genie-rec" }
+ genie-save = { version = "0.1.0", path = "../../formats/genie-save" }
+ flate2.workspace = true
++binrw.workspace = true
+ rayon.workspace = true
+ serde_json.workspace = true
+ 
+diff --git a/crates/tools/genie-oracle/examples/census.rs b/crates/tools/genie-oracle/examples/census.rs
+index 90a8616f..f4b3e703 100644
+--- a/crates/tools/genie-oracle/examples/census.rs
++++ b/crates/tools/genie-oracle/examples/census.rs
+@@ -26,6 +26,7 @@ fn main() -> Result<(), Box<dyn Error>> {
+         [rec, dat, updates] => (rec, dat, Some(updates.parse()?)),
+         _ => return Err("usage: census REC DAT [UPDATES]".into()),
+     };
++    if std::env::var_os("GENIE_TRACE_COMMANDS").is_some() { genie_oracle::trace_commands(true); }
+     let recording = read(rec)?;
+     let masters = install_read(dat.as_ref())?;
+     let run = census_run(&recording, Some(&masters), limit)?;
+diff --git a/crates/tools/genie-oracle/src/census.rs b/crates/tools/genie-oracle/src/census.rs
+index 99849470..c2f33c43 100644
+--- a/crates/tools/genie-oracle/src/census.rs
++++ b/crates/tools/genie-oracle/src/census.rs
+@@ -112,7 +112,20 @@ pub fn census_run(
+     limit: Option<usize>,
+ ) -> Result<CensusRun, Error> {
+     let chapter = chapters(recording)?[0];
+-    let header = chapter.header()?;
++    let mut header = chapter.header()?;
++    // EXPERIMENT (save 68.9): civilization names to numbers from the file GENIE_CIVILIZATIONS
++    // names (the install's resources/_common/dat/civilizations.json).
++    if let Ok(path) = std::env::var("GENIE_CIVILIZATIONS") {
++        let text = std::fs::read_to_string(&path)
++            .map_err(|e| genie_save::GenieError::io("civilizations.json").with("path", &path).with_source(e))?;
++        let json: serde_json::Value = serde_json::from_str(&text)
++            .map_err(|e| genie_save::GenieError::invalid_input("civilizations.json").with("error", e))?;
++        let names: Vec<String> = json["civilization_list"]
++            .as_array()
++            .map(|l| l.iter().map(|c| c["data_name"].as_str().unwrap_or_default().to_owned()).collect())
++            .unwrap_or_default();
++        header.resolve_civ_ids(&names)?;
++    }
+     let sections = header.players();
+     let (syncs, checkpoints) = recorded_checkpoints(&chapter)?;
+     let total = limit.map_or(syncs, |l| l.min(syncs));
+@@ -124,10 +137,118 @@ pub fn census_run(
+     } else {
+         CensusEnd::Recording
+     };
++    for (p, section) in sections.iter().enumerate() {
++        for object in section.live_objects() {
++            if let Some(saved) = object.static_part() {
++                if saved.master_obj == 1245 {
++                    eprintln!("PIG_INITIAL player={} id={} capture={:?}", p, saved.id, object.combat().map(|c| c.rge_combat_object.capture_flag));
++                }
++            }
++        }
++    }
 +    let sort_lists = std::env::var_os("GENIE_EXPERIMENT_SORT_LISTS").is_some();
 +    if sort_lists {
 +        genie_core::objects::object_list::ID_ORDERED.store(true, std::sync::atomic::Ordering::Relaxed);
 +        for player in &mut turns.players { player.objects.sort_by_id(); }
 +        turns.reindex();
 +    }
-     let initial_time = turns.world_time.millis();
-     let mut elapsed_ms = 0u64;
-     let mut dump_prev = u64::from(turns.world_time.millis());
-@@ -171,6 +177,7 @@ pub fn census_run(
-         } else {
-             run(&mut turns, &mut decoder, from_ref(&frame));
-         }
++    let initial_time = turns.world_time.millis();
++    let mut elapsed_ms = 0u64;
++    let mut dump_prev = u64::from(turns.world_time.millis());
+     for frame in frames(&chapter, total)? {
+-        run(&mut turns, &mut decoder, from_ref(&frame));
++        elapsed_ms += u64::from(frame.dt.get());
++        if std::env::var_os("GENIE_TRACE_PHASE").is_some() && frame.checkpoint.is_some() {
++            let cp = frame.checkpoint.as_ref().unwrap();
++            let commands: Vec<_> = frame.commands.iter().filter_map(|p| decoder.command(p)).collect();
++            let before_tick = turns.ticks.get();
++            eprintln!("CP_TIME tick={} actual_before_ms={} recorded_ms={} dt={}", before_tick, turns.world_time.millis(), cp.world_time, frame.dt.get());
++            let report = |w: &World, phase: String| {
++                for lane in cp.lanes.iter().filter(|l| l.iter().any(|&x| x != 0)) {
++                    let id = lane[8] as usize;
++                    if let (Some(section), Some(player)) = (sections.get(id), w.players.get(id)) {
++                        let actual = lane_block(section, id as u32, player, &w.parts);
++                        let diff: Vec<_> = actual.iter().zip(lane).enumerate().filter(|(_, (a,b))| a != b).map(|(i,(a,b))| (i,*a,*b)).collect();
++                        eprintln!("PHASE {}", serde_json::json!({"tick_before":before_tick,"player":id,"phase":phase,"actual_ms":w.world_time.millis(),"recorded_ms":cp.world_time,"differences":diff}));
++                    }
++                }
++            };
++            report(&turns, "before".to_string());
++            turns.tick_observed(frame.dt, &commands, &mut |w, step| report(w, format!("{:?}",step)));
++        } else {
++            run(&mut turns, &mut decoder, from_ref(&frame));
++        }
 +        // (the lists keep their order by themselves once ID_ORDERED is set)
-         if let Ok(raw) = std::env::var("GENIE_TRACE_MOTION") {
-             if let Ok(wanted) = raw.parse::<i32>() {
-                 for (p, player) in turns.players.iter().enumerate() {
-@@ -181,6 +188,13 @@ pub fn census_run(
-             }
-         }
++        if let Ok(raw) = std::env::var("GENIE_TRACE_MOTION") {
++            if let Ok(wanted) = raw.parse::<i32>() {
++                for (p, player) in turns.players.iter().enumerate() {
++                    if let Some(u) = player.objects.iter().find(|u| u.id.get() == wanted) {
++                        eprintln!("MOTION {}", serde_json::json!({"tick": turns.ticks.get(), "time_ms":turns.world_time.millis(),"dt_ms":frame.dt.get(),"player":p,"id":wanted,"master":u.life.master_id.get(),"position":u.position().get()}));
++                    }
++                }
++            }
++        }
          census.update(&turns, &sections);
+-        if census.players.iter().all(CensusPlayer::done) {
 +        // DIAGNOSTIC: GENIE_TRACE_RES=1 prints each human player's food, wood, stone and gold after every update.
 +        if std::env::var_os("GENIE_TRACE_RES").is_some() {
 +            for (p, state) in turns.players.iter().enumerate().skip(1) {
@@ -624,27 +1854,116 @@ index 0904afb4..383ebafd 100644
 +                eprintln!("RES {}", serde_json::json!({"ms": turns.world_time.millis(), "player": p, "res": r}));
 +            }
 +        }
-         // DIAGNOSTIC: GENIE_DUMP_MS=15000,30000 prints each player's non-zero attributes and live
-         // object counts by master at the first update whose world time reaches each mark.
-         if let Ok(raw) = std::env::var("GENIE_DUMP_MS") {
-@@ -208,14 +222,17 @@ pub fn census_run(
-             }
-             dump_prev = now;
-         }
--        if std::env::var_os("GENIE_TRACE_OBJECTS").is_some() && [499, 999, 1499].contains(&census.updates) {
--            for (p, state) in turns.players.iter().enumerate().skip(1) {
++        // DIAGNOSTIC: GENIE_DUMP_MS=15000,30000 prints each player's non-zero attributes and live
++        // object counts by master at the first update whose world time reaches each mark.
++        if let Ok(raw) = std::env::var("GENIE_DUMP_MS") {
++            let now = u64::from(turns.world_time.millis());
++            for mark in raw.split(',').filter_map(|x| x.trim().parse::<u64>().ok()) {
++                if now >= mark && dump_prev < mark {
++                    for (p, state) in turns.players.iter().enumerate() {
++                        let attrs: Vec<String> = state.attributes.iter().enumerate()
++                            .filter(|(_, a)| format!("{a:?}") != format!("{:?}", genie_core::players::Amount::ZERO))
++                            .map(|(i, a)| format!("{i}={a:?}")).collect();
++                        let mut by_master = std::collections::BTreeMap::<i16, usize>::new();
++                        for u in &state.objects { *by_master.entry(u.life.master_id.get()).or_default() += 1; }
++                        eprintln!("DUMP mark_ms={mark} world_ms={now} update={} player={p} live={} by_master={by_master:?} attrs=[{}]", census.updates, state.objects.len(), attrs.join(" "));
++                        if std::env::var_os("GENIE_DUMP_UNITS").is_some() {
++                            for u in state.objects.iter().filter(|u| p > 0 || std::env::var_os("GENIE_DUMP_ALL").is_some() || [1245i16, 48, 412, 822, 1139, 1301, 89, 126].contains(&u.life.master_id.get())) {
++                                let a = crate::header_runs::checkpoint_action(turns.parts.actions_of(u.id), turns.parts.production.get(u.id));
++                                let kind = a.and_then(|a| a.kind).map(|k| k.get());
++                                let st = a.map(|a| a.state.get()).unwrap_or(0);
++                                let goal = turns.parts.actions_of(u.id).list.artifact().and_then(|a| a.goal).map(|g| (g.x(), g.y()));
++                        eprintln!("UNIT mark_ms={mark} player={p} id={} master={} pos={:?} action_kind={kind:?} action_state={st} held={:?} hp={:?} goal={goal:?}", u.id.get(), u.life.master_id.get(), u.position().get(), u.life.amount, u.life.hp);
++                            }
++                        }
++                    }
++                }
++            }
++            dump_prev = now;
++        }
++        // DIAGNOSTIC: GENIE_TRACE_STEER_RANGE=a-b turns GENIE_TRACE_STEER on for those updates only
++        if let Some((a, b)) = std::env::var("GENIE_TRACE_STEER_RANGE").ok().and_then(|r| { let mut it = r.split('-'); Some((it.next()?.parse::<u64>().ok()?, it.next()?.parse::<u64>().ok()?)) }) {
++            if census.updates as u64 == a { genie_core::movement::TRACE_STEER_WINDOW.store(true, std::sync::atomic::Ordering::Relaxed); }
++            if census.updates as u64 == b + 1 { genie_core::movement::TRACE_STEER_WINDOW.store(false, std::sync::atomic::Ordering::Relaxed); }
++        }
 +        let trace_range = std::env::var("GENIE_TRACE_OBJECTS_RANGE").ok().and_then(|r| { let mut it = r.split('-'); Some((it.next()?.parse::<u64>().ok()?, it.next()?.parse::<u64>().ok()?)) });
 +        if (std::env::var_os("GENIE_TRACE_OBJECTS").is_some() && [499, 999, 1499].contains(&census.updates)) || trace_range.is_some_and(|(a, b)| (a..=b).contains(&(census.updates as u64))) {
 +            for (p, state) in turns.players.iter().enumerate() {
-                 for u in &state.objects {
++                for u in &state.objects {
 +                    if p == 0 && turns.parts.unit_ai.get(u.id).is_none() { continue; }
 +                    let (look, limit) = turns.parts.unit_ai.get(u.id).map(|ai| (ai.look_around_timer.get(), ai.look_around_timeout.get())).unwrap_or((0, 0));
-                     let a = crate::header_runs::checkpoint_action(turns.parts.actions_of(u.id), turns.parts.production.get(u.id));
-                     let timer = turns.parts.unit_ai.get(u.id).map(|ai| ai.retarget_timer.get()).unwrap_or(0);
-                     let kind = a.and_then(|a| a.kind).map(|k| k.get());
-                     let action_state = a.map(|a| a.state.get()).unwrap_or(0);
--                    eprintln!("OBJECT {}", serde_json::json!({"tick":census.updates,"player":p,"id":u.id.get(),"master":u.life.master_id.get(),"position":u.position().get(),"action_kind":kind,"action_state":action_state,"retarget_ms":timer}));
++                    let a = crate::header_runs::checkpoint_action(turns.parts.actions_of(u.id), turns.parts.production.get(u.id));
++                    let timer = turns.parts.unit_ai.get(u.id).map(|ai| ai.retarget_timer.get()).unwrap_or(0);
++                    let kind = a.and_then(|a| a.kind).map(|k| k.get());
++                    let action_state = a.map(|a| a.state.get()).unwrap_or(0);
 +                    eprintln!("OBJECT {}", serde_json::json!({"ms":turns.world_time.millis(),"tick":census.updates,"player":p,"id":u.id.get(),"master":u.life.master_id.get(),"position":u.position().get(),"action_kind":kind,"action_state":action_state,"retarget_ms":timer,"look":look,"limit":limit}));
-                 }
-             }
++                }
++            }
++        }
++        if census.updates == 499 || census.updates == 999 {
++            for (p, state) in turns.players.iter().enumerate() {
++                let pigs: Vec<_> = state.objects.iter().filter(|u| u.life.master_id.get() == 1245).map(|u| u.id.get()).collect();
++                eprintln!("PIG_COUNT update={} player={} ids={:?}", census.updates, p, pigs);
++            }
++            eprintln!("TIMING update={} initial_ms={} elapsed_ms={} actual_ms={}", census.updates, initial_time, elapsed_ms, turns.world_time.millis());
++        }
++        if std::env::var_os("GENIE_NO_STOP").is_none() && census.players.iter().all(CensusPlayer::done) {
+             end = CensusEnd::AllDone;
+             break;
          }
+@@ -221,6 +342,15 @@ impl Census {
+             ) else {
+                 continue;
+             };
++            if std::env::var_os("GENIE_PRINT_CHECKPOINTS").is_some() {
++                let block = lane_block(section, lane[8], state, &turns.parts);
++                eprintln!(
++                    "CPWORDS syncs={at} world_ms={} player={p} rec={:?} eng={:?}",
++                    turns.world_time.millis(),
++                    lane,
++                    block
++                );
++            }
+             if player.done() {
+                 continue;
+             }
+diff --git a/crates/tools/genie-oracle/src/map_and_sight.rs b/crates/tools/genie-oracle/src/map_and_sight.rs
+index d79318cd..9410c201 100644
+--- a/crates/tools/genie-oracle/src/map_and_sight.rs
++++ b/crates/tools/genie-oracle/src/map_and_sight.rs
+@@ -234,8 +234,13 @@ pub(super) fn spatial(
+                     // the save's +0x924 (a map's objects keep what the map gave them, as
+                     // 426048706's Gaia petards their 0); the setup's rule without a combat part
+                     capture: o.combat().map_or_else(
+-                        || Ok(capture_kind(player, m.class, master, roles)),
+-                        |c| CaptureKind::try_from(c.rge_combat_object.capture_flag),
++                        || Ok::<CaptureKind, genie_core::GenieError>(capture_kind(player, m.class, master, roles)),
++                        |c| {
++                            let saved = CaptureKind::try_from(c.rge_combat_object.capture_flag)?;
++                            if std::env::var_os("GENIE_EXPERIMENT_CAPTURE_SETUP").is_some() && header.file_header.new_save_game_version == 0x44e666 {
++                                Ok(capture_kind(player, m.class, master, roles))
++                            } else { Ok(saved) }
++                        },
+                     )?,
+                     // the object's type: the save's factory types 70 and 80, any other below
+                     kind: if o.tribe_combat_object.is_some() {
+diff --git a/crates/tools/genie-oracle/src/setup.rs b/crates/tools/genie-oracle/src/setup.rs
+index 0c6a6c44..cb07d175 100644
+--- a/crates/tools/genie-oracle/src/setup.rs
++++ b/crates/tools/genie-oracle/src/setup.rs
+@@ -99,6 +99,15 @@ pub fn layer() -> Result<&'static BuildLayer, GenieError> {
+ /// The build layer does not evaluate ([`layer`]); what else the slice does not model of the save
+ /// stops every player instead.
+ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> Result<World, GenieError> {
++    let mut resolved = header.clone();
++    if let Some(table) = masters {
++        if !table.civilization_names.is_empty() {
++            resolved.resolve_civ_ids(&table.civilization_names)?;
++        } else if table.civilization_count > 0 {
++            resolved.resolve_civ_ids_from_lobby(table.civilization_count)?;
++        }
++    }
++    let header = &resolved;
+     let build = layer()?;
+     let missile_tuning = &build.tuning.missile;
+     let victory = &header.world.base_world.victory_conditions;
