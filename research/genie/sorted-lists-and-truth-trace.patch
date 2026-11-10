@@ -96,13 +96,88 @@ index d2edcddb..717eaa39 100644
 +        .or(Some(id))
 +}
 diff --git a/crates/engine/genie-core/src/gathering/hunt/unit.rs b/crates/engine/genie-core/src/gathering/hunt/unit.rs
-index 0c37a95e..cc7c3f6f 100644
+index 0c37a95e..c64ba17c 100644
 --- a/crates/engine/genie-core/src/gathering/hunt/unit.rs
 +++ b/crates/engine/genie-core/src/gathering/hunt/unit.rs
-@@ -541,6 +541,18 @@ impl Unit {
+@@ -430,6 +430,44 @@ impl Unit {
+             {
+                 None
+             }
++            // 188329 0xbb7aa8..0xbb7c39: livestock (class 58) is searched in three passes
++            None if std::env::var_os("GENIE_EXPERIMENT_HUNT_188329").is_some()
++                && class.is_some_and(|k| k.get() == 58) =>
++            {
++                use crate::map::spatial::{CLOSEST_FROM, ClosestFrom};
++                let point = (hunt.point.x(), hunt.point.y());
++                let site = hunt
++                    .carry_to
++                    .and_then(|s| c.w.spatial.get(s.id()))
++                    .map(|q| (q.position, q.radius));
++                let master = self.master(c.w.master_tables(), c.player)?;
++                let (los, sr) = (master.line_of_sight.get(), master.action_part().search_radius.get());
++                let r = if los >= sr { los } else { sr };
++                let (my_at, my_radius) = (self.position(), master.radius);
++                let gap = |c: &Step<'_>, id: Option<ObjectId>| -> f32 {
++                    id.and_then(|id| c.w.spatial.get(id)).map_or(f32::NAN, |q| {
++                        let gx = ((q.position.x() - my_at.x()).abs() - (q.radius.x() + my_radius.x())).max(0.0);
++                        let gy = ((q.position.y() - my_at.y()).abs() - (q.radius.y() + my_radius.y())).max(0.0);
++                        crate::math::fmath::sqrt(gx * gx + gy * gy)
++                    })
++                };
++                let mut pass = |c: &mut Step<'_>, state: Option<ObjectState>, site| {
++                    CLOSEST_FROM.with(|k| k.set(Some(ClosestFrom { site, point })));
++                    let out = self.hunt_closest_object_in(actions, c, class, roles, state);
++                    CLOSEST_FROM.with(|k| k.set(None));
++                    out
++                };
++                let (mut a, d) = pass(c, Some(ObjectState::Dead), site)?;
++                let g = gap(c, a);
++                if a.is_none() || !(g < r || ((2 * d) as f32) < r) {
++                    a = pass(c, Some(ObjectState::Dead), None)?.0;
++                }
++                let g = gap(c, a);
++                if a.is_none() || !(g < r) {
++                    a = pass(c, None, site)?.0;
++                }
++                a
++            }
+             None => self.hunt_closest_object(actions, c, class, roles)?,
+             Some(group) => {
+                 let cap = if group == GatherGroup::WOOD {
+@@ -455,6 +493,19 @@ impl Unit {
+         class: Option<ClassId>,
+         roles: &Roles,
+     ) -> Result<Option<ObjectId>, GenieError> {
++        Ok(self.hunt_closest_object_in(actions, c, class, roles, None)?.0)
++    }
++
++    /// [`Unit::hunt_closest_object`] for objects in `state` (None any), with the search's
++    /// truncated distance.
++    fn hunt_closest_object_in(
++        &self,
++        actions: &Action,
++        c: &mut Step<'_>,
++        class: Option<ClassId>,
++        roles: &Roles,
++        state: Option<ObjectState>,
++    ) -> Result<(Option<ObjectId>, i32), GenieError> {
+         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
+         if self.my_pasture.is_some() {
+             return Err(GenieError::unsupported(
+@@ -473,7 +524,7 @@ impl Unit {
+             pick: Pick::Closest {
+                 group: class,
+                 relation: None,
+-                state: None,
++                state,
+                 master: None,
+                 workers: if roles.of_some_class(class).contains(ClassRoles::FARM) {
+                     WorkerCount::ONE
+@@ -541,7 +592,19 @@ impl Unit {
                      "a hunt without a unit AI after its drop-off",
                  ))?;
          ai.alert(result, c.dt.seconds());
+-        Ok(result.id)
 +        if std::env::var_os("GENIE_LOG_HUNT_SEARCH").is_some() {
 +            eprintln!(
 +                "HUNT_AFTER_DROP world_ms={} turn={:?} fresh={} unit={} at={:?} class={:?} found={:?}",
@@ -115,9 +190,10 @@ index 0c37a95e..cc7c3f6f 100644
 +                result.id.map(ObjectId::get)
 +            );
 +        }
-         Ok(result.id)
++        Ok((result.id, result.distance.get()))
      }
  
+     /// Nothing found after the drop (`LAB_140ac9509`): a computer player's hunt of a kind but
 diff --git a/crates/engine/genie-core/src/groups/update/mod.rs b/crates/engine/genie-core/src/groups/update/mod.rs
 index 0e406949..ed5ae5a2 100644
 --- a/crates/engine/genie-core/src/groups/update/mod.rs
@@ -146,6 +222,106 @@ index f639a3e9..ce64ea50 100644
  pub mod construction;
  pub mod garrison;
  pub mod gathering;
+diff --git a/crates/engine/genie-core/src/map/spatial/mod.rs b/crates/engine/genie-core/src/map/spatial/mod.rs
+index 4cc3b283..0a931928 100644
+--- a/crates/engine/genie-core/src/map/spatial/mod.rs
++++ b/crates/engine/genie-core/src/map/spatial/mod.rs
+@@ -46,6 +46,7 @@ mod objects;
+ mod pather;
+ mod record_id;
+ mod search;
++pub use self::search::{CLOSEST_FROM, ClosestFrom};
+ mod sight;
+ mod tile_sight;
+ 
+diff --git a/crates/engine/genie-core/src/map/spatial/search.rs b/crates/engine/genie-core/src/map/spatial/search.rs
+index 877228f6..80fae81b 100644
+--- a/crates/engine/genie-core/src/map/spatial/search.rs
++++ b/crates/engine/genie-core/src/map/spatial/search.rs
+@@ -445,6 +445,8 @@ impl Spatial {
+             trapper: at.is_some_and(|m| roles.of_master(m.master).contains(MasterRoles::TRAPPER)),
+         };
+         let spared = filter.spared.map(QueryRelation::list);
++        let from_key = CLOSEST_FROM.with(std::cell::Cell::get);
++        let mut best_from: Option<(ObjectId, f32, f32)> = None;
+         let mut best: Option<(ObjectId, f32)> = None;
+         for relation in UnitRelation::ALL {
+             // no filter (−1) keeps every list
+@@ -470,14 +472,51 @@ impl Spatial {
+                 if !closest_kept(record.id, (seer, p), filter, (player, searcher), checks)? {
+                     continue;
+                 }
++                let (p_position, p_radius) = (p.position, p.radius);
+                 if filter.reach
+                     && !reach(self, record.id, Distance::new(spatial_tuning.closest_range))?
+                 {
+                     continue;
+                 }
++                if let Some(key) = from_key {
++                    // 188329 0xd239a2..0xd23be1: the keys and the choice
++                    let mut d = record.distance.get();
++                    let mut s = -1.0_f32;
++                    if let Some((sp, sr)) = key.site {
++                        let gx = ((p_position.x() - sp.x()).abs() - (p_radius.x() + sr.x())).max(0.0);
++                        let gy = ((p_position.y() - sp.y()).abs() - (p_radius.y() + sr.y())).max(0.0);
++                        d = crate::math::fmath::sqrt(gx * gx + gy * gy);
++                        if d == 0.0 {
++                            let dx = key.point.0 - p_position.x();
++                            let dy = key.point.1 - p_position.y();
++                            s = crate::math::fmath::sqrt(dy * dy + dx * dx);
++                        }
++                    }
++                    best_from = match best_from {
++                        None => Some((record.id, d, s)),
++                        Some((bid, bd, bs)) => {
++                            let lower = if record.id < bid { record.id } else { bid };
++                            if bd > d {
++                                Some((record.id, d, s))
++                            } else if d == 0.0 && bs > s {
++                                Some((record.id, d, s))
++                            } else if d != 0.0 && d == bd {
++                                Some((lower, bd, bs))
++                            } else if s != -1.0 && s == bs {
++                                Some((lower, bd, bs))
++                            } else {
++                                Some((bid, bd, bs))
++                            }
++                        }
++                    };
++                    continue;
++                }
+                 best = nearer(best, &record);
+             }
+         }
++        if from_key.is_some() {
++            return Ok(best_from.map_or((None, -1.0), |(id, d, _)| (Some(id), d)));
++        }
+         // the distance starts at `DAT_14330ec20` (−1) without a find
+         Ok(best.map_or((None, -1.0), |(id, d)| (Some(id), d)))
+     }
+@@ -652,6 +691,22 @@ pub(super) fn farm_kept(
+     Ok(true)
+ }
+ 
++/// 188329 `0xd22c20`'s extra argument (EXPERIMENT, set around a search by the hunt's three-pass
++/// livestock search): the object the candidates are measured from (its place and radii; None
++/// keeps the search's stored distance) and the point the second key measures from.
++#[derive(Clone, Copy, Debug)]
++pub struct ClosestFrom {
++    /// The object measured from.
++    pub site: Option<(Position, crate::map::Footprint)>,
++    /// The second key's point (the hunt's point).
++    pub point: (f32, f32),
++}
++
++thread_local! {
++    /// The key of the next `ClosestObject` searches of this thread (EXPERIMENT).
++    pub static CLOSEST_FROM: std::cell::Cell<Option<ClosestFrom>> = const { std::cell::Cell::new(None) };
++}
++
+ /// The nearer of the nearest so far, `best`, and `record`, by the search's distance; a tie
+ /// goes to the lower id (a NaN distance so far gives way).
+ pub(super) fn nearer(best: Option<(ObjectId, f32)>, record: &Record) -> Option<(ObjectId, f32)> {
 diff --git a/crates/engine/genie-core/src/movement/long_walk.rs b/crates/engine/genie-core/src/movement/long_walk.rs
 index f6314358..9d7b8d8a 100644
 --- a/crates/engine/genie-core/src/movement/long_walk.rs
