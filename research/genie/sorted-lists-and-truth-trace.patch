@@ -1,3 +1,25 @@
+diff --git a/crates/engine/genie-core/src/movement/walk.rs b/crates/engine/genie-core/src/movement/walk.rs
+index ff48ae22..91a75969 100644
+--- a/crates/engine/genie-core/src/movement/walk.rs
++++ b/crates/engine/genie-core/src/movement/walk.rs
+@@ -152,6 +152,17 @@ impl Mover {
+         flat = flat.with_height(0.0);
+         let flat = normalize(flat);
+         let (turn, clipped) = self.turn_toward(flat, direction, self.turn_dt(dt, movement_tuning));
++        // DIAGNOSTIC: the steering inputs' bits
++        if std::env::var_os("GENIE_TRACE_STEER").is_some() {
++            let m = self.moved_at.vector();
++            eprintln!(
++                "STEER at={:08x},{:08x} fwd={:08x},{:08x},{:08x} dir={:08x},{:08x},{:08x} turn={:08x} clipped={}",
++                m.x().to_bits(), m.y().to_bits(),
++                self.forward.x().to_bits(), self.forward.height().to_bits(), self.forward.y().to_bits(),
++                direction.x().to_bits(), direction.height().to_bits(), direction.y().to_bits(),
++                turn.get().to_bits(), matches!(clipped, Turn::Clipped)
++            );
++        }
+         if self.paths.walked()?.flags.contains(LevelFlags::REACHED) && turn == Angle::ZERO {
+             return Ok(clipped);
+         }
 diff --git a/crates/engine/genie-core/src/objects/object_list.rs b/crates/engine/genie-core/src/objects/object_list.rs
 index a4790a15..9dff401e 100644
 --- a/crates/engine/genie-core/src/objects/object_list.rs
