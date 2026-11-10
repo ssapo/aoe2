@@ -1,5 +1,5 @@
 diff --git a/crates/engine/genie-core/src/movement/long_walk.rs b/crates/engine/genie-core/src/movement/long_walk.rs
-index f6314358..b9d53560 100644
+index f6314358..ee731a21 100644
 --- a/crates/engine/genie-core/src/movement/long_walk.rs
 +++ b/crates/engine/genie-core/src/movement/long_walk.rs
 @@ -425,6 +425,7 @@ pub(crate) fn short_path_including(
@@ -15,7 +15,7 @@ index f6314358..b9d53560 100644
          ))?;
      let found = pather.search(mesh, &words, &query, &shapes)?;
 +    // DIAGNOSTIC: the short pather's query and answer
-+    if std::env::var_os("GENIE_TRACE_STEER").is_some() {
++    if std::env::var_os("GENIE_TRACE_STEER").is_some() || std::env::var_os("GENIE_TRACE_PATHS").is_some() {
 +        eprintln!(
 +            "SHORTPATH walker={:?} target={} target_shape={:?} ignore_shapes={:?} query={:?} result={:?} points={:?}",
 +            walker.id,
@@ -159,10 +159,34 @@ index cdaefff8..70eff0eb 100644
      if ua < 0x1a3 {
          if !(-0x1062..=0x40_1062).contains(&ua) || current <= ua {
 diff --git a/crates/engine/genie-core/src/pathing/short_path/main_loop.rs b/crates/engine/genie-core/src/pathing/short_path/main_loop.rs
-index e9cbaaa4..64e0ead7 100644
+index e9cbaaa4..0a23813e 100644
 --- a/crates/engine/genie-core/src/pathing/short_path/main_loop.rs
 +++ b/crates/engine/genie-core/src/pathing/short_path/main_loop.rs
-@@ -421,7 +421,25 @@ impl Search<'_> {
+@@ -208,7 +208,22 @@ impl Search<'_> {
+     /// node, a clear ray a terminal goal candidate, and a ray that still touches the axis L.
+     pub(super) fn corner_expand(&mut self, n: Node, emit: Emit) -> Result<(), GenieError> {
+         let p = n.at;
+-        let mut t = range_point(self.goal.range, p, self.goal.at)?;
++        // 188329 (`0x107f7a0`, type 3): the same cut at the goal's box as the start node's
++        let mut aim = self.goal.at;
++        if super::build_188329() {
++            let (g, d) = (self.goal, self.ctx.d);
++            let box_ = crate::pathing::FixedRect::new(
++                g.at.x().wrapping_sub(g.rrx.get()).wrapping_add(d.get()),
++                g.at.y().wrapping_sub(g.rry.get()).wrapping_add(d.get()),
++                g.at.x().wrapping_add(g.rrx.get()).wrapping_sub(d.get()),
++                g.at.y().wrapping_add(g.rry.get()).wrapping_sub(d.get()),
++            );
++            let mut cut = RayFraction::START;
++            if super::geometry::ray_rect(p, g.at, box_, &mut cut).is_some() {
++                aim = Self::at_fraction(p, g.at, cut);
++            }
++        }
++        let mut t = range_point(self.goal.range, p, aim)?;
+         let mut frac = RayFraction::START;
+         let reach = n.g.wrapping_add(float_distance(t, p));
+         if !self.beats_goal(reach)? {
+@@ -421,7 +436,25 @@ impl Search<'_> {
                  if self.pop_test(&n)? {
                      return Ok(None);
                  }
