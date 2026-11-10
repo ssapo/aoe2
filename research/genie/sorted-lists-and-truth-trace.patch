@@ -1,3 +1,55 @@
+diff --git a/crates/engine/genie-core/src/movement/long_walk.rs b/crates/engine/genie-core/src/movement/long_walk.rs
+index f6314358..b9d53560 100644
+--- a/crates/engine/genie-core/src/movement/long_walk.rs
++++ b/crates/engine/genie-core/src/movement/long_walk.rs
+@@ -425,6 +425,7 @@ pub(crate) fn short_path_including(
+             shape: plan.pathing.shape(id),
+         })
+         .collect();
++    let trace_target = format!("{:?}", target_object.as_ref().map(|t| (t.id, t.position, t.half_size)));
+     let call = Call {
+         from: Point::new(x, y),
+         to: to.ground(),
+@@ -474,6 +475,19 @@ pub(crate) fn short_path_including(
+             "a short path without the game's mesh",
+         ))?;
+     let found = pather.search(mesh, &words, &query, &shapes)?;
++    // DIAGNOSTIC: the short pather's query and answer
++    if std::env::var_os("GENIE_TRACE_STEER").is_some() {
++        eprintln!(
++            "SHORTPATH walker={:?} target={} target_shape={:?} ignore_shapes={:?} query={:?} result={:?} points={:?}",
++            walker.id,
++            trace_target,
++            target.and_then(|id| plan.pathing.shape(id)),
++            shapes,
++            query,
++            found.result,
++            to_path(&found.points).points
++        );
++    }
+     for p in to_path(&found.points).points {
+         let _ = out.push(p);
+     }
+diff --git a/crates/engine/genie-core/src/movement/step.rs b/crates/engine/genie-core/src/movement/step.rs
+index 75476db0..63a16095 100644
+--- a/crates/engine/genie-core/src/movement/step.rs
++++ b/crates/engine/genie-core/src/movement/step.rs
+@@ -566,6 +566,15 @@ impl Mover {
+         let position = self.moved_at.vector();
+         let level = self.paths.walked()?;
+         let waypoint = point_or_zero_of(level, level.waypoint);
++        // DIAGNOSTIC: the walked level's points
++        if std::env::var_os("GENIE_TRACE_STEER").is_some() {
++            eprintln!(
++                "WALKWP at={:08x},{:08x} wp={:08x},{:08x} index={:?} level={:?} range={:?} points={:?}",
++                position.x().to_bits(), position.y().to_bits(),
++                waypoint.x().to_bits(), waypoint.y().to_bits(),
++                level.waypoint, level.level, level.range, level.points
++            );
++        }
+         if ground(position, waypoint).get() < EPSILON {
+             self.paths.walked_mut()?.flags |= LevelFlags::REACHED | LevelFlags::AT_WAYPOINT;
+             return Ok(Next::Again);
 diff --git a/crates/engine/genie-core/src/movement/walk.rs b/crates/engine/genie-core/src/movement/walk.rs
 index ff48ae22..91a75969 100644
 --- a/crates/engine/genie-core/src/movement/walk.rs
@@ -73,6 +125,108 @@ index a4790a15..9dff401e 100644
      /// `unit` goes to the end of the list.
      pub fn push(&mut self, unit: Unit) {
          self.units.push(unit);
+diff --git a/crates/engine/genie-core/src/pathing/short_path/geometry.rs b/crates/engine/genie-core/src/pathing/short_path/geometry.rs
+index cdaefff8..70eff0eb 100644
+--- a/crates/engine/genie-core/src/pathing/short_path/geometry.rs
++++ b/crates/engine/genie-core/src/pathing/short_path/geometry.rs
+@@ -143,6 +143,28 @@ pub(super) fn segment_hit(
+     let ub =
+         (((((y1 - y3) * (x2 - x1)) >> 22) - (((y2 - y1) * (x1 - x3)) >> 22)) * 0x40_0000) / den;
+     let current = i64::from(t.get());
++    if super::build_188329() {
++        // 188329 (`0x1084070`): a touch within a hundredth past `t` counts and backs `t` off by a
++        // hundredth (`0xa3d7`) from the nearer of the two, not below 0
++        let inner = 0x1a3..=0x3f_fe5d_i64;
++        if inner.contains(&ua) && ua < current && inner.contains(&ub) {
++            *t = RayFraction::new(ua as i32);
++            return Some(Meet::Cross);
++        }
++        if !(-0x1062..=0x40_1062).contains(&ua)
++            || current + 0xa3d7 <= ua
++            || !(-0x1062..=0x40_1062).contains(&ub)
++        {
++            return None;
++        }
++        let nearer = if ua < current { ua } else { current };
++        *t = RayFraction::new((nearer - 0xa3d7).max(0) as i32);
++        return Some(if ua == 0 && (ub == 0 || ub == 0x40_0000) {
++            Meet::TouchAtStart
++        } else {
++            Meet::Touch
++        });
++    }
+     let mut test_ub_low = true;
+     if ua < 0x1a3 {
+         if !(-0x1062..=0x40_1062).contains(&ua) || current <= ua {
+diff --git a/crates/engine/genie-core/src/pathing/short_path/main_loop.rs b/crates/engine/genie-core/src/pathing/short_path/main_loop.rs
+index e9cbaaa4..64e0ead7 100644
+--- a/crates/engine/genie-core/src/pathing/short_path/main_loop.rs
++++ b/crates/engine/genie-core/src/pathing/short_path/main_loop.rs
+@@ -421,7 +421,25 @@ impl Search<'_> {
+                 if self.pop_test(&n)? {
+                     return Ok(None);
+                 }
+-                let t = range_point(self.goal.range, p, self.goal.at)?;
++                // 188329 (`0x107f7a0`, type 0 without a parent): the segment to the goal is first
++                // cut where it meets the goal's box (its point ± the sums of the radius and the
++                // half sizes, `0x96ccb0`) shrunk by `d` (`0x1084210`, from 1.1); the range point
++                // is taken toward that cut
++                let mut aim = self.goal.at;
++                if super::build_188329() {
++                    let g = self.goal;
++                    let box_ = crate::pathing::FixedRect::new(
++                        g.at.x().wrapping_sub(g.rrx.get()).wrapping_add(d.get()),
++                        g.at.y().wrapping_sub(g.rry.get()).wrapping_add(d.get()),
++                        g.at.x().wrapping_add(g.rrx.get()).wrapping_sub(d.get()),
++                        g.at.y().wrapping_add(g.rry.get()).wrapping_sub(d.get()),
++                    );
++                    let mut cut = RayFraction::START;
++                    if super::geometry::ray_rect(p, g.at, box_, &mut cut).is_some() {
++                        aim = Self::at_fraction(p, g.at, cut);
++                    }
++                }
++                let t = range_point(self.goal.range, p, aim)?;
+                 let mut frac = RayFraction::START;
+                 let found = self.ctx.raycast(p, t, &mut frac, Callback::Box)?;
+                 match found {
+diff --git a/crates/engine/genie-core/src/pathing/short_path/mod.rs b/crates/engine/genie-core/src/pathing/short_path/mod.rs
+index 84934264..5b6c494a 100644
+--- a/crates/engine/genie-core/src/pathing/short_path/mod.rs
++++ b/crates/engine/genie-core/src/pathing/short_path/mod.rs
+@@ -178,6 +178,13 @@ const NUDGES: [FixedPoint; 4] = [
+ const OPEN_CORNER_WITHOUT_EMIT: GenieError =
+     GenieError::unreachable("an open corner node without the token and sides it emits with");
+ 
++/// EXPERIMENT (`GENIE_EXPERIMENT_SHORT_188329`): the short pather as build 188329 runs it
++/// (`0x107f7a0`), where it differs from 158041's.
++pub(super) fn build_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_SHORT_188329").is_some())
++}
++
+ /// The goal of a search (`local_148`): its point, the unit's radius, the target's half sizes,
+ /// their sums and the range.
+ #[derive(Clone, Copy, Debug)]
+@@ -202,8 +209,17 @@ impl Goal {
+             r,
+             rx: q.half_x,
+             ry: q.half_y,
+-            rrx: r.wrapping_add(q.half_x),
+-            rry: r.wrapping_add(q.half_y),
++            // 188329 (`0x107baf0`): a half size of 0 keeps the sum 0 (TEST then JE), not the radius
++            rrx: if build_188329() && q.half_x == FixedDistance::ZERO {
++                FixedDistance::ZERO
++            } else {
++                r.wrapping_add(q.half_x)
++            },
++            rry: if build_188329() && q.half_y == FixedDistance::ZERO {
++                FixedDistance::ZERO
++            } else {
++                r.wrapping_add(q.half_y)
++            },
+             range: q.range,
+             range2: FixedDistanceSquared::of(q.range),
+         }
 diff --git a/crates/engine/genie-core/src/unit_ai/unit.rs b/crates/engine/genie-core/src/unit_ai/unit.rs
 index 9dfdf3ce..09030b99 100644
 --- a/crates/engine/genie-core/src/unit_ai/unit.rs
