@@ -33,7 +33,7 @@
 
 ## 4. 어디에 뭐가 있나
 
-사용자 PC `C:\Users\ssapo\AppData\Local\Temp\genie-replays\`:
+사용자 PC `C:\Users\ssapo\genie-replays\`:
 
 | 경로 | 내용 |
 |---|---|
@@ -45,6 +45,8 @@
 | `runs\` | 실행 스크립트(`*.ps1`)와 출력(`*.err`, `*.out`), 비교 스크립트 |
 | `re-kit\` | 원본 분석 환경: 디컴파일 원문, 색인, 보조 스크립트, 분석용 EXE, Ghidra 프로젝트(7절) |
 | `CONTINUE.md` | 이 문서의 사본 |
+
+2026-11-10에 `%LOCALAPPDATA%\Temp\genie-replays`에서 이 위치로 옮겼다. 옛 경로에는 새 위치를 가리키는 연결(junction)만 남겼다. 같은 폴더의 `DECOMPILE-READING.md`·`WORKLOG-2026-11-10.md`는 다른 도우미가 이어서 쓴 원본 읽기 기록이다(유닛 갱신의 실제 호출부가 `0x114c0f0`임을 찾았다. 엔진의 `GENIE_EXPERIMENT_AI_ORDER_188329`는 그 도우미의 미검증·미완성 실험이다).
 
 메모리 덤프 원본은 `C:\Users\ssapo\Downloads\aoe2_memdump\AoE2DE_s_57257_mem.bin`.
 
