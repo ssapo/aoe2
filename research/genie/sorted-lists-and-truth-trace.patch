@@ -95,6 +95,39 @@ index d2edcddb..717eaa39 100644
 +        .and_then(|&(_, to)| ObjectId::of_field(to))
 +        .or(Some(id))
 +}
+diff --git a/crates/engine/genie-core/src/garrison/let_out.rs b/crates/engine/genie-core/src/garrison/let_out.rs
+index e526db7f..515c626e 100644
+--- a/crates/engine/genie-core/src/garrison/let_out.rs
++++ b/crates/engine/genie-core/src/garrison/let_out.rs
+@@ -132,7 +132,10 @@ impl World {
+                 "a unit with units inside leaving a building",
+             ));
+         }
+-        let Ok(spot) = self.spot_beside(player, building, &made, toward) else {
++        self.spawn_path_set(player, building, &made, toward)?;
++        let spot = self.spot_beside(player, building, &made, toward);
++        Self::spawn_path_clear();
++        let Ok(spot) = spot else {
+             return Err(GenieError::unsupported(
+                 "an unload whose unit finds no spot (its later rings)",
+             ));
+@@ -438,6 +441,16 @@ pub(super) fn let_out_aim(
+             LetOutAim::Target(g)
+         }
+         Some(g) if g.state == GatherPointState::Kept => LetOutAim::Point(g.point.ground()),
++        // HYPOTHESIS (from the truth log, villager 4375 at 232.1 s; not read in the code): a
++        // gather point on the building itself still sends the unit to its point
++        Some(g)
++            if point.x() == NO_POINT
++                && g.state == GatherPointState::Point
++                && g.target == Some(building)
++                && std::env::var_os("GENIE_EXPERIMENT_UNLOAD_188329").is_some() =>
++        {
++            LetOutAim::Point(g.point.ground())
++        }
+         _ => LetOutAim::Point(point),
+     }
+ }
 diff --git a/crates/engine/genie-core/src/gathering/hunt/gathering.rs b/crates/engine/genie-core/src/gathering/hunt/gathering.rs
 index 2df7dd4b..f5744a6e 100644
 --- a/crates/engine/genie-core/src/gathering/hunt/gathering.rs
@@ -872,6 +905,71 @@ index 916707bf..f1e13afc 100644
          let (g, parent, sw) = if sw.found {
              (
                  through_float(delta.x().wrapping_abs()).wrapping_add(b.g),
+diff --git a/crates/engine/genie-core/src/production/spawn/new_unit.rs b/crates/engine/genie-core/src/production/spawn/new_unit.rs
+index 21b51dda..d941c894 100644
+--- a/crates/engine/genie-core/src/production/spawn/new_unit.rs
++++ b/crates/engine/genie-core/src/production/spawn/new_unit.rs
+@@ -116,7 +116,10 @@ impl World {
+                 "a new unit of a master that does not move",
+             ));
+         }
+-        let point = self.spot_beside(p, i, &made, toward)?;
++        self.spawn_path_set(p, i, &made, toward)?;
++        let point = self.spot_beside(p, i, &made, toward);
++        super::search::SPAWN_PATH.with(|s| *s.borrow_mut() = None);
++        let point = point?;
+         let new = self.combat_object(p, master, &made, point.with_height(position.z()))?;
+         let class = self.tracker_key(p, master).class;
+         let owner = self.players.player_mut(p)?;
+@@ -529,3 +532,48 @@ impl World {
+         Ok(idx)
+     }
+ }
++
++impl World {
++    /// EXPERIMENT (188329 spawn search, step 7): plans the tile path from the gather point
++    /// `toward` to the building `i` of player `p` for a unit of master `made` and leaves it for
++    /// the next spawn search ([`super::search::SPAWN_PATH`]); the caller clears it after.
++    pub(crate) fn spawn_path_set(
++        &mut self,
++        p: PlayerId,
++        i: ListIndex,
++        made: &crate::objects::masters::Master,
++        toward: Option<crate::map::Point>,
++    ) -> Result<(), GenieError> {
++        // 188329 spawn search, step 7: the tile path from the gather point to the building
++        if std::env::var_os("GENIE_EXPERIMENT_SPAWN_188329").is_some() {
++            let mut points: Option<Vec<(f32, f32)>> = None;
++            if let (Some(g), Some(moving)) = (toward, made.move_stats) {
++                let hx = self.players.live(p, i)?.master(self.master_tables(), p)?.radius.x();
++                let tuning = self.model.tuning.tile_path.clone();
++                if let Some(planner) = self.pathing.planner(moving.restriction, self.spatial.tiles()) {
++                    let req = crate::pathing::tile_path::Request {
++                        from: g,
++                        to: self.players.live(p, i)?.position().ground(),
++                        radii: crate::map::Distance::new(hx),
++                        range: crate::map::Distance::ZERO,
++                        closed: Vec::new(),
++                        full: true,
++                    };
++                    let mut path = crate::pathing::tile_path::Path::default();
++                    let _ = planner.plan::<GenieError>(&req, true, &mut path, None, &tuning)?;
++                    points = Some(path.points.iter().map(|q| (q.x(), q.y())).collect());
++                }
++            }
++            if std::env::var_os("GENIE_TRACE_SPAWN").is_some() {
++                eprintln!("SPAWNPATH {:?}", points);
++            }
++            super::search::SPAWN_PATH.with(|s| *s.borrow_mut() = points);
++        }
++        Ok(())
++    }
++
++    /// Clears what [`World::spawn_path_set`] left.
++    pub(crate) fn spawn_path_clear() {
++        super::search::SPAWN_PATH.with(|s| *s.borrow_mut() = None);
++    }
++}
 diff --git a/crates/engine/genie-core/src/production/spawn/objects.rs b/crates/engine/genie-core/src/production/spawn/objects.rs
 index 9e0c8f61..17c5e310 100644
 --- a/crates/engine/genie-core/src/production/spawn/objects.rs
@@ -929,13 +1027,19 @@ index 9e0c8f61..17c5e310 100644
              &site,
              made.radius,
 diff --git a/crates/engine/genie-core/src/production/spawn/search.rs b/crates/engine/genie-core/src/production/spawn/search.rs
-index e5f89e13..3097f92d 100644
+index e5f89e13..04e9c49d 100644
 --- a/crates/engine/genie-core/src/production/spawn/search.rs
 +++ b/crates/engine/genie-core/src/production/spawn/search.rs
-@@ -79,6 +79,178 @@ pub fn spawn_point(
+@@ -79,6 +79,261 @@ pub fn spawn_point(
      ))
  }
  
++thread_local! {
++    /// EXPERIMENT (188329 spawn path mode): the tile planner's path from the gather point to the
++    /// building's centre, set by the caller around [`spawn_point_188329`].
++    pub static SPAWN_PATH: std::cell::RefCell<Option<Vec<(f32, f32)>>> = const { std::cell::RefCell::new(None) };
++}
++
 +/// EXPERIMENT (`GENIE_EXPERIMENT_SPAWN_188329`): the spawn point as build 188329 finds it
 +/// (`0x1288c20`). A grid of tiles two around the building holds each tile's steps (`passable`
 +/// tiles only, four ways) from the ring of tiles beside the building and the passable tiles under
@@ -1031,7 +1135,62 @@ index e5f89e13..3097f92d 100644
 +    let widest = rx.max(ry).max(0.1);
 +    let out_rings = (2.0 / (widest + widest)) as i64 as u32;
 +    let rings = ((least as f32 / (widest + widest)) as i64 as u32).wrapping_add(out_rings);
-+    for n in 0..rings {
++    // 188329 steps 7 and 12: with a tile path of two points or more from the gather point to the
++    // building, the candidates are ordered first by their tiles' steps from the path's last point
++    // but one (0x12796a0)
++    let path = SPAWN_PATH.with(|p| p.borrow().clone());
++    let mut steps2: Option<Vec<i16>> = None;
++    if let (Some(_), Some(points)) = (site.gather, path.as_ref()) {
++        if points.len() > 1 {
++            let (px, py) = points[points.len() - 2];
++            let sx = ((px as i32) - ox).clamp(0, grid_w as i32 - 1);
++            let sy = ((py as i32) - oy).clamp(0, grid_h as i32 - 1);
++            let mut s2 = vec![10000_i16; (grid_w * grid_h) as usize];
++            let mut q: std::collections::VecDeque<(u16, u16, i16)> = std::collections::VecDeque::new();
++            q.push_back((sx as u16, sy as u16, 0));
++            // the game passes the grid coordinates here (0x128a437..58)
++            let mut blocked = !passable(sx, sy);
++            while let Some((gx, gy, d)) = q.pop_front() {
++                let i = (u32::from(gx) + u32::from(gy) * grid_w) as usize;
++                let Some(cell) = s2.get_mut(i) else { continue };
++                if d < *cell {
++                    *cell = d;
++                    for (ddx, ddy) in [(1_i16, 0_i16), (-1, 0), (0, -1), (0, 1)] {
++                        let (nx, ny) = (gx.wrapping_add(ddx as u16), gy.wrapping_add(ddy as u16));
++                        if u32::from(nx) < grid_w && u32::from(ny) < grid_h {
++                            let j = (u32::from(ny) * grid_w + u32::from(nx)) as usize;
++                            let there = s2.get(j).copied().unwrap_or(-1);
++                            if there != -1 && d + 1 < there {
++                                let pass = passable(ox + i32::from(nx), oy + i32::from(ny));
++                                if blocked {
++                                    if pass {
++                                        blocked = false;
++                                    }
++                                    q.push_back((nx, ny, d + 1));
++                                } else if pass {
++                                    q.push_back((nx, ny, d + 1));
++                                }
++                            }
++                        }
++                    }
++                }
++            }
++            steps2 = Some(s2);
++        }
++    }
++    let mut n = 0;
++    loop {
++        if n >= rings {
++            // step 13: after the last ring the rings run again by distance alone
++            if steps2.take().is_some() {
++                n = 0;
++                continue;
++            }
++            break;
++        }
++        let ring = n;
++        n += 1;
++        let n = ring;
 +        let (dx, dy) = if n < out_rings {
 +            (
 +                // the offset and the half size are summed first (0x128997e), then the steps
@@ -1093,6 +1252,28 @@ index e5f89e13..3097f92d 100644
 +            let (fy, fx) = (gather.y() - p.y(), gather.x() - p.x());
 +            fy * fy + fx * fx
 +        };
++        if let Some(s2) = steps2.as_ref() {
++            let cell = |p: &Point| {
++                let i = ((p.y() - oyf) as i64 as i32)
++                    .wrapping_mul(grid_w as i32)
++                    .wrapping_add((p.x() - oxf) as i64 as i32) as u32 as usize;
++                s2.get(i).copied().unwrap_or(10000)
++            };
++            let mut best: Option<Point> = None;
++            for p in &found {
++                let better = best.is_none_or(|b| {
++                    let (a, bb) = (cell(p), cell(&b));
++                    if a != bb { a < bb } else { key(p) < key(&b) }
++                });
++                if better {
++                    best = Some(*p);
++                }
++            }
++            match best {
++                Some(p) if cell(&p) != 10000 => return Ok(p),
++                _ => continue,
++            }
++        }
 +        let mut best: Option<Point> = None;
 +        for p in &found {
 +            if best.is_none_or(|b| key(p) < key(&b)) {
@@ -1184,6 +1365,21 @@ index bf5761c6..b877d169 100644
          let _ = self.evasive_move(point, (OrderForce::Forced, BadPoint::Kept), at, ai, side)?;
          Ok(())
      }
+diff --git a/crates/engine/genie-core/src/unit_ai/ids.rs b/crates/engine/genie-core/src/unit_ai/ids.rs
+index d0cbfb72..5adf364c 100644
+--- a/crates/engine/genie-core/src/unit_ai/ids.rs
++++ b/crates/engine/genie-core/src/unit_ai/ids.rs
+@@ -218,6 +218,10 @@ pub fn factory_kind(
+             return Some(UnitAiKind::Siege);
+         }
+     }
++    // 188329 (0x12ca630): class 65 takes the hunted animal's AI, like 9 and 59
++    if class.get() == 65 && std::env::var_os("GENIE_EXPERIMENT_EVADE_188329").is_some() {
++        return Some(UnitAiKind::Hunted);
++    }
+     Some({
+         let held = roles.of_class(class);
+         if held.intersects(
 diff --git a/crates/engine/genie-core/src/unit_ai/side.rs b/crates/engine/genie-core/src/unit_ai/side.rs
 index 7fd24514..be5a8a66 100644
 --- a/crates/engine/genie-core/src/unit_ai/side.rs
