@@ -212,6 +212,46 @@ index 8ae7fee5..35ac2065 100644
          if !matches!(self.state, MoveWaitState::Never) || matches!(patience, Patience::Fails) {
              return MoveTo::Failed;
          }
+diff --git a/crates/engine/genie-core/src/movement/new_path.rs b/crates/engine/genie-core/src/movement/new_path.rs
+index 1f873756..3c5d62ce 100644
+--- a/crates/engine/genie-core/src/movement/new_path.rs
++++ b/crates/engine/genie-core/src/movement/new_path.rs
+@@ -463,6 +463,35 @@ impl Mover {
+         Ok(result.reaches().then(|| path.length()))
+     }
+ 
++    /// 188329 evasiveMoveFrom (0xd26200): the tile planner's path (0x1057a40 with the radii
++    /// `radii`, range 0, the tile search, no smoothing unit) from the unit to `to`, measured;
++    /// None without a planner for the unit's restriction.
++    pub fn plan_path(
++        &self,
++        at: Position,
++        world: &Spatial,
++        plan: &mut Planning<'_>,
++        to: Point,
++        radii: Distance,
++        tile_path_tuning: &TilePathTuning,
++    ) -> Result<Option<Path>, GenieError> {
++        let Some(planner) = plan.pathing.planner(self.stats.restriction, world.tiles()) else {
++            return Ok(None);
++        };
++        let req = Request {
++            from: at.ground(),
++            to,
++            radii,
++            range: Distance::ZERO,
++            closed: Vec::new(),
++            full: true,
++        };
++        let mut path = Path::default();
++        let _ = planner.plan::<GenieError>(&req, false, &mut path, None, tile_path_tuning)?;
++        path.measure();
++        Ok(Some(path))
++    }
++
+     /// The length of the tile planner's path (`FUN_140f7c530` with the radii `radii`, range 0, no
+     /// closed tiles, the tile search for a human player, no smoothing) from the unit to `to`, and
+     /// the planner's result; None without a planner for the unit's restriction.
 diff --git a/crates/engine/genie-core/src/movement/step.rs b/crates/engine/genie-core/src/movement/step.rs
 index 75476db0..76a92fb9 100644
 --- a/crates/engine/genie-core/src/movement/step.rs
@@ -254,6 +294,27 @@ index ff48ae22..d725068d 100644
          if self.paths.walked()?.flags.contains(LevelFlags::REACHED) && turn == Angle::ZERO {
              return Ok(clipped);
          }
+diff --git a/crates/engine/genie-core/src/movement/waypoint.rs b/crates/engine/genie-core/src/movement/waypoint.rs
+index 54c082c7..88708540 100644
+--- a/crates/engine/genie-core/src/movement/waypoint.rs
++++ b/crates/engine/genie-core/src/movement/waypoint.rs
+@@ -434,6 +434,16 @@ impl Mover {
+                 // a looping parent path moves on (FUN_140f98bc0 with 1)
+                 if parent.has_path && parent.path_flags.contains(PathFlags::LOOPS) {
+                     parent.waypoint = parent.looping_next(parent.waypoint);
++                } else if std::env::var_os("GENIE_EXPERIMENT_WALK_188329").is_some() {
++                    // 188329 (0x1211cb3..0x1211d35): the levels above are dropped too until the
++                    // walked one is the top level, each left asking again. PARTIAL: the trade
++                    // cart's exemption (class 19) is not tested here.
++                    while self.paths.len() > 1
++                        && self.paths.walked()?.level != WaypointLevel::Top
++                    {
++                        let _ = self.paths.remove(0);
++                        self.paths.walked_mut()?.state = PathState::WantsPath;
++                    }
+                 }
+             }
+             LinkedPathKind::AsksAgain => {
 diff --git a/crates/engine/genie-core/src/objects/object_list.rs b/crates/engine/genie-core/src/objects/object_list.rs
 index a4790a15..9dff401e 100644
 --- a/crates/engine/genie-core/src/objects/object_list.rs
@@ -807,30 +868,74 @@ index 7a8bacbb..b3c4e2f8 100644
              }
          }
 diff --git a/crates/engine/genie-core/src/unit_ai/idle_animals.rs b/crates/engine/genie-core/src/unit_ai/idle_animals.rs
-index bf5761c6..6154c635 100644
+index bf5761c6..b877d169 100644
 --- a/crates/engine/genie-core/src/unit_ai/idle_animals.rs
 +++ b/crates/engine/genie-core/src/unit_ai/idle_animals.rs
-@@ -153,7 +153,19 @@ impl UnitAi {
+@@ -153,7 +153,38 @@ impl UnitAi {
          let reach = (at.speed * unit_ai_tuning.evade_reach).get();
          let (dx, dy) = (other.x() - x, other.y() - y);
          let d = sqrt(dy * dy + dx * dx);
 -        let point = Position::new(x - (dx / d) * reach, y - (dy / d) * reach, z);
 +        let mut point = Position::new(x - (dx / d) * reach, y - (dy / d) * reach, z);
 +        // 188329 evasiveMoveFrom (0xd26200): the move goes to the point at the walked distance
-+        // `reach` along the tile planner's path to that target (0x106e0b0). PARTIAL: the path is
-+        // taken as the straight one (its two points); a planned path around something is not
-+        // modelled here, nor the second target and the four directions (steps 7 and 8).
++        // `reach` along the tile planner's path to that target (0x106e0b0), when the path has
++        // more than one point and is longer than 0.3. PARTIAL: the clamp to the map, the second
++        // target and the four directions (steps 4, 7 and 8) are not modelled; without a planner
++        // the straight path stands in.
 +        if std::env::var_os("GENIE_EXPERIMENT_EVADE_188329").is_some() {
-+            let (sx, sy) = (point.x() - x, point.y() - y);
-+            let seg = sqrt(sx * sx + sy * sy);
-+            if reach <= seg {
-+                let k = reach / seg;
-+                point = Position::new(x + k * sx, y + k * sy, z);
++            let radii = Distance::new(at.size.x());
++            let points: Vec<(f32, f32)> = match side.tile_path(Point::new(point.x(), point.y()), radii)? {
++                Some(path) if 1 < path.points.len() && 0.3 < path.length.get() => {
++                    path.points.iter().map(|p| (p.x(), p.y())).collect()
++                }
++                Some(_) => Vec::new(),
++                None => vec![(x, y), (point.x(), point.y())],
++            };
++            if let Some(&last) = points.last() {
++                let mut out = last;
++                let mut walked = 0.0_f32;
++                for w in points.windows(2) {
++                    let [a, b] = w else { continue };
++                    let (sx, sy) = (b.0 - a.0, b.1 - a.1);
++                    let len = sqrt((sx * sx + 0.0) + sy * sy);
++                    if reach <= len + walked {
++                        let k = (reach - walked) / len;
++                        out = (k * sx + a.0, k * sy + a.1);
++                        break;
++                    }
++                    walked += len;
++                }
++                point = Position::new(out.0, out.1, z);
 +            }
 +        }
          let _ = self.evasive_move(point, (OrderForce::Forced, BadPoint::Kept), at, ai, side)?;
          Ok(())
      }
+diff --git a/crates/engine/genie-core/src/unit_ai/side.rs b/crates/engine/genie-core/src/unit_ai/side.rs
+index 7fd24514..be5a8a66 100644
+--- a/crates/engine/genie-core/src/unit_ai/side.rs
++++ b/crates/engine/genie-core/src/unit_ai/side.rs
+@@ -37,6 +37,20 @@ pub trait UnitSide {
+     /// What the search does not model.
+     fn closest(&mut self, search: &Search<'_>) -> Result<Found, GenieError>;
+ 
++    /// 188329 evasiveMoveFrom: the tile planner's path from the unit to `to` (the unit's radius
++    /// `radii`), None where the side has no planner.
++    ///
++    /// # Errors
++    ///
++    /// What the planner does not model.
++    fn tile_path(
++        &mut self,
++        _to: Point,
++        _radii: Distance,
++    ) -> Result<Option<crate::pathing::tile_path::Path>, GenieError> {
++        Ok(None)
++    }
++
+     /// The unit's attack command on object `target` (slot 0x338, `FUN_14120cea0`), forced or
+     /// not, while its unit AI stands as `ai`: true when the unit attacks it, with the notifies
+     /// the command posts to the unit AI (kind and parameters), which the AI queues.
 diff --git a/crates/engine/genie-core/src/unit_ai/unit.rs b/crates/engine/genie-core/src/unit_ai/unit.rs
 index dc286d39..4ddecf51 100644
 --- a/crates/engine/genie-core/src/unit_ai/unit.rs
@@ -955,6 +1060,43 @@ index 1ecba910..35cc518d 100644
                  match (found.id, found.position) {
                      (Some(id), Some(position)) => Some(Gatherable {
                          id,
+diff --git a/crates/engine/genie-core/src/unit_ai/world_view/side.rs b/crates/engine/genie-core/src/unit_ai/world_view/side.rs
+index 77dc93ea..65dae9d8 100644
+--- a/crates/engine/genie-core/src/unit_ai/world_view/side.rs
++++ b/crates/engine/genie-core/src/unit_ai/world_view/side.rs
+@@ -286,6 +286,32 @@ impl UnitSide for UnitView<'_, '_> {
+         Ok(class)
+     }
+ 
++    fn tile_path(
++        &mut self,
++        to: crate::map::Point,
++        radii: Distance,
++    ) -> Result<Option<crate::pathing::tile_path::Path>, GenieError> {
++        let mut plan = Planning {
++            pathing: &mut self.c.w.pathing,
++            now: self.c.w.world_time,
++            player_kind: self.player_kind,
++            object: self.c.w.streams.get(Stream::Object),
++            groups: &self.c.w.groups,
++        };
++        let unit = &*self.unit;
++        let Some(mover) = self.c.w.parts.mover_of(unit.id) else {
++            return Ok(None);
++        };
++        mover.plan_path(
++            unit.position(),
++            &self.c.w.spatial,
++            &mut plan,
++            to,
++            radii,
++            &self.c.w.model.tuning.tile_path,
++        )
++    }
++
+     fn reaches(&mut self, target: ObjectId, range: Distance) -> Result<bool, GenieError> {
+         let mut plan = Planning {
+             pathing: &mut self.c.w.pathing,
 diff --git a/crates/engine/genie-core/src/world/index.rs b/crates/engine/genie-core/src/world/index.rs
 index 8c22fa57..15f31bd7 100644
 --- a/crates/engine/genie-core/src/world/index.rs

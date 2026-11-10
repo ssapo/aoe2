@@ -163,3 +163,16 @@
 - 다음 가장 이른 어긋남: 사슴 3828(95.72 s), 양 3670(98.244 s: 엔진이 같은 갱신 안에서 0.005짜리 부분 경로를 한 번 더 걸음).
 
 실행 스크립트: `tools/run_go.ps1`(이름·갱신 수·추가 환경변수), `tools/run_summ.sh`(체크포인트 단어별 첫 불일치 + 자원 채점), `tools/truth_cmp_spawn.py`. 추적: `GENIE_TRACE_STEER_RANGE=a-b`(그 갱신 구간만 STEER/WALKWP/SHORTPATH), `GENIE_TRACE_SPAWN`의 `SPAWNCAND`.
+
+## 12. 사슴 도망: 플래너 경로 버전 (`GENIE_EXPERIMENT_EVADE_188329`)
+
+- `evade`가 타일 플래너 경로(`Mover::plan_path`, `UnitSide::tile_path`)를 구해 그 위의 reach 지점으로 감. 사슴 3828(95.64 s) 웨이포인트가 진실 비트(428b3024, 42add6ce)와 일치. 9번의 직선 가정은 플래너가 없을 때만 씀.
+- 미구현: 지도 경계 자르기, 두 번째 목표, 4방향(원본 4, 7, 8단계).
+
+## 13. 걷기: 종류 2 링크가 끝나면 최상위까지 풀기 (스위치 `GENIE_EXPERIMENT_WALK_188329`, R4-D1)
+
+- 사례: 양 3670, 98.244 s (`original-188329-walk-case-98s.md`). 원본 `0x1211c43..0x1211d37`: 종류 2로 연결된 걷는 레벨이 끝나면 현재 레벨이 유형 2(최상위)가 될 때까지 레벨을 버림. 그래서 다음 요청이 최상위 요청이 되고, 0.01보다 짧은 경로는 타일 플래너 재시도 규칙으로 버려짐 → 0.1 멈춤.
+- 엔진 `movement/waypoint.rs` `Mover::arrived`의 `MovesOn` 분기. 교역 수레(클래스 19) 예외는 아직 안 넣음.
+- 결과: 전 객체 위치 비트 일치 98 s → 125 s 이상(추적 구간 끝). P1 위치 단어 105.3 → 146.3 s, P1 자원 정확 135.3 → 164.7 s. P2는 그대로(위치 188.1 s, 자원 207.2 s).
+
+현재 스위치 묶음: SORT_LISTS, SHORT_188329, SPAWN_188329, AI_ORDER_188329, EVADE_188329, WALK_188329 (+ MOVETO_188329는 사례 없음).
