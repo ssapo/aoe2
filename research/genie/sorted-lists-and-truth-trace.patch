@@ -95,6 +95,52 @@ index d2edcddb..717eaa39 100644
 +        .and_then(|&(_, to)| ObjectId::of_field(to))
 +        .or(Some(id))
 +}
+diff --git a/crates/engine/genie-core/src/gathering/hunt/gathering.rs b/crates/engine/genie-core/src/gathering/hunt/gathering.rs
+index 2df7dd4b..f5744a6e 100644
+--- a/crates/engine/genie-core/src/gathering/hunt/gathering.rs
++++ b/crates/engine/genie-core/src/gathering/hunt/gathering.rs
+@@ -175,6 +175,41 @@ impl HuntAction {
+                 return Ok(HuntNext::Stay);
+             }
+         }
++        // 188329 `set_state(6)` (0xbb5b11..0xbb5b2f): a target of class 8, 32 or 15 pulls the unit
++        // against it (0x1116f60) when their tiles are in line on one axis: that coordinate
++        // becomes the target's minus both radii times the whole tile difference
++        if std::env::var_os("GENIE_EXPERIMENT_HUNT_188329").is_some()
++            && matches!(f.victim.class.get(), 8 | 32 | 15)
++        {
++            if let Some((tp, tr)) = c.w.spatial.get_known(self.target)?.map(|t| (t.position, t.radius)) {
++                let here = unit.place.position();
++                let dx = (tp.x() as i32) - (here.x() as i32);
++                let dy = (tp.y() as i32) - (here.y() as i32);
++                if let Some(mover) = c.w.parts.mover_mut(unit.id) {
++                    let mr = mover.stats.radius;
++                    let at = if dx != 0 && dy == 0 {
++                        Some(crate::map::Position::new(tp.x() - (mr.x() + tr.x()) * dx as f32, here.y(), here.z()))
++                    } else if dx == 0 && dy != 0 {
++                        Some(crate::map::Position::new(here.x(), tp.y() - (mr.y() + tr.y()) * dy as f32, here.z()))
++                    } else {
++                        None
++                    };
++                    if let Some(at) = at {
++                        let at = mover.set_position(at, c.w.spatial.map, &c.w.model.tuning.movement);
++                        let at = mover.grounded(at, c.w.spatial.terrain.as_ref());
++                        mover.mark_move(at, c.w.world_time);
++                        mover.new_position(
++                            &mut unit.place,
++                            unit.id,
++                            at,
++                            (&mut c.w.spatial, Some(&mut c.w.pathing)),
++                            roles,
++                            c.w.model.tuning.visibility,
++                        )?;
++                    }
++                }
++            }
++        }
+         self.begin_face(c, unit, r);
+         Ok(HuntNext::Stay)
+     }
 diff --git a/crates/engine/genie-core/src/gathering/hunt/unit.rs b/crates/engine/genie-core/src/gathering/hunt/unit.rs
 index 0c37a95e..c64ba17c 100644
 --- a/crates/engine/genie-core/src/gathering/hunt/unit.rs
@@ -428,6 +474,57 @@ index 1f873756..3c5d62ce 100644
      /// The length of the tile planner's path (`FUN_140f7c530` with the radii `radii`, range 0, no
      /// closed tiles, the tile search for a human player, no smoothing) from the unit to `to`, and
      /// the planner's result; None without a planner for the unit's restriction.
+diff --git a/crates/engine/genie-core/src/movement/request_plans.rs b/crates/engine/genie-core/src/movement/request_plans.rs
+index 8c1a150a..27fd9930 100644
+--- a/crates/engine/genie-core/src/movement/request_plans.rs
++++ b/crates/engine/genie-core/src/movement/request_plans.rs
+@@ -176,7 +176,7 @@ impl Mover {
+         } else {
+             GoalReach::Far
+         };
+-        let r = self.short_path_to(me, (world, by_id), plan, w, near, np)?;
++        let r = self.short_path_to(me, (world, by_id), plan, w, near, np, None)?;
+         if r != ShortFound::Reached || np.path.length.get() <= EPSILON {
+             np.flags |= PlanFlags::SHORT_FAILED;
+             np.path.points.clear();
+@@ -251,12 +251,13 @@ impl Mover {
+         w: &Way<'_>,
+         near: GoalReach,
+         np: &mut NewPath,
++        goal: Option<BVector>,
+     ) -> Result<ShortFound, GenieError> {
+         let movement_tuning = &by_id.tuning().movement;
+         let line = ground_line(self.moved_at, w.waypoint);
+         let ignore = self.ignore_list(me, world, plan, w.goal.target, line, by_id)?;
+         let ask = ShortAsk {
+-            goal: w.waypoint,
++            goal: goal.unwrap_or(w.waypoint),
+             range: short_range(near, w.range, movement_tuning),
+             target: w.target_id,
+             ignore: &ignore,
+@@ -333,7 +334,21 @@ impl Mover {
+         let movement_tuning = &by_id.tuning().movement;
+         np.flags &= !PlanFlags::PLANNED;
+         np.path.points.clear();
+-        let r = self.short_path_to(me, (world, by_id), plan, w, near, np)?;
++        // 188329 (0x1212df3..0x1212efd): with every level that has a path on its last waypoint,
++        // the tail short try asks for the target's own place, not the waypoint
++        let goal = if std::env::var_os("GENIE_EXPERIMENT_WALK_188329").is_some()
++            && self
++                .paths
++                .iter()
++                .all(|l| !l.has_path || l.waypoint.at_or_past_last(l.points.len()))
++        {
++            w.goal
++                .target
++                .map(|(_, t)| BVector::new(t.position.x(), 0.0, t.position.y()))
++        } else {
++            None
++        };
++        let r = self.short_path_to(me, (world, by_id), plan, w, near, np, goal)?;
+         let length = np.path.length.get();
+         let blocked = r.fails()
+             || length <= EPSILON
 diff --git a/crates/engine/genie-core/src/movement/step.rs b/crates/engine/genie-core/src/movement/step.rs
 index 75476db0..76a92fb9 100644
 --- a/crates/engine/genie-core/src/movement/step.rs
