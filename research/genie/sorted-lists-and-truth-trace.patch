@@ -135,6 +135,33 @@ index d8742d52..8d4a2c63 100644
          c.w.parts.set_town_bell(id, bell);
          Ok(())
      }
+diff --git a/crates/engine/genie-core/src/gathering/gather_search/passes.rs b/crates/engine/genie-core/src/gathering/gather_search/passes.rs
+index 2945a9b1..79aa24d9 100644
+--- a/crates/engine/genie-core/src/gathering/gather_search/passes.rs
++++ b/crates/engine/genie-core/src/gathering/gather_search/passes.rs
+@@ -178,10 +178,21 @@ pub(super) fn first_resource(
+     kind: GatherGroup,
+ ) -> Result<Option<Candidate>, GenieError> {
+     let open = |o: &Candidate| o.pasture.is_some() || !o.untargetable;
++    // 188329 0xd1bfa0, kind 5 (the villager AI's kind for class 10, 0xcf9c60): also a dead
++    // object of class 10 with some amount held; the first match in the tile's order, none else
++    let kind5 = kind.get() == 5;
+     let found: Vec<&Candidate> = on_tile
+         .iter()
+-        .filter(|o| open(o) && o.auto_gather && o.gather_group == kind && Amount::ZERO < o.amount)
++        .filter(|o| {
++            open(o)
++                && Amount::ZERO < o.amount
++                && ((kind5 && o.class.get() == 10 && crate::objects::ObjectState::Alive < o.state)
++                    || (o.auto_gather && o.gather_group == kind))
++        })
+         .collect();
++    if kind5 {
++        return Ok(found.first().map(|o| **o));
++    }
+     match found.as_slice() {
+         [one] => Ok(Some(**one)),
+         [] if on_tile.iter().all(open) => Ok(None),
 diff --git a/crates/engine/genie-core/src/gathering/hunt/gathering.rs b/crates/engine/genie-core/src/gathering/hunt/gathering.rs
 index 2df7dd4b..f5744a6e 100644
 --- a/crates/engine/genie-core/src/gathering/hunt/gathering.rs
@@ -182,10 +209,27 @@ index 2df7dd4b..f5744a6e 100644
          Ok(HuntNext::Stay)
      }
 diff --git a/crates/engine/genie-core/src/gathering/hunt/unit.rs b/crates/engine/genie-core/src/gathering/hunt/unit.rs
-index 0c37a95e..c64ba17c 100644
+index 0c37a95e..12586d1c 100644
 --- a/crates/engine/genie-core/src/gathering/hunt/unit.rs
 +++ b/crates/engine/genie-core/src/gathering/hunt/unit.rs
-@@ -430,6 +430,44 @@ impl Unit {
+@@ -422,7 +422,15 @@ impl Unit {
+                 "slot 0x1b0 of another unit AI than the civilian's",
+             ));
+         }
+-        let kind = class.and_then(|class| civilian_kind(class, roles));
++        let mut kind = class.and_then(|class| civilian_kind(class, roles));
++        // 188329 (0xcf9c60): the villager AI's slot 0x1b0 gives kind 5 for class 10, so a boar
++        // hunt searches by kind after its drop
++        if kind.is_none()
++            && std::env::var_os("GENIE_EXPERIMENT_HUNT_188329").is_some()
++            && class.is_some_and(|k| k.get() == 10)
++        {
++            kind = Some(GatherGroup::from(5_u8));
++        }
+         let found = match kind {
+             None if roles
+                 .of_some_class(hunt.target_class)
+@@ -430,6 +438,44 @@ impl Unit {
              {
                  None
              }
@@ -230,7 +274,7 @@ index 0c37a95e..c64ba17c 100644
              None => self.hunt_closest_object(actions, c, class, roles)?,
              Some(group) => {
                  let cap = if group == GatherGroup::WOOD {
-@@ -455,6 +493,19 @@ impl Unit {
+@@ -455,6 +501,19 @@ impl Unit {
          class: Option<ClassId>,
          roles: &Roles,
      ) -> Result<Option<ObjectId>, GenieError> {
@@ -250,7 +294,7 @@ index 0c37a95e..c64ba17c 100644
          let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
          if self.my_pasture.is_some() {
              return Err(GenieError::unsupported(
-@@ -473,7 +524,7 @@ impl Unit {
+@@ -473,7 +532,7 @@ impl Unit {
              pick: Pick::Closest {
                  group: class,
                  relation: None,
@@ -259,7 +303,7 @@ index 0c37a95e..c64ba17c 100644
                  master: None,
                  workers: if roles.of_some_class(class).contains(ClassRoles::FARM) {
                      WorkerCount::ONE
-@@ -541,7 +592,19 @@ impl Unit {
+@@ -541,7 +600,19 @@ impl Unit {
                      "a hunt without a unit AI after its drop-off",
                  ))?;
          ai.alert(result, c.dt.seconds());
@@ -475,10 +519,26 @@ index 8ae7fee5..35ac2065 100644
              return MoveTo::Failed;
          }
 diff --git a/crates/engine/genie-core/src/movement/new_path.rs b/crates/engine/genie-core/src/movement/new_path.rs
-index 1f873756..3c5d62ce 100644
+index 1f873756..2887dc8b 100644
 --- a/crates/engine/genie-core/src/movement/new_path.rs
 +++ b/crates/engine/genie-core/src/movement/new_path.rs
-@@ -463,6 +463,35 @@ impl Mover {
+@@ -65,6 +65,15 @@ impl Mover {
+         }
+         let level = self.paths.walked_mut()?;
+         if !flags.contains(PlanFlags::FOUND) || level.range < to_end {
++            // 188329 (0x121445d): tries left are tested before the last-waypoint test, so the
++            // unit pauses 0.1 and stops at any waypoint
++            if std::env::var_os("GENIE_EXPERIMENT_WALK_188329").is_some()
++                && level.continue_counter.left()
++            {
++                level.pause_time = Seconds::new(movement_tuning.stuck_pause);
++                self.stop()?;
++                return Ok(AfterRequest::Paused);
++            }
+             if level.waypoint.at_or_past_last(level.points.len()) {
+                 if level.continue_counter.left() {
+                     // the unit pauses itself (slot 0x5f0, the walked level's `+0x34`) and stops
+@@ -463,6 +472,35 @@ impl Mover {
          Ok(result.reaches().then(|| path.length()))
      }
  
