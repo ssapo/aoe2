@@ -1,6 +1,6 @@
 # 이어받는 사람(또는 AI)을 위한 안내
 
-기준일: 2026-11-11 저녁 (12절이 최신, 지금 상태는 13.4; 2절에 리플 3개 표). **일을 끝낼 때는 13절의 기록 지침을 꼭 따른다.** 브랜치: `research/genie-188329` (저장소 `ssapo/aoe2`). 이 문서만 읽고 같은 방식으로 이어갈 수 있게 썼다. 세부 근거는 [truth-log-findings.md](truth-log-findings.md)에 있다.
+기준일: 2026-11-11 밤 (12절이 최신, 지금 상태는 13.4; 2.1절에 리플 3개 표). **일을 끝낼 때는 13절의 기록 지침을 꼭 따른다.** 브랜치: `research/genie-188329` (저장소 `ssapo/aoe2`). 이 문서만 읽고 같은 방식으로 이어갈 수 있게 썼다. 세부 근거는 [truth-log-findings.md](truth-log-findings.md)에 있다.
 
 ## 1. 목표
 
@@ -28,17 +28,21 @@
 - 엔진은 update 36,452(약 930초)에서 멈춘다: "a helper that answers a call for help". 멈추는 곳은 고칠 때마다 바뀐다(22번 기록 참고). 900초 누적값은 그 직전이라 아직 믿을 만하지만, 멈춤이 900초 앞으로 오면 못 쓴다.
 - 시작 시점(11-10 저녁)에는 자원 일치 134초, 위치 일치 32.5초였다. 그 사이에 넣은 것은 12절 표에 전부 있다.
 
-### 2.1 리플 3개 (2026-11-12, 스위치 12개 + `SEARCH_CLEAR=unit`, 실행 `c1_239`, `c1_161`, `c1_097`; 518239882·517426097은 g1_*와 같은 값)
+### 2.1 리플 3개 (2026-11-11 밤, 스위치 15개 + `SEARCH_CLEAR=unit`, 실행 `I_ti_239`, `I_ti_161`, `I_ti_097`)
 
 | 리플 (기록) | 위치(word 7) 첫 불일치 P1 / P2 | 자원 첫 차이(> 0.01) P1 / P2 | 자원 50 넘게 P1 / P2 | 엔진 멈춤 update |
 |---|---|---|---|---|
-| 518239882 (truth4) | 384.8 / 426.8 | 411.2 / 450.9 | 596.3 / 767.1 | 36,479 |
-| 518470161 (truth5) | 307.7 / 171.2 | 320.3 / 218.5 | 324.0 / 345.7 | 87,665 |
-| 517426097 (truth6) | 230.4 / 249.9 | 324.0 / 280.5 | 579.2 / 325.5 | 62,242 |
+| 518239882 (truth4) | 384.8 / 426.8 | 411.2 / 450.9 | 596.3 / 767.1 | 36,452 (P1 "a helper that answers a call for help") |
+| 518470161 (truth5) | 307.7 / 216.7 | 320.3 / 218.5 | 324.0 / 345.7 | 87,784 (P2 "a farmer that found nothing after its drop-off", 0xf3) |
+| 517426097 (truth6) | 230.4 / 444.9 | 324.0 / 582.1 | 579.2 / 707.6 | 73,336 (P2 "a horde's command") |
 
-새 리플 두 개를 처음 돌렸을 때(스위치 9개)는 518470161 P2 위치 8.7초·식량 35.6초, 517426097 P1 위치 93.9초·식량 123.8초였다. findings 27~29로 위처럼 늘었다. 채점: `runs/summ2.sh <이름> ../truth/analysisN`(518239882는 `../truth/analysis`).
+518239882 900초 누적(원본 대비 엔진): P1 식량 −190, 나무 −160.6; P2 식량 −249.7, 나무 −26.5. 확인 체크포인트(P1/P2): 518239882 32/33, 518470161 46/32, 517426097 34/67.
 
-켜는 스위치(전부 `=1`): `GENIE_EXPERIMENT_SORT_LISTS`, `GENIE_EXPERIMENT_SHORT_188329`, `GENIE_EXPERIMENT_SPAWN_188329`, `GENIE_EXPERIMENT_AI_ORDER_188329`, `GENIE_EXPERIMENT_EVADE_188329`, `GENIE_EXPERIMENT_WALK_188329`, `GENIE_EXPERIMENT_HUNT_188329`, `GENIE_EXPERIMENT_UNLOAD_188329`, `GENIE_EXPERIMENT_MOVETO_188329`, `GENIE_EXPERIMENT_CORNER_188329`, `GENIE_EXPERIMENT_REWALK_188329`, `GENIE_EXPERIMENT_GRAZE_188329`. 앞의 셋은 `runs\go.ps1`이 항상 켠다. 나머지는 `-Envs`로 준다(12.3절).
+바로 앞(c1_*, 스위치 12개)과 비교: 518470161 P2 위치 171.2 → 216.7초(32번), 517426097 P2 위치 249.9 → 444.9초·자원 280.5 → 582.1초(33번), 518239882 900초 P1 나무 −176.9 → −160.6·P2 식량 −259.7 → −249.7(35번). 518239882의 멈춤은 36,479 → 36,452로 27 update 일찍 온다(35번, 900초 뒤라 채점에는 영향 없음).
+
+새 리플 두 개를 처음 돌렸을 때(스위치 9개)는 518470161 P2 위치 8.7초·식량 35.6초, 517426097 P1 위치 93.9초·식량 123.8초였다. findings 27~36으로 위처럼 늘었다. 채점: `runs/summ2.sh <이름> ../truth/analysisN`(518239882는 `../truth/analysis`, 518470161은 `analysis5`, 517426097은 `analysis6`).
+
+켜는 스위치(전부 `=1`): `GENIE_EXPERIMENT_SORT_LISTS`, `GENIE_EXPERIMENT_SHORT_188329`, `GENIE_EXPERIMENT_SPAWN_188329`, `GENIE_EXPERIMENT_AI_ORDER_188329`, `GENIE_EXPERIMENT_EVADE_188329`, `GENIE_EXPERIMENT_WALK_188329`, `GENIE_EXPERIMENT_HUNT_188329`, `GENIE_EXPERIMENT_UNLOAD_188329`, `GENIE_EXPERIMENT_MOVETO_188329`, `GENIE_EXPERIMENT_CORNER_188329`, `GENIE_EXPERIMENT_REWALK_188329`, `GENIE_EXPERIMENT_GRAZE_188329`, `GENIE_EXPERIMENT_BACKWORK_IGNORE_188329`, `GENIE_EXPERIMENT_TASKARGS_188329`, `GENIE_EXPERIMENT_IGNORELIST_188329`. 앞의 셋은 `runs\go.ps1`이 항상 켠다. 나머지는 `-Envs`로 준다(12.3절의 `$a`). 켜지 않는 것: `GENIE_EXPERIMENT_UPSTREAM_RELICS`, `GENIE_EXPERIMENT_UPSTREAM_CART`(upstream 동작 그대로, 원본 확인 없음; 켜도 세 리플 결과 같음, 34번).
 
 ## 3. 지켜야 할 것
 
@@ -193,6 +197,12 @@
 | CORNER_188329 | 모서리 노드 광선 콜백 0x107c590(토큰 없음, 넓이 0 교집합 건너뜀, 축 광선은 스윕) | `short_path/raycast.rs` `corner_ray_188329`, `main_loop.rs` `corner_expand` | corner-ray-case-4.9s (findings 27) | 518470161 4.9초 사례 |
 | REWALK_188329 | 재보행이 지나가는 UNSET 정점의 목표 판정 | `short_path/main_loop.rs` `rewalk_advance` | rewalk-goal-case-90.9s (findings 28) | 517426097 90.9초 사례 |
 | GRAZE_188329 | 가축이 혼자 움직이기 전 풀 뜯기 한도(Graze wait_time)와 도달 길이 검사 | `unit_ai/idle_animals.rs`, `unit_ai/side.rs`, `world_view/side.rs`, `movement/path_end.rs` `reach_length`, `long_path/{mod,cost}.rs` | graze-limit-case-10s (findings 29) | 518470161 10.0초 사례 |
+| HUNT_188329 | 걸어가던 사냥 대상이 사라졌을 때(MoveTo 코드 4/5) 예약 명령이 있으면 사냥을 끝내고 예약 명령으로(0xbb66f9) | `gathering/hunt/update.rs` `update_walk`, `hunter.rs` `hunt_part`(`HuntState::Done`) | hunt-queued-case-247.6s (findings 33) | 517426097 247.6초 사례(A_p18 비트 일치) |
+| BACKWORK_IGNORE_188329 | 건물에서 일하러 내보낼 때 먼저 모으고, 각자 무시 목록을 비운 뒤 다른 유닛들을 넣음(0x16f4ba0) | `garrison/unload.rs` `back_to_work_inside_188329`, `orders/town_bell.rs` `workers_out` | backwork-ignore-case-166.9s (findings 32) | 518470161 166.9초 사례 |
+| TASKARGS_188329 | 작업 명령 인자: slot 0x138의 6번째 = 명령 출처, 7번째 = 작업 바이트. 직접 0x8a8 호출자는 바이트 0 | `objects/unit/stop.rs` `ai_command`, `groups/update/{release,send}.rs`, `orders/{drop_site,town_bell,mod}.rs` | taskargs-ignorelist-check (findings 35) | 세 리플 첫 불일치 그대로, 518239882 900초 개선 |
+| IGNORELIST_188329 | 걷기 질의(0x120cb90)가 장애물 관리자 무시 목록을 먼저 설정하고 남겨 둠, 짧은 경로의 내려놓기 질의(0x120f04f)가 그 목록을 뺌 | `map/spatial/grid.rs`, `movement/{waypoint,new_path}.rs` | taskargs-ignorelist-check (findings 36) | 세 리플 첫 불일치 그대로(518239882·517426097은 출력 바이트 동일) |
+| (스위치 없음) | upstream 이식: 유물 수입, ClosestObject 한도·농장, Transport 정지, 형식 크레이트(`num_enum` 0.7) | `construction/building_update.rs`, `players/world_player/income.rs`, `map/spatial/search.rs`, `unit_ai/update.rs`, `garrison/transport/work.rs`, formats/*, `Cargo.toml`/`.lock` | upstream-ports-sessionA (findings 34) | 세 리플 결과 그대로. 188329 미확인 |
+| UPSTREAM_RELICS / UPSTREAM_CART (켜지 않음) | upstream 그대로의 유물 없는 수도원 0.0 더하기 / 손수레 slot 0x140 인자 | `construction/building_update.rs` / `gathering/mule_cart.rs` | findings 34 | 켜도 세 리플 같음. 원본 확인 없음 |
 | (스위치 없음) | 엔진이 멈추던 세 곳을 원본 동작으로 | `unit_ai/actions.rs`, `orders/moves.rs` | unsupported-stops | 끝까지 실행됨 |
 
 "근거" 열의 문서는 모두 이 폴더의 `original-188329-*.md`이다. 사례 문서는 주소와 손 계산까지 들어 있다.
@@ -204,7 +214,7 @@ $d="$env:USERPROFILE\genie-replays"
 # 빌드만 (약 3분; 끝은 build7.err의 "Finished"로 확인. census가 돌고 있으면 exe를 못 덮어써서 실패하니 먼저 Stop-Process -Name census)
 powershell -File $d\runs\steer.ps1
 # 실행: 이름, 갱신 수(기본 41600 = 기준 리플 끝까지; 다른 리플은 200000), 추가 환경변수, -Replay <리플 폴더 번호>(기본 518239882)
-$a='GENIE_EXPERIMENT_AI_ORDER_188329=1;GENIE_EXPERIMENT_EVADE_188329=1;GENIE_EXPERIMENT_WALK_188329=1;GENIE_EXPERIMENT_HUNT_188329=1;GENIE_EXPERIMENT_UNLOAD_188329=1;GENIE_EXPERIMENT_MOVETO_188329=1;GENIE_EXPERIMENT_CORNER_188329=1;GENIE_EXPERIMENT_REWALK_188329=1;GENIE_EXPERIMENT_GRAZE_188329=1'
+$a='GENIE_EXPERIMENT_AI_ORDER_188329=1;GENIE_EXPERIMENT_EVADE_188329=1;GENIE_EXPERIMENT_WALK_188329=1;GENIE_EXPERIMENT_HUNT_188329=1;GENIE_EXPERIMENT_UNLOAD_188329=1;GENIE_EXPERIMENT_MOVETO_188329=1;GENIE_EXPERIMENT_CORNER_188329=1;GENIE_EXPERIMENT_REWALK_188329=1;GENIE_EXPERIMENT_GRAZE_188329=1;GENIE_EXPERIMENT_BACKWORK_IGNORE_188329=1;GENIE_EXPERIMENT_TASKARGS_188329=1;GENIE_EXPERIMENT_IGNORELIST_188329=1'
 powershell -File $d\runs\go.ps1 -Name fX -Envs "$a;GENIE_TRACE_RES=1"                       # 전체, 자원 추적 (약 3분)
 powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OBJECTS_RANGE=14540-14700"   # 그 갱신 구간의 개체 추적
 ```
@@ -239,17 +249,19 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 12.5 미해결 (이른 순)
 
-0. (새 리플, 2026-11-12) 가장 이른 것부터:
-   - 518470161 P2 위치 171.2초, P2 자원 218.5초(식량 −10), P1 307.7초. 미조사. 다음 첫 동작: 체크포인트 앞 구간 개체 추적 → `TRUTH=truth/truth5.jsonl python3 runs/cmp_pos.py`.
-   - 518470161 멧돼지 9719가 엔진에서 약 12.3초 일찍 움직임(36.9초, update 2673 vs 원본 49.2초). 다음 첫 동작: update 2660~2680을 `GENIE_TRACE_ANIMAL=1`과 함께 추적, truth5의 t174/t178·airng와 비교(`case-518470161-player-60s.md`).
-   - 517426097 P1 228.5초 그룹 형성 속도: findings 31(읽음, 미구현, 앞섬 0.81타일 유도 필요).
-   - 517426097 P2 247.6초 사냥꾼 2974·3820: 염소가 GOAT_D로 바뀐 뒤의 사냥 다음 동작(findings 31 끝).
-   - upstream 검토(`upstream-review-2026-11-12.md`): 우리 멈춤 4곳은 upstream도 미해결. 후보: c050b687의 작업 명령 인자 순서(188329 `0x1140670`에서 먼저 확인), aefb2c22 장애물 무시 목록(참고 패치 `upstream-aefb2c22-ignore-list-port.patch`).
+0. (세 리플, 2026-11-11 밤, 실행 `I_ti_*`) 가장 이른 것부터:
+   - 518470161 P2 216.7초(word 7·9)와 P2 자원 218.5초(식량 −10): 양치기 9381의 내려놓기 경로(update 16401, 215.397초). 엔진은 내려놓기 무시 규칙이 9366을 무시해 동쪽, 원본은 서쪽(9366을 장애물로 둠). 시작점이 9366 상자 가장자리에 정확히 걸린다(x 고정소수 106913032). 의심: 시작 노드의 탈출 탐색 0x107e9d9~0x107f66e(`original-188329-backwork-ignore-case-166.9s.md` 4절 S1). IGNORELIST로는 안 바뀜(36번). 다음 첫 동작: `out_p10/sp.py`의 시작 노드를 이 질의(from (106913032, 152901760), to (113246208, 142606336), r 0.2, 목표 반폭 2.0, 9381·10413·9366·마을회관 부속 도형)로 돌려 `out_p16/start.c`와 줄 단위로 대조.
+   - 518470161 P2 word 4 229.7초, word 10 242.7초, word 1 288.2초: 위 사례의 결과일 수 있다. 위를 고친 뒤 다시 본다.
+   - 517426097 P1 230.4초 그룹 형성 속도: findings 31(읽음, 미구현). 다음 첫 동작: 0x110a544(형성 초기화)와 +0x178 초깃값을 읽어 슬롯의 처음 앞섬(약 0.81타일)을 유도한 뒤 `GENIE_EXPERIMENT_FORMING_188329`로 넣기(`original-188329-group-forming-case-228s.md` 3절).
+   - 517426097 P1 word 4·9 282.4초, 518470161 P1 307.7초(모든 단어), 517426097 P1 자원 324.0초(나무 +9.5), 518470161 P1 자원 320.3초: 미조사. 다음 첫 동작: 각 체크포인트 앞 구간 개체 추적 → `TRUTH=truth/truth5.jsonl`(또는 truth6) `python3 runs/cmp_pos.py`.
+   - 517426097 P2 444.9초(word 7·9): 미조사(33번으로 249.9초에서 밀려남). 다음 첫 동작: 같은 방법.
+   - 엔진 멈춤: 518239882 36,452 "a helper that answers a call for help"(4번), 518470161 87,784 P2 "a farmer that found nothing after its drop-off"(0xf3), 517426097 73,336 P2 "a horde's command (commandHorde)". 22번과 같은 방식(원본 동작을 읽어 오류를 대체). 세션 B: horde 멈춤은 작업 명령 전 `group_command`에서 나므로 TASKARGS와 무관(확인 `original-188329-taskargs-ignorelist-check.md` 4절 S2).
+   - 해결되어 지운 것: 518470161 P2 171.2초(32번), 517426097 P2 247.6초 사냥꾼(33번), 518470161 멧돼지 9719 36.9초(30번으로 이미 해결, 34번 참고), upstream c050b687·aefb2c22 확인(35·36번).
 1. (기준 리플) Gaia 동물 마스터 2095(말, 클래스 9) **id 4285 한 마리만**: 186.6초부터 원본에서만 도망간다(정찰병 3428이 지나갈 때). 4283은 위치 일치, 4284는 양쪽 다 정지(예전의 "4283~4285 전체"는 틀린 기록). 식량 없는 동물이라 자원 영향 없음. 186.381초의 4285·3428 위치, retarget=1244, look=672는 원본과 일치. 원본 idle은 검색이 대상을 찾으면 0xd26200(도망)을 부르는데, 엔진에서 타이머 때문에 검색을 안 하는지 검색이 실패하는지 아직 못 갈랐다. 문서 `original-188329-animal-case-186s.md`, findings 26. 다음 첫 동작: 지금 빌드(진단 출력 포함, 13.4)로 `go.ps1 -Name p27 -Updates 9480 -Envs "$a;GENIE_TRACE_OBJECTS_RANGE=9430-9480;GENIE_TRACE_OBJECT_IDS=4283,4284,4285,3428;GENIE_TRACE_ANIMAL=1"` → ANIMAL_SEARCH / ANIMAL_EVADE 줄에서 4285의 검색 결과와 타이머를 본다.
-2. 383.4초 P1 나무꾼 4371(그리고 4363): 벌목소로 가는 짧은 경로 모양이 다르다(원본은 y = 45.1211을 따라 동쪽으로 간 뒤 꺾음). 도착 시각은 같다. 짧은 경로 사례로 넘길 만하다.
+2. 383.4초 P1 나무꾼 4371(그리고 4363)(IGNORELIST를 켜도 518239882 출력이 바이트 동일이라 세션 B의 S4 후보는 아님): 벌목소로 가는 짧은 경로 모양이 다르다(원본은 y = 45.1211을 따라 동쪽으로 간 뒤 꺾음). 도착 시각은 같다. 짧은 경로 사례로 넘길 만하다.
 3. 411.2초 P1 나무 −10: p25에서 4371의 선행 채집 지연을 확인(25번). 복귀 후 약 0.0546 차이가 연속 유지됨. 4363도 약 0.098276 차이. 다음 첫 동작: update 약 16350~16600을 추적해 383.4초 전후의 이전 왕복부터 비교. 450.9초 P2는 미조사.
-4. 엔진 멈춤: update 36,452 "a helper that answers a call for help (its reach, bestUnitToAttack and AttackObject)". 그 앞 실행에서는 41,256 "a horde's command (commandHorde)". 22번과 같은 방식(원본 동작을 읽어 오류를 대체)으로 처리.
-5. 읽기에서 확정했지만 아직 안 넣은 것(사례가 나오면 넣는다): 채집 N1(자원 탐색 `0xd23bf0` 전체), N2(0.25초 재선정), N4(광산 교체); 농장 D1(자리 뽑기), D2(삭제된 농장) + 삭제 명령 0x83; 건설 C2, C4; 가축 3단계 탐색의 AI 통지 쪽(R2-D8b); 사슴 도망의 지도 경계 자르기·두 번째 목표·4방향; 걷기 D2, D3, D5, D7, D8; 길찾기 최종 선택 R16-D1; 죽을 때 애니 속도 0(R13-D1); 연구·비용 R8 D1~D7; 작업 시작 붙이기의 Gather(유형 5) 쪽.
+4. 엔진 멈춤(518239882): update 36,452 "a helper that answers a call for help (its reach, bestUnitToAttack and AttackObject)"(TASKARGS 없이는 36,479). 그 앞 실행에서는 41,256 "a horde's command (commandHorde)". 22번과 같은 방식(원본 동작을 읽어 오류를 대체)으로 처리. 세션 B의 추정(S1): 엔진은 그룹 병사의 재타겟을 잘못 꺼서 대상이 죽은 뒤 놀게 되고 이 멈춤 조건(`unit_ai/world_view/side.rs:192` `helper_free`)에 걸린다. TASKARGS를 켜도 멈춤은 그대로(27 update 일찍)라 이 추정만으로는 설명이 안 된다.
+5. 읽기에서 확정했지만 아직 안 넣은 것(사례가 나오면 넣는다): 채집 N1(자원 탐색 `0xd23bf0` 전체), N2(0.25초 재선정), N4(광산 교체); 농장 D1(자리 뽑기), D2(삭제된 농장) + 삭제 명령 0x83; 건설 C2, C4; 가축 3단계 탐색의 AI 통지 쪽(R2-D8b); 사슴 도망의 지도 경계 자르기·두 번째 목표·4방향; 걷기 D2, D3, D5, D7, D8; 길찾기 최종 선택 R16-D1; 죽을 때 애니 속도 0(R13-D1); 연구·비용 R8 D1~D7; 작업 시작 붙이기의 Gather(유형 5) 쪽. 세션 B에서 확정했지만 안 넣은 것: AI가 사라진 대상(자원 종류 없는 클래스)에 내린 명령은 원본이 대상 검색 0xd22c20 뒤 그 결과에 작업(0xd37eed~0xd37f31), 엔진은 NotTaken(`unit_ai/order_kinds.rs` `order_on_target`). 장애물 관리자 목록이 복사가 아니라 포인터인 점(S5)과 엔진에 대응이 없는 목록 설정자들(S6, 주소는 확인 문서 4절). 0x16f4ba0이 클래스 0x15·0x42도 모으는 점(엔진은 클래스 4와 master 1808만).
 6. 다른 리플 검증을 한 번도 안 했다. PC `genie-replays\`에 리플 폴더가 여러 개 있다(515741992, 516293031, 516495787, 516746960, 516956894, 517426097, 518470161, 519686090, 519700670). 원본 기록이 없어도 체크포인트 단어로는 비교할 수 있다: 같은 스위치로 돌려 단어별 첫 불일치가 기준 리플과 비슷하게 늦어지는지 본다.
 7. 제품화: 스레드 로컬 지름길 두 개(`CLOSEST_FROM`, `SPAWN_PATH`)를 정식 인자로 바꾸고, 스위치들을 "빌드 188329" 한 설정으로 묶는다. 분석기 출력(실제 수입, 동물별 먹은 양, "어디까지 검증됨" 줄)은 아직 손대지 않았다.
 
@@ -277,6 +289,10 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 | `truth\analysis5\`, `truth\analysis6\` | truth5/6의 자원·개체 캐시(`runs/extract_truth.py <jsonl> <폴더>`로 만듦, Windows python으로 수 초) |
 | `runs\summ2.sh`, `runs\extract_truth.py` | 리플별 채점(`summ2.sh <이름> <analysis 폴더>`), 캐시 만들기. `cmp_pos.py`·`cmp_held.py`는 환경변수 `TRUTH=<jsonl>`로 기록 파일을 바꾼다 |
 | `re-kit\re-focused-case-p10.tar.gz`, `re-kit\re-focused-cases-p11-p12-g1.tar.gz`, `re-kit\re-focused-cases-p13-p15.tar.gz` | findings 27~29의 원본 읽기·손 계산(Python 짧은 경로 포트 `out_p10/sp.py`, `out_p11/sp.py`) |
+| `re-kit\re-focused-cases-p16-p18-B.tar.gz` | findings 32~36의 원본 읽기 원문: `out_p16`(166.9초 내보내기 무시 목록, 215.4초 양치기 시작 노드 디컴파일 `start.c`), `out_p17`(멧돼지 idle 0xcfc290 디스어셈블), `out_p18`(사냥 예약 명령, 0xd004a0 디컴파일), `out_B`(작업 인자·무시 목록 확인, 패치 `taskargs_188329*.patch`, `ignorelist_188329*.patch`, 진단 `ignorelist_trace*.patch`; `*_pc.patch`는 PC 줄 끝) |
+| `backup-A\`, `backup-I\` | 세션 A(upstream 이식, P16, P18)와 통합 세션 I(작업 인자·무시 목록 패치)가 고치기 전의 엔진 파일 사본(`<상대 경로>`) |
+| `patch-2026-11-11-I.patch` | 이번 엔진 패치 사본(저장소 `sorted-lists-and-truth-trace.patch`와 같음) |
+| `runs\I_x_*`, `I_t_*`, `I_i_*`, `I_ti_*` | 35·36번 검증 실행(기준 / +TASKARGS / +IGNORELIST / +둘 다). `I_s0_239`, `I_s1_239`: IGNORELIST 꺼짐·켜짐의 STEER 추적(update 2000~2300, IGNORE 줄의 `mgr=`) |
 | 엔진 패치 | 저장소 `sorted-lists-and-truth-trace.patch` = PC `genie\`의 `git diff --ignore-cr-at-eol`(기준 `91d81be4`). 다시 만들 때: `cd genie && GIT_OPTIONAL_LOCKS=0 git diff --ignore-cr-at-eol > ../<새이름>.patch` |
 
 
@@ -286,7 +302,7 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 13.1 사례 하나를 끝낼 때마다 (고쳤든 못 고쳤든)
 
-`truth-log-findings.md` 맨 끝에 번호를 이어 한 절을 쓴다(지금 마지막은 31번). 형식:
+`truth-log-findings.md` 맨 끝에 번호를 이어 한 절을 쓴다(지금 마지막은 36번). 형식:
 
 ```
 ## <번호>. <한 줄 제목> (스위치 `GENIE_EXPERIMENT_...`에 추가 / 새 스위치 / 스위치 없음)
@@ -323,9 +339,9 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 13.4 지금 하던 일 (멈출 때마다 이 절을 덮어쓴다)
 
-- 날짜·작성: 2026-11-12 새벽, Claude.
-- 한 일: findings 27~31. 30은 설정만 바꿈(`runs/go.ps1` `SEARCH_CLEAR=unit`). 31은 읽기만 하고 구현 안 함. upstream 108커밋 검토(그대로 가져오기는 98개 충돌, 손으로 옮길 후보만 정리).
-- 엔진 소스 상태: 빌드됨(GRAZE까지 포함). 반쯤 넣은 변경 없음. 패치를 다시 만들 때 **git이 추적하지 않는 새 파일(`genie-core/src/correction.rs`, oracle `examples/*_probe.rs`)도 넣는다**: `git diff --ignore-cr-at-eol > P; for f in $(git status --short --untracked-files=all | grep '^?? crates/.*\.rs$' | cut -c4-); do git diff --no-index /dev/null "$f" >> P; done`(GIT_OPTIONAL_LOCKS=0). 저장소 패치는 CRLF가 섞여 있어 `git apply` 전에 줄 끝을 맞춘다.
-- 실행: 돌고 있는 것 없음. 최신 전체 실행 `c1_239`, `c1_161`, `c1_097`.
-- 원본 읽기 환경: 클라우드 컨테이너에 re-kit 압축 3개 + Ghidra 11.3.2(GitHub에서 받음) + JDK 21 + `pip install capstone numpy`로 차림. 사례마다 도우미 하나(프롬프트 공통부는 PC `runs\helper-common.txt`).
-- 다음 첫 동작: 12.5의 0번 목록 순서대로.
+- 날짜·작성: 2026-11-11 밤, Claude(통합 세션 I).
+- 한 일: 세션 A의 엔진 변경(upstream 이식, P16 `BACKWORK_IGNORE`, P18 `HUNT` 추가)을 받은 PC 트리 위에 세션 B의 패치 셋(`TASKARGS`, `IGNORELIST`, IGNORE 줄의 `mgr=` 진단)을 얹고 빌드했다. 세 리플을 기준 / +TASKARGS / +IGNORELIST / +둘 다로 돌려 비교했다(35, 36번). 두 스위치 모두 어느 리플·선수의 첫 불일치도 앞당기지 않아 기본 묶음에 넣었다(2절, 12.3의 `$a`). findings 32~36 기록.
+- 엔진 소스 상태: 빌드됨(2026-11-11 20:36, `build7.err` "Finished"). 반쯤 넣은 변경 없음. 고치기 전 파일은 `backup-A\`, `backup-I\`. 패치를 다시 만들 때 git이 추적하지 않는 새 파일(`genie-core/src/correction.rs`, oracle `examples/*_probe.rs`)도 넣는다: `git diff --ignore-cr-at-eol > P; for f in $(git status --short --untracked-files=all | grep '^?? crates/.*\.rs$' | cut -c4-); do git diff --no-index /dev/null "$f" >> P; done`(GIT_OPTIONAL_LOCKS=0). 세션 A가 `num_enum`을 0.5 → 0.7로 올렸다(`Cargo.toml`·`Cargo.lock`이 패치에 들어 있다; PC는 crates.io에서 0.7.6을 받았다). 저장소 패치는 CRLF가 섞여 있어 `git apply` 전에 줄 끝을 맞춘다.
+- 실행: 돌고 있는 것 없음. 최신 전체 실행 `I_ti_239`, `I_ti_161`, `I_ti_097`(스위치 15개 + `GENIE_TRACE_RES=1`). 기준(`I_x_*`)은 세션 A의 `A_*`와 stderr·stdout 바이트 동일.
+- 주의할 것: TASKARGS는 518239882의 멈춤을 36,479 → 36,452로, IGNORELIST는 518470161 P1의 멈춤(다른 선수가 멈춘 결과)을 89,722 → 89,441로 당긴다. 둘 다 원본 기록 범위 밖이고 첫 불일치는 그대로라 켜 두었다.
+- 다음 첫 동작: 12.5의 0번 목록 순서대로(맨 앞: 518470161 215.4초 양치기 9381의 시작 노드 손 계산).
