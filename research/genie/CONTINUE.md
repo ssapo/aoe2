@@ -28,12 +28,12 @@
 - 엔진은 update 36,452(약 930초)에서 멈춘다: "a helper that answers a call for help". 멈추는 곳은 고칠 때마다 바뀐다(22번 기록 참고). 900초 누적값은 그 직전이라 아직 믿을 만하지만, 멈춤이 900초 앞으로 오면 못 쓴다.
 - 시작 시점(11-10 저녁)에는 자원 일치 134초, 위치 일치 32.5초였다. 그 사이에 넣은 것은 12절 표에 전부 있다.
 
-### 2.1 리플 3개 (2026-11-11 저녁, 스위치 12개, 실행 `g1_239`, `g1_161`, `g1_097`)
+### 2.1 리플 3개 (2026-11-12, 스위치 12개 + `SEARCH_CLEAR=unit`, 실행 `c1_239`, `c1_161`, `c1_097`; 518239882·517426097은 g1_*와 같은 값)
 
 | 리플 (기록) | 위치(word 7) 첫 불일치 P1 / P2 | 자원 첫 차이(> 0.01) P1 / P2 | 자원 50 넘게 P1 / P2 | 엔진 멈춤 update |
 |---|---|---|---|---|
 | 518239882 (truth4) | 384.8 / 426.8 | 411.2 / 450.9 | 596.3 / 767.1 | 36,479 |
-| 518470161 (truth5) | 60.7 / 60.7 | 320.3 / 180.9 | 324.0 / 376.8 | 95,123 |
+| 518470161 (truth5) | 307.7 / 171.2 | 320.3 / 218.5 | 324.0 / 345.7 | 87,665 |
 | 517426097 (truth6) | 230.4 / 249.9 | 324.0 / 280.5 | 579.2 / 325.5 | 62,242 |
 
 새 리플 두 개를 처음 돌렸을 때(스위치 9개)는 518470161 P2 위치 8.7초·식량 35.6초, 517426097 P1 위치 93.9초·식량 123.8초였다. findings 27~29로 위처럼 늘었다. 채점: `runs/summ2.sh <이름> ../truth/analysisN`(518239882는 `../truth/analysis`).
@@ -101,7 +101,7 @@
 - 빌드 전에 `Stop-Process -Name census` (실행 파일이 잠겨 있으면 링크 실패).
 - 원격 셸의 PowerShell 호출은 30~80초에 끊긴다. `Start-Process powershell -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File',<스크립트> -WindowStyle Hidden`으로 떼어 돌리고 `.done` 파일을 기다린다. 빌드와 실행은 다른 스크립트로 나눈다(`runs\steer.ps1`이 빌드).
 - 네이티브 stderr는 `Start-Process -RedirectStandardError`로 받는다(`2>`는 UTF-16으로 깨진다).
-- 기본 환경 변수: `GENIE_CORRECT=ids GENIE_EXPERIMENT_SEARCH_CLEAR=tick GENIE_EXPERIMENT_CAPTURE_SETUP=1 GENIE_NO_STOP=1 GENIE_PRINT_CHECKPOINTS=1` + 2절의 스위치 셋. 인자: `<리플> <DAT> <update 수>` (전체는 41600).
+- 기본 환경 변수: `GENIE_CORRECT=ids GENIE_EXPERIMENT_SEARCH_CLEAR=unit GENIE_EXPERIMENT_CAPTURE_SETUP=1 GENIE_NO_STOP=1 GENIE_PRINT_CHECKPOINTS=1` + 2절의 스위치 셋. 인자: `<리플> <DAT> <update 수>` (전체는 41600).
 - 추적은 느리다. 전 개체 위치 추적은 700틱에 5분쯤 걸리니 틱 범위를 좁힌다. 체크포인트만 보는 실행은 2분이다.
 - 엔진 소스를 고친 뒤에는 저장소의 패치를 다시 만든다: 기준 커밋(`91d81be4` + 기존 연구 패치 8개)에 대한 `git diff`가 `sorted-lists-and-truth-trace.patch`다.
 
@@ -239,11 +239,12 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 12.5 미해결 (이른 순)
 
-0. (새 리플, 2026-11-11 저녁) 가장 이른 것부터:
-   - 518470161 15.067초(update 991) 가이아 묶음: 원본이 그 틱에 AI 난수를 7개 더 쓴다(airng 카운터 차이 303 → 310). 배회 걸음이 다른 동물에게 밀려 들어감. 원인 미확인. 다음 첫 동작: update 985~995를 동물 진단(`GENIE_TRACE_ANIMAL=1`)과 함께 추적, 원본 airng와 엔진 난수 호출 수를 동물별로 맞춰 본다(`re-kit/re-focused-cases-p11-p12-g1.tar.gz`의 out_p12 `wand.py` 참고).
-   - 518470161 위치 60.7초(P1·P2), P2 식량 180.9초; 517426097 P1 위치 230.4초, P2 249.9초. 아직 개체를 특정하지 않음. 다음 첫 동작: 체크포인트 앞 구간을 `GENIE_TRACE_OBJECTS_RANGE`로 추적하고 `TRUTH=truth/truth5.jsonl python3 runs/cmp_pos.py`.
-   - 517426097 염소 3204가 88.735초에 원본에서만 새 가이아 3827(GOAT_D 1061, 식량 약 60)로 바뀐다. 엔진은 안 만든다. cmp_pos로 안 보임(엔진에 그 id가 없음). 자원(동물별 먹은 양)에 영향 가능.
-
+0. (새 리플, 2026-11-12) 가장 이른 것부터:
+   - 518470161 P2 위치 171.2초, P2 자원 218.5초(식량 −10), P1 307.7초. 미조사. 다음 첫 동작: 체크포인트 앞 구간 개체 추적 → `TRUTH=truth/truth5.jsonl python3 runs/cmp_pos.py`.
+   - 518470161 멧돼지 9719가 엔진에서 약 12.3초 일찍 움직임(36.9초, update 2673 vs 원본 49.2초). 다음 첫 동작: update 2660~2680을 `GENIE_TRACE_ANIMAL=1`과 함께 추적, truth5의 t174/t178·airng와 비교(`case-518470161-player-60s.md`).
+   - 517426097 P1 228.5초 그룹 형성 속도: findings 31(읽음, 미구현, 앞섬 0.81타일 유도 필요).
+   - 517426097 P2 247.6초 사냥꾼 2974·3820: 염소가 GOAT_D로 바뀐 뒤의 사냥 다음 동작(findings 31 끝).
+   - upstream 검토(`upstream-review-2026-11-12.md`): 우리 멈춤 4곳은 upstream도 미해결. 후보: c050b687의 작업 명령 인자 순서(188329 `0x1140670`에서 먼저 확인), aefb2c22 장애물 무시 목록(참고 패치 `upstream-aefb2c22-ignore-list-port.patch`).
 1. (기준 리플) Gaia 동물 마스터 2095(말, 클래스 9) **id 4285 한 마리만**: 186.6초부터 원본에서만 도망간다(정찰병 3428이 지나갈 때). 4283은 위치 일치, 4284는 양쪽 다 정지(예전의 "4283~4285 전체"는 틀린 기록). 식량 없는 동물이라 자원 영향 없음. 186.381초의 4285·3428 위치, retarget=1244, look=672는 원본과 일치. 원본 idle은 검색이 대상을 찾으면 0xd26200(도망)을 부르는데, 엔진에서 타이머 때문에 검색을 안 하는지 검색이 실패하는지 아직 못 갈랐다. 문서 `original-188329-animal-case-186s.md`, findings 26. 다음 첫 동작: 지금 빌드(진단 출력 포함, 13.4)로 `go.ps1 -Name p27 -Updates 9480 -Envs "$a;GENIE_TRACE_OBJECTS_RANGE=9430-9480;GENIE_TRACE_OBJECT_IDS=4283,4284,4285,3428;GENIE_TRACE_ANIMAL=1"` → ANIMAL_SEARCH / ANIMAL_EVADE 줄에서 4285의 검색 결과와 타이머를 본다.
 2. 383.4초 P1 나무꾼 4371(그리고 4363): 벌목소로 가는 짧은 경로 모양이 다르다(원본은 y = 45.1211을 따라 동쪽으로 간 뒤 꺾음). 도착 시각은 같다. 짧은 경로 사례로 넘길 만하다.
 3. 411.2초 P1 나무 −10: p25에서 4371의 선행 채집 지연을 확인(25번). 복귀 후 약 0.0546 차이가 연속 유지됨. 4363도 약 0.098276 차이. 다음 첫 동작: update 약 16350~16600을 추적해 383.4초 전후의 이전 왕복부터 비교. 450.9초 P2는 미조사.
@@ -275,7 +276,7 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 | `truth\truth5.jsonl`, `truth\truth5.status` | 리플 518470161 원본 기록(12.6) |
 | `truth\analysis5\`, `truth\analysis6\` | truth5/6의 자원·개체 캐시(`runs/extract_truth.py <jsonl> <폴더>`로 만듦, Windows python으로 수 초) |
 | `runs\summ2.sh`, `runs\extract_truth.py` | 리플별 채점(`summ2.sh <이름> <analysis 폴더>`), 캐시 만들기. `cmp_pos.py`·`cmp_held.py`는 환경변수 `TRUTH=<jsonl>`로 기록 파일을 바꾼다 |
-| `re-kit\re-focused-case-p10.tar.gz`, `re-kit\re-focused-cases-p11-p12-g1.tar.gz` | findings 27~29의 원본 읽기·손 계산(Python 짧은 경로 포트 `out_p10/sp.py`, `out_p11/sp.py`) |
+| `re-kit\re-focused-case-p10.tar.gz`, `re-kit\re-focused-cases-p11-p12-g1.tar.gz`, `re-kit\re-focused-cases-p13-p15.tar.gz` | findings 27~29의 원본 읽기·손 계산(Python 짧은 경로 포트 `out_p10/sp.py`, `out_p11/sp.py`) |
 | 엔진 패치 | 저장소 `sorted-lists-and-truth-trace.patch` = PC `genie\`의 `git diff --ignore-cr-at-eol`(기준 `91d81be4`). 다시 만들 때: `cd genie && GIT_OPTIONAL_LOCKS=0 git diff --ignore-cr-at-eol > ../<새이름>.patch` |
 
 
@@ -285,7 +286,7 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 13.1 사례 하나를 끝낼 때마다 (고쳤든 못 고쳤든)
 
-`truth-log-findings.md` 맨 끝에 번호를 이어 한 절을 쓴다(지금 마지막은 29번). 형식:
+`truth-log-findings.md` 맨 끝에 번호를 이어 한 절을 쓴다(지금 마지막은 31번). 형식:
 
 ```
 ## <번호>. <한 줄 제목> (스위치 `GENIE_EXPERIMENT_...`에 추가 / 새 스위치 / 스위치 없음)
@@ -322,9 +323,9 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 13.4 지금 하던 일 (멈출 때마다 이 절을 덮어쓴다)
 
-- 날짜·작성: 2026-11-11 저녁, Claude.
-- 한 일: 리플 3개 체제로 바꿈. 새 리플 2개(518470161, 517426097)의 가장 이른 불일치 3건을 원본에서 읽어 넣음(findings 27~29, 스위치 CORNER / REWALK / GRAZE). 원본 읽기는 클라우드 쪽 분석 환경(re-kit 압축 3개 + Ghidra 11.3.2 + JDK 21 + pip capstone)에서 도우미 여러 개를 동시에 돌렸다. 엔진 수정·빌드는 한 번에 한 쪽만 했다.
-- 엔진 소스 상태: 빌드됨(마지막 빌드 = GRAZE 포함). 반쯤 넣은 변경 없음. 저장소 패치를 이 상태로 다시 만듦.
-- 실행: 돌고 있는 것 없음. 최신 전체 실행 `g1_239`, `g1_161`, `g1_097`(스위치 12개), 비교용 `g1_*r`(GRAZE 끔).
-- 다음 첫 동작: 12.5의 0번(518470161 15.067초 난수 7개 차이)부터. 그다음 518470161 60.7초 위치, 517426097 230.4초 위치. 기준 리플의 411초 나무(12.5의 3번)와 186초 말(1번)은 그 뒤.
-- 기준 리플 518239882 수치는 바뀌지 않음(2.1절). 2절의 옛 표는 f1(스위치 9개) 기준이다.
+- 날짜·작성: 2026-11-12 새벽, Claude.
+- 한 일: findings 27~31. 30은 설정만 바꿈(`runs/go.ps1` `SEARCH_CLEAR=unit`). 31은 읽기만 하고 구현 안 함. upstream 108커밋 검토(그대로 가져오기는 98개 충돌, 손으로 옮길 후보만 정리).
+- 엔진 소스 상태: 빌드됨(GRAZE까지 포함). 반쯤 넣은 변경 없음. 패치를 다시 만들 때 **git이 추적하지 않는 새 파일(`genie-core/src/correction.rs`, oracle `examples/*_probe.rs`)도 넣는다**: `git diff --ignore-cr-at-eol > P; for f in $(git status --short --untracked-files=all | grep '^?? crates/.*\.rs$' | cut -c4-); do git diff --no-index /dev/null "$f" >> P; done`(GIT_OPTIONAL_LOCKS=0). 저장소 패치는 CRLF가 섞여 있어 `git apply` 전에 줄 끝을 맞춘다.
+- 실행: 돌고 있는 것 없음. 최신 전체 실행 `c1_239`, `c1_161`, `c1_097`.
+- 원본 읽기 환경: 클라우드 컨테이너에 re-kit 압축 3개 + Ghidra 11.3.2(GitHub에서 받음) + JDK 21 + `pip install capstone numpy`로 차림. 사례마다 도우미 하나(프롬프트 공통부는 PC `runs\helper-common.txt`).
+- 다음 첫 동작: 12.5의 0번 목록 순서대로.

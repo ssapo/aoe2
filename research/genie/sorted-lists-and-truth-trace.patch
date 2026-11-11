@@ -3358,3 +3358,567 @@ index 0c6a6c44..cb07d175 100644
      let build = layer()?;
      let missile_tuning = &build.tuning.missile;
      let victory = &header.world.base_world.victory_conditions;
+diff --git a/crates/engine/genie-core/src/correction.rs b/crates/engine/genie-core/src/correction.rs
+new file mode 100755
+index 00000000..3f35b183
+--- /dev/null
++++ b/crates/engine/genie-core/src/correction.rs
+@@ -0,0 +1,296 @@
++//! Correction mode (`GENIE_CORRECT=1`, research): the simulation is pulled back to what a
++//! recording says of the original game where it says it.
++//!
++//! - A unit id an order names that the commanding player does not hold is read as the player's
++//!   nearest unclaimed id (within [`ID_REACH`]): the object ids drift when the simulation makes
++//!   objects (a carcass, its blood) at other times than the game did. The pairs found are kept,
++//!   and a target id takes a kept pair too.
++//! - An order's or a gather point's target that moves is put at the point the packet names: the
++//!   game writes the target's place there when the player clicks it.
++//!
++//! Every correction prints a `CORRECT_ID` or `CORRECT_POS` line to stderr.
++
++use std::collections::{HashMap, HashSet};
++use std::sync::{Mutex, OnceLock};
++
++use crate::commands::Command;
++use crate::map::Position;
++use crate::movement::MoveState;
++use crate::objects::ObjectId;
++use crate::orders::Interact;
++use crate::players::PlayerId;
++use crate::world::World;
++use crate::world::index::Place;
++use crate::world::slots::PlayerSlots;
++
++/// How far from a recorded id the simulation's id may lie.
++pub const ID_REACH: i32 = 4;
++
++/// The least distance a target is put back over.
++const SNAP_LEAST: f32 = 0.01;
++
++#[derive(Default)]
++struct Ids {
++    /// Recorded id -> the simulation's id.
++    map: HashMap<i32, i32>,
++    /// The simulation's ids a recorded id already stands for (itself or another).
++    claimed: HashSet<i32>,
++    /// Recorded ids an order named while the simulation held them for its player: one gone
++    /// since died in the simulation, and is not read as another.
++    seen: HashSet<(usize, i32)>,
++}
++
++fn ids() -> &'static Mutex<Ids> {
++    static IDS: OnceLock<Mutex<Ids>> = OnceLock::new();
++    IDS.get_or_init(|| Mutex::new(Ids::default()))
++}
++
++/// Whether the correction mode is on (`GENIE_CORRECT`).
++#[must_use]
++pub fn enabled() -> bool {
++    static ON: OnceLock<bool> = OnceLock::new();
++    *ON.get_or_init(|| std::env::var_os("GENIE_CORRECT").is_some())
++}
++
++/// Whether the mode puts targets back (`GENIE_CORRECT` not `ids`).
++fn snaps() -> bool {
++    static ON: OnceLock<bool> = OnceLock::new();
++    *ON.get_or_init(|| std::env::var("GENIE_CORRECT").as_deref() != Ok("ids"))
++}
++
++/// A recorded id the commanding player holds stands for itself.
++pub fn claim(player: PlayerId, id: Option<ObjectId>) {
++    if enabled()
++        && let Some(id) = id
++        && let Ok(mut ids) = ids().lock()
++    {
++        let _ = ids.claimed.insert(id.get());
++        let _ = ids.seen.insert((player.index(), id.get()));
++    }
++}
++
++/// The simulation's id for recorded unit id `id` of `player`'s order, none for none found.
++pub fn unit_id(w: &World, player: PlayerId, id: Option<ObjectId>) -> Option<ObjectId> {
++    unit_id_of(w, player, id, Kind::Any)
++}
++
++/// What a list names: units, buildings, or either (a target).
++#[derive(Clone, Copy, PartialEq, Eq)]
++pub(crate) enum Kind {
++    Units,
++    Buildings,
++    Any,
++}
++
++/// [`unit_id`] for a list of `kind`: a candidate of the other kind does not count.
++pub(crate) fn unit_id_of(
++    w: &World,
++    player: PlayerId,
++    id: Option<ObjectId>,
++    kind: Kind,
++) -> Option<ObjectId> {
++    use crate::objects::masters::MasterKind;
++    let id = id?;
++    let Ok(mut ids) = ids().lock() else {
++        return None;
++    };
++    let held = |x: i32| {
++        ObjectId::of_field(x)
++            .and_then(|o| w.place(o))
++            .is_some_and(|p| p.player() == player)
++    };
++    if let Some(&to) = ids.map.get(&id.get())
++        && held(to)
++    {
++        return ObjectId::of_field(to);
++    }
++    if ids.seen.contains(&(player.index(), id.get())) {
++        return None;
++    }
++    let objects = &w.players.player(player).ok()?.objects;
++    let mut best: Option<i32> = None;
++    for u in objects {
++        let x = u.id.get();
++        let d = (x - id.get()).abs();
++        if d == 0 || ID_REACH < d || ids.claimed.contains(&x) {
++            continue;
++        }
++        let building = u
++            .master(w.master_tables(), player)
++            .is_ok_and(|m| m.kind == MasterKind::BUILDING);
++        if (kind == Kind::Units && building) || (kind == Kind::Buildings && !building) {
++            continue;
++        }
++        best = match best {
++            Some(b) if (b - id.get()).abs() < d || ((b - id.get()).abs() == d && b < x) => Some(b),
++            _ => Some(x),
++        };
++    }
++    let to = best?;
++    let _ = ids.map.insert(id.get(), to);
++    let _ = ids.claimed.insert(to);
++    eprintln!(
++        "CORRECT_ID world_ms={} player={} recorded={} sim={to}",
++        w.world_time.millis(),
++        player.index(),
++        id.get()
++    );
++    ObjectId::of_field(to)
++}
++
++/// A target id: its kept pair, else itself.
++fn target_id(id: Option<ObjectId>) -> Option<ObjectId> {
++    let id = id?;
++    ids()
++        .lock()
++        .ok()
++        .and_then(|ids| ids.map.get(&id.get()).copied())
++        .and_then(ObjectId::of_field)
++        .or(Some(id))
++}
++
++impl World {
++    /// The command as the correction mode runs it: its units' ids and its target's read as the
++    /// simulation's ([`unit_id`], [`World::target_of`]), then an order's or a gather point's
++    /// target put at the packet's point.
++    pub(crate) fn correct_command(&mut self, command: &Command) -> Command {
++        use crate::commands::UnitList;
++        let mut command = command.clone();
++        let fix_of = |w: &World, player: PlayerId, list: &mut UnitList, kind: Kind| {
++            if list.names_last_commanded() {
++                return;
++            }
++            for slot in &mut list.ids {
++                let held = slot.and_then(|id| w.place(id)).is_some_and(|p| p.player() == player);
++                if held {
++                    claim(player, *slot);
++                } else if slot.is_some() {
++                    if let Some(to) = unit_id_of(w, player, *slot, kind) {
++                        *slot = Some(to);
++                    }
++                }
++            }
++        };
++        let fix = |w: &World, player: PlayerId, list: &mut UnitList| {
++            fix_of(w, player, list, Kind::Units);
++        };
++        match &mut command {
++            Command::Order(c) => {
++                fix(self, c.player, &mut c.units);
++                if let crate::commands::Order::Interact(Interact { target, .. }) = &mut c.order {
++                    *target = self.target_of(c.player, *target);
++                }
++            }
++            Command::Build(c) => fix(self, c.player, &mut c.builders),
++            Command::BuildWall(c) => fix(self, c.player, &mut c.builders),
++            Command::GatherPoint(c) => {
++                fix(self, c.player, &mut c.units);
++                c.target = self.target_of(c.player, c.target);
++            }
++            Command::SetGatherState(c) => fix(self, c.player, &mut c.units),
++            Command::Queue(c) => fix_of(self, c.player, &mut c.buildings, Kind::Buildings),
++            Command::CommandQueue(c) => {
++                fix(self, c.player, &mut c.units);
++                c.target = self.target_of(c.player, c.target);
++            }
++            Command::GoBackToWork(c) => {
++                if let Some(to) = self.target_of(c.player, Some(c.id)) {
++                    c.id = to;
++                }
++            }
++            Command::Unload(c) => fix(self, c.player, &mut c.units),
++            Command::AutoScout(c) => fix(self, c.player, &mut c.units),
++            Command::Stop(c) => fix(self, c.player, &mut c.units),
++            Command::Patrol(c) => fix(self, c.player, &mut c.units),
++            Command::AttackMove(c) => fix(self, c.player, &mut c.units),
++            Command::SeekShelter(c) => fix(self, c.player, &mut c.units),
++            Command::UnitAiState(c) => fix(self, c.player, &mut c.units),
++            Command::FormFormation(c) => fix(self, c.player, &mut c.units),
++            Command::UnitOrder(c) => {
++                fix(self, c.player, &mut c.units);
++                c.target = self.target_of(c.player, c.target);
++            }
++            _ => {}
++        }
++        if snaps() {
++            match &command {
++                Command::Order(c) => {
++                    if let crate::commands::Order::Interact(Interact { target, point, .. }) =
++                        &c.order
++                    {
++                        self.snap(*target, point.x(), point.y());
++                    }
++                }
++                Command::GatherPoint(c) => self.snap(c.target, c.point.x(), c.point.y()),
++                _ => {}
++            }
++        }
++        command
++    }
++
++    /// A target id as the simulation holds it: a kept pair's; one the world does not hold
++    /// read as the commanding player's nearest unclaimed id ([`unit_id`], a foundation made at
++    /// another id); else itself.
++    fn target_of(&self, player: PlayerId, id: Option<ObjectId>) -> Option<ObjectId> {
++        let kept = target_id(id);
++        if kept != id {
++            return kept;
++        }
++        match id {
++            Some(t) if self.place(t).is_none() => unit_id(self, player, id).or(id),
++            _ => id,
++        }
++    }
++
++    /// A live object that moves goes to (x, y), keeping its height.
++    fn snap(&mut self, id: Option<ObjectId>, x: f32, y: f32) {
++        let Some(id) = id else { return };
++        let Some(Place::Live(p, i)) = self.place(id) else {
++            return;
++        };
++        let moves = self
++            .parts
++            .mover_of(id)
++            .is_some_and(|m| 0.0 < m.stats.speed.get());
++        if !moves || !(0.0..1e5).contains(&x) || !(0.0..1e5).contains(&y) {
++            return;
++        }
++        let moving = MoveState::of_mover(self.parts.mover_of(id));
++        let now = self.world_time;
++        let Ok(unit) = self.players.live_mut(p, i) else {
++            return;
++        };
++        if unit.life.inside.is_some() {
++            return;
++        }
++        let here = unit.position();
++        let (dx, dy) = (x - here.x(), y - here.y());
++        if (dx * dx + dy * dy).sqrt() < SNAP_LEAST {
++            return;
++        }
++        let at = Position::new(x, y, here.z());
++        if unit
++            .new_position(
++                at,
++                moving,
++                (&mut self.spatial, Some(&mut self.pathing)),
++                &self.model.roles,
++                self.model.tuning.visibility,
++            )
++            .is_err()
++        {
++            return;
++        }
++        if let Some(m) = self.parts.mover_mut(id) {
++            m.mark_move(at, now);
++        }
++        eprintln!(
++            "CORRECT_POS world_ms={} id={} from=({:.3},{:.3}) to=({x:.3},{y:.3}) d={:.3}",
++            now.millis(),
++            id.get(),
++            here.x(),
++            here.y(),
++            (dx * dx + dy * dy).sqrt()
++        );
++    }
++}
+diff --git a/crates/tools/genie-oracle/examples/cache_probe.rs b/crates/tools/genie-oracle/examples/cache_probe.rs
+new file mode 100755
+index 00000000..6db7cc85
+--- /dev/null
++++ b/crates/tools/genie-oracle/examples/cache_probe.rs
+@@ -0,0 +1,15 @@
++//! Verify special task-group persistence and direct/cached game-data imports.
++use genie_model::objects::masters::{Task,ClassId,ActionKind};
++fn main()->Result<(),Box<dyn std::error::Error>> {
++ for raw in [-1288i16,-1256,-1448] {
++  let mut t=Task::default();t.action_kind=ActionKind::try_from(154)?;t.object_group=Some(ClassId::of_master(raw));
++  let json=serde_json::to_string(&t)?;let recovered:Task=serde_json::from_str(&json)?;
++  assert_eq!(recovered,t);assert!(serde_json::from_str::<ClassId>(&raw.to_string()).is_err());
++ }
++ println!("special groups JSON preserved; ordinary ClassId still rejects negatives");
++ let a:Vec<String>=std::env::args().collect();let path=std::path::Path::new(&a[1]);let dir=std::path::Path::new(&a[2]);
++ let direct=genie_oracle::install::read(path)?;
++ let first=genie_oracle::install::load(path,dir)?;let second=genie_oracle::install::load(path,dir)?;
++ assert_eq!(direct,first);assert_eq!(first,second);
++ println!("DAT direct/cold-cache/warm-cache equal; civ tables={} canonical names={}",direct.civilization_count,direct.civilization_names.len());Ok(())
++}
+diff --git a/crates/tools/genie-oracle/examples/capture_probe.rs b/crates/tools/genie-oracle/examples/capture_probe.rs
+new file mode 100755
+index 00000000..36501c8b
+--- /dev/null
++++ b/crates/tools/genie-oracle/examples/capture_probe.rs
+@@ -0,0 +1,5 @@
++//! Inspect livestock combat fields and their byte offsets without changing semantics.
++use binrw::BinWrite;
++fn main()->Result<(),Box<dyn std::error::Error>> {
++let b=std::fs::read(std::env::args().nth(1).unwrap())?;let h=genie_rec::de::chapters(&b)?[0].header()?;
++for (p,s) in h.players().iter().enumerate(){for o in s.live_objects(){if let Some(st)=o.static_part(){if st.master_obj==1245 || st.master_obj==448 {if let Some(c)=o.combat(){println!("tribe_extra={:?}",c.extra_v68_9);let c=&c.rge_combat_object;let mut out=std::io::Cursor::new(Vec::new());c.write_le_args(&mut out,())?;let mut a=std::io::Cursor::new(Vec::new());c.rge_action_object.write_le_args(&mut a,())?;let offset=a.position() as usize;println!("player={p} id={} master={} action_end={} capture={} tail={:02x?}",st.id,st.master_obj,offset,c.capture_flag,&out.get_ref()[offset.saturating_sub(32)..]);}}}}}Ok(())}
+diff --git a/crates/tools/genie-oracle/examples/civ_probe.rs b/crates/tools/genie-oracle/examples/civ_probe.rs
+new file mode 100755
+index 00000000..062149b2
+--- /dev/null
++++ b/crates/tools/genie-oracle/examples/civ_probe.rs
+@@ -0,0 +1,10 @@
++//! Prints each DAT civilization's index, internal name, icon set and resource count.
++fn main() -> Result<(), Box<dyn std::error::Error>> {
++    let path = std::env::args().nth(1).ok_or("usage: civ_probe <empires2_x2_p1.dat>")?;
++    let bytes = std::fs::read(path)?;
++    let d = genie_dat::de::DatFile::read_from(&bytes[..])?;
++    for (i, c) in d.civs.iter().enumerate() {
++        println!("{i}\t{:?}\ticon_set={}\tresources={}", c.name, c.icon_set, c.resource_count);
++    }
++    Ok(())
++}
+diff --git a/crates/tools/genie-oracle/examples/command_probe.rs b/crates/tools/genie-oracle/examples/command_probe.rs
+new file mode 100755
+index 00000000..de832a63
+--- /dev/null
++++ b/crates/tools/genie-oracle/examples/command_probe.rs
+@@ -0,0 +1,29 @@
++//! Tallies a recording's command packets by their first byte (the command id): how many decode
++//! with genie-command-codec and how many fail, with the first error of each failing id.
++use std::collections::BTreeMap;
++fn main() -> Result<(), Box<dyn std::error::Error>> {
++    let path = std::env::args().nth(1).ok_or("usage: command_probe <replay>")?;
++    let bytes = std::fs::read(path)?;
++    let chapter = genie_rec::de::chapters(&bytes)?[0];
++    let mut tally: BTreeMap<u8, (usize, usize, Option<String>, Option<usize>)> = BTreeMap::new();
++    for op in chapter.ops() {
++        if let genie_rec::de::Op::Command { packet, .. } = op? {
++            let id = packet.first().copied().unwrap_or(0xff);
++            let e = tally.entry(id).or_default();
++            match genie_command_codec::decode(packet) {
++                Ok(_) => e.0 += 1,
++                Err(err) => {
++                    e.1 += 1;
++                    if e.2.is_none() {
++                        e.2 = Some(format!("{err:?}").chars().take(160).collect());
++                        e.3 = Some(packet.len());
++                    }
++                }
++            }
++        }
++    }
++    for (id, (ok, bad, err, len)) in tally {
++        println!("id={id:#04x} ok={ok} fail={bad} len={len:?} {}", err.unwrap_or_default());
++    }
++    Ok(())
++}
+diff --git a/crates/tools/genie-oracle/examples/dat_probe.rs b/crates/tools/genie-oracle/examples/dat_probe.rs
+new file mode 100755
+index 00000000..6e37d250
+--- /dev/null
++++ b/crates/tools/genie-oracle/examples/dat_probe.rs
+@@ -0,0 +1,13 @@
++//! Diagnose task values without changing game semantics.
++fn main() -> Result<(), Box<dyn std::error::Error>> {
++ let bytes=std::fs::read(std::env::args().nth(1).unwrap())?;
++ let d=genie_dat::de::DatFile::read_from(&bytes[..])?;
++ println!("civs={} techs={}",d.civs.len(),d.techs.len());
++ let encoded=d.to_bytes()?;
++ let mut decoded=Vec::new();
++ std::io::Read::read_to_end(&mut flate2::read::DeflateDecoder::new(&bytes[..]), &mut decoded)?;
++ println!("roundtrip_equal={} original={} encoded={}",decoded==encoded,decoded.len(),encoded.len());
++ let mut n=0;
++ for (ci,c) in d.civs.iter().enumerate() { for (ui,u) in c.units.iter().enumerate() { if let Some(u)=u {if let Some(b)=&u.bird {for t in &b.tasks {if t.class_id < -1 {n+=1;if n<8 {println!("civ={ci} unit={ui} task={t:?}");}}}}}}}
++ println!("invalid_class_tasks={n}");Ok(())
++}
+diff --git a/crates/tools/genie-oracle/examples/header_probe.rs b/crates/tools/genie-oracle/examples/header_probe.rs
+new file mode 100755
+index 00000000..3fea849c
+--- /dev/null
++++ b/crates/tools/genie-oracle/examples/header_probe.rs
+@@ -0,0 +1,9 @@
++fn main() -> Result<(), Box<dyn std::error::Error>> {
++ let bytes=std::fs::read(std::env::args().nth(1).unwrap())?;
++ let chapters=genie_rec::de::chapters(&bytes)?;
++ println!("chapters: {}",chapters.len());
++ println!("save version: {:?}",chapters[0].save_version()?);
++ let header=chapters[0].header()?;
++ println!("players: {}",header.players().len());
++ Ok(())
++}
+diff --git a/crates/tools/genie-oracle/examples/identity_probe.rs b/crates/tools/genie-oracle/examples/identity_probe.rs
+new file mode 100755
+index 00000000..e840bcda
+--- /dev/null
++++ b/crates/tools/genie-oracle/examples/identity_probe.rs
+@@ -0,0 +1,13 @@
++//! Verify the explicit replay lobby IDs used when canonical install metadata is absent.
++fn main()->Result<(),Box<dyn std::error::Error>> {
++ let a:Vec<String>=std::env::args().collect();let b=std::fs::read(&a[1])?;let mut h=genie_rec::de::chapters(&b)?[0].header()?;
++ h.resolve_civ_ids_from_lobby(63)?;
++ for (id,s) in h.players().iter().enumerate(){println!("player={} civ={} name={:?}",id,s.world_player().base.civ_id,s.world_player().base.civ_data_name);}
++ let table=genie_oracle::install::read(std::path::Path::new(&a[2]))?;
++ let original=genie_rec::de::chapters(&b)?[0].header()?;
++ let world=genie_oracle::slice_from_header(&original,Some(&table))?;
++ println!("common-slice civs={:?}",world.players.iter().map(|p|p.civ.get()).collect::<Vec<_>>());
++ // Invalid table bounds must not silently produce a civilization.
++ let mut h=genie_rec::de::chapters(&b)?[0].header()?;assert!(h.resolve_civ_ids_from_lobby(1).is_err());
++ Ok(())
++}
+diff --git a/crates/tools/genie-oracle/examples/lobby_probe.rs b/crates/tools/genie-oracle/examples/lobby_probe.rs
+new file mode 100755
+index 00000000..2a739fa1
+--- /dev/null
++++ b/crates/tools/genie-oracle/examples/lobby_probe.rs
+@@ -0,0 +1,13 @@
++//! Reads only the save's file header (lobby) of an inflated header and prints where it ends.
++use std::io::{Cursor, Read};
++fn main() -> Result<(), Box<dyn std::error::Error>> {
++    let path = std::env::args().nth(1).ok_or("usage: lobby_probe <inflated header>")?;
++    let mut bytes = Vec::new();
++    let _ = std::fs::File::open(path)?.read_to_end(&mut bytes)?;
++    let raw = u32::from_le_bytes([bytes[12], bytes[13], bytes[14], bytes[15]]);
++    let mut c = Cursor::new(&bytes[..]);
++    let h = <genie_save::generated::world::SaveGameFileHeader as binrw::BinRead>::read_le_args(&mut c, (raw,))?;
++    println!("lobby_end={:#x}", c.position());
++    println!("{h:#?}");
++    Ok(())
++}
+diff --git a/crates/tools/genie-oracle/examples/roundtrip_probe.rs b/crates/tools/genie-oracle/examples/roundtrip_probe.rs
+new file mode 100755
+index 00000000..c8812a4a
+--- /dev/null
++++ b/crates/tools/genie-oracle/examples/roundtrip_probe.rs
+@@ -0,0 +1,17 @@
++//! Parses an inflated save header with genie-save, writes it back and compares the bytes.
++use std::io::Cursor;
++fn main() -> Result<(), Box<dyn std::error::Error>> {
++    let path = std::env::args().nth(1).ok_or("usage: roundtrip_probe <inflated header>")?;
++    let original = std::fs::read(path)?;
++    let header = genie_save::parse(&original)?;
++    let mut out = Cursor::new(Vec::new());
++    genie_save::write(&header, &mut out)?;
++    let written = out.into_inner();
++    let first_diff = original.iter().zip(&written).position(|(a, b)| a != b);
++    println!(
++        "players={} original={} written={} equal={} first_diff={:?}",
++        header.players().len(), original.len(), written.len(), original == written,
++        first_diff.map(|d| format!("{d:#x}"))
++    );
++    Ok(())
++}
+diff --git a/crates/tools/genie-oracle/examples/sync_probe.rs b/crates/tools/genie-oracle/examples/sync_probe.rs
+new file mode 100755
+index 00000000..2ffe7627
+--- /dev/null
++++ b/crates/tools/genie-oracle/examples/sync_probe.rs
+@@ -0,0 +1,27 @@
++//! Tallies a recording's sync and checkpoint ops by their dt (ms), with the total, to compare
++//! the recorded game time with the duration.
++use std::collections::BTreeMap;
++fn main() -> Result<(), Box<dyn std::error::Error>> {
++    let path = std::env::args().nth(1).ok_or("usage: sync_probe <replay>")?;
++    let bytes = std::fs::read(path)?;
++    let chapter = genie_rec::de::chapters(&bytes)?[0];
++    let (mut syncs, mut total, mut dts) = (0u64, 0u64, BTreeMap::<u32, u64>::new());
++    let mut first: Vec<String> = Vec::new();
++    for op in chapter.ops() {
++        let op = op?;
++        let dt = match &op {
++            genie_rec::de::Op::Sync { dt } | genie_rec::de::Op::Checkpoint { dt, .. } => *dt,
++            _ => {
++                if first.len() < 12 { first.push(format!("{op:?}").chars().take(80).collect()); }
++                continue;
++            }
++        };
++        if first.len() < 12 { first.push(format!("dt={dt}")); }
++        syncs += 1;
++        total += u64::from(dt);
++        *dts.entry(dt).or_default() += 1;
++    }
++    println!("syncs={syncs} total_ms={total} first_ops={first:?}");
++    for (dt, n) in dts.iter().rev().take(12) { println!("dt={dt} n={n}"); }
++    Ok(())
++}
+diff --git a/crates/tools/genie-oracle/examples/task_probe.rs b/crates/tools/genie-oracle/examples/task_probe.rs
+new file mode 100755
+index 00000000..f714a6a8
+--- /dev/null
++++ b/crates/tools/genie-oracle/examples/task_probe.rs
+@@ -0,0 +1,26 @@
++//! Lists the DAT tasks whose class is below -1: (action kind, class, unit_id) with counts and a few
++//! unit ids, to study what a negative class means.
++use std::collections::BTreeMap;
++fn main() -> Result<(), Box<dyn std::error::Error>> {
++    let path = std::env::args().nth(1).ok_or("usage: task_probe <dat>")?;
++    let bytes = std::fs::read(path)?;
++    let d = genie_dat::de::DatFile::read_from(&bytes[..])?;
++    let mut seen: BTreeMap<(i16, i16, i16, i16), (usize, Vec<usize>)> = BTreeMap::new();
++    for c in &d.civs {
++        for (ui, u) in c.units.iter().enumerate() {
++            let Some(u) = u else { continue };
++            let Some(b) = &u.bird else { continue };
++            for t in &b.tasks {
++                if t.class_id < -1 {
++                    let e = seen.entry((t.action_kind, t.class_id, t.unit_id, t.task_kind)).or_default();
++                    e.0 += 1;
++                    if !e.1.contains(&ui) && e.1.len() < 8 { e.1.push(ui); }
++                }
++            }
++        }
++    }
++    for ((a, cl, uid, tk), (n, units)) in seen {
++        println!("action={a} class={cl} unit_id={uid} task_kind={tk} count={n} units={units:?}");
++    }
++    Ok(())
++}
+diff --git a/crates/tools/genie-oracle/examples/unit_probe.rs b/crates/tools/genie-oracle/examples/unit_probe.rs
+new file mode 100755
+index 00000000..acbbfdde
+--- /dev/null
++++ b/crates/tools/genie-oracle/examples/unit_probe.rs
+@@ -0,0 +1,13 @@
++//! Prints a DAT unit (civ, unit id) with every field, to compare with a save's master.
++fn main() -> Result<(), Box<dyn std::error::Error>> {
++    let mut a = std::env::args().skip(1);
++    let path = a.next().ok_or("usage: unit_probe <dat> <civ> <unit>")?;
++    let civ: usize = a.next().ok_or("civ")?.parse()?;
++    let unit: usize = a.next().ok_or("unit")?.parse()?;
++    let bytes = std::fs::read(path)?;
++    let d = genie_dat::de::DatFile::read_from(&bytes[..])?;
++    let mut u = d.civs[civ].units[unit].clone().ok_or("no unit")?;
++    if let Some(b) = u.bird.as_mut() { b.tasks.clear(); }
++    println!("{u:#?}");
++    Ok(())
++}

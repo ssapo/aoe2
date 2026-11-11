@@ -7,7 +7,7 @@ if ($Build) {
   $b = Start-Process -FilePath "$env:USERPROFILE\.cargo\bin\cargo.exe" -ArgumentList 'build','--release','-p','genie-oracle','--example','census' -WorkingDirectory "$d\genie" -RedirectStandardOutput "$d\build7.out" -RedirectStandardError "$d\build7.err" -WindowStyle Hidden -PassThru -Wait
   if ($b.ExitCode -ne 0) { "build=$($b.ExitCode)" | Out-File "$d\runs\$Name.done" -Encoding ascii; exit }
 }
-$env:GENIE_CORRECT='ids'; $env:GENIE_EXPERIMENT_SEARCH_CLEAR='tick'; $env:GENIE_EXPERIMENT_CAPTURE_SETUP='1'; $env:GENIE_NO_STOP='1'; $env:GENIE_PRINT_CHECKPOINTS='1'
+$env:GENIE_CORRECT='ids'; $env:GENIE_EXPERIMENT_SEARCH_CLEAR='unit'; $env:GENIE_EXPERIMENT_CAPTURE_SETUP='1'; $env:GENIE_NO_STOP='1'; $env:GENIE_PRINT_CHECKPOINTS='1'
 $env:GENIE_EXPERIMENT_SORT_LISTS='1'; $env:GENIE_EXPERIMENT_SHORT_188329='1'; $env:GENIE_EXPERIMENT_SPAWN_188329='1'
 foreach ($kv in $Envs.Split(';')) { if ($kv) { $k,$v = $kv.Split('=',2); Set-Item "env:$k" $v } }
 $rep=(Get-ChildItem "$d\$Replay\*.aoe2record" | Select-Object -First 1).FullName

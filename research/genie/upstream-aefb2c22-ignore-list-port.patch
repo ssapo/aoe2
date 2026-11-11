@@ -1,0 +1,350 @@
+diff --git a/crates/engine/genie-core/src/map/spatial/grid.rs b/crates/engine/genie-core/src/map/spatial/grid.rs
+index 9f616e05..b0143442 100644
+--- a/crates/engine/genie-core/src/map/spatial/grid.rs
++++ b/crates/engine/genie-core/src/map/spatial/grid.rs
+@@ -247,8 +247,8 @@ impl Spatial {
+     /// The obstruction manager's ignore list as the last `FUN_1410562e0` left it
+     /// ([`Spatial::set_manager_ignore`]).
+     #[must_use]
+-    pub fn manager_ignore(&self) -> Vec<RecordId> {
+-        self.manager_ignore.clone()
++    pub fn manager_ignore(&self) -> &[RecordId] {
++        &self.manager_ignore
+     }
+ 
+     /// `FUN_1410562d0` on the obstruction manager: its buffer becomes `buffer` (None: not set),
+diff --git a/crates/engine/genie-core/src/map/spatial/mod.rs b/crates/engine/genie-core/src/map/spatial/mod.rs
+index 36f7407d..5d6b5b19 100644
+--- a/crates/engine/genie-core/src/map/spatial/mod.rs
++++ b/crates/engine/genie-core/src/map/spatial/mod.rs
+@@ -299,6 +299,27 @@ impl Tiles {
+             .and_then(|i| self.words.get(i).copied())
+     }
+ 
++    /// Whether the obstruction manager marks `tile` blocked ([`BLOCKED`]); a tile off the map is
++    /// not.
++    #[must_use]
++    pub fn blocked(&self, tile: Tile) -> bool {
++        self.word(tile).is_some_and(|w| w & BLOCKED != 0)
++    }
++
++    /// A test's map of `size`: every tile of class 0, blocked where `blocked` says.
++    #[cfg(test)]
++    pub(crate) fn with_blocked(size: GridSize, blocked: impl Fn(Tile) -> bool) -> Self {
++        let mut tiles = Self::new(size, vec![0; (size.width() * size.height()) as usize]);
++        for y in 0..size.height() {
++            for x in 0..size.width() {
++                if blocked(Tile::new(x, y)) {
++                    tiles.words[(y * size.width() + x) as usize] |= BLOCKED;
++                }
++            }
++        }
++        tiles
++    }
++
+     /// How many tall objects stand on `tile`.
+     #[must_use]
+     pub fn tall(&self, tile: Tile) -> Option<u8> {
+diff --git a/crates/engine/genie-core/src/map/spatial/objects.rs b/crates/engine/genie-core/src/map/spatial/objects.rs
+index 0134df68..b5522e0b 100644
+--- a/crates/engine/genie-core/src/map/spatial/objects.rs
++++ b/crates/engine/genie-core/src/map/spatial/objects.rs
+@@ -482,16 +482,17 @@ impl Spatial {
+     /// as the routines that test one walk ask (`FUN_141052b90`, `FUN_141052350` with flags `0x100`,
+     /// then `FUN_1410561f0`): the temporary records of the tiles its terrain mask lacks
+     /// ([`Spatial::put_tile_records`]), tested ([`Spatial::segment_meets`]) and removed again.
++    /// The query leaves out the manager's ignore list as its caller set it last
++    /// ([`Spatial::set_manager_ignore`]).
+     pub fn segment_blocked(
+         &mut self,
+         a: Point,
+         b: Point,
+         grow: Distance,
+         mask: TerrainMask,
+-        ignore: &[RecordId],
+     ) -> bool {
+         self.put_tile_records(a, b, grow, mask);
+-        let blocked = self.segment_meets(a, b, grow, ignore);
++        let blocked = self.segment_meets(a, b, grow, &self.manager_ignore);
+         self.clear_tile_records();
+         blocked
+     }
+diff --git a/crates/engine/genie-core/src/movement/move_to/mod.rs b/crates/engine/genie-core/src/movement/move_to/mod.rs
+index 35ac2065..44652a5b 100644
+--- a/crates/engine/genie-core/src/movement/move_to/mod.rs
++++ b/crates/engine/genie-core/src/movement/move_to/mod.rs
+@@ -562,10 +562,9 @@ pub fn target_left(
+             a.x().max(b.x()) + grow.get(),
+             a.y().max(b.y()) + grow.get(),
+         ))?;
+-        let ignore = walk.world.manager_ignore();
+         if !walk
+             .world
+-            .segment_blocked(a, b, grow, mover.stats.restriction_mask, &ignore)
++            .segment_blocked(a, b, grow, mover.stats.restriction_mask)
+         {
+             return Ok(Follow::PathEnd(at));
+         }
+diff --git a/crates/engine/genie-core/src/movement/waypoint.rs b/crates/engine/genie-core/src/movement/waypoint.rs
+index 88708540..0e559312 100644
+--- a/crates/engine/genie-core/src/movement/waypoint.rs
++++ b/crates/engine/genie-core/src/movement/waypoint.rs
+@@ -223,11 +223,10 @@ impl Mover {
+             < movement_tuning.target_short_reach
+         {
+             let [x, _, y] = level.points.checked(level.waypoint.get() as usize)?.get();
+-            let ignore = world.manager_ignore();
+             if world.object_holds(
+                 Point::new(x, y),
+                 world.manager_grow(),
+-                &ignore,
++                world.manager_ignore(),
+                 Movers::Counted,
+                 by_id,
+             )? {
+@@ -340,7 +339,9 @@ impl Mover {
+         if !(rx <= x && rz <= y && x <= w as f32 - rx && y <= h as f32 - ry) {
+             return Ok(false);
+         }
+-        let ignore = by_id.query_ignore(&[Some(me.id), target]);
++        // FUN_14114cc60 sets the manager's ignore list to them first (FUN_1410562e0), and the
++        // queries after it read the list it left
++        world.set_manager_ignore(&by_id.query_ignore(&[Some(me.id), target]));
+         // the query starts at +0x824, where the unit last moved to
+         let (from, to) = self.query_ends(self.moved_at.vector(), p, world.map);
+         let grow = rx * movement_tuning.straight_grow;
+@@ -350,13 +351,8 @@ impl Mover {
+             from.x().max(to.x()) + grow,
+             from.y().max(to.y()) + grow,
+         ))?;
+-        let blocked = world.segment_blocked(
+-            from,
+-            to,
+-            Distance::new(grow),
+-            self.stats.restriction_mask,
+-            &ignore,
+-        );
++        let blocked =
++            world.segment_blocked(from, to, Distance::new(grow), self.stats.restriction_mask);
+         // FUN_14114cc60 resets the buffer it set for the query (FUN_1410562d0 with 0)
+         world.set_manager_buffer(None);
+         Ok(!blocked)
+@@ -387,6 +383,9 @@ impl Mover {
+             return Ok(false);
+         }
+         let ignore = by_id.query_ignore(&[Some(me.id), target]);
++        // FUN_14114cc60 sets the manager's ignore list to them first (FUN_1410562e0), also when
++        // the tiles block
++        world.set_manager_ignore(&ignore);
+         // the query starts at +0x824, where the unit last moved to
+         let (from, to) = self.query_ends(self.moved_at.vector(), p, world.map);
+         let rect = Rect::spanning(from, to);
+diff --git a/crates/engine/genie-core/src/objects/role.rs b/crates/engine/genie-core/src/objects/role.rs
+index 26bb0542..1b4ac028 100644
+--- a/crates/engine/genie-core/src/objects/role.rs
++++ b/crates/engine/genie-core/src/objects/role.rs
+@@ -24,7 +24,7 @@ pub trait Role {
+ /// foundation, a missile keeps the id of a shooter that is gone), so no test makes one: the
+ /// role starts where the save's field of the role is read or where the code gives the object
+ /// the role ([`RoleId::new`]), and the type carries it from there.
+-pub struct RoleId<R: Role>(ObjectId, PhantomData<fn() -> R>);
++pub struct RoleId<R>(ObjectId, PhantomData<fn() -> R>);
+ 
+ impl<R: Role> RoleId<R> {
+     /// Object `id` in the role: the save's field of the role, or the routine that gives the
+diff --git a/crates/engine/genie-core/src/pathing/mod.rs b/crates/engine/genie-core/src/pathing/mod.rs
+index 4f3846ef..4bb76371 100644
+--- a/crates/engine/genie-core/src/pathing/mod.rs
++++ b/crates/engine/genie-core/src/pathing/mod.rs
+@@ -17,8 +17,7 @@ use crate::map::GridSize;
+ use crate::map::Position;
+ use crate::map::Restriction;
+ use crate::map::TerrainId;
+-use crate::map::Tile;
+-use crate::map::spatial::{BLOCKED, Obstruction, Placed, Tiles};
++use crate::map::spatial::{Obstruction, Placed, Tiles};
+ use crate::movement::MoveState;
+ use crate::objects::ObjectId;
+ use crate::objects::masters::ObstructionKind;
+@@ -291,10 +290,9 @@ impl Pathing {
+     /// from the map on first use, `FUN_140f74f90`); the planners built before see the tiles'
+     /// changes first. None for a restriction the data has not got.
+     pub fn planner(&mut self, restriction: RestrictionId, tiles: &Tiles) -> Option<&mut Planner> {
+-        let blocked = |tile: Tile| tiles.word(tile).is_some_and(|w| w & BLOCKED != 0);
+         for rect in self.pending.drain(..) {
+             for p in self.planners.values_mut() {
+-                p.update(rect, &blocked);
++                p.update(rect, tiles);
+             }
+         }
+         let _ = self.restrictions.get(restriction.index())?;
+@@ -304,7 +302,7 @@ impl Pathing {
+         };
+         if !self.planners.contains_key(&key) {
+             let passable = self.restrictions.get(key.index())?.clone();
+-            let planner = Planner::new(self.size, self.terrain.clone(), passable, &blocked);
++            let planner = Planner::new(self.size, self.terrain.clone(), passable, tiles);
+             let _ = self.planners.insert(key, planner);
+         }
+         self.planners.get_mut(&key)
+diff --git a/crates/engine/genie-core/src/pathing/tile_path/grid.rs b/crates/engine/genie-core/src/pathing/tile_path/grid.rs
+index a6b8a1af..9ca01274 100644
+--- a/crates/engine/genie-core/src/pathing/tile_path/grid.rs
++++ b/crates/engine/genie-core/src/pathing/tile_path/grid.rs
+@@ -6,6 +6,7 @@ use crate::map::GridSize;
+ use crate::map::Restriction;
+ use crate::map::TerrainId;
+ use crate::map::Tile;
++use crate::map::spatial::Tiles;
+ use crate::math::fmath::BVector;
+ use crate::pathing::tile_path::{
+     Cell, CellEdges, CellIndex, CellKind, Cells, GridLevel, NO_COST, NodeIndex, Nodes, OpenList,
+@@ -42,19 +43,6 @@ pub struct Planner {
+     pub(super) points: Vec<BVector>,
+ }
+ 
+-/// What the grid reads of the map: whether the obstruction manager marks a tile blocked
+-/// (`DAT_143f0a088 + 0x98`, bit `0x4000`).
+-pub trait Blocked {
+-    /// `tile` is blocked.
+-    fn blocked(&self, tile: Tile) -> bool;
+-}
+-
+-impl<F: Fn(Tile) -> bool> Blocked for F {
+-    fn blocked(&self, tile: Tile) -> bool {
+-        self(tile)
+-    }
+-}
+-
+ impl Planner {
+     /// Whether two planners hold the same grid: the map's size, the levels, the cells, the
+     /// restriction's passability and the terrain. What a search leaves (the region, the goal, the
+@@ -74,11 +62,12 @@ impl Planner {
+     /// every tile's edges and the levels above them (`FUN_140f7e4b0` over the whole map).
+     /// `terrain` holds each tile's terrain row by row, `passable` the restriction's value per
+     /// terrain (above 0 passes).
++    #[must_use]
+     pub fn new(
+         size: GridSize,
+         terrain: Vec<TerrainId>,
+         passable: Restriction,
+-        map: &impl Blocked,
++        tiles: &Tiles,
+     ) -> Self {
+         let (w, h) = (size.width() as i16, size.height() as i16);
+         let w0 = (w.wrapping_add(7)) & !7;
+@@ -109,7 +98,7 @@ impl Planner {
+                 planner.init_cell(GridLevel::TOP, PlanTile::new(x, y));
+             }
+         }
+-        planner.update(PlanRect::new(0, 0, w, h), map);
++        planner.update(PlanRect::new(0, 0, w, h), tiles);
+         planner
+     }
+ 
+@@ -177,11 +166,11 @@ impl Planner {
+ 
+     /// `FUN_140f799b0` (through the passability lambda, `0x140f7b110`): 1 when the tile is
+     /// blocked, else a bit per passable neighbour (2 left, 4 right, 8 above, 0x10 below).
+-    pub(super) fn adjacency(&self, tile: Tile, map: &impl Blocked) -> u32 {
++    pub(super) fn adjacency(&self, tile: Tile, tiles: &Tiles) -> u32 {
+         let (w, h) = (self.size.width(), self.size.height());
+         let passes = |t: Tile| {
+             let kind = self.terrain[(t.y() * w + t.x()) as usize];
+-            self.passable.passes(kind) && !map.blocked(t)
++            self.passable.passes(kind) && !tiles.blocked(t)
+         };
+         if !passes(tile) {
+             return 1;
+@@ -206,7 +195,7 @@ impl Planner {
+ 
+     /// Rebuild the cells over a changed rectangle of tiles and its border (`FUN_140f7e4b0`, which
+     /// the obstruction manager calls back through `FUN_140f7d4b0` when tiles change).
+-    pub fn update(&mut self, rect: PlanRect, map: &impl Blocked) {
++    pub fn update(&mut self, rect: PlanRect, tiles: &Tiles) {
+         let [x0, y0, x1, y1] = rect.get();
+         let (lo_x, hi_x) = (x0.min(x1), x0.max(x1).wrapping_add(1));
+         let (lo_y, hi_y) = (y0.min(y1), y0.max(y1).wrapping_add(1));
+@@ -218,14 +207,14 @@ impl Planner {
+         self.region = PlanRect::new(rx0, ry0, rx1, ry1);
+         for cx in (rx0 >> 3)..=(rx1 >> 3) {
+             for cy in (ry0 >> 3)..=(ry1 >> 3) {
+-                let _ = self.rebuild(GridLevel::TOP, PlanTile::new(cx, cy), map);
++                let _ = self.rebuild(GridLevel::TOP, PlanTile::new(cx, cy), tiles);
+             }
+         }
+     }
+ 
+     /// `FUN_140f7e5e0`: a cell's edges and kind from its tile (level 0) or its children; returns
+     /// the cell.
+-    pub(super) fn rebuild(&mut self, level: GridLevel, at: PlanTile, map: &impl Blocked) -> Cell {
++    pub(super) fn rebuild(&mut self, level: GridLevel, at: PlanTile, tiles: &Tiles) -> Cell {
+         let i = self.index(level, at);
+         let old = self.cells[i].kind;
+         let mut low = old.off_map();
+@@ -235,7 +224,7 @@ impl Planner {
+                 self.cells[i].kind = low.plus(CellKind::LONE);
+             }
+             if self.region.holds_at(GridLevel::TILES, at) {
+-                let a = self.adjacency(at.tile(), map);
++                let a = self.adjacency(at.tile(), tiles);
+                 self.cells[i].edges = CellEdges::NONE;
+                 if a & 1 == 0 {
+                     let mut b = CellEdges::NONE;
+@@ -266,7 +255,7 @@ impl Planner {
+         let mut child = [Cell::EMPTY; 4];
+         for (k, &c) in children.iter().enumerate() {
+             if low.is_empty() || !self.cells[i].kind.intersects(CellKind::child_off_map(k)) {
+-                child[k] = self.rebuild(l, c, map);
++                child[k] = self.rebuild(l, c, tiles);
+             }
+         }
+         let [d0, d1, d2, d3] = child.map(|c| c.edges);
+diff --git a/crates/engine/genie-core/src/pathing/tile_path/mod.rs b/crates/engine/genie-core/src/pathing/tile_path/mod.rs
+index 5451e3a1..7ffbfd5d 100644
+--- a/crates/engine/genie-core/src/pathing/tile_path/mod.rs
++++ b/crates/engine/genie-core/src/pathing/tile_path/mod.rs
+@@ -33,7 +33,7 @@ mod smoothing;
+ pub use self::cell::{Cell, CellEdges, CellKind};
+ use self::cell::{CellIndex, Cells};
+ pub use self::goal_marks::Request;
+-pub use self::grid::{Blocked, Planner};
++pub use self::grid::Planner;
+ pub use self::grid_level::GridLevel;
+ pub use self::plan_tile::{PlanRect, PlanTile};
+ #[cfg(test)]
+diff --git a/crates/tools/genie-oracle/src/pathing_inputs.rs b/crates/tools/genie-oracle/src/pathing_inputs.rs
+index bdd6c159..e1162e5a 100644
+--- a/crates/tools/genie-oracle/src/pathing_inputs.rs
++++ b/crates/tools/genie-oracle/src/pathing_inputs.rs
+@@ -2,7 +2,6 @@
+ //! terrain and the tile pathfinder's planner.
+ 
+ use genie_core::map::GridSize;
+-use genie_core::map::Tile;
+ use genie_core::objects::ObjectId;
+ use genie_core::pathing::{FixedDistance, FixedPoint, FixedRect};
+ use genie_core::pathing::{ShapeId, ShapeSide};
+@@ -141,7 +140,6 @@ pub fn planner_from_save(
+     terrain: &TerrainTable,
+     passable: Restriction,
+ ) -> Result<Planner, Error> {
+-    use genie_core::map::spatial::BLOCKED;
+     let chapter = chapters(save)?[0];
+     let header = chapter.header()?;
+     let map = &header.world.base_world.map;
+@@ -152,13 +150,11 @@ pub fn planner_from_save(
+         .collect();
+     let layer = layer().map_err(Error::Unmodelled)?;
+     let spatial = spatial(&header, terrain, layer).map_err(Error::Unmodelled)?;
+-    let tiles = spatial.tiles();
+-    let blocked = |tile: Tile| tiles.word(tile).is_some_and(|w| w & BLOCKED != 0);
+     Ok(Planner::new(
+         GridSize::new(map.map_width, map.map_height),
+         terrain_ids,
+         passable,
+-        &blocked,
++        spatial.tiles(),
+     ))
+ }
+ 
