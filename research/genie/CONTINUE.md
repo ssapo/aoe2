@@ -242,7 +242,7 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 - 기록 결과(확인함): 끝난 뒤 status = `lines=12934 last_ms=1200056`. 파일 1,113,185,172바이트(약 1.06GB). 게임 시각 1200초(20분)에서 기록기가 스스로 멈췄다(`-MaxWorldMs` 기본 1200000). **리플 번호는 jsonl 안에 없다.** 아래 목록이 유일한 기록이다.
 - **주의: status 파일 이름이 `truthlog5.status`로 고정**이라 다음 기록이 덮어쓴다. 그래서 truth5의 status는 `truth\truth5.status`로 복사해 두었다. 새로 기록한 뒤에도 `truthlog5.status`를 `truthN.status`로 복사한다.
 - 기록하는 법(실제로 통한 순서): 게임에서 리플을 열고 시작 직후 일시정지 → PowerShell에서 `powershell -ExecutionPolicy Bypass -File C:\Users\ssapo\genie-replays\truth\truthlog5.ps1 -Out C:\Users\ssapo\genie-replays\truth\truthN.jsonl` → 일시정지 해제. 기록기가 몇 초 늦게 붙어도 괜찮다(truth5는 3.1초부터). 처음 120초는 매 틱이라 1~2배속, 그 뒤는 200ms 간격이라 8배속까지 괜찮다(16배속이면 표본이 빠진다). 정상이면 10초 안에 jsonl 크기가 늘기 시작한다. status에 "wrong build" / "OpenProcess failed"가 나오면 실패. 20분에 약 1GB. `-MaxSeconds`(기본 3600)는 실제 시간 상한이라 1시간 넘게 걸리면 중간에 끝난다.
-- **원본 기록 목록 (리플 → 파일)**: 518239882 → `truth4.jsonl`(v4, 0~900초, status `truthlog4.status`) / 518470161 → `truth5.jsonl`(v5, 3.1~1200초, status `truth5.status`). 새로 기록하면 여기에 한 줄 추가한다. 리플 폴더(맵·문명·선수)는 `genie-replays\<리플번호>\`.
+- **원본 기록 목록 (리플 → 파일)**: 518239882 → `truth4.jsonl`(v4, 0~900초, status `truthlog4.status`) / 518470161 → `truth5.jsonl`(v5, 3.1~1200초, status `truth5.status`) / 517426097 → `truth6.jsonl`(v5, ~1199초, 10,938줄, 624MB, status `truth6.status`, 2026-11-11 14:04 종료). 세 리플 모두 사용자는 ssapo. 새로 기록하면 여기에 한 줄 추가한다. 리플 폴더(맵·문명·선수)는 `genie-replays\<리플번호>\`.
 
 ### 12.7 파일 위치 추가분
 
