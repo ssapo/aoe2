@@ -11,7 +11,7 @@ index 06cee5e6..658d6aaa 100644
   "genie-command-codec",
   "genie-core",
 diff --git a/Cargo.toml b/Cargo.toml
-index e1267700..178e9ee7 100644
+index e1267700..b1967040 100644
 --- a/Cargo.toml
 +++ b/Cargo.toml
 @@ -183,3 +183,16 @@ absolute_paths = "deny"
@@ -32,7 +32,7 @@ index e1267700..178e9ee7 100644
 +opt-level = 0
 +codegen-units = 16
 diff --git a/crates/engine/genie-core/src/commands/mod.rs b/crates/engine/genie-core/src/commands/mod.rs
-index d2edcddb..717eaa39 100644
+index d2edcddb..eca0bff9 100644
 --- a/crates/engine/genie-core/src/commands/mod.rs
 +++ b/crates/engine/genie-core/src/commands/mod.rs
 @@ -290,13 +290,32 @@ impl World {
@@ -341,7 +341,7 @@ index 0e406949..ed5ae5a2 100644
          }
          if self.current_command == GroupCommandKind::MOVE && self.patrols() {
 diff --git a/crates/engine/genie-core/src/lib.rs b/crates/engine/genie-core/src/lib.rs
-index f639a3e9..ce64ea50 100644
+index f639a3e9..62cfedb6 100644
 --- a/crates/engine/genie-core/src/lib.rs
 +++ b/crates/engine/genie-core/src/lib.rs
 @@ -34,6 +34,7 @@ pub use genie_error::{ErrorKind, GenieError, GenieResult};
@@ -353,7 +353,7 @@ index f639a3e9..ce64ea50 100644
  pub mod garrison;
  pub mod gathering;
 diff --git a/crates/engine/genie-core/src/map/spatial/mod.rs b/crates/engine/genie-core/src/map/spatial/mod.rs
-index 4cc3b283..0a931928 100644
+index 4cc3b283..36f7407d 100644
 --- a/crates/engine/genie-core/src/map/spatial/mod.rs
 +++ b/crates/engine/genie-core/src/map/spatial/mod.rs
 @@ -46,6 +46,7 @@ mod objects;
@@ -1787,7 +1787,7 @@ index 8c22fa57..15f31bd7 100644
          let out = list.out_at(i);
          let gone = list.swap_remove(i)?;
 diff --git a/crates/engine/genie-core/src/world/world_update.rs b/crates/engine/genie-core/src/world/world_update.rs
-index f127e410..d5e27ea2 100644
+index f127e410..c81b0510 100644
 --- a/crates/engine/genie-core/src/world/world_update.rs
 +++ b/crates/engine/genie-core/src/world/world_update.rs
 @@ -49,6 +49,8 @@ impl World {
@@ -1800,7 +1800,7 @@ index f127e410..d5e27ea2 100644
              let stopped: Vec<bool> = self
                  .players
 diff --git a/crates/engine/genie-import/src/dat.rs b/crates/engine/genie-import/src/dat.rs
-index 8b58e128..849f8cc4 100644
+index 8b58e128..cda336a8 100644
 --- a/crates/engine/genie-import/src/dat.rs
 +++ b/crates/engine/genie-import/src/dat.rs
 @@ -276,6 +276,10 @@ impl TerrainTable {
@@ -1832,7 +1832,7 @@ index 8b58e128..849f8cc4 100644
              graphics: Graphics::default(),
              terrain: TerrainTable::default(),
 diff --git a/crates/engine/genie-import/src/dat/dat_work.rs b/crates/engine/genie-import/src/dat/dat_work.rs
-index b4034340..0bf005e5 100644
+index b4034340..d6b0ea25 100644
 --- a/crates/engine/genie-import/src/dat/dat_work.rs
 +++ b/crates/engine/genie-import/src/dat/dat_work.rs
 @@ -76,6 +76,14 @@ pub(super) fn sound_event(event: u32, sound: i16, sounds: &[Sound]) -> i32 {
@@ -1861,7 +1861,7 @@ index b4034340..0bf005e5 100644
          combat_level: t.enable_targeting,
          combat_level_flag: TaskFlags::from_bits_retain(t.combat_level_flag),
 diff --git a/crates/engine/genie-import/src/install.rs b/crates/engine/genie-import/src/install.rs
-index 77f51e58..8edbe3be 100644
+index 77f51e58..f71f9582 100644
 --- a/crates/engine/genie-import/src/install.rs
 +++ b/crates/engine/genie-import/src/install.rs
 @@ -23,11 +23,13 @@ use std::io::ErrorKind;
@@ -1940,7 +1940,7 @@ index 77f51e58..8edbe3be 100644
                  linked_techs,
                  unit_lines,
 diff --git a/crates/engine/genie-import/src/install/tests.rs b/crates/engine/genie-import/src/install/tests.rs
-index 959aa7e6..b06707dc 100644
+index 959aa7e6..d5a6d690 100644
 --- a/crates/engine/genie-import/src/install/tests.rs
 +++ b/crates/engine/genie-import/src/install/tests.rs
 @@ -20,7 +20,7 @@ fn imported() -> MasterTable {
@@ -1990,7 +1990,7 @@ index 959aa7e6..b06707dc 100644
 +    assert_eq!(crate::cache::decode(&crate::cache::encode(&table).unwrap()).unwrap(),table);
 +}
 diff --git a/crates/engine/genie-model/src/objects/masters/task.rs b/crates/engine/genie-model/src/objects/masters/task.rs
-index a34c2460..21814ba3 100644
+index a34c2460..6fde0173 100644
 --- a/crates/engine/genie-model/src/objects/masters/task.rs
 +++ b/crates/engine/genie-model/src/objects/masters/task.rs
 @@ -27,6 +27,8 @@ pub struct Task {
@@ -2024,7 +2024,7 @@ index a34c2460..21814ba3 100644
 +    }
 +}
 diff --git a/crates/formats/genie-save/src/generated/world.rs b/crates/formats/genie-save/src/generated/world.rs
-index f3876c52..ae080305 100644
+index f3876c52..c88e80fc 100644
 --- a/crates/formats/genie-save/src/generated/world.rs
 +++ b/crates/formats/genie-save/src/generated/world.rs
 @@ -101,7 +101,7 @@ pub struct PlayerCivilization {
@@ -2450,7 +2450,7 @@ index f3876c52..ae080305 100644
      }
  }
 diff --git a/crates/formats/genie-save/src/lib.rs b/crates/formats/genie-save/src/lib.rs
-index 83eaaa03..83de9376 100644
+index 83eaaa03..6afa46d8 100644
 --- a/crates/formats/genie-save/src/lib.rs
 +++ b/crates/formats/genie-save/src/lib.rs
 @@ -126,6 +126,50 @@ impl Header {
@@ -2505,7 +2505,7 @@ index 83eaaa03..83de9376 100644
      /// where it ends).
      ///
 diff --git a/crates/formats/genie-save/src/objects.rs b/crates/formats/genie-save/src/objects.rs
-index deebaa01..72b44a2a 100644
+index deebaa01..3b8d4ee7 100644
 --- a/crates/formats/genie-save/src/objects.rs
 +++ b/crates/formats/genie-save/src/objects.rs
 @@ -37,6 +37,22 @@ impl Player {
@@ -2532,7 +2532,7 @@ index deebaa01..72b44a2a 100644
      #[must_use]
      pub fn objects(&self) -> Option<&PlayerObjects> {
 diff --git a/crates/tools/genie-oracle/Cargo.toml b/crates/tools/genie-oracle/Cargo.toml
-index ab4dccd9..93f57170 100644
+index ab4dccd9..384621d5 100644
 --- a/crates/tools/genie-oracle/Cargo.toml
 +++ b/crates/tools/genie-oracle/Cargo.toml
 @@ -23,6 +23,7 @@ genie-json = { version = "0.1.0", path = "../../formats/genie-json" }
@@ -2544,7 +2544,7 @@ index ab4dccd9..93f57170 100644
  serde_json.workspace = true
  
 diff --git a/crates/tools/genie-oracle/examples/census.rs b/crates/tools/genie-oracle/examples/census.rs
-index 90a8616f..f4b3e703 100644
+index 90a8616f..77c5309d 100644
 --- a/crates/tools/genie-oracle/examples/census.rs
 +++ b/crates/tools/genie-oracle/examples/census.rs
 @@ -26,6 +26,7 @@ fn main() -> Result<(), Box<dyn Error>> {
@@ -2719,7 +2719,7 @@ index 99849470..9577b2fc 100644
                  continue;
              }
 diff --git a/crates/tools/genie-oracle/src/map_and_sight.rs b/crates/tools/genie-oracle/src/map_and_sight.rs
-index d79318cd..9410c201 100644
+index d79318cd..9bc800f3 100644
 --- a/crates/tools/genie-oracle/src/map_and_sight.rs
 +++ b/crates/tools/genie-oracle/src/map_and_sight.rs
 @@ -234,8 +234,13 @@ pub(super) fn spatial(
@@ -2739,7 +2739,7 @@ index d79318cd..9410c201 100644
                      // the object's type: the save's factory types 70 and 80, any other below
                      kind: if o.tribe_combat_object.is_some() {
 diff --git a/crates/tools/genie-oracle/src/setup.rs b/crates/tools/genie-oracle/src/setup.rs
-index 0c6a6c44..cb07d175 100644
+index 0c6a6c44..bb683526 100644
 --- a/crates/tools/genie-oracle/src/setup.rs
 +++ b/crates/tools/genie-oracle/src/setup.rs
 @@ -99,6 +99,15 @@ pub fn layer() -> Result<&'static BuildLayer, GenieError> {
