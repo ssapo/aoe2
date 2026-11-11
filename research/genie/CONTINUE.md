@@ -1,6 +1,6 @@
 # 이어받는 사람(또는 AI)을 위한 안내
 
-기준일: 2026-11-11 (12절이 최신; 2절 숫자도 최신). **일을 끝낼 때는 13절의 기록 지침을 꼭 따른다.** 브랜치: `research/genie-188329` (저장소 `ssapo/aoe2`). 이 문서만 읽고 같은 방식으로 이어갈 수 있게 썼다. 세부 근거는 [truth-log-findings.md](truth-log-findings.md)에 있다.
+기준일: 2026-11-11 오후 (12절이 최신, 지금 상태는 13.4; 2절 숫자는 f1 기준). **일을 끝낼 때는 13절의 기록 지침을 꼭 따른다.** 브랜치: `research/genie-188329` (저장소 `ssapo/aoe2`). 이 문서만 읽고 같은 방식으로 이어갈 수 있게 썼다. 세부 근거는 [truth-log-findings.md](truth-log-findings.md)에 있다.
 
 ## 1. 목표
 
@@ -171,7 +171,7 @@
 | SPAWN_188329 | 경로 방식(집결점→건물 타일 경로, 끝에서 둘째 점부터 걸음 수 우선) + 내보내기도 같은 탐색 | `search.rs`, `new_unit.rs` `spawn_path_set`, `garrison/let_out.rs` | findings 17 | 227초, 232초 사례 |
 | AI_ORDER_188329 | 대기 명령 확인을 매 틱, 전체 갱신은 큐 안 돌림, 그룹 술어 | `unit_ai/{unit,actions,update}.rs`, `groups/update/mod.rs` | reading-round2 R1 | 32.5초, 38.8초 사례 |
 | EVADE_188329 | 사슴 도망: 타일 플래너 경로 위 reach 지점 | `unit_ai/idle_animals.rs` `evade`, `movement/new_path.rs` `plan_path`, `unit_ai/side.rs` `tile_path` | findings 9, 12 | 70.4초, 95.6초 사례 |
-| EVADE_188329 | 클래스 65 → Hunted AI | `unit_ai/ids.rs` | R11-D3 | **효과 없음**(아래 미해결 1) |
+| EVADE_188329 | 클래스 65 → Hunted AI | `unit_ai/ids.rs` | R11-D3 | **186초 사례와 무관**: 그 동물은 클래스 9이고, AI 종류는 리플 저장값(need_unit_ai=2)을 그대로 써서 이 변경이 닿지 않는 경로다(findings 26). 지울지 말지는 미정 |
 | WALK_188329 | 종류 2 링크가 끝나면 최상위 레벨까지 풀기(R4-D1) | `movement/waypoint.rs` `arrived` | walk-case-98s | 98.2초 사례 |
 | WALK_188329 | 꼬리 짧은 경로의 목표 = 대상의 현재 위치(R4-D4) | `movement/request_plans.rs` `short_try` | tail-goal-case-175s | 175.3초 사례 |
 | WALK_188329 | 경로 없음 + 시도 남음 → 어느 웨이포인트에서나 0.1초 멈춤(R4-D6) | `movement/new_path.rs` `no_path` | pause-case-330s | 330.1초 사례(시작 평가값과 함께) |
@@ -226,7 +226,7 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 12.5 미해결 (이른 순)
 
-1. Gaia 동물 마스터 2095(id 4283~4285): 186.6초부터 원본에서만 도망간다(정찰병이 지나갈 때). 식량이 없는 동물이라 자원 영향은 없다. 클래스 65 → Hunted를 넣었지만 변화 없음 → 리플에서 AI 종류가 저장값에서 오는지, 클래스가 65가 맞는지 확인 필요.
+1. Gaia 동물 마스터 2095(말, 클래스 9) **id 4285 한 마리만**: 186.6초부터 원본에서만 도망간다(정찰병 3428이 지나갈 때). 4283은 위치 일치, 4284는 양쪽 다 정지(예전의 "4283~4285 전체"는 틀린 기록). 식량 없는 동물이라 자원 영향 없음. 186.381초의 4285·3428 위치, retarget=1244, look=672는 원본과 일치. 원본 idle은 검색이 대상을 찾으면 0xd26200(도망)을 부르는데, 엔진에서 타이머 때문에 검색을 안 하는지 검색이 실패하는지 아직 못 갈랐다. 문서 `original-188329-animal-case-186s.md`, findings 26. 다음 첫 동작: 지금 빌드(진단 출력 포함, 13.4)로 `go.ps1 -Name p27 -Updates 9480 -Envs "$a;GENIE_TRACE_OBJECTS_RANGE=9430-9480;GENIE_TRACE_OBJECT_IDS=4283,4284,4285,3428;GENIE_TRACE_ANIMAL=1"` → ANIMAL_SEARCH / ANIMAL_EVADE 줄에서 4285의 검색 결과와 타이머를 본다.
 2. 383.4초 P1 나무꾼 4371(그리고 4363): 벌목소로 가는 짧은 경로 모양이 다르다(원본은 y = 45.1211을 따라 동쪽으로 간 뒤 꺾음). 도착 시각은 같다. 짧은 경로 사례로 넘길 만하다.
 3. 411.2초 P1 나무 −10: p25에서 4371의 선행 채집 지연을 확인(25번). 복귀 후 약 0.0546 차이가 연속 유지됨. 4363도 약 0.098276 차이. 다음 첫 동작: update 약 16350~16600을 추적해 383.4초 전후의 이전 왕복부터 비교. 450.9초 P2는 미조사.
 4. 엔진 멈춤: update 36,452 "a helper that answers a call for help (its reach, bestUnitToAttack and AttackObject)". 그 앞 실행에서는 41,256 "a horde's command (commandHorde)". 22번과 같은 방식(원본 동작을 읽어 오류를 대체)으로 처리.
@@ -236,9 +236,13 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 12.6 원본 기록을 다시 뜰 때
 
-`truth\truthlog5.ps1`(컴파일만 확인, 실제 기록은 안 해봄): v4에 더해 경로 상태·웨이포인트를 끝까지, 유닛 AI의 명령·액션·대상(`ai+0x38..0x50`), 맨 앞 액션 노드와 객체(`obj+0x420` → `list+0x10`)를 기록한다. `-DenseUntilMs`까지는 매 틱, 그 뒤는 200 ms 간격. 리플을 낮은 배속으로 재생하면서 `powershell -File truth\truthlog5.ps1 -Out truth\truth5.jsonl`. 게임 메모리는 읽기만 하고, 싱글·리플 재생에서만 쓴다(3절).
+`truth\truthlog5.ps1`(2026-11-11 실제 기록 성공): v4에 더해 경로 상태·웨이포인트를 끝까지, 유닛 AI의 명령·액션·대상(`ai+0x38..0x50`), 맨 앞 액션 노드와 객체(`obj+0x420` → `list+0x10`)를 기록한다. `-DenseUntilMs`까지는 매 틱, 그 뒤는 200 ms 간격. 리플을 낮은 배속으로 재생하면서 `powershell -File truth\truthlog5.ps1 -Out truth\truth5.jsonl`. 게임 메모리는 읽기만 하고, 싱글·리플 재생에서만 쓴다(3절).
 
 - **2026-11-11 낮: 두 번째 원본 기록을 떴다.** 리플 **518470161**, 파일 PC `truth\truth5.jsonl` (v5 형식: 12.6절의 추가 항목 포함, 3.1초부터, 처음 120초는 매 틱). 기록 중 확인: 77초 지점에 422MB, 줄 빠짐 없음. 끝난 뒤 `truth\truthlog5.status`에 줄 수와 마지막 시각이 있다. 아직 아무도 분석하지 않았다. 쓸 곳: (1) 같은 스위치 묶음이 다른 리플에서도 맞는지 검증(엔진 실행은 `runs\go.ps1`의 리플 폴더 `518239882`를 `518470161`로 바꾼 사본으로), (2) v5의 AI 명령·액션·맨 앞 액션 객체로 "어느 단계에서 늦는지"를 직접 보기. 비교 도구(`cmp_pos.py`, `cmp_held.py`)는 `truth/truth4.jsonl` 경로가 박혀 있으니 인자로 바꿔 써야 한다. `truth/analysis`의 자원 캐시(`cache_res.csv`)도 이 리플용으로 새로 만들어야 `grade_res.py`를 쓸 수 있다.
+- 기록 결과(확인함): 끝난 뒤 status = `lines=12934 last_ms=1200056`. 파일 1,113,185,172바이트(약 1.06GB). 게임 시각 1200초(20분)에서 기록기가 스스로 멈췄다(`-MaxWorldMs` 기본 1200000). **리플 번호는 jsonl 안에 없다.** 아래 목록이 유일한 기록이다.
+- **주의: status 파일 이름이 `truthlog5.status`로 고정**이라 다음 기록이 덮어쓴다. 그래서 truth5의 status는 `truth\truth5.status`로 복사해 두었다. 새로 기록한 뒤에도 `truthlog5.status`를 `truthN.status`로 복사한다.
+- 기록하는 법(실제로 통한 순서): 게임에서 리플을 열고 시작 직후 일시정지 → PowerShell에서 `powershell -ExecutionPolicy Bypass -File C:\Users\ssapo\genie-replays\truth\truthlog5.ps1 -Out C:\Users\ssapo\genie-replays\truth\truthN.jsonl` → 일시정지 해제. 기록기가 몇 초 늦게 붙어도 괜찮다(truth5는 3.1초부터). 처음 120초는 매 틱이라 1~2배속, 그 뒤는 200ms 간격이라 8배속까지 괜찮다(16배속이면 표본이 빠진다). 정상이면 10초 안에 jsonl 크기가 늘기 시작한다. status에 "wrong build" / "OpenProcess failed"가 나오면 실패. 20분에 약 1GB. `-MaxSeconds`(기본 3600)는 실제 시간 상한이라 1시간 넘게 걸리면 중간에 끝난다.
+- **원본 기록 목록 (리플 → 파일)**: 518239882 → `truth4.jsonl`(v4, 0~900초, status `truthlog4.status`) / 518470161 → `truth5.jsonl`(v5, 3.1~1200초, status `truth5.status`). 새로 기록하면 여기에 한 줄 추가한다. 리플 폴더(맵·문명·선수)는 `genie-replays\<리플번호>\`.
 
 ### 12.7 파일 위치 추가분
 
@@ -249,6 +253,8 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 | `runs\go.ps1`, `steer.ps1`, `summ.sh`, `cmp_*.py` | 12.3절의 도구(저장소 `tools/`에도 사본) |
 | `truth\truthlog5.ps1` | 12.6절 |
 | `re-kit\case25-evidence.zip` | 25번 대응 표본과 비교 도구(새 디컴파일 없음) |
+| `runs\p26.err`, `p26a.err`, `p26paths.err` | 186초 동물 사례 추적(update 9430~9480). ANIMAL 진단 추가 전 빌드 |
+| `truth\truth5.jsonl`, `truth\truth5.status` | 리플 518470161 원본 기록(12.6) |
 | 엔진 패치 | 저장소 `sorted-lists-and-truth-trace.patch` = PC `genie\`의 `git diff --ignore-cr-at-eol`(기준 `91d81be4`). 다시 만들 때: `cd genie && GIT_OPTIONAL_LOCKS=0 git diff --ignore-cr-at-eol > ../<새이름>.patch` |
 
 
@@ -258,7 +264,7 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 13.1 사례 하나를 끝낼 때마다 (고쳤든 못 고쳤든)
 
-`truth-log-findings.md` 맨 끝에 번호를 이어 한 절을 쓴다(지금 마지막은 24번). 형식:
+`truth-log-findings.md` 맨 끝에 번호를 이어 한 절을 쓴다(지금 마지막은 26번). 형식:
 
 ```
 ## <번호>. <한 줄 제목> (스위치 `GENIE_EXPERIMENT_...`에 추가 / 새 스위치 / 스위치 없음)
@@ -295,9 +301,13 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 13.4 지금 하던 일 (멈출 때마다 이 절을 덮어쓴다)
 
-- 날짜·작성: 2026-11-11, Codex.
-- 이번 확인: findings 25번. p25 추적으로 411.2초 나무 차이 후보 4371을 특정했고, 내려놓기 전부터 뒤처짐을 확인. 4363의 선행 보유량 차이도 확인. 원인 코드 및 정확한 시작 틱은 미확정.
-- 상태: 엔진 소스 변경/반쯤 넣은 변경 없음. 기존 build7.err의 성공을 확인했으며 재빌드는 하지 않음. 12.2에 추가할 구현 없음. 2절 수치는 마지막 전체 실행 f1 그대로(새 전체 채점 없음).
-- 실행: p25는 17400~17800을 요청했으나 필요한 표본을 얻은 413.394초 부근에서 직접 종료(run=-1). 마지막 줄은 잘릴 수 있다. 실행 중인 작업 없음.
-- 다음 첫 동작: 최신 엔진으로 update 약 16350~16600을 추적하여 4371/4363의 383.4초 전후 왕복과 채집 재개를 비교. 시작부터 차이가 있으면 앞 구간으로 이동. pW/pX/pY는 과거 설정이므로 최신 기준으로 단정하지 말 것.
-- 도구: runs/case25_compare.py (저장소 tools 사본). python runs/case25_compare.py runs/p25.err 4371 4363. raw 증거 묶음 re-kit/case25-evidence.zip.
+- 날짜·작성: 2026-11-11 오후, Claude. Codex가 멈춘 상태를 그대로 정리해 적었다(엔진 동작 변경 없음).
+- 순서: Codex가 findings 25(411.2초 나무)를 커밋한 뒤 186.6초 동물 사례(findings 26)를 시작했다가 중간에 멈췄다. 그 사이 Claude는 두 번째 원본 기록(518470161 → truth5, 12.6)만 진행했다.
+- 엔진 소스 상태: **진단 출력만 추가됨, 게임 동작 변경 없음.** (1) `GENIE_TRACE_OBJECT_IDS=<id,...>`: OBJECT 줄을 그 id만 찍고 ai 종류·idle 타이머·현재 액션·현재 대상을 더 찍는다(`genie-oracle/src/census.rs`). (2) `GENIE_TRACE_ANIMAL=1`: `unit_ai/idle_animals.rs`의 ANIMAL_SEARCH / ANIMAL_EVADE 줄. census.exe는 11:32 빌드라 마지막 소스 수정(11:26)을 포함한다. 저장소 패치를 이 상태로 다시 만들어 반영했다(13.2-5).
+- 실행: p26 / p26a / p26paths(11:20~11:29)는 ANIMAL 진단을 넣기 **전** 빌드로 돌아서 ANIMAL 줄이 0개다. ANIMAL 진단으로는 아직 한 번도 안 돌렸다. 돌고 있는 실행 없음.
+- 숫자: 2절은 f1 그대로(새 전체 실행 없음, 개선 주장 없음).
+- 다음 첫 동작(하나만 고른다. 두 도우미가 동시에 엔진 소스를 고치지 않는다):
+  - (a) 186초 동물: 12.5의 1번 명령으로 p27을 돌려 4285의 검색 결과·타이머를 본다.
+  - (b) 411초 나무: update 16350~16600을 추적해 4371/4363이 언제부터 뒤처지는지 본다(12.5의 3번). 383.4초 경로 모양 차이(12.5의 2번)가 원인 후보(추정).
+  - (c) 다른 리플 검증: 518470161을 같은 스위치로 돌려 truth5와 비교(12.6). 비교 도구 경로·자원 캐시를 이 리플용으로 바꿔야 한다.
+- 도구: `runs/case25_compare.py`(저장소 tools 사본). `python runs/case25_compare.py runs/p25.err 4371 4363`. 25번 증거 `re-kit/case25-evidence.zip`.

@@ -1502,14 +1502,15 @@ index 7a8bacbb..f5493e8f 100644
              }
          }
 diff --git a/crates/engine/genie-core/src/unit_ai/idle_animals.rs b/crates/engine/genie-core/src/unit_ai/idle_animals.rs
-index bf5761c6..b877d169 100644
+index bf5761c6..9f0986a5 100644
 --- a/crates/engine/genie-core/src/unit_ai/idle_animals.rs
 +++ b/crates/engine/genie-core/src/unit_ai/idle_animals.rs
-@@ -153,7 +153,38 @@ impl UnitAi {
+@@ -153,8 +153,42 @@ impl UnitAi {
          let reach = (at.speed * unit_ai_tuning.evade_reach).get();
          let (dx, dy) = (other.x() - x, other.y() - y);
          let d = sqrt(dy * dy + dx * dx);
 -        let point = Position::new(x - (dx / d) * reach, y - (dy / d) * reach, z);
+-        let _ = self.evasive_move(point, (OrderForce::Forced, BadPoint::Kept), at, ai, side)?;
 +        let mut point = Position::new(x - (dx / d) * reach, y - (dy / d) * reach, z);
 +        // 188329 evasiveMoveFrom (0xd26200): the move goes to the point at the walked distance
 +        // `reach` along the tile planner's path to that target (0x106e0b0), when the path has
@@ -1542,9 +1543,23 @@ index bf5761c6..b877d169 100644
 +                point = Position::new(out.0, out.1, z);
 +            }
 +        }
-         let _ = self.evasive_move(point, (OrderForce::Forced, BadPoint::Kept), at, ai, side)?;
++        let moved = self.evasive_move(point, (OrderForce::Forced, BadPoint::Kept), at, ai, side)?;
++        if std::env::var_os("GENIE_TRACE_ANIMAL").is_some() {
++            eprintln!("ANIMAL_EVADE from={:?} other={:?} point={:?} moved={:?}", at.position, other, point, moved);
++        }
          Ok(())
      }
+ 
+@@ -236,6 +270,9 @@ impl UnitAi {
+             },
+             memory: Memory::default(),
+         })?;
++        if std::env::var_os("GENIE_TRACE_ANIMAL").is_some() {
++            eprintln!("ANIMAL_SEARCH pos={:?} radius={:?} found={:?} other={:?}", at.position, radius, found.id, found.position);
++        }
+         self.alert(found, at.dt_seconds);
+         if found.id.is_some() {
+             let other = found
 diff --git a/crates/engine/genie-core/src/unit_ai/ids.rs b/crates/engine/genie-core/src/unit_ai/ids.rs
 index d0cbfb72..5adf364c 100644
 --- a/crates/engine/genie-core/src/unit_ai/ids.rs
@@ -2556,7 +2571,7 @@ index 90a8616f..77c5309d 100644
      let masters = install_read(dat.as_ref())?;
      let run = census_run(&recording, Some(&masters), limit)?;
 diff --git a/crates/tools/genie-oracle/src/census.rs b/crates/tools/genie-oracle/src/census.rs
-index 99849470..9577b2fc 100644
+index 99849470..7b6d13cd 100644
 --- a/crates/tools/genie-oracle/src/census.rs
 +++ b/crates/tools/genie-oracle/src/census.rs
 @@ -112,7 +112,20 @@ pub fn census_run(
@@ -2581,7 +2596,7 @@ index 99849470..9577b2fc 100644
      let sections = header.players();
      let (syncs, checkpoints) = recorded_checkpoints(&chapter)?;
      let total = limit.map_or(syncs, |l| l.min(syncs));
-@@ -124,10 +137,118 @@ pub fn census_run(
+@@ -124,10 +137,122 @@ pub fn census_run(
      } else {
          CensusEnd::Recording
      };
@@ -2681,13 +2696,17 @@ index 99849470..9577b2fc 100644
 +        if (std::env::var_os("GENIE_TRACE_OBJECTS").is_some() && [499, 999, 1499].contains(&census.updates)) || trace_range.is_some_and(|(a, b)| (a..=b).contains(&(census.updates as u64))) {
 +            for (p, state) in turns.players.iter().enumerate() {
 +                for u in &state.objects {
++                    if let Ok(ids) = std::env::var("GENIE_TRACE_OBJECT_IDS") {
++                        if !ids.split(',').any(|id| id.parse::<i32>().ok() == Some(u.id.get())) { continue; }
++                    }
 +                    if p == 0 && turns.parts.unit_ai.get(u.id).is_none() { continue; }
 +                    let (look, limit) = turns.parts.unit_ai.get(u.id).map(|ai| (ai.look_around_timer.get(), ai.look_around_timeout.get())).unwrap_or((0, 0));
 +                    let a = crate::header_runs::checkpoint_action(turns.parts.actions_of(u.id), turns.parts.production.get(u.id));
 +                    let timer = turns.parts.unit_ai.get(u.id).map(|ai| ai.retarget_timer.get()).unwrap_or(0);
++                    let ai_trace = turns.parts.unit_ai.get(u.id).map(|ai| format!("{:?} idle={}/{} action={:?} target={:?}", ai.ai_kind, ai.idle_timer.get(), ai.adjusted_idle_timeout.get(), ai.current_action, ai.current_target));
 +                    let kind = a.and_then(|a| a.kind).map(|k| k.get());
 +                    let action_state = a.map(|a| a.state.get()).unwrap_or(0);
-+                    eprintln!("OBJECT {}", serde_json::json!({"ms":turns.world_time.millis(),"tick":census.updates,"player":p,"id":u.id.get(),"held":u.life.amount.get(),"state":u.life.state as u8,"master":u.life.master_id.get(),"position":u.position().get(),"action_kind":kind,"action_state":action_state,"retarget_ms":timer,"look":look,"limit":limit}));
++                    eprintln!("OBJECT {}", serde_json::json!({"ms":turns.world_time.millis(),"tick":census.updates,"player":p,"id":u.id.get(),"held":u.life.amount.get(),"state":u.life.state as u8,"master":u.life.master_id.get(),"position":u.position().get(),"action_kind":kind,"action_state":action_state,"retarget_ms":timer,"look":look,"limit":limit,"ai":ai_trace}));
 +                }
 +            }
 +        }
@@ -2702,7 +2721,7 @@ index 99849470..9577b2fc 100644
              end = CensusEnd::AllDone;
              break;
          }
-@@ -221,6 +342,15 @@ impl Census {
+@@ -221,6 +346,15 @@ impl Census {
              ) else {
                  continue;
              };
