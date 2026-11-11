@@ -238,6 +238,8 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 `truth\truthlog5.ps1`(컴파일만 확인, 실제 기록은 안 해봄): v4에 더해 경로 상태·웨이포인트를 끝까지, 유닛 AI의 명령·액션·대상(`ai+0x38..0x50`), 맨 앞 액션 노드와 객체(`obj+0x420` → `list+0x10`)를 기록한다. `-DenseUntilMs`까지는 매 틱, 그 뒤는 200 ms 간격. 리플을 낮은 배속으로 재생하면서 `powershell -File truth\truthlog5.ps1 -Out truth\truth5.jsonl`. 게임 메모리는 읽기만 하고, 싱글·리플 재생에서만 쓴다(3절).
 
+- **2026-11-11 낮: 두 번째 원본 기록을 떴다.** 리플 **518470161**, 파일 PC `truth\truth5.jsonl` (v5 형식: 12.6절의 추가 항목 포함, 3.1초부터, 처음 120초는 매 틱). 기록 중 확인: 77초 지점에 422MB, 줄 빠짐 없음. 끝난 뒤 `truth\truthlog5.status`에 줄 수와 마지막 시각이 있다. 아직 아무도 분석하지 않았다. 쓸 곳: (1) 같은 스위치 묶음이 다른 리플에서도 맞는지 검증(엔진 실행은 `runs\go.ps1`의 리플 폴더 `518239882`를 `518470161`로 바꾼 사본으로), (2) v5의 AI 명령·액션·맨 앞 액션 객체로 "어느 단계에서 늦는지"를 직접 보기. 비교 도구(`cmp_pos.py`, `cmp_held.py`)는 `truth/truth4.jsonl` 경로가 박혀 있으니 인자로 바꿔 써야 한다. `truth/analysis`의 자원 캐시(`cache_res.csv`)도 이 리플용으로 새로 만들어야 `grade_res.py`를 쓸 수 있다.
+
 ### 12.7 파일 위치 추가분
 
 | 경로 (PC `genie-replays\`) | 내용 |
