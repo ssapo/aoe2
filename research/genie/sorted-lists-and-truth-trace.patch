@@ -11,7 +11,7 @@ index 06cee5e6..658d6aaa 100644
   "genie-command-codec",
   "genie-core",
 diff --git a/Cargo.toml b/Cargo.toml
-index e1267700..b1967040 100644
+index e1267700..178e9ee7 100644
 --- a/Cargo.toml
 +++ b/Cargo.toml
 @@ -183,3 +183,16 @@ absolute_paths = "deny"
@@ -32,7 +32,7 @@ index e1267700..b1967040 100644
 +opt-level = 0
 +codegen-units = 16
 diff --git a/crates/engine/genie-core/src/commands/mod.rs b/crates/engine/genie-core/src/commands/mod.rs
-index d2edcddb..eca0bff9 100644
+index d2edcddb..717eaa39 100644
 --- a/crates/engine/genie-core/src/commands/mod.rs
 +++ b/crates/engine/genie-core/src/commands/mod.rs
 @@ -290,13 +290,32 @@ impl World {
@@ -341,7 +341,7 @@ index 0e406949..ed5ae5a2 100644
          }
          if self.current_command == GroupCommandKind::MOVE && self.patrols() {
 diff --git a/crates/engine/genie-core/src/lib.rs b/crates/engine/genie-core/src/lib.rs
-index f639a3e9..62cfedb6 100644
+index f639a3e9..ce64ea50 100644
 --- a/crates/engine/genie-core/src/lib.rs
 +++ b/crates/engine/genie-core/src/lib.rs
 @@ -34,6 +34,7 @@ pub use genie_error::{ErrorKind, GenieError, GenieResult};
@@ -353,7 +353,7 @@ index f639a3e9..62cfedb6 100644
  pub mod garrison;
  pub mod gathering;
 diff --git a/crates/engine/genie-core/src/map/spatial/mod.rs b/crates/engine/genie-core/src/map/spatial/mod.rs
-index 4cc3b283..36f7407d 100644
+index 4cc3b283..0a931928 100644
 --- a/crates/engine/genie-core/src/map/spatial/mod.rs
 +++ b/crates/engine/genie-core/src/map/spatial/mod.rs
 @@ -46,6 +46,7 @@ mod objects;
@@ -574,6 +574,160 @@ index 1f873756..2887dc8b 100644
      /// The length of the tile planner's path (`FUN_140f7c530` with the radii `radii`, range 0, no
      /// closed tiles, the tile search for a human player, no smoothing) from the unit to `to`, and
      /// the planner's result; None without a planner for the unit's restriction.
+diff --git a/crates/engine/genie-core/src/movement/path_end.rs b/crates/engine/genie-core/src/movement/path_end.rs
+index 8dd9623e..40bd3b95 100644
+--- a/crates/engine/genie-core/src/movement/path_end.rs
++++ b/crates/engine/genie-core/src/movement/path_end.rs
+@@ -31,7 +31,7 @@ use crate::movement::{
+     footprint_gap_squared, lowered_units, overlap, pause_rank, point_or_zero, point_or_zero_of,
+ };
+ use crate::objects::masters::MasterId;
+-use crate::pathing::long_path::{LongRequest, LongTarget, gate_lets_pass, reaches};
++use crate::pathing::long_path::{LongRequest, LongTarget, gate_lets_pass, reach_length, reaches};
+ use crate::pathing::tile_path::{Path, Request};
+ use crate::players::PlayerId;
+ use crate::players::PlayerSet;
+@@ -222,6 +222,140 @@ impl Mover {
+         reaches(world.tiles(), world.map, &req, &gates, *long_path_tuning)
+     }
+ 
++    /// 188329's point reach test with a length (`FUN_14120fec0` -> `0x107a5e0` with a length
++    /// pointer; `GENIE_EXPERIMENT_GRAZE_188329`): [`Mover::reach_test`]'s tests for the point `to`
++    /// without a target, from the unit's place `at` (`+0x3bc`: x, height, y; the wrapper hands it,
++    /// not `+0x824`). None where the test answers no; else the length written: the short pather's
++    /// path measured along its points (`0x106eca0`: the sum of the 3D segment lengths from the
++    /// path's first point, [`Path::measure`]) when it reaches (`0x107ac6c`), else the long
++    /// pather's ([`reach_length`]: 0 in range, else the last popped tile's cost).
++    ///
++    /// # Errors
++    ///
++    /// What the planners do not model.
++    pub fn reach_length(
++        &self,
++        (at, me): (Position, &Me),
++        (world, by_id): (&mut Spatial, ObjectsRef<'_>),
++        plan: &mut Planning<'_>,
++        to: Point,
++        range: Distance,
++        master: MasterId,
++    ) -> Result<Option<Distance>, GenieError> {
++        let long_path_tuning = &by_id.tuning().long_path;
++        let tile_path_tuning = &by_id.tuning().tile_path;
++        let movement_tuning = &by_id.tuning().movement;
++        let roles = by_id.roles();
++        // FUN_14120fec0 hands the unit's +0x3bc (x, height, y) as the start
++        let (x, y, height_at) = (at.x(), at.y(), at.z());
++        let (w, h) = (world.map.width(), world.map.height());
++        let on_map = |px: f32, py: f32| {
++            at_most_or_unordered(0.0, px)
++                && at_most_or_unordered(0.0, py)
++                && below_or_unordered(px, w as f32)
++                && below_or_unordered(py, h as f32)
++        };
++        if !on_map(x, y) || !on_map(to.x(), to.y()) {
++            return Ok(None);
++        }
++        let radius = self.stats.radius;
++        let ground = radius.ground();
++        let mut path = Path::default();
++        if let Some(planner) = plan.pathing.planner(self.stats.restriction, world.tiles()) {
++            let req = Request {
++                from: Point::new(x, y),
++                to,
++                radii: Distance::new(radius.x()),
++                range,
++                closed: Vec::new(),
++                full: false,
++            };
++            let found =
++                planner.plan::<GenieError>(&req, false, &mut path, None, tile_path_tuning)?;
++            if !found.reaches() {
++                return Ok(None);
++            }
++        }
++        let solid = 0.0 < radius.z() && 0.0 < radius.x() && 0.0 < radius.y();
++        let (dx, dy) = (to.x() - x, to.y() - y);
++        if solid && sqrt(dx * dx + 0.0 + dy * dy) <= movement_tuning.reach_short {
++            let goal = BVector::new(to.x(), 0.0, to.y());
++            let line = (Point::new(x, height_at), Point::new(to.x(), 0.0));
++            let ignore = self.ignore_list(me, world, plan, None, line, by_id)?;
++            let ask = ShortAsk {
++                goal,
++                range,
++                target: None,
++                ignore: &ignore,
++                include: &[],
++            };
++            let owner = super::long_walk::owner_number(world, me.id);
++            let found = super::long_walk::short_path_including(
++                self.walker(me.id),
++                Point::new(x, y),
++                (world, by_id),
++                plan,
++                ask,
++                owner,
++                &mut path,
++            )?;
++            if found.reaches() {
++                // 0x107ac78: FUN_14106eca0 measures the path the short pather wrote
++                path.measure();
++                return Ok(Some(path.length));
++            }
++        }
++        // the gap from the unit's place (its decoded x and y)
++        let gap = |d: f32, r: f32| {
++            let g = d.abs() - r;
++            if 0.0 <= g { g } else { 0.0 }
++        };
++        let (gx, gy) = (gap(to.x() - at.x(), radius.x()), gap(to.y() - at.y(), radius.y()));
++        if gx * gx + gy * gy < DistanceSquared::new(movement_tuning.reach_near).get() {
++            return Ok(None);
++        }
++        let walker = LongWalker {
++            id: me.id,
++            position: at,
++            radius: ground,
++            mask: self.stats.restriction_mask,
++            moves: self.stats.speed != Speed::ZERO
++                || roles
++                    .of_master(master)
++                    .contains(MasterRoles::LONG_PATH_MOVER),
++            ignore_units: &self.ignore_units,
++            group_units: plan.groups.group_units(me.group),
++        };
++        let lowered = lowered_units(&walker, world, None, by_id)
++            .into_iter()
++            .filter_map(|id| world.get(id))
++            .filter(|p| p.tall)
++            .map(|p| Tile::new(p.position.x() as i32, p.position.y() as i32))
++            .collect();
++        let req = LongRequest {
++            from: Tile::new(cvttss2si(x), cvttss2si(y)),
++            to: Tile::new(cvttss2si(to.x()), cvttss2si(to.y())),
++            range,
++            target: None,
++            moves: self.stats.speed != Speed::ZERO
++                || roles
++                    .of_master(master)
++                    .contains(MasterRoles::LONG_PATH_MOVER),
++            mask: self.stats.restriction_mask,
++            player_kind: plan.player_kind,
++            lowered,
++            within_range: false,
++            near_player: false,
++            allies: world
++                .get(me.id)
++                .map_or(PlayerSet::NONE, |p| world.allies_of(p.player)),
++        };
++        let player = world.get(me.id).map(|p| p.player);
++        let gates = |t| player.map_or(Ok(false), |p| gate_lets_pass(world, by_id, p, t));
++        Ok(reach_length(world.tiles(), world.map, &req, &gates, *long_path_tuning)?
++            .map(Distance::new))
++    }
++
+     /// The test before a non-quiet `MoveTo`'s path end follows its moved target (`0x140aa2a70` in
+     /// state 4): the top path (`FUN_140f960f0`) and the walked level's own path, that level being
+     /// level 0, are both held, and the level's current waypoint (`FUN_140f9bcd0`) is the top
 diff --git a/crates/engine/genie-core/src/movement/request_plans.rs b/crates/engine/genie-core/src/movement/request_plans.rs
 index 8c1a150a..d8c85454 100644
 --- a/crates/engine/genie-core/src/movement/request_plans.rs
@@ -804,6 +958,108 @@ index 29f5d776..4e3fe984 100644
          }
          let takes_it = !order.flags.contains(OrderFlags::QUEUED)
              && self.parts.unit_ai.get(unit.id).is_none_or(|ai| {
+diff --git a/crates/engine/genie-core/src/pathing/long_path/cost.rs b/crates/engine/genie-core/src/pathing/long_path/cost.rs
+index bce9f3c0..1039b8f3 100644
+--- a/crates/engine/genie-core/src/pathing/long_path/cost.rs
++++ b/crates/engine/genie-core/src/pathing/long_path/cost.rs
+@@ -32,6 +32,11 @@ impl LongCost {
+         Self(self.0 >> 2)
+     }
+ 
++    /// Its value, the game's `int` (188329's reach test hands it on as a float length).
++    pub(super) const fn get(self) -> i32 {
++        self.0
++    }
++
+     /// One more for a step that turns.
+     pub(super) const fn turned(self) -> Self {
+         Self(self.0.wrapping_add(1))
+diff --git a/crates/engine/genie-core/src/pathing/long_path/mod.rs b/crates/engine/genie-core/src/pathing/long_path/mod.rs
+index 65cff0cf..9d07c25f 100644
+--- a/crates/engine/genie-core/src/pathing/long_path/mod.rs
++++ b/crates/engine/genie-core/src/pathing/long_path/mod.rs
+@@ -212,6 +212,9 @@ enum Searched {
+         reached: bool,
+         end: Tile,
+         entered: Vec<Option<StepDir>>,
++        /// Reached: the cost (`+0x38420`) of the tile popped last, the one that reached the goal
++        /// or that the goal was stepped onto from (188329 `0x107a0a3`, `0x107a144`).
++        cost: LongCost,
+     },
+ }
+ 
+@@ -230,6 +233,34 @@ pub fn reaches(
+     })
+ }
+ 
++/// 188329's long pather (`0x1078d60`) for a goal point with a length to write and no path
++/// (the point reach test `0x107a5e0`): None when it does not reach the goal; else the length it
++/// writes: 0 for a goal in range before the search (`0x1079196`), otherwise the cost
++/// (`+0x38420`, an int as a float, `cvtdq2ps`) of the tile it popped last: the tile that reached the
++/// goal (`0x107a144`) or the one the goal was stepped onto from (`0x107a0a3`).
++///
++/// # Errors
++///
++/// What the search does not model.
++pub fn reach_length(
++    tiles: &Tiles,
++    map: GridSize,
++    req: &LongRequest,
++    gates: GateAsk<'_>,
++    long_path_tuning: LongPathTuning,
++) -> Result<Option<f32>, GenieError> {
++    Ok(match search(tiles, map, req, gates, long_path_tuning)? {
++        Searched::Refused => None,
++        Searched::InRange => Some(0.0),
++        Searched::Ran {
++            reached: true,
++            cost,
++            ..
++        } => Some(cost.get() as f32),
++        Searched::Ran { reached: false, .. } => None,
++    })
++}
++
+ /// `FUN_140f9eb70` with a path to write (its argument 12): whether the unit reaches the goal, and
+ /// the path ([`trace`] from the tile the search ended on, at the unit's height `z`; empty when the
+ /// search did not run). A path the trace cannot write (a point equal to the one beside it) is
+@@ -252,6 +283,7 @@ pub fn path(
+             reached,
+             end,
+             entered,
++            ..
+         } => trace(req.from, end, &entered, map, z)
+             .map_or_else(|| (false, Path::default()), |path| (reached, path)),
+     })
+@@ -564,10 +596,12 @@ fn search(
+         let (gx, gy) = (x1 - cx, y1 - cy);
+         let d = sqrt(gx.wrapping_mul(gx).wrapping_add(gy.wrapping_mul(gy)) as f32);
+         if rect.holds(c) || search_reached(req, d, long_path_tuning) {
++            let cost = *front.cost.checked(cell(map, c))?;
+             return Ok(Searched::Ran {
+                 reached: true,
+                 end: c,
+                 entered: front.entered,
++                cost,
+             });
+         }
+         let near = LongCost::of_gap(x1 - cx, y1 - cy).quartered();
+@@ -593,6 +627,7 @@ fn search(
+                     reached: true,
+                     end,
+                     entered: front.entered,
++                    cost: here,
+                 });
+             }
+         }
+@@ -603,6 +638,7 @@ fn search(
+         reached: false,
+         end: nearest.0,
+         entered: front.entered,
++        cost: nearest.1,
+     })
+ }
+ 
 diff --git a/crates/engine/genie-core/src/pathing/short_path/geometry.rs b/crates/engine/genie-core/src/pathing/short_path/geometry.rs
 index cdaefff8..70eff0eb 100644
 --- a/crates/engine/genie-core/src/pathing/short_path/geometry.rs
@@ -838,10 +1094,84 @@ index cdaefff8..70eff0eb 100644
      if ua < 0x1a3 {
          if !(-0x1062..=0x40_1062).contains(&ua) || current <= ua {
 diff --git a/crates/engine/genie-core/src/pathing/short_path/main_loop.rs b/crates/engine/genie-core/src/pathing/short_path/main_loop.rs
-index e9cbaaa4..02de6c1c 100644
+index e9cbaaa4..6094bdfe 100644
 --- a/crates/engine/genie-core/src/pathing/short_path/main_loop.rs
 +++ b/crates/engine/genie-core/src/pathing/short_path/main_loop.rs
-@@ -208,7 +208,22 @@ impl Search<'_> {
+@@ -116,11 +116,11 @@ impl Search<'_> {
+             if forward {
+                 self.rewalk_corner(&walk, &poly, (fv, gf), (WalkDir::Forward, e, fv))?;
+                 (fv, gf, alive_f) =
+-                    self.rewalk_advance(&walk, &poly, (fv, gf), WalkDir::Forward)?;
++                    self.rewalk_advance(&walk, &poly, (fv, gf), WalkDir::Forward, (e, next0))?;
+             } else {
+                 self.rewalk_corner(&walk, &poly, (bv, gb), (WalkDir::Backward, bv, next0))?;
+                 (bv, gb, alive_b) =
+-                    self.rewalk_advance(&walk, &poly, (bv, gb), WalkDir::Backward)?;
++                    self.rewalk_advance(&walk, &poly, (bv, gb), WalkDir::Backward, (e, next0))?;
+             }
+         }
+     }
+@@ -176,15 +176,14 @@ impl Search<'_> {
+     /// forward or backward: its place, the cost there and whether it is still below the
+     /// vertex's.
+     fn rewalk_advance(
+-        &self,
++        &mut self,
+         walk: &Rewalk,
+         poly: &Poly,
+         (from, g): (VertexIndex, FixedDistance),
+         dir: WalkDir,
++        (e, next0): (VertexIndex, VertexIndex),
+     ) -> Result<(VertexIndex, FixedDistance, bool), GenieError> {
+         let m = walk.count;
+-        // the costs as the search holds them, the vertices from the walk's copy
+-        let costs = self.poly(walk.poly)?;
+         let (mut vi, mut g) = (from, g);
+         let mut at = poly.vertex(from)?;
+         loop {
+@@ -195,11 +194,40 @@ impl Search<'_> {
+             };
+             let w = poly.vertex(vi)?;
+             g = g.wrapping_add(cheb(at, w));
+-            let cost = costs.cost(vi)?;
++            // the costs as the search holds them, the vertices from the walk's copy
++            let cost = self.poly(walk.poly)?.cost(vi)?;
+             at = w;
+             if cost != UNSET {
+                 return Ok((vi, g, g < cost));
+             }
++            // 188329 (0x1080580..0x1080683, 0x10808a0..0x108097b): a vertex no corner node
++            // reached is a goal candidate (0x107dcf0); a goal ends this direction (its alive
++            // flag is g < UNSET). Case 90.9 s of replay 517426097.
++            if super::build_188329() && super::rewalk_goal_188329() {
++                let run = if dir == WalkDir::Forward {
++                    Run {
++                        poly: walk.poly,
++                        dir,
++                        lo: e,
++                        hi: vi,
++                    }
++                } else {
++                    Run {
++                        poly: walk.poly,
++                        dir,
++                        lo: vi,
++                        hi: next0,
++                    }
++                };
++                if self.goal_test(Corner {
++                    cost: g,
++                    parent: walk.parent,
++                    run,
++                    point: w,
++                })? {
++                    return Ok((vi, g, g < cost));
++                }
++            }
+         }
+     }
+ 
+@@ -208,15 +236,42 @@ impl Search<'_> {
      /// node, a clear ray a terminal goal candidate, and a ray that still touches the axis L.
      pub(super) fn corner_expand(&mut self, n: Node, emit: Emit) -> Result<(), GenieError> {
          let p = n.at;
@@ -865,10 +1195,18 @@ index e9cbaaa4..02de6c1c 100644
          let mut frac = RayFraction::START;
          let reach = n.g.wrapping_add(float_distance(t, p));
          if !self.beats_goal(reach)? {
-@@ -217,6 +232,14 @@ impl Search<'_> {
-         let mut found = self
-             .ctx
-             .raycast(p, t, &mut frac, Callback::Corner(emit.token))?;
+             return Ok(());
+         }
+-        let mut found = self
+-            .ctx
+-            .raycast(p, t, &mut frac, Callback::Corner(emit.token))?;
++        // 188329 (0x107fe1d): the corner ray's callback is 0x107c590, no token
++        let mut found = if super::build_188329() && super::corner_ray_188329() {
++            self.ctx.corner_ray_188329(p, t, &mut frac)?
++        } else {
++            self.ctx
++                .raycast(p, t, &mut frac, Callback::Corner(emit.token))?
++        };
 +        // 188329 (0x107fe6b..0x107fe94): a corner node's touching ray goes to the start node's
 +        // touch handler (0x107cb80); no nudged rays, no axis L
 +        if super::build_188329() {
@@ -880,7 +1218,7 @@ index e9cbaaa4..02de6c1c 100644
          if touches(found) {
              let b = self.bounds;
              for dir in NUDGES {
-@@ -421,7 +444,25 @@ impl Search<'_> {
+@@ -421,7 +476,25 @@ impl Search<'_> {
                  if self.pop_test(&n)? {
                      return Ok(None);
                  }
@@ -907,7 +1245,7 @@ index e9cbaaa4..02de6c1c 100644
                  let mut frac = RayFraction::START;
                  let found = self.ctx.raycast(p, t, &mut frac, Callback::Box)?;
                  match found {
-@@ -518,7 +559,10 @@ impl Search<'_> {
+@@ -518,7 +591,10 @@ impl Search<'_> {
                  b.y0()
              },
          );
@@ -920,10 +1258,10 @@ index e9cbaaa4..02de6c1c 100644
          let dir_y = AxisDir::of_dy(delta.y());
          self.legs(base, c, dir_x, dir_y, delta)?;
 diff --git a/crates/engine/genie-core/src/pathing/short_path/mod.rs b/crates/engine/genie-core/src/pathing/short_path/mod.rs
-index 84934264..5b6c494a 100644
+index 84934264..da65bd70 100644
 --- a/crates/engine/genie-core/src/pathing/short_path/mod.rs
 +++ b/crates/engine/genie-core/src/pathing/short_path/mod.rs
-@@ -178,6 +178,13 @@ const NUDGES: [FixedPoint; 4] = [
+@@ -178,6 +178,27 @@ const NUDGES: [FixedPoint; 4] = [
  const OPEN_CORNER_WITHOUT_EMIT: GenieError =
      GenieError::unreachable("an open corner node without the token and sides it emits with");
  
@@ -934,10 +1272,24 @@ index 84934264..5b6c494a 100644
 +    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_SHORT_188329").is_some())
 +}
 +
++/// The corner ray's callback of 188329 (`0x107c590`, case 4.9 s of replay 518470161), on top of
++/// [`build_188329`]: `GENIE_EXPERIMENT_CORNER_188329`.
++pub(super) fn corner_ray_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_CORNER_188329").is_some())
++}
++
++/// The re-walk's goal test of the vertices it passes over (188329 `0x1080670`, `0x108096f`,
++/// case 90.9 s of replay 517426097), on top of [`build_188329`]: `GENIE_EXPERIMENT_REWALK_188329`.
++pub(super) fn rewalk_goal_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_REWALK_188329").is_some())
++}
++
  /// The goal of a search (`local_148`): its point, the unit's radius, the target's half sizes,
  /// their sums and the range.
  #[derive(Clone, Copy, Debug)]
-@@ -202,8 +209,17 @@ impl Goal {
+@@ -202,8 +223,17 @@ impl Goal {
              r,
              rx: q.half_x,
              ry: q.half_y,
@@ -998,6 +1350,52 @@ index 6b1e956f..bd77ed9d 100644
          if low <= gv && gv <= high {
              let foot = if dx != 0 {
                  FixedPoint::new(gv, a.y())
+diff --git a/crates/engine/genie-core/src/pathing/short_path/raycast.rs b/crates/engine/genie-core/src/pathing/short_path/raycast.rs
+index d952fd6e..3f0c1f1d 100644
+--- a/crates/engine/genie-core/src/pathing/short_path/raycast.rs
++++ b/crates/engine/genie-core/src/pathing/short_path/raycast.rs
+@@ -368,6 +368,41 @@ impl Ctx<'_> {
+         Ok(out)
+     }
+ 
++    /// 188329 `0x107c590` (thunk `0x107b1b0`, set at `0x107fe1d`), the corner node's ray: an axis
++    /// ray is the axis sweep (`0x1082960`), result 1 with `t = (|hit - a| << 22) / delta`, the
++    /// division by the signed delta as the game does it (negative toward -x / -y); any other ray
++    /// is callback C (box not grown, zero-area clips skipped, 3 -> 2). No token. Case 4.9 s of
++    /// replay 518470161 (`original-188329-corner-ray-case-4.9s.md`).
++    pub(super) fn corner_ray_188329(
++        &self,
++        a: FixedPoint,
++        b: FixedPoint,
++        t: &mut RayFraction,
++    ) -> Result<Option<(Meet, Hit)>, GenieError> {
++        let dx = b.x().wrapping_sub(a.x());
++        let dy = b.y().wrapping_sub(a.y());
++        if dx != 0 && dy != 0 {
++            return self.raycast(a, b, t, Callback::Sight);
++        }
++        let (dir, delta) = if dx == 0 {
++            (AxisDir::of_dy(dy), dy)
++        } else {
++            (AxisDir::of_dx(dx), dx)
++        };
++        let Some((shape, side, at)) = self.sweep(a, b, dir)?.counted()? else {
++            return Ok(None);
++        };
++        if delta == 0 {
++            return Err(GenieError::unsupported(
++                "a corner ray to its own point (a division by zero)",
++            ));
++        }
++        let (h, s) = if dx == 0 { (at.y(), a.y()) } else { (at.x(), a.x()) };
++        let num = if 0 < delta { h.wrapping_sub(s) } else { s.wrapping_sub(h) };
++        *t = RayFraction::new(((i64::from(num) << 22) / i64::from(delta)) as i32);
++        Ok(Some((Meet::Cross, Hit { shape, side })))
++    }
++
+     /// `FUN_140fa8e60`: whether the straight walk from `a` to `b` is blocked (the smoothing's line of
+     /// sight): an axis sweep along an axis, else the raycast with callback C.
+     pub(super) fn sight_blocked(&self, a: FixedPoint, b: FixedPoint) -> Result<bool, GenieError> {
 diff --git a/crates/engine/genie-core/src/pathing/short_path/start.rs b/crates/engine/genie-core/src/pathing/short_path/start.rs
 index 916707bf..89c5a82a 100644
 --- a/crates/engine/genie-core/src/pathing/short_path/start.rs
@@ -1502,10 +1900,49 @@ index 7a8bacbb..f5493e8f 100644
              }
          }
 diff --git a/crates/engine/genie-core/src/unit_ai/idle_animals.rs b/crates/engine/genie-core/src/unit_ai/idle_animals.rs
-index bf5761c6..9f0986a5 100644
+index bf5761c6..c4c0d925 100644
 --- a/crates/engine/genie-core/src/unit_ai/idle_animals.rs
 +++ b/crates/engine/genie-core/src/unit_ai/idle_animals.rs
-@@ -153,8 +153,42 @@ impl UnitAi {
+@@ -29,6 +29,38 @@ use crate::world::layer::ClassRoles;
+ use crate::world::layer::MasterRoles;
+ use std::cmp::Ordering;
+ 
++/// 188329's graze limit on a hunted animal's own moves (`0xcfcbd0`, case 10.036 s of replay
++/// 518470161): `GENIE_EXPERIMENT_GRAZE_188329`.
++fn graze_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_GRAZE_188329").is_some())
++}
++
++/// The range of 188329's graze reach test (`[0x3202890]`, 0.1).
++const GRAZE_REACH: f32 = 0.1;
++
++/// 188329's test before a hunted animal's own move to `to` (`0xcfcbd0`): the graze limit `v`
++/// (slot 0x870, [`UnitSide::graze_limit`]); at most 0 (`COMISS v, 0; JBE`) lets the move go.
++/// Else the reach test with its length to `to` within 0.1 (`FUN_14120fec0`) must reach, and its
++/// length be within `v`: for the wander and the home move (`0xcfd872`: `COMISS len, v; JA`
++/// refuses, an unordered length passes), for the leash (`0xcfcf76`: `COMISS v, len; JB`
++/// refuses, an unordered one too, `leash`).
++fn graze_lets(side: &mut dyn UnitSide, to: Point, leash: bool) -> Result<bool, GenieError> {
++    let v = side.graze_limit()?;
++    if !(0.0 < v) {
++        return Ok(true);
++    }
++    let len = side.reach_length(to, Distance::new(GRAZE_REACH))?;
++    if std::env::var_os("GENIE_TRACE_ANIMAL").is_some() {
++        eprintln!("ANIMAL_GRAZE to={to:?} limit={v} leash={leash} len={len:?}");
++    }
++    Ok(match len {
++        None => false,
++        Some(l) if leash => v >= l.get(),
++        Some(l) => !(l.get() > v),
++    })
++}
++
+ impl UnitAi {
+     /// The boar's idle check (slot 72, `FUN_140c1e630`): `FUN_140c41e50` first
+     /// ([`UnitAi::cap_human_order`]). A furious boar, or any in mode 1, stays. Then one draw of
+@@ -153,8 +185,42 @@ impl UnitAi {
          let reach = (at.speed * unit_ai_tuning.evade_reach).get();
          let (dx, dy) = (other.x() - x, other.y() - y);
          let d = sqrt(dy * dy + dx * dx);
@@ -1550,7 +1987,48 @@ index bf5761c6..9f0986a5 100644
          Ok(())
      }
  
-@@ -236,6 +270,9 @@ impl UnitAi {
+@@ -189,24 +255,35 @@ impl UnitAi {
+         ai: &mut Well512,
+         side: &mut dyn UnitSide,
+     ) -> Result<IdleOutcome, GenieError> {
+-        let h = self.hunted.ok_or(GenieError::unsupported(
++        let mut h = self.hunted.ok_or(GenieError::unsupported(
+             "a hunted animal without its origin",
+         ))?;
+         let (x, y, z) = (at.position.x(), at.position.y(), at.position.z());
+-        let go_home = AiMove {
++        let mut go_home = AiMove {
+             point: h.origin.with_z(z),
+             range: AI_MOVE_RANGE,
+             force: OrderForce::Forced,
+             pace: Pace::Walk,
+         };
++        let graze = graze_188329();
+         let leash = h.leash.squared();
+         if DistanceSquared::ZERO < leash {
+             let gap = point_gap_squared(h.origin.ground(), at.position, at.size);
+             if leash < gap {
+-                if let Some(m) = self.move_to(go_home) {
+-                    side.effect_now(Effect::Move(m), self, ai)?;
++                if graze && !graze_lets(side, h.origin.ground(), true)? {
++                    // 0xcfd003..0xcfd0b3: the origin becomes the unit's place (decoded x, y, z)
++                    // and the check goes on to the search
++                    h.origin = at.position;
++                    if let Some(hh) = self.hunted.as_mut() {
++                        hh.origin = at.position;
++                    }
++                    go_home.point = h.origin.with_z(z);
++                } else {
++                    if let Some(m) = self.move_to(go_home) {
++                        side.effect_now(Effect::Move(m), self, ai)?;
++                    }
++                    return Ok(IdleOutcome::Acted);
+                 }
+-                return Ok(IdleOutcome::Acted);
+             }
+         }
+         if at.flags.contains(SurroundingFlags::MODE_1) {
+@@ -236,6 +313,9 @@ impl UnitAi {
              },
              memory: Memory::default(),
          })?;
@@ -1560,6 +2038,27 @@ index bf5761c6..9f0986a5 100644
          self.alert(found, at.dt_seconds);
          if found.id.is_some() {
              let other = found
+@@ -249,6 +329,10 @@ impl UnitAi {
+             let dx = x - h.origin.x();
+             let dy = y - h.origin.y();
+             if HUNTED_HOME < dy * dy + dx * dx {
++                // 0xcfd80e..0xcfd876: a refused move answers 5
++                if graze && !graze_lets(side, h.origin.ground(), false)? {
++                    return Ok(IdleOutcome::Idle);
++                }
+                 if let Some(m) = self.move_to(go_home) {
+                     side.effect_now(Effect::Move(m), self, ai)?;
+                 }
+@@ -264,6 +348,9 @@ impl UnitAi {
+             };
+             let sx = step(ai) as f32;
+             let sy = step(ai) as f32;
++            if graze && !graze_lets(side, Point::new(x + sx, sy + y), false)? {
++                return Ok(IdleOutcome::Idle);
++            }
+             let wander = self.move_to(AiMove {
+                 point: Position::new(x + sx, sy + y, z),
+                 ..go_home
 diff --git a/crates/engine/genie-core/src/unit_ai/ids.rs b/crates/engine/genie-core/src/unit_ai/ids.rs
 index d0cbfb72..5adf364c 100644
 --- a/crates/engine/genie-core/src/unit_ai/ids.rs
@@ -1576,7 +2075,7 @@ index d0cbfb72..5adf364c 100644
          let held = roles.of_class(class);
          if held.intersects(
 diff --git a/crates/engine/genie-core/src/unit_ai/side.rs b/crates/engine/genie-core/src/unit_ai/side.rs
-index 7fd24514..be5a8a66 100644
+index 7fd24514..a0f390a8 100644
 --- a/crates/engine/genie-core/src/unit_ai/side.rs
 +++ b/crates/engine/genie-core/src/unit_ai/side.rs
 @@ -37,6 +37,20 @@ pub trait UnitSide {
@@ -1600,6 +2099,40 @@ index 7fd24514..be5a8a66 100644
      /// The unit's attack command on object `target` (slot 0x338, `FUN_14120cea0`), forced or
      /// not, while its unit AI stands as `ai`: true when the unit attacks it, with the notifies
      /// the command posts to the unit AI (kind and parameters), which the AI queues.
+@@ -196,6 +210,33 @@ pub trait UnitSide {
+         Err(GenieError::unsupported("a reach test without the world"))
+     }
+ 
++    /// 188329 slot 0x870 of a combat unit (`0x12b5f20`: `+0x810`, which slot 0x968 sets from
++    /// its master's tasks: the Graze task's (action type 6) `search_wait_time`, `+0x1c`): the
++    /// longest walk the hunted animal's idle check (`0xcfcbd0`) lets the animal start; 0 when the
++    /// master has no such task (the base slot `0x11390e0`). `GENIE_EXPERIMENT_GRAZE_188329`.
++    ///
++    /// # Errors
++    ///
++    /// What the master tables do not hold.
++    fn graze_limit(&mut self) -> Result<f32, GenieError> {
++        Ok(0.0)
++    }
++
++    /// 188329's point reach test with its length (`FUN_14120fec0` -> `0x107a5e0`, the unit's
++    /// place to `to` within `range`): None when not reached, else the length the test writes
++    /// ([`crate::movement::Mover::reach_length`]). `GENIE_EXPERIMENT_GRAZE_188329`.
++    ///
++    /// # Errors
++    ///
++    /// What the reach test does not model.
++    fn reach_length(
++        &mut self,
++        _to: Point,
++        _range: Distance,
++    ) -> Result<Option<Distance>, GenieError> {
++        Ok(None)
++    }
++
+     /// What the base handler's case 0x216 reads ([`OffFootprint`]) for a unit sent off the
+     /// footprint of `site` (its master's radii `radius`).
+     ///
 diff --git a/crates/engine/genie-core/src/unit_ai/unit.rs b/crates/engine/genie-core/src/unit_ai/unit.rs
 index dc286d39..4ddecf51 100644
 --- a/crates/engine/genie-core/src/unit_ai/unit.rs
@@ -1725,10 +2258,10 @@ index 1ecba910..35cc518d 100644
                      (Some(id), Some(position)) => Some(Gatherable {
                          id,
 diff --git a/crates/engine/genie-core/src/unit_ai/world_view/side.rs b/crates/engine/genie-core/src/unit_ai/world_view/side.rs
-index 77dc93ea..65dae9d8 100644
+index 77dc93ea..1d405114 100644
 --- a/crates/engine/genie-core/src/unit_ai/world_view/side.rs
 +++ b/crates/engine/genie-core/src/unit_ai/world_view/side.rs
-@@ -286,6 +286,32 @@ impl UnitSide for UnitView<'_, '_> {
+@@ -286,6 +286,80 @@ impl UnitSide for UnitView<'_, '_> {
          Ok(class)
      }
  
@@ -1755,6 +2288,54 @@ index 77dc93ea..65dae9d8 100644
 +            to,
 +            radii,
 +            &self.c.w.model.tuning.tile_path,
++        )
++    }
++
++    fn graze_limit(&mut self) -> Result<f32, GenieError> {
++        // slot 0x968 (0x12bafe0) over the master's tasks: each Graze task (action type 6,
++        // 0x12bbaf2) writes +0x810, so the last one's stands
++        let master = self.unit.master(self.c.w.master_tables(), self.player)?;
++        Ok(master
++            .action_part()
++            .tasks
++            .iter()
++            .rev()
++            .find(|t| t.action_kind == crate::objects::masters::ActionKind::HUNT_RANGE)
++            .map_or(0.0, |t| t.wait_time.get()))
++    }
++
++    fn reach_length(
++        &mut self,
++        to: Point,
++        range: Distance,
++    ) -> Result<Option<Distance>, GenieError> {
++        let mut plan = Planning {
++            pathing: &mut self.c.w.pathing,
++            now: self.c.w.world_time,
++            player_kind: self.player_kind,
++            object: self.c.w.streams.get(Stream::Object),
++            groups: &self.c.w.groups,
++        };
++        let unit = &*self.unit;
++        let walker = unit.me(self.actions);
++        let Some(mover) = self.c.w.parts.mover_of(unit.id) else {
++            return Ok(None);
++        };
++        let by_id = ObjectsRef::new(
++            &self.c.w.players,
++            &self.c.w.index,
++            &self.c.w.model.masters,
++            &self.c.w.parts,
++            &self.c.w.model.roles,
++            &self.c.w.model.tuning,
++        );
++        mover.reach_length(
++            (unit.position(), &walker),
++            (&mut self.c.w.spatial, by_id),
++            &mut plan,
++            to,
++            range,
++            unit.life.master_id,
 +        )
 +    }
 +
@@ -1802,7 +2383,7 @@ index 8c22fa57..15f31bd7 100644
          let out = list.out_at(i);
          let gone = list.swap_remove(i)?;
 diff --git a/crates/engine/genie-core/src/world/world_update.rs b/crates/engine/genie-core/src/world/world_update.rs
-index f127e410..c81b0510 100644
+index f127e410..d5e27ea2 100644
 --- a/crates/engine/genie-core/src/world/world_update.rs
 +++ b/crates/engine/genie-core/src/world/world_update.rs
 @@ -49,6 +49,8 @@ impl World {
@@ -1815,7 +2396,7 @@ index f127e410..c81b0510 100644
              let stopped: Vec<bool> = self
                  .players
 diff --git a/crates/engine/genie-import/src/dat.rs b/crates/engine/genie-import/src/dat.rs
-index 8b58e128..cda336a8 100644
+index 8b58e128..849f8cc4 100644
 --- a/crates/engine/genie-import/src/dat.rs
 +++ b/crates/engine/genie-import/src/dat.rs
 @@ -276,6 +276,10 @@ impl TerrainTable {
@@ -1847,7 +2428,7 @@ index 8b58e128..cda336a8 100644
              graphics: Graphics::default(),
              terrain: TerrainTable::default(),
 diff --git a/crates/engine/genie-import/src/dat/dat_work.rs b/crates/engine/genie-import/src/dat/dat_work.rs
-index b4034340..d6b0ea25 100644
+index b4034340..0bf005e5 100644
 --- a/crates/engine/genie-import/src/dat/dat_work.rs
 +++ b/crates/engine/genie-import/src/dat/dat_work.rs
 @@ -76,6 +76,14 @@ pub(super) fn sound_event(event: u32, sound: i16, sounds: &[Sound]) -> i32 {
@@ -1876,7 +2457,7 @@ index b4034340..d6b0ea25 100644
          combat_level: t.enable_targeting,
          combat_level_flag: TaskFlags::from_bits_retain(t.combat_level_flag),
 diff --git a/crates/engine/genie-import/src/install.rs b/crates/engine/genie-import/src/install.rs
-index 77f51e58..f71f9582 100644
+index 77f51e58..8edbe3be 100644
 --- a/crates/engine/genie-import/src/install.rs
 +++ b/crates/engine/genie-import/src/install.rs
 @@ -23,11 +23,13 @@ use std::io::ErrorKind;
@@ -1955,7 +2536,7 @@ index 77f51e58..f71f9582 100644
                  linked_techs,
                  unit_lines,
 diff --git a/crates/engine/genie-import/src/install/tests.rs b/crates/engine/genie-import/src/install/tests.rs
-index 959aa7e6..d5a6d690 100644
+index 959aa7e6..b06707dc 100644
 --- a/crates/engine/genie-import/src/install/tests.rs
 +++ b/crates/engine/genie-import/src/install/tests.rs
 @@ -20,7 +20,7 @@ fn imported() -> MasterTable {
@@ -2005,7 +2586,7 @@ index 959aa7e6..d5a6d690 100644
 +    assert_eq!(crate::cache::decode(&crate::cache::encode(&table).unwrap()).unwrap(),table);
 +}
 diff --git a/crates/engine/genie-model/src/objects/masters/task.rs b/crates/engine/genie-model/src/objects/masters/task.rs
-index a34c2460..6fde0173 100644
+index a34c2460..21814ba3 100644
 --- a/crates/engine/genie-model/src/objects/masters/task.rs
 +++ b/crates/engine/genie-model/src/objects/masters/task.rs
 @@ -27,6 +27,8 @@ pub struct Task {
@@ -2039,7 +2620,7 @@ index a34c2460..6fde0173 100644
 +    }
 +}
 diff --git a/crates/formats/genie-save/src/generated/world.rs b/crates/formats/genie-save/src/generated/world.rs
-index f3876c52..c88e80fc 100644
+index f3876c52..ae080305 100644
 --- a/crates/formats/genie-save/src/generated/world.rs
 +++ b/crates/formats/genie-save/src/generated/world.rs
 @@ -101,7 +101,7 @@ pub struct PlayerCivilization {
@@ -2465,7 +3046,7 @@ index f3876c52..c88e80fc 100644
      }
  }
 diff --git a/crates/formats/genie-save/src/lib.rs b/crates/formats/genie-save/src/lib.rs
-index 83eaaa03..6afa46d8 100644
+index 83eaaa03..83de9376 100644
 --- a/crates/formats/genie-save/src/lib.rs
 +++ b/crates/formats/genie-save/src/lib.rs
 @@ -126,6 +126,50 @@ impl Header {
@@ -2520,7 +3101,7 @@ index 83eaaa03..6afa46d8 100644
      /// where it ends).
      ///
 diff --git a/crates/formats/genie-save/src/objects.rs b/crates/formats/genie-save/src/objects.rs
-index deebaa01..3b8d4ee7 100644
+index deebaa01..72b44a2a 100644
 --- a/crates/formats/genie-save/src/objects.rs
 +++ b/crates/formats/genie-save/src/objects.rs
 @@ -37,6 +37,22 @@ impl Player {
@@ -2547,7 +3128,7 @@ index deebaa01..3b8d4ee7 100644
      #[must_use]
      pub fn objects(&self) -> Option<&PlayerObjects> {
 diff --git a/crates/tools/genie-oracle/Cargo.toml b/crates/tools/genie-oracle/Cargo.toml
-index ab4dccd9..384621d5 100644
+index ab4dccd9..93f57170 100644
 --- a/crates/tools/genie-oracle/Cargo.toml
 +++ b/crates/tools/genie-oracle/Cargo.toml
 @@ -23,6 +23,7 @@ genie-json = { version = "0.1.0", path = "../../formats/genie-json" }
@@ -2559,7 +3140,7 @@ index ab4dccd9..384621d5 100644
  serde_json.workspace = true
  
 diff --git a/crates/tools/genie-oracle/examples/census.rs b/crates/tools/genie-oracle/examples/census.rs
-index 90a8616f..77c5309d 100644
+index 90a8616f..f4b3e703 100644
 --- a/crates/tools/genie-oracle/examples/census.rs
 +++ b/crates/tools/genie-oracle/examples/census.rs
 @@ -26,6 +26,7 @@ fn main() -> Result<(), Box<dyn Error>> {
@@ -2571,7 +3152,7 @@ index 90a8616f..77c5309d 100644
      let masters = install_read(dat.as_ref())?;
      let run = census_run(&recording, Some(&masters), limit)?;
 diff --git a/crates/tools/genie-oracle/src/census.rs b/crates/tools/genie-oracle/src/census.rs
-index 99849470..7b6d13cd 100644
+index 99849470..cbdc9d06 100644
 --- a/crates/tools/genie-oracle/src/census.rs
 +++ b/crates/tools/genie-oracle/src/census.rs
 @@ -112,7 +112,20 @@ pub fn census_run(
@@ -2738,7 +3319,7 @@ index 99849470..7b6d13cd 100644
                  continue;
              }
 diff --git a/crates/tools/genie-oracle/src/map_and_sight.rs b/crates/tools/genie-oracle/src/map_and_sight.rs
-index d79318cd..9bc800f3 100644
+index d79318cd..9410c201 100644
 --- a/crates/tools/genie-oracle/src/map_and_sight.rs
 +++ b/crates/tools/genie-oracle/src/map_and_sight.rs
 @@ -234,8 +234,13 @@ pub(super) fn spatial(
@@ -2758,7 +3339,7 @@ index d79318cd..9bc800f3 100644
                      // the object's type: the save's factory types 70 and 80, any other below
                      kind: if o.tribe_combat_object.is_some() {
 diff --git a/crates/tools/genie-oracle/src/setup.rs b/crates/tools/genie-oracle/src/setup.rs
-index 0c6a6c44..bb683526 100644
+index 0c6a6c44..cb07d175 100644
 --- a/crates/tools/genie-oracle/src/setup.rs
 +++ b/crates/tools/genie-oracle/src/setup.rs
 @@ -99,6 +99,15 @@ pub fn layer() -> Result<&'static BuildLayer, GenieError> {

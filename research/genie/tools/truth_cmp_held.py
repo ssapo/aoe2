@@ -8,7 +8,7 @@ for l in open(sys.argv[1],errors='replace'):
         E.setdefault(r['ms'],{})[r['id']]=(r.get('held'),r.get('state'))
 print('engine ms',len(E),min(E),max(E))
 first={};cnt={};run={};cand={}
-with open('truth/truth4.jsonl','rb') as fh:
+with open(__import__('os').environ.get('TRUTH','truth/truth4.jsonl'),'rb') as fh:
     for l in fh:
         i=l.find(b'"ms":'); ms=int(l[i+5:l.find(b',',i)])
         if ms<min(E): continue

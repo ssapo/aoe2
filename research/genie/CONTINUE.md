@@ -1,6 +1,6 @@
 # 이어받는 사람(또는 AI)을 위한 안내
 
-기준일: 2026-11-11 오후 (12절이 최신, 지금 상태는 13.4; 2절 숫자는 f1 기준). **일을 끝낼 때는 13절의 기록 지침을 꼭 따른다.** 브랜치: `research/genie-188329` (저장소 `ssapo/aoe2`). 이 문서만 읽고 같은 방식으로 이어갈 수 있게 썼다. 세부 근거는 [truth-log-findings.md](truth-log-findings.md)에 있다.
+기준일: 2026-11-11 저녁 (12절이 최신, 지금 상태는 13.4; 2절에 리플 3개 표). **일을 끝낼 때는 13절의 기록 지침을 꼭 따른다.** 브랜치: `research/genie-188329` (저장소 `ssapo/aoe2`). 이 문서만 읽고 같은 방식으로 이어갈 수 있게 썼다. 세부 근거는 [truth-log-findings.md](truth-log-findings.md)에 있다.
 
 ## 1. 목표
 
@@ -28,7 +28,17 @@
 - 엔진은 update 36,452(약 930초)에서 멈춘다: "a helper that answers a call for help". 멈추는 곳은 고칠 때마다 바뀐다(22번 기록 참고). 900초 누적값은 그 직전이라 아직 믿을 만하지만, 멈춤이 900초 앞으로 오면 못 쓴다.
 - 시작 시점(11-10 저녁)에는 자원 일치 134초, 위치 일치 32.5초였다. 그 사이에 넣은 것은 12절 표에 전부 있다.
 
-켜는 스위치(전부 `=1`): `GENIE_EXPERIMENT_SORT_LISTS`, `GENIE_EXPERIMENT_SHORT_188329`, `GENIE_EXPERIMENT_SPAWN_188329`, `GENIE_EXPERIMENT_AI_ORDER_188329`, `GENIE_EXPERIMENT_EVADE_188329`, `GENIE_EXPERIMENT_WALK_188329`, `GENIE_EXPERIMENT_HUNT_188329`, `GENIE_EXPERIMENT_UNLOAD_188329`, `GENIE_EXPERIMENT_MOVETO_188329`. 앞의 셋은 `runs\go.ps1`이 항상 켠다. 나머지는 `-Envs`로 준다(12.3절).
+### 2.1 리플 3개 (2026-11-11 저녁, 스위치 12개, 실행 `g1_239`, `g1_161`, `g1_097`)
+
+| 리플 (기록) | 위치(word 7) 첫 불일치 P1 / P2 | 자원 첫 차이(> 0.01) P1 / P2 | 자원 50 넘게 P1 / P2 | 엔진 멈춤 update |
+|---|---|---|---|---|
+| 518239882 (truth4) | 384.8 / 426.8 | 411.2 / 450.9 | 596.3 / 767.1 | 36,479 |
+| 518470161 (truth5) | 60.7 / 60.7 | 320.3 / 180.9 | 324.0 / 376.8 | 95,123 |
+| 517426097 (truth6) | 230.4 / 249.9 | 324.0 / 280.5 | 579.2 / 325.5 | 62,242 |
+
+새 리플 두 개를 처음 돌렸을 때(스위치 9개)는 518470161 P2 위치 8.7초·식량 35.6초, 517426097 P1 위치 93.9초·식량 123.8초였다. findings 27~29로 위처럼 늘었다. 채점: `runs/summ2.sh <이름> ../truth/analysisN`(518239882는 `../truth/analysis`).
+
+켜는 스위치(전부 `=1`): `GENIE_EXPERIMENT_SORT_LISTS`, `GENIE_EXPERIMENT_SHORT_188329`, `GENIE_EXPERIMENT_SPAWN_188329`, `GENIE_EXPERIMENT_AI_ORDER_188329`, `GENIE_EXPERIMENT_EVADE_188329`, `GENIE_EXPERIMENT_WALK_188329`, `GENIE_EXPERIMENT_HUNT_188329`, `GENIE_EXPERIMENT_UNLOAD_188329`, `GENIE_EXPERIMENT_MOVETO_188329`, `GENIE_EXPERIMENT_CORNER_188329`, `GENIE_EXPERIMENT_REWALK_188329`, `GENIE_EXPERIMENT_GRAZE_188329`. 앞의 셋은 `runs\go.ps1`이 항상 켠다. 나머지는 `-Envs`로 준다(12.3절).
 
 ## 3. 지켜야 할 것
 
@@ -180,6 +190,9 @@
 | HUNT_188329 | 클래스 10(멧돼지) → 종류 5 탐색(R2-N1) | `hunt/unit.rs`, `gathering/gather_search/passes.rs` `first_resource` | boar-kind-case-335s | 335.1초 사례 |
 | UNLOAD_188329 | 복귀 기록: 맨 앞 액션의 대상이 그 건물이 아니면 대상 없이 기록 | `garrison/unit.rs` `go_inside` | unload-case-232s | 232.1초 사례 |
 | MOVETO_188329 | MoveTo는 기다리지 않고 바로 실패(R2-D9 = R7-C1) | `movement/move_to/mod.rs` `give_up` | findings 21 | 394초 사례 |
+| CORNER_188329 | 모서리 노드 광선 콜백 0x107c590(토큰 없음, 넓이 0 교집합 건너뜀, 축 광선은 스윕) | `short_path/raycast.rs` `corner_ray_188329`, `main_loop.rs` `corner_expand` | corner-ray-case-4.9s (findings 27) | 518470161 4.9초 사례 |
+| REWALK_188329 | 재보행이 지나가는 UNSET 정점의 목표 판정 | `short_path/main_loop.rs` `rewalk_advance` | rewalk-goal-case-90.9s (findings 28) | 517426097 90.9초 사례 |
+| GRAZE_188329 | 가축이 혼자 움직이기 전 풀 뜯기 한도(Graze wait_time)와 도달 길이 검사 | `unit_ai/idle_animals.rs`, `unit_ai/side.rs`, `world_view/side.rs`, `movement/path_end.rs` `reach_length`, `long_path/{mod,cost}.rs` | graze-limit-case-10s (findings 29) | 518470161 10.0초 사례 |
 | (스위치 없음) | 엔진이 멈추던 세 곳을 원본 동작으로 | `unit_ai/actions.rs`, `orders/moves.rs` | unsupported-stops | 끝까지 실행됨 |
 
 "근거" 열의 문서는 모두 이 폴더의 `original-188329-*.md`이다. 사례 문서는 주소와 손 계산까지 들어 있다.
@@ -190,8 +203,8 @@
 $d="$env:USERPROFILE\genie-replays"
 # 빌드만 (약 3분; 끝은 build7.err의 "Finished"로 확인. census가 돌고 있으면 exe를 못 덮어써서 실패하니 먼저 Stop-Process -Name census)
 powershell -File $d\runs\steer.ps1
-# 실행: 이름, 갱신 수(기본 41600 = 끝까지), 추가 환경변수
-$a='GENIE_EXPERIMENT_AI_ORDER_188329=1;GENIE_EXPERIMENT_EVADE_188329=1;GENIE_EXPERIMENT_WALK_188329=1;GENIE_EXPERIMENT_HUNT_188329=1;GENIE_EXPERIMENT_UNLOAD_188329=1;GENIE_EXPERIMENT_MOVETO_188329=1'
+# 실행: 이름, 갱신 수(기본 41600 = 기준 리플 끝까지; 다른 리플은 200000), 추가 환경변수, -Replay <리플 폴더 번호>(기본 518239882)
+$a='GENIE_EXPERIMENT_AI_ORDER_188329=1;GENIE_EXPERIMENT_EVADE_188329=1;GENIE_EXPERIMENT_WALK_188329=1;GENIE_EXPERIMENT_HUNT_188329=1;GENIE_EXPERIMENT_UNLOAD_188329=1;GENIE_EXPERIMENT_MOVETO_188329=1;GENIE_EXPERIMENT_CORNER_188329=1;GENIE_EXPERIMENT_REWALK_188329=1;GENIE_EXPERIMENT_GRAZE_188329=1'
 powershell -File $d\runs\go.ps1 -Name fX -Envs "$a;GENIE_TRACE_RES=1"                       # 전체, 자원 추적 (약 3분)
 powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OBJECTS_RANGE=14540-14700"   # 그 갱신 구간의 개체 추적
 ```
@@ -226,7 +239,12 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 12.5 미해결 (이른 순)
 
-1. Gaia 동물 마스터 2095(말, 클래스 9) **id 4285 한 마리만**: 186.6초부터 원본에서만 도망간다(정찰병 3428이 지나갈 때). 4283은 위치 일치, 4284는 양쪽 다 정지(예전의 "4283~4285 전체"는 틀린 기록). 식량 없는 동물이라 자원 영향 없음. 186.381초의 4285·3428 위치, retarget=1244, look=672는 원본과 일치. 원본 idle은 검색이 대상을 찾으면 0xd26200(도망)을 부르는데, 엔진에서 타이머 때문에 검색을 안 하는지 검색이 실패하는지 아직 못 갈랐다. 문서 `original-188329-animal-case-186s.md`, findings 26. 다음 첫 동작: 지금 빌드(진단 출력 포함, 13.4)로 `go.ps1 -Name p27 -Updates 9480 -Envs "$a;GENIE_TRACE_OBJECTS_RANGE=9430-9480;GENIE_TRACE_OBJECT_IDS=4283,4284,4285,3428;GENIE_TRACE_ANIMAL=1"` → ANIMAL_SEARCH / ANIMAL_EVADE 줄에서 4285의 검색 결과와 타이머를 본다.
+0. (새 리플, 2026-11-11 저녁) 가장 이른 것부터:
+   - 518470161 15.067초(update 991) 가이아 묶음: 원본이 그 틱에 AI 난수를 7개 더 쓴다(airng 카운터 차이 303 → 310). 배회 걸음이 다른 동물에게 밀려 들어감. 원인 미확인. 다음 첫 동작: update 985~995를 동물 진단(`GENIE_TRACE_ANIMAL=1`)과 함께 추적, 원본 airng와 엔진 난수 호출 수를 동물별로 맞춰 본다(`re-kit/re-focused-cases-p11-p12-g1.tar.gz`의 out_p12 `wand.py` 참고).
+   - 518470161 위치 60.7초(P1·P2), P2 식량 180.9초; 517426097 P1 위치 230.4초, P2 249.9초. 아직 개체를 특정하지 않음. 다음 첫 동작: 체크포인트 앞 구간을 `GENIE_TRACE_OBJECTS_RANGE`로 추적하고 `TRUTH=truth/truth5.jsonl python3 runs/cmp_pos.py`.
+   - 517426097 염소 3204가 88.735초에 원본에서만 새 가이아 3827(GOAT_D 1061, 식량 약 60)로 바뀐다. 엔진은 안 만든다. cmp_pos로 안 보임(엔진에 그 id가 없음). 자원(동물별 먹은 양)에 영향 가능.
+
+1. (기준 리플) Gaia 동물 마스터 2095(말, 클래스 9) **id 4285 한 마리만**: 186.6초부터 원본에서만 도망간다(정찰병 3428이 지나갈 때). 4283은 위치 일치, 4284는 양쪽 다 정지(예전의 "4283~4285 전체"는 틀린 기록). 식량 없는 동물이라 자원 영향 없음. 186.381초의 4285·3428 위치, retarget=1244, look=672는 원본과 일치. 원본 idle은 검색이 대상을 찾으면 0xd26200(도망)을 부르는데, 엔진에서 타이머 때문에 검색을 안 하는지 검색이 실패하는지 아직 못 갈랐다. 문서 `original-188329-animal-case-186s.md`, findings 26. 다음 첫 동작: 지금 빌드(진단 출력 포함, 13.4)로 `go.ps1 -Name p27 -Updates 9480 -Envs "$a;GENIE_TRACE_OBJECTS_RANGE=9430-9480;GENIE_TRACE_OBJECT_IDS=4283,4284,4285,3428;GENIE_TRACE_ANIMAL=1"` → ANIMAL_SEARCH / ANIMAL_EVADE 줄에서 4285의 검색 결과와 타이머를 본다.
 2. 383.4초 P1 나무꾼 4371(그리고 4363): 벌목소로 가는 짧은 경로 모양이 다르다(원본은 y = 45.1211을 따라 동쪽으로 간 뒤 꺾음). 도착 시각은 같다. 짧은 경로 사례로 넘길 만하다.
 3. 411.2초 P1 나무 −10: p25에서 4371의 선행 채집 지연을 확인(25번). 복귀 후 약 0.0546 차이가 연속 유지됨. 4363도 약 0.098276 차이. 다음 첫 동작: update 약 16350~16600을 추적해 383.4초 전후의 이전 왕복부터 비교. 450.9초 P2는 미조사.
 4. 엔진 멈춤: update 36,452 "a helper that answers a call for help (its reach, bestUnitToAttack and AttackObject)". 그 앞 실행에서는 41,256 "a horde's command (commandHorde)". 22번과 같은 방식(원본 동작을 읽어 오류를 대체)으로 처리.
@@ -255,6 +273,9 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 | `re-kit\case25-evidence.zip` | 25번 대응 표본과 비교 도구(새 디컴파일 없음) |
 | `runs\p26.err`, `p26a.err`, `p26paths.err` | 186초 동물 사례 추적(update 9430~9480). ANIMAL 진단 추가 전 빌드 |
 | `truth\truth5.jsonl`, `truth\truth5.status` | 리플 518470161 원본 기록(12.6) |
+| `truth\analysis5\`, `truth\analysis6\` | truth5/6의 자원·개체 캐시(`runs/extract_truth.py <jsonl> <폴더>`로 만듦, Windows python으로 수 초) |
+| `runs\summ2.sh`, `runs\extract_truth.py` | 리플별 채점(`summ2.sh <이름> <analysis 폴더>`), 캐시 만들기. `cmp_pos.py`·`cmp_held.py`는 환경변수 `TRUTH=<jsonl>`로 기록 파일을 바꾼다 |
+| `re-kit\re-focused-case-p10.tar.gz`, `re-kit\re-focused-cases-p11-p12-g1.tar.gz` | findings 27~29의 원본 읽기·손 계산(Python 짧은 경로 포트 `out_p10/sp.py`, `out_p11/sp.py`) |
 | 엔진 패치 | 저장소 `sorted-lists-and-truth-trace.patch` = PC `genie\`의 `git diff --ignore-cr-at-eol`(기준 `91d81be4`). 다시 만들 때: `cd genie && GIT_OPTIONAL_LOCKS=0 git diff --ignore-cr-at-eol > ../<새이름>.patch` |
 
 
@@ -264,7 +285,7 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 13.1 사례 하나를 끝낼 때마다 (고쳤든 못 고쳤든)
 
-`truth-log-findings.md` 맨 끝에 번호를 이어 한 절을 쓴다(지금 마지막은 26번). 형식:
+`truth-log-findings.md` 맨 끝에 번호를 이어 한 절을 쓴다(지금 마지막은 29번). 형식:
 
 ```
 ## <번호>. <한 줄 제목> (스위치 `GENIE_EXPERIMENT_...`에 추가 / 새 스위치 / 스위치 없음)
@@ -301,13 +322,9 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 13.4 지금 하던 일 (멈출 때마다 이 절을 덮어쓴다)
 
-- 날짜·작성: 2026-11-11 오후, Claude. Codex가 멈춘 상태를 그대로 정리해 적었다(엔진 동작 변경 없음).
-- 순서: Codex가 findings 25(411.2초 나무)를 커밋한 뒤 186.6초 동물 사례(findings 26)를 시작했다가 중간에 멈췄다. 그 사이 Claude는 두 번째 원본 기록(518470161 → truth5, 12.6)만 진행했다.
-- 엔진 소스 상태: **진단 출력만 추가됨, 게임 동작 변경 없음.** (1) `GENIE_TRACE_OBJECT_IDS=<id,...>`: OBJECT 줄을 그 id만 찍고 ai 종류·idle 타이머·현재 액션·현재 대상을 더 찍는다(`genie-oracle/src/census.rs`). (2) `GENIE_TRACE_ANIMAL=1`: `unit_ai/idle_animals.rs`의 ANIMAL_SEARCH / ANIMAL_EVADE 줄. census.exe는 11:32 빌드라 마지막 소스 수정(11:26)을 포함한다. 저장소 패치를 이 상태로 다시 만들어 반영했다(13.2-5).
-- 실행: p26 / p26a / p26paths(11:20~11:29)는 ANIMAL 진단을 넣기 **전** 빌드로 돌아서 ANIMAL 줄이 0개다. ANIMAL 진단으로는 아직 한 번도 안 돌렸다. 돌고 있는 실행 없음.
-- 숫자: 2절은 f1 그대로(새 전체 실행 없음, 개선 주장 없음).
-- 다음 첫 동작(하나만 고른다. 두 도우미가 동시에 엔진 소스를 고치지 않는다):
-  - (a) 186초 동물: 12.5의 1번 명령으로 p27을 돌려 4285의 검색 결과·타이머를 본다.
-  - (b) 411초 나무: update 16350~16600을 추적해 4371/4363이 언제부터 뒤처지는지 본다(12.5의 3번). 383.4초 경로 모양 차이(12.5의 2번)가 원인 후보(추정).
-  - (c) 다른 리플 검증: 518470161을 같은 스위치로 돌려 truth5와 비교(12.6). 비교 도구 경로·자원 캐시를 이 리플용으로 바꿔야 한다.
-- 도구: `runs/case25_compare.py`(저장소 tools 사본). `python runs/case25_compare.py runs/p25.err 4371 4363`. 25번 증거 `re-kit/case25-evidence.zip`.
+- 날짜·작성: 2026-11-11 저녁, Claude.
+- 한 일: 리플 3개 체제로 바꿈. 새 리플 2개(518470161, 517426097)의 가장 이른 불일치 3건을 원본에서 읽어 넣음(findings 27~29, 스위치 CORNER / REWALK / GRAZE). 원본 읽기는 클라우드 쪽 분석 환경(re-kit 압축 3개 + Ghidra 11.3.2 + JDK 21 + pip capstone)에서 도우미 여러 개를 동시에 돌렸다. 엔진 수정·빌드는 한 번에 한 쪽만 했다.
+- 엔진 소스 상태: 빌드됨(마지막 빌드 = GRAZE 포함). 반쯤 넣은 변경 없음. 저장소 패치를 이 상태로 다시 만듦.
+- 실행: 돌고 있는 것 없음. 최신 전체 실행 `g1_239`, `g1_161`, `g1_097`(스위치 12개), 비교용 `g1_*r`(GRAZE 끔).
+- 다음 첫 동작: 12.5의 0번(518470161 15.067초 난수 7개 차이)부터. 그다음 518470161 60.7초 위치, 517426097 230.4초 위치. 기준 리플의 411초 나무(12.5의 3번)와 186초 말(1번)은 그 뒤.
+- 기준 리플 518239882 수치는 바뀌지 않음(2.1절). 2절의 옛 표는 f1(스위치 9개) 기준이다.

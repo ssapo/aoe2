@@ -9,7 +9,7 @@ for l in open(sys.argv[1] if len(sys.argv)>1 else 'runs/pos2.err',errors='replac
         E.setdefault(r['ms'],{})[r['id']]=(h(r['position'][0]),h(r['position'][1]))
 print('engine ms',len(E),max(E))
 first={};cnt={};tot=0
-with open('truth/truth4.jsonl','rb') as fh:
+with open(__import__('os').environ.get('TRUTH','truth/truth4.jsonl'),'rb') as fh:
     for l in fh:
         try: r=json.loads(l)
         except Exception: continue
