@@ -741,6 +741,58 @@ index a4790a15..9dff401e 100644
      /// `unit` goes to the end of the list.
      pub fn push(&mut self, unit: Unit) {
          self.units.push(unit);
+diff --git a/crates/engine/genie-core/src/orders/moves.rs b/crates/engine/genie-core/src/orders/moves.rs
+index 29f5d776..4e3fe984 100644
+--- a/crates/engine/genie-core/src/orders/moves.rs
++++ b/crates/engine/genie-core/src/orders/moves.rs
+@@ -91,12 +91,10 @@ impl World {
+             .live(player, idx)?
+             .master(self.master_tables(), player)?;
+         let speed = master.move_stats.as_ref().map_or(Speed::ZERO, |m| m.speed);
+-        if master.kind < MasterKind::MOVING || speed <= Speed::ZERO {
+-            if order.flags.contains(OrderFlags::QUEUED) {
+-                return Err(GenieError::unsupported(
+-                    "a queued move of an object that does not move",
+-                ));
+-            }
++        // 188329 0x16ebc20: an object that does not move is skipped only when the move is not
++        // queued; a queued move goes into its unit AI's queue like a mover's
++        let non_mover = master.kind < MasterKind::MOVING || speed <= Speed::ZERO;
++        if non_mover && !order.flags.contains(OrderFlags::QUEUED) {
+             return Ok(());
+         }
+         let target = self
+@@ -104,16 +102,20 @@ impl World {
+             .map(|(tp, t)| (t.life.master_id, tp));
+         let unit = self.players.live_mut(player, idx)?;
+         // FUN_141197da0, then slot 0x2a0 with 1: it waits to move
+-        let mover = self
+-            .parts
+-            .mover_mut(unit.id)
+-            .ok_or(GenieError::unsupported(
+-                "a moved unit without movement state",
+-            ))?;
+-        mover.ignore_units.clear();
+-        mover.waiting = 1;
+-        for &other in others {
+-            ignore_unit(&mut mover.ignore_units, other);
++        match self.parts.mover_mut(unit.id) {
++            Some(mover) => {
++                mover.ignore_units.clear();
++                mover.waiting = 1;
++                for &other in others {
++                    ignore_unit(&mut mover.ignore_units, other);
++                }
++            }
++            None if non_mover => {}
++            None => {
++                return Err(GenieError::unsupported(
++                    "a moved unit without movement state",
++                ));
++            }
+         }
+         let takes_it = !order.flags.contains(OrderFlags::QUEUED)
+             && self.parts.unit_ai.get(unit.id).is_none_or(|ai| {
 diff --git a/crates/engine/genie-core/src/pathing/short_path/geometry.rs b/crates/engine/genie-core/src/pathing/short_path/geometry.rs
 index cdaefff8..70eff0eb 100644
 --- a/crates/engine/genie-core/src/pathing/short_path/geometry.rs
@@ -1360,10 +1412,46 @@ index e5f89e13..04e9c49d 100644
  /// below it (down), left of it or right of it (out).
  #[derive(Clone, Copy)]
 diff --git a/crates/engine/genie-core/src/unit_ai/actions.rs b/crates/engine/genie-core/src/unit_ai/actions.rs
-index 7a8bacbb..b3c4e2f8 100644
+index 7a8bacbb..f5493e8f 100644
 --- a/crates/engine/genie-core/src/unit_ai/actions.rs
 +++ b/crates/engine/genie-core/src/unit_ai/actions.rs
-@@ -467,7 +467,12 @@ impl UnitAi {
+@@ -136,10 +136,13 @@ impl UnitAi {
+         let (order, action, p0) = (self.current_order, self.current_action, n.p[0]);
+         let attack = AiAction::Attack.value();
+         if (order == Some(OrderKind::Attack) || n.p[2] == 0x202) && p0 == attack {
++            // 188329 0xd3578a: with retargeting off (`+0x1de`) a target still in the world breaks
++            // off (3, nothing changed); a gone target clears the byte and goes on
+             if self.retarget_disabled != 0 {
+-                return Err(GenieError::unsupported(
+-                    "an invalidated attack with retargeting off (+0x1d6)",
+-                ));
++                if at.target.is_some() {
++                    return Ok(crate::unit_ai::BREAK);
++                }
++                self.retarget_disabled = 0;
+             }
+             let produced = self.process_idle(at, player_kind, ai, side)?;
+             if produced == IdleOutcome::Acted {
+@@ -286,15 +289,14 @@ impl UnitAi {
+     ) -> Result<(), GenieError> {
+         let action = self.current_action;
+         let current = self.current_order;
+-        if self.patrol_redraws() {
+-            return Err(GenieError::unsupported("a stop on a patrol order"));
+-        }
+         self.last_action = action;
+         if order == StopOrder::End
+             || current.is_some_and(|o| o.owns(action))
+             || matches!(current, Some(OrderKind::Patrol | OrderKind::AttackMove))
+         {
+-            self.cap_patrol_secondary();
++            // 188329 0xd40e40: a patrol's idle timeout (750) is redrawn (slot 0x1a8, one AI draw)
++            // before the secondary timer's cap
++            self.leave_patrol_timers(rng);
+             self.last_order = current;
+             self.current_order = None;
+             self.order_priority = OrderPriority::NONE;
+@@ -467,7 +469,12 @@ impl UnitAi {
          player_kind: PlayerKind,
          ai: &mut Well512,
      ) -> Result<(), GenieError> {
@@ -1377,7 +1465,7 @@ index 7a8bacbb..b3c4e2f8 100644
              return Ok(());
          }
          if (self.current_action.is_some() || at.flags.contains(SurroundingFlags::BUSY))
-@@ -563,6 +568,10 @@ impl UnitAi {
+@@ -563,6 +570,10 @@ impl UnitAi {
                  let _ = self.orders.remove(k);
              }
              if r == OrderOutcome::Taken {
@@ -2443,7 +2531,7 @@ index 90a8616f..f4b3e703 100644
      let masters = install_read(dat.as_ref())?;
      let run = census_run(&recording, Some(&masters), limit)?;
 diff --git a/crates/tools/genie-oracle/src/census.rs b/crates/tools/genie-oracle/src/census.rs
-index 99849470..c2f33c43 100644
+index 99849470..9577b2fc 100644
 --- a/crates/tools/genie-oracle/src/census.rs
 +++ b/crates/tools/genie-oracle/src/census.rs
 @@ -112,7 +112,20 @@ pub fn census_run(
@@ -2574,7 +2662,7 @@ index 99849470..c2f33c43 100644
 +                    let timer = turns.parts.unit_ai.get(u.id).map(|ai| ai.retarget_timer.get()).unwrap_or(0);
 +                    let kind = a.and_then(|a| a.kind).map(|k| k.get());
 +                    let action_state = a.map(|a| a.state.get()).unwrap_or(0);
-+                    eprintln!("OBJECT {}", serde_json::json!({"ms":turns.world_time.millis(),"tick":census.updates,"player":p,"id":u.id.get(),"master":u.life.master_id.get(),"position":u.position().get(),"action_kind":kind,"action_state":action_state,"retarget_ms":timer,"look":look,"limit":limit}));
++                    eprintln!("OBJECT {}", serde_json::json!({"ms":turns.world_time.millis(),"tick":census.updates,"player":p,"id":u.id.get(),"held":u.life.amount.get(),"state":u.life.state as u8,"master":u.life.master_id.get(),"position":u.position().get(),"action_kind":kind,"action_state":action_state,"retarget_ms":timer,"look":look,"limit":limit}));
 +                }
 +            }
 +        }
