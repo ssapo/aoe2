@@ -747,6 +747,687 @@ index c9f58b16..cd8759ba 100644
          };
          self.order_work(p, idx, &work)
      }
+diff --git a/crates/engine/genie-core/src/groups/command.rs b/crates/engine/genie-core/src/groups/command.rs
+index cc0b4325..ece1041b 100644
+--- a/crates/engine/genie-core/src/groups/command.rs
++++ b/crates/engine/genie-core/src/groups/command.rs
+@@ -71,6 +71,11 @@ bitflags::bitflags! {
+         const DIRECT = 1 << 4;
+         /// `param_11`.
+         const KEEP_FLAG = 1 << 5;
++        /// 188329's last argument (`arg12`): 1 from `BUnitGroup::command` (`0x10d785d`,
++        /// `0x10d790f`) and the queue's run; a fresh move not queued, held or a leg sets
++        /// [`GroupFlags::RELAYOUT_AT_TURN`] and [`GroupFlags::PLACE_AGAIN`] (`0x10d8ec1`..`0x10d8edf`,
++        /// `GENIE_EXPERIMENT_FORMING_188329`).
++        const FRESH = 1 << 6;
+     }
+ }
+ 
+@@ -274,6 +279,13 @@ impl World {
+         let world_time = self.world_time;
+         let g = self.groups.held_mut(group)?;
+         g.flags &= !(GroupFlags::MEMBERS_SENT | GroupFlags::FOLLOWED);
++        if crate::groups::forming_188329()
++            && how.flags.contains(MoveFlags::FRESH)
++            && !how.flags.intersects(MoveFlags::QUEUED | MoveFlags::HOLD | MoveFlags::LEG)
++        {
++            // 188329 0x10d8ec1..0x10d8edf
++            g.flags |= GroupFlags::RELAYOUT_AT_TURN | GroupFlags::PLACE_AGAIN;
++        }
+         // the game compares the two integers: a target of none changes a group with one
+         let changed = target != g.current_target.target.key();
+         if let Some(done) = self.queue_move(group, point, how)? {
+@@ -499,7 +511,7 @@ impl World {
+                 last.point.ground(),
+                 MoveTo {
+                     range: last.range,
+-                    flags: MoveFlags::FORGET_TARGET | MoveFlags::DIRECT,
++                    flags: MoveFlags::FORGET_TARGET | MoveFlags::DIRECT | MoveFlags::FRESH,
+                 },
+             )?;
+         }
+diff --git a/crates/engine/genie-core/src/groups/formation/column_line.rs b/crates/engine/genie-core/src/groups/formation/column_line.rs
+index 24636f40..f8d712a1 100644
+--- a/crates/engine/genie-core/src/groups/formation/column_line.rs
++++ b/crates/engine/genie-core/src/groups/formation/column_line.rs
+@@ -358,6 +358,8 @@ fn lay_category(
+         clear_line(line);
+         let _ = reset_line(line, actual, at.line_index);
+         line.distance_back = at.distance_back;
++        // 188329 createColumnLine 0x10daf62: the line's `+0x18` is half its spacing
++        line.spacing_half = Distance::new(cat.spacing.get() * 0.5);
+         lay_line(
+             formation,
+             cat,
+diff --git a/crates/engine/genie-core/src/groups/formation/passability.rs b/crates/engine/genie-core/src/groups/formation/passability.rs
+index 25d0c676..e867d51e 100644
+--- a/crates/engine/genie-core/src/groups/formation/passability.rs
++++ b/crates/engine/genie-core/src/groups/formation/passability.rs
+@@ -80,6 +80,17 @@ impl World {
+             0.0,
+         );
+         let [position, forward, up, _right] = g.motion.position;
++        if crate::groups::trace_forming() {
++            eprintln!(
++                "FORMING_XFORM0 ms={} group={:?} kind={:?} pos=({}, {}) stored={}",
++                self.world_time.millis(),
++                group,
++                formation.transform_kind,
++                position.x(),
++                position.y(),
++                g.stored_positions.points.len()
++            );
++        }
+         // calculateYawAngle without its clamp (`param_5` 0), with the world's update time
+         let dt = self.dt_seconds;
+         let yaw = g
+diff --git a/crates/engine/genie-core/src/groups/mod.rs b/crates/engine/genie-core/src/groups/mod.rs
+index 7787900f..fe88c3a1 100644
+--- a/crates/engine/genie-core/src/groups/mod.rs
++++ b/crates/engine/genie-core/src/groups/mod.rs
+@@ -204,6 +204,8 @@ pub struct FormationLine {
+     pub attack_range: Distance,
+     /// `mDistanceBack`.
+     pub distance_back: Distance,
++    /// 188329 line `+0x18` (not saved): half the line's spacing (createColumnLine `0x10daf62`).
++    pub spacing_half: Distance,
+ }
+ 
+ /// A formation (`BFormation`, read by `FUN_1410180b0`).
+@@ -469,6 +471,71 @@ pub struct UnitGroup {
+     /// (`BUnitGroup::command` sets it), so its next move empties the command queue first;
+     /// `checkQueuedOrders` (`FUN_14100d460`) clears it.
+     pub replaces_queue: u8,
++    /// 188329 `+0x174` (not saved): the slowest member's speed, which the statistics write
++    /// (`0x10d5a8e`, 0 without members); `GENIE_EXPERIMENT_FORMING_188329`.
++    pub slowest_speed: f32,
++    /// 188329 `+0x178` (not saved): the members' shared catch-up budget, 0 from the constructor
++    /// (`0x10be829`); `GENIE_EXPERIMENT_FORMING_188329`.
++    pub speed_budget: f32,
++    /// 188329 `+0x5cc` (not saved): the group is formed (0 from the constructor, `0x10be99e`; set
++    /// at `0x110b870`, cleared at `0x110a544`); `GENIE_EXPERIMENT_FORMING_188329`.
++    pub formed: bool,
++    /// The speed pass's speeds by member index (`0x144365130`, scratch, not saved), none for a
++    /// member the pass skipped; `GENIE_EXPERIMENT_FORMING_188329`.
++    pub forming_speeds: Vec<Option<f32>>,
++    /// The group's speed pass has not run yet (not saved; `GENIE_EXPERIMENT_FORMING_FIRSTGAP_188329`).
++    pub first_pass: bool,
++    /// The motion had [`MotionFlags::NEW`] when this update's motion step began (scratch, not
++    /// saved): 188329's first update only plans in both motion steps (`0x1114830` twice), so the
++    /// group does not step in it (`GENIE_EXPERIMENT_FORMING_FIRSTPLAN_188329`).
++    pub motion_was_new: bool,
++}
++
++/// 188329's group forming (`0x10d52f0`, `0x10eed10`, `0x110b15c`..`0x110b870`, `0x10d6960`, case
++/// 228.5 s of replay 517426097): `GENIE_EXPERIMENT_FORMING_188329`.
++pub(crate) fn forming_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_FORMING_188329").is_some())
++}
++
++/// On top of [`forming_188329`], SUSPECTED (not read): a group's first speed pass measures each
++/// member's gap from its place one step back (`GENIE_EXPERIMENT_FORMING_FIRSTGAP_188329`).
++pub(crate) fn forming_firstgap_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_FORMING_FIRSTGAP_188329").is_some())
++}
++
++/// On top of [`forming_188329`], F10 of the P20 reading: both motion steps of a group's first
++/// update only plan (`0x1114830` twice), so the group does not step in it
++/// (`GENIE_EXPERIMENT_FORMING_FIRSTPLAN_188329`). Off by default: with it the 228.5 s case misses
++/// the truth by up to 65 ulp, without it (the engine's step, then the slot transform's one-update
++/// lag from the stored positions' front) the four truth points match bit for bit (findings 39).
++pub(crate) fn forming_firstplan_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_FORMING_FIRSTPLAN_188329").is_some())
++}
++
++/// `GENIE_TRACE_FORMING`: FORMING lines (group place, top speed, budget, members' speeds).
++pub(crate) fn trace_forming() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| std::env::var_os("GENIE_TRACE_FORMING").is_some())
++}
++
++/// 188329 `0x10d6960`: a member's speed for gap `g` and factor `k`, `v` its top speed (slot
++/// 0x220) and `top` the group's (`+0xbc`).
++pub(crate) fn member_speed_188329(g: f32, k: f32, v: f32, top: f32) -> f32 {
++    let v = v * k;
++    if !(0.1 <= g) {
++        return top;
++    }
++    if g < 2.0 {
++        let t = g - 0.1;
++        let t = if t > 0.0 { t } else { 0.0 };
++        let t = t / 1.9;
++        let t = if 1.0 <= t { 1.0 } else { t };
++        return (v - top) * crate::math::fmath::sqrt(crate::math::fmath::sqrt(t)) + top;
++    }
++    v
+ }
+ 
+ impl Motion {
+@@ -536,6 +603,7 @@ impl UnitGroup {
+             current_target: TargetData::default(),
+             differentiator_id: Differentiator::NONE,
+             replaces_queue: 1,
++            first_pass: true,
+             ..Self::default()
+         }
+     }
+diff --git a/crates/engine/genie-core/src/groups/order.rs b/crates/engine/genie-core/src/groups/order.rs
+index 398a973c..7e09814f 100644
+--- a/crates/engine/genie-core/src/groups/order.rs
++++ b/crates/engine/genie-core/src/groups/order.rs
+@@ -83,7 +83,7 @@ impl World {
+         let command = task.map(|t| GroupCommandKind::of_action(t.command));
+         let mut moved = GroupMove::NotBegun;
+         if command.is_none_or(|c| c == MOVE_COMMAND) {
+-            let mut flags = MoveFlags::FORGET_TARGET;
++            let mut flags = MoveFlags::FORGET_TARGET | MoveFlags::FRESH;
+             flags.set(MoveFlags::QUEUED, order.queued);
+             flags.set(MoveFlags::DIRECT, order.direct);
+             moved = self.command_move_to(
+diff --git a/crates/engine/genie-core/src/groups/place.rs b/crates/engine/genie-core/src/groups/place.rs
+index 51f6a791..fc1d741e 100644
+--- a/crates/engine/genie-core/src/groups/place.rs
++++ b/crates/engine/genie-core/src/groups/place.rs
+@@ -386,15 +386,20 @@ impl World {
+                         beside <= (r + r) * (r + r)
+                     } =>
+             {
+-                Some(u.moved_vector(self.parts.mover_of(u.id)))
++                Some((u.id, u.moved_vector(self.parts.mover_of(u.id))))
+             }
+             _ => self
+                 .object(nearest)
+-                .map(|(_, u)| u.moved_vector(self.parts.mover_of(u.id))),
++                .map(|(_, u)| (u.id, u.moved_vector(self.parts.mover_of(u.id)))),
+         };
+-        let Some(at) = spot else {
++        let Some((lead_id, at)) = spot else {
+             return Ok(());
+         };
++        let at = if crate::groups::forming_188329() {
++            self.front_lead_188329(group, lead_id, at, &held)?
++        } else {
++            at
++        };
+         let g = self.groups.held_mut(group)?;
+         g.stored_positions.clear_points();
+         g.motion.new_position[0] = at;
+@@ -402,6 +407,162 @@ impl World {
+         Ok(())
+     }
+ 
++    /// 188329 movePositionToFront's tail (`0x10ef2ca`..`0x10ef7e6`, case 228.5 s of replay
++    /// 517426097): the group stands `lead` ahead of its members along the path from the walked
++    /// path's goal W to its centroid. `lead` = 0.5 + the first line's half spacing (`+0x18`) + the
++    /// distance back of the first line holding a slot of the chosen member's category (byte
++    /// `0x408ec78` = 1), at most 0.1 once formed. W = the walked level's last point when its level
++    /// byte is not 0, else its parent's waypoint at least 10 (summed on the ground) beyond the
++    /// current one. The pather's path from W to the centroid (`FUN_1410532b0`, not read) is taken
++    /// as the straight line [W, centroid] (SUSPECTED: true on open ground). `d` = the least
++    /// distance along it of the chosen member's place and the members' (`0x10d1b10`), less the
++    /// lead, at least 0 (at least 0.5 on a patrol); the place at `d` along the path
++    /// (`0x106e0b0`). `at` (the member's place) without a path.
++    fn front_lead_188329(
++        &self,
++        group: GroupId,
++        lead_id: ObjectId,
++        at: BVector,
++        held: &[(ObjectId, BVector)],
++    ) -> Result<BVector, GenieError> {
++        let g = self.groups.held(group)?;
++        let mut lead = 0.5_f32;
++        if let Some(f) = g.current_formation.as_ref()
++            && !f.slots.is_empty()
++            && let Some(line0) = f.lines.first()
++        {
++            lead += line0.spacing_half.get();
++            let category = g
++                .unit_kinds
++                .iter()
++                .find(|k| k.units.contains(&lead_id))
++                .map(|k| k.formation_category);
++            if let Some(c) = category {
++                let lines = usize::try_from(f.number_lines).unwrap_or(0);
++                let line = f.lines.iter().take(lines).find(|l| {
++                    l.indices.iter().any(|&i| {
++                        f.slots
++                            .get(i as usize)
++                            .is_some_and(|s| s.desired_category == c)
++                    })
++                });
++                if let Some(l) = line {
++                    lead += l.distance_back.get();
++                }
++            }
++        }
++        if g.formed && !(lead <= 0.1) {
++            lead = 0.1;
++        }
++        // W: the walked level's last point (its level byte not 0), else the parent's waypoint
++        // at least 10 beyond its current one
++        let w = match g.motion.paths.first() {
++            Some(l) if l.level.get() != 0 => l.points.last().copied(),
++            Some(_) => g.motion.paths.get(1).and_then(|p| {
++                let mut i = usize::try_from(p.waypoint.get()).ok()?;
++                let mut acc = 0.0_f32;
++                while acc < 10.0 && i + 1 < p.points.len() {
++                    let (a, b) = (p.points.get(i)?, p.points.get(i + 1)?);
++                    let (dx, dy) = (b.x() - a.x(), b.y() - a.y());
++                    acc += sqrt(dx * dx + dy * dy);
++                    i += 1;
++                }
++                p.points.get(i).copied()
++            }),
++            None => None,
++        };
++        let Some(w) = w else {
++            return Ok(at);
++        };
++        let c = g.centroid;
++        let path = [w, c];
++        // 0x10d1b10: the distance along the path of a point's projection
++        let along = |p: BVector| -> f32 {
++            let mut best = f32::MAX;
++            let mut best_along = 0.0_f32;
++            let mut acc = 0.0_f32;
++            for s in path.windows(2) {
++                let (a, b) = (s[0], s[1]);
++                let (dx, dh, dy) = (b.x() - a.x(), b.height() - a.height(), b.y() - a.y());
++                let len2 = dx * dx + dh * dh + dy * dy;
++                let len = sqrt(len2);
++                let (qx, qh, qy) = (p.x() - a.x(), p.height() - a.height(), p.y() - a.y());
++                let t = if 0.0 < len2 {
++                    (qx * dx + qh * dh + qy * dy) / len2
++                } else {
++                    0.0
++                };
++                let t = if t < 0.0 { 0.0 } else if 1.0 < t { 1.0 } else { t };
++                let (ox, oh, oy) = (qx - t * dx, qh - t * dh, qy - t * dy);
++                let off = ox * ox + oh * oh + oy * oy;
++                let here = if 1.0 <= t {
++                    acc + len
++                } else if t <= 0.0 {
++                    acc
++                } else {
++                    let (px, ph, py) = (t * dx, t * dh, t * dy);
++                    acc + sqrt(px * px + ph * ph + py * py)
++                };
++                if off < best {
++                    best = off;
++                    best_along = here;
++                }
++                acc += len;
++            }
++            best_along
++        };
++        let mut d = along(at);
++        for &(_, p) in held {
++            let e = along(p);
++            if e < d {
++                d = e;
++            }
++        }
++        d -= lead;
++        if !(0.0 <= d) {
++            d = 0.0;
++        }
++        let patrol = crate::groups::formation::top_path(&g.motion.paths)
++            .is_some_and(|l| l.path_flags.contains(crate::movement::PathFlags::LOOPS))
++            || g.flags.contains(GroupFlags::PATROL);
++        if patrol && d < 0.5 {
++            d = 0.5;
++        }
++        // 0x106e0b0: the place at `d` along the path (ground lengths)
++        let mut point = c;
++        let mut acc = 0.0_f32;
++        let n = path.len();
++        for (k, s) in path.windows(2).enumerate() {
++            let (a, b) = (s[0], s[1]);
++            let (dx, dh, dy) = (b.x() - a.x(), b.height() - a.height(), b.y() - a.y());
++            let len = sqrt(dx * dx + dy * dy);
++            if d <= acc + len || k + 2 == n {
++                let t = if 0.0 < len { (d - acc) / len } else { 0.0 };
++                point = BVector::new(t * dx + a.x(), t * dh + a.height(), t * dy + a.y());
++                break;
++            }
++            acc += len;
++        }
++        if crate::groups::trace_forming() {
++            eprintln!(
++                "FORMING_FRONT ms={} group={:?} lead_unit={} lead={} formed={} w=({}, {}) c=({}, {}) d={} point=({}, {})",
++                self.world_time.millis(),
++                group,
++                lead_id.get(),
++                lead,
++                g.formed,
++                w.x(),
++                w.y(),
++                c.x(),
++                c.y(),
++                d,
++                point.x(),
++                point.y()
++            );
++        }
++        Ok(point)
++    }
++
+     /// The terrain classes master `master` of player `p` lets its objects stand on: its
+     /// restriction (`+0x606`) in the map's table (`FUN_141054630`).
+     ///
+diff --git a/crates/engine/genie-core/src/groups/stats.rs b/crates/engine/genie-core/src/groups/stats.rs
+index e101e2d0..487bea72 100644
+--- a/crates/engine/genie-core/src/groups/stats.rs
++++ b/crates/engine/genie-core/src/groups/stats.rs
+@@ -110,9 +110,19 @@ impl World {
+     pub fn statistics_only(&mut self, group: GroupId, far: FarMembers) -> Result<bool, GenieError> {
+         let dt = self.dt_seconds;
+         let (views, objects) = self.member_views(group, far)?;
++        let forming = crate::groups::forming_188329();
++        let near = if forming {
++            self.near_members_188329(group)?
++        } else {
++            0
++        };
+         let g = self.groups.held_mut(group)?;
+         let (held, mut slowest, under_attack) = member_totals(g, &views, objects, dt)?;
+         if held == 0 {
++            if forming {
++                // 0x10d5a8e: 0 without members
++                g.slowest_speed = 0.0;
++            }
+             g.smallest_unit_radius = Distance::ZERO;
+             g.desired_spacing = Distance::ZERO;
+             g.smallest_unit_range = Distance::ZERO;
+@@ -135,7 +145,16 @@ impl World {
+         g.desired_spacing = largest + largest;
+         g.total_spacing = largest + g.total_spacing + largest + g.total_spacing;
+         g.stored_positions.desired_length = (largest + largest) * g.members.len() as f32;
+-        if g.flags.contains(GroupFlags::CATCHING_UP) {
++        if forming {
++            // 188329 0x10d5a8e, 0x10d5ad8..0x10d5b21: the slowest is kept (`+0x174`); with no
++            // member near its slot half of it, else while catching up or forming 0.8333333 of it
++            g.slowest_speed = slowest;
++            if near == 0 {
++                slowest *= 0.5;
++            } else if g.flags.contains(GroupFlags::CATCHING_UP) || !g.formed {
++                slowest *= f32::from_bits(0x3f55_5555);
++            }
++        } else if g.flags.contains(GroupFlags::CATCHING_UP) {
+             slowest /= self.model.tuning.group.slow_group_factor;
+         }
+         g.motion.maximum_velocity_forward = Speed::new(slowest);
+@@ -168,6 +187,35 @@ impl World {
+         Ok(g.motion.flags.contains(MotionFlags::NEW))
+     }
+ 
++    /// 188329 `0x10d56a8`..`0x10d5721`: the members the world holds without an own move (state 0)
++    /// whose ground gap (`sqrt(dy*dy + dx*dx)`) from their place (slot 0x568, `+0x3bc`) to their
++    /// first slot's transform place is below 0.25; 0 without a formation.
++    fn near_members_188329(&self, group: GroupId) -> Result<u32, GenieError> {
++        let g = self.groups.held(group)?;
++        let Some(f) = g.current_formation.as_ref() else {
++            return Ok(0);
++        };
++        let mut near = 0;
++        for m in &g.members {
++            if m.specific_move.active != 0 {
++                continue;
++            }
++            let Some((_, u)) = self.object(m.id) else {
++                continue;
++            };
++            let Some(s) = f.slots.iter().find(|s| s.unit_id == Some(m.id)) else {
++                continue;
++            };
++            let p = u.position();
++            let dx = s.transform_position.x() - p.x();
++            let dy = s.transform_position.y() - p.y();
++            if crate::math::fmath::sqrt(dy * dy + dx * dx) < 0.25 {
++                near += 1;
++            }
++        }
++        Ok(near)
++    }
++
+     /// [`World::statistics_only`]'s member loop: each member's view in the members' order with the
+     /// index it has then, and the objects of their searches.
+     fn member_views(
+diff --git a/crates/engine/genie-core/src/groups/steer/slot_steps.rs b/crates/engine/genie-core/src/groups/steer/slot_steps.rs
+index d9156f6d..a69f7d0b 100644
+--- a/crates/engine/genie-core/src/groups/steer/slot_steps.rs
++++ b/crates/engine/genie-core/src/groups/steer/slot_steps.rs
+@@ -220,6 +220,33 @@ impl World {
+         let radius = mover.stats.radius.x();
+         let speed = mover.stats.speed;
+         self.set_slot_state(group, slot, state)?;
++        if crate::groups::forming_188329() {
++            // 188329 0x10f0554..0x10f0617: a member that does not stop takes the speed pass's
++            // speed (an own move's `S(gap, 1.2)`), its gap (from slot 0x568) above 0.25 sets
++            // CATCHING_UP, and beyond 5.0 it runs when it can, else walks
++            if state == SlotState::Stopping {
++                return self.stop_at_slot(group, id);
++            }
++            let (_, u) = self.object(id).ok_or_else(|| member_gone(id))?;
++            let p = u.position();
++            let dx = to.x() - p.x();
++            let dy = to.y() - p.y();
++            let gap = crate::math::fmath::sqrt(dy * dy + dx * dx);
++            let g = self.groups.held(group)?;
++            let index = g.members.iter().position(|m| m.id == id);
++            let top = g.motion.maximum_velocity_forward.get();
++            let spd = index
++                .and_then(|i| g.forming_speeds.get(i).copied().flatten())
++                .unwrap_or_else(|| crate::groups::member_speed_188329(gap, 1.2, speed.get(), top));
++            self.set_member_speed(id, Speed::new(spd));
++            if !(gap <= 0.25) {
++                self.groups.held_mut(group)?.flags |= GroupFlags::CATCHING_UP;
++            }
++            if !(gap > 5.0 && self.show_running(id)? != SpriteShow::NoSprite) {
++                let _ = self.show_walking(id)?;
++            }
++            return Ok(());
++        }
+         let within = !below_or_unordered(radius, gap.get());
+         let near =
+             !within && !below_or_unordered(radius * self.model.tuning.group.slot_reach, gap.get());
+diff --git a/crates/engine/genie-core/src/groups/steer/to_slots.rs b/crates/engine/genie-core/src/groups/steer/to_slots.rs
+index 999d44b5..9365bd08 100644
+--- a/crates/engine/genie-core/src/groups/steer/to_slots.rs
++++ b/crates/engine/genie-core/src/groups/steer/to_slots.rs
+@@ -61,6 +61,9 @@ impl World {
+         group: GroupId,
+         differentiators: &[ObjectId],
+     ) -> Result<(), GenieError> {
++        if crate::groups::forming_188329() {
++            self.speed_pass_188329(group)?;
++        }
+         let mut i = 0;
+         loop {
+             let g = self.groups.held(group)?;
+@@ -131,6 +134,118 @@ impl World {
+         Ok(())
+     }
+ 
++    /// 188329's speed pass (`0x110b15c`..`0x110b3db`, after [`GroupFlags::CATCHING_UP`] cleared):
++    /// for each member the world holds without an active own move (1) and with a slot (its
++    /// first), the gap `sqrt(dy*dy + dx*dx)` from its place (slot 0x568) to the slot's transform
++    /// place. Forming: `lo = S(gap, 1.0)`, `hi = S(gap, 1.2)` ([`member_speed_188329`]), the speed
++    /// `lo` plus an extra `hi - lo`; `hi` above the slowest (`+0x174`) adds its excess to the
++    /// wanted extra, else `lo - slowest` is taken from the budget (`+0x178`). After the loop a
++    /// wanted extra above the budget scales every positive extra by budget / wanted and empties the
++    /// budget, else the budget pays it; the speeds take their extras. Formed: `S(gap, 1.2)`.
++    /// With `GENIE_EXPERIMENT_FORMING_FIRSTGAP_188329` the group's first pass measures the gap
++    /// from one step back (SUSPECTED, not read: the member's place less its forward times its top
++    /// speed times dt).
++    ///
++    /// [`member_speed_188329`]: crate::groups::member_speed_188329
++    fn speed_pass_188329(&mut self, group: GroupId) -> Result<(), GenieError> {
++        let firstgap = crate::groups::forming_firstgap_188329();
++        let dt = self.dt_seconds.get();
++        let g = self.groups.held(group)?;
++        let top = g.motion.maximum_velocity_forward.get();
++        let slowest = g.slowest_speed;
++        let (formed, first) = (g.formed, g.first_pass);
++        let mut budget = g.speed_budget;
++        let mut wanted = 0.0_f32;
++        let n = g.members.len();
++        let mut speeds: Vec<Option<f32>> = vec![None; n];
++        let mut extra = vec![0.0_f32; n];
++        let mut gaps = vec![0.0_f32; n];
++        let Some(f) = g.current_formation.as_ref() else {
++            return Ok(());
++        };
++        for (i, m) in g.members.iter().enumerate() {
++            if m.specific_move.active == 1 {
++                continue;
++            }
++            let Some((_, u)) = self.object(m.id) else {
++                continue;
++            };
++            let Some(s) = f.slots.iter().find(|s| s.unit_id == Some(m.id)) else {
++                continue;
++            };
++            let Some(mover) = self.parts.mover_of(u.id) else {
++                continue;
++            };
++            let p = u.position();
++            let (mut px, mut py) = (p.x(), p.y());
++            let v = mover.stats.speed.get();
++            if firstgap && first {
++                let step = v * dt;
++                px -= mover.forward.x() * step;
++                py -= mover.forward.y() * step;
++            }
++            let dx = s.transform_position.x() - px;
++            let dy = s.transform_position.y() - py;
++            let gap = sqrt(dy * dy + dx * dx);
++            gaps[i] = gap;
++            if formed {
++                speeds[i] = Some(crate::groups::member_speed_188329(gap, 1.2, v, top));
++            } else {
++                let lo = crate::groups::member_speed_188329(gap, 1.0, v, top);
++                let hi = crate::groups::member_speed_188329(gap, 1.2, v, top);
++                speeds[i] = Some(lo);
++                extra[i] = hi - lo;
++                let x = hi - slowest;
++                if x > 0.0 {
++                    wanted += x;
++                } else {
++                    budget -= lo - slowest;
++                }
++            }
++        }
++        if !formed {
++            if wanted > budget {
++                let r = budget / wanted;
++                for x in &mut extra {
++                    if *x > 0.0 {
++                        *x *= r;
++                    }
++                }
++                budget = 0.0;
++            } else {
++                budget -= wanted;
++            }
++            for (s, x) in speeds.iter_mut().zip(&extra) {
++                if let Some(s) = s {
++                    *s += *x;
++                }
++            }
++        }
++        if crate::groups::trace_forming() {
++            eprintln!(
++                "FORMING_PASS ms={} group={:?} pos=({}, {}) top={} slowest={} formed={} budget={} first={} gaps={:?} speeds={:?}",
++                self.world_time.millis(),
++                group,
++                self.groups.held(group)?.motion.position[0].x(),
++                self.groups.held(group)?.motion.position[0].y(),
++                top,
++                slowest,
++                formed,
++                budget,
++                first,
++                gaps,
++                speeds
++            );
++        }
++        let g = self.groups.held_mut(group)?;
++        if !formed {
++            g.speed_budget = budget;
++        }
++        g.forming_speeds = speeds;
++        g.first_pass = false;
++        Ok(())
++    }
++
+     /// A member in no slot (`0x14103ef2e`): it stops (slot 0x5d0) when its action list holds no
+     /// `MoveTo` (slot 0x538 with 1), its top action is not in state 4, 5 or 11 (slot 0x2b0) and
+     /// it moves (slot 0x5c8).
+diff --git a/crates/engine/genie-core/src/groups/update/awake.rs b/crates/engine/genie-core/src/groups/update/awake.rs
+index 4ce9b2f7..7ed0dbfe 100644
+--- a/crates/engine/genie-core/src/groups/update/awake.rs
++++ b/crates/engine/genie-core/src/groups/update/awake.rs
+@@ -106,6 +106,7 @@ impl World {
+             PathBudget::Tested
+         };
+         let forward = g.motion.position[1];
++        g.motion_was_new = g.motion.flags.contains(MotionFlags::NEW);
+         self.motion_update(group, budget)?;
+         self.after_motion(group, far, forward)
+     }
+@@ -261,6 +262,13 @@ impl World {
+                 .is_some_and(|f| !f.slots.is_empty())
+             {
+                 self.members_to_slots(group, differentiators)?;
++                if crate::groups::forming_188329() {
++                    // 188329 0x110b85b..0x110b870: no member catching up forms the group
++                    let g = self.groups.held_mut(group)?;
++                    if !g.flags.contains(GroupFlags::CATCHING_UP) && !g.formed {
++                        g.formed = true;
++                    }
++                }
+             }
+         }
+         Ok(())
+@@ -299,6 +307,15 @@ impl World {
+         forward: BVector,
+     ) -> Result<(), GenieError> {
+         if self.turns_formation(group, forward)? {
++            if crate::groups::forming_188329() {
++                // 188329 0x110a52f..0x110a544: a turn above pi/4 with RELAYOUT_AT_TURN forms
++                // the group again
++                let g = self.groups.held_mut(group)?;
++                let turn = angle_between(g.motion.position[1], forward).abs();
++                if TURN_LIMIT < turn && g.flags.contains(GroupFlags::RELAYOUT_AT_TURN) {
++                    g.formed = false;
++                }
++            }
+             let g = self.groups.held(group)?;
+             let without_path = g.motion.paths.first().is_some_and(|l| !l.has_path);
+             self.groups.held_mut(group)?.stored_positions.clear_points();
+@@ -321,7 +338,18 @@ impl World {
+             self.groups.held_mut(group)?.flags &= !GroupFlags::RELAYOUT_AT_TURN;
+         }
+         self.groups.held_mut(group)?.motion.drop_to_high_level()?;
++        let g = self.groups.held(group)?;
++        let first = crate::groups::forming_188329()
++            && crate::groups::forming_firstplan_188329()
++            && g.motion_was_new;
++        let before = g.motion.position[0];
+         self.motion_update(group, PathBudget::Tested)?;
++        if first {
++            // 188329: both motion steps of the group's first update only plan (F10)
++            let g = self.groups.held_mut(group)?;
++            g.motion.position[0] = before;
++            g.motion.new_position[0] = before;
++        }
+         if let Some(mut f) = self.groups.held_mut(group)?.current_formation.take() {
+             let moved = self.formation_transform(&mut f, group, SlotOrder::Closest);
+             self.groups.held_mut(group)?.current_formation = Some(f);
 diff --git a/crates/engine/genie-core/src/groups/update/mod.rs b/crates/engine/genie-core/src/groups/update/mod.rs
 index 0e406949..ed5ae5a2 100644
 --- a/crates/engine/genie-core/src/groups/update/mod.rs
@@ -1369,10 +2050,23 @@ index 8c1a150a..77fd054c 100644
          let blocked = r.fails()
              || length <= EPSILON
 diff --git a/crates/engine/genie-core/src/movement/step.rs b/crates/engine/genie-core/src/movement/step.rs
-index 75476db0..76a92fb9 100644
+index 75476db0..9e6af638 100644
 --- a/crates/engine/genie-core/src/movement/step.rs
 +++ b/crates/engine/genie-core/src/movement/step.rs
-@@ -566,6 +566,15 @@ impl Mover {
+@@ -107,6 +107,12 @@ impl Mover {
+         match group {
+             Some(GroupSpeed::Aside) => return Speed::ZERO,
+             Some(GroupSpeed::OwnMove(speed)) => {
++                // 188329 0x120f490: an own move walks at S(3.0, 1.2), 1.2 times its top speed
++                let speed = if crate::groups::forming_188329() {
++                    Speed::new(self.stats.speed.get() * 1.2)
++                } else {
++                    speed
++                };
+                 // the walked level walks (state 3) and its pause is not above 0 (`COMISS`
+                 // then `JA`: a NaN pause walks)
+                 let walks = self.paths.first().is_some_and(|l| {
+@@ -566,6 +572,15 @@ impl Mover {
          let position = self.moved_at.vector();
          let level = self.paths.walked()?;
          let waypoint = point_or_zero_of(level, level.waypoint);
@@ -1976,10 +2670,10 @@ index e9cbaaa4..6094bdfe 100644
          let dir_y = AxisDir::of_dy(delta.y());
          self.legs(base, c, dir_x, dir_y, delta)?;
 diff --git a/crates/engine/genie-core/src/pathing/short_path/mod.rs b/crates/engine/genie-core/src/pathing/short_path/mod.rs
-index 84934264..da65bd70 100644
+index 84934264..856597fe 100644
 --- a/crates/engine/genie-core/src/pathing/short_path/mod.rs
 +++ b/crates/engine/genie-core/src/pathing/short_path/mod.rs
-@@ -178,6 +178,27 @@ const NUDGES: [FixedPoint; 4] = [
+@@ -178,6 +178,36 @@ const NUDGES: [FixedPoint; 4] = [
  const OPEN_CORNER_WITHOUT_EMIT: GenieError =
      GenieError::unreachable("an open corner node without the token and sides it emits with");
  
@@ -2004,10 +2698,19 @@ index 84934264..da65bd70 100644
 +    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_REWALK_188329").is_some())
 +}
 +
++/// The start's escape contacts (188329 `0x107f3bd..0x107f5d2`, case 215.4 s of replay 518470161),
++/// on top of [`build_188329`]: a contact on the doubled-radius circle counts (`0x107f529` `jg`:
++/// `d2 <= rr2`), and a contact whose other shape is ignored is kept (the loop reads no ignore flag):
++/// `GENIE_EXPERIMENT_ESCAPE_188329`.
++pub(super) fn escape_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_ESCAPE_188329").is_some())
++}
++
  /// The goal of a search (`local_148`): its point, the unit's radius, the target's half sizes,
  /// their sums and the range.
  #[derive(Clone, Copy, Debug)]
-@@ -202,8 +223,17 @@ impl Goal {
+@@ -202,8 +232,17 @@ impl Goal {
              r,
              rx: q.half_x,
              ry: q.half_y,
@@ -2115,7 +2818,7 @@ index d952fd6e..3f0c1f1d 100644
      /// sight): an axis sweep along an axis, else the raycast with callback C.
      pub(super) fn sight_blocked(&self, a: FixedPoint, b: FixedPoint) -> Result<bool, GenieError> {
 diff --git a/crates/engine/genie-core/src/pathing/short_path/start.rs b/crates/engine/genie-core/src/pathing/short_path/start.rs
-index 916707bf..89c5a82a 100644
+index 916707bf..e881fe5e 100644
 --- a/crates/engine/genie-core/src/pathing/short_path/start.rs
 +++ b/crates/engine/genie-core/src/pathing/short_path/start.rs
 @@ -69,7 +69,12 @@ impl Search<'_> {
@@ -2132,7 +2835,27 @@ index 916707bf..89c5a82a 100644
          let start = Node {
              g: FixedDistance::ZERO,
              f: FixedDistance::new(f),
-@@ -340,6 +345,32 @@ impl Search<'_> {
+@@ -258,8 +263,9 @@ impl Search<'_> {
+         let mesh = self.ctx.mesh;
+         let d = self.ctx.d;
+         let b = self.bounds;
++        let escape = super::build_188329() && super::escape_188329();
+         for &c in mesh.sides.checked(id.index())?.checked(side.index())? {
+-            if (d >= c.half) || self.ctx.ignored(c.other) {
++            if (d >= c.half) || (!escape && self.ctx.ignored(c.other)) {
+                 continue;
+             }
+             let q = contact_point(c.at, c.side, d, c.at_side_start);
+@@ -283,7 +289,7 @@ impl Search<'_> {
+             let dx = i64::from(px - q.x());
+             let dy = i64::from(py - q.y());
+             let d2 = FixedDistanceSquared::new(((dy * dy) >> 22) + ((dx * dx) >> 22));
+-            if d2 < rr2 {
++            if (if escape { d2 <= rr2 } else { d2 < rr2 }) {
+                 let g0 = (sqrt(d2.get() as f32 * TO_FLOAT) * TO_FIXED) as i32;
+                 let g = FixedDistance::new(if c.side == side { g0 + 0x32 } else { g0 });
+                 self.side_node(g, root, id, side, q);
+@@ -340,6 +346,32 @@ impl Search<'_> {
              FixedPoint::new(p.x(), c.y())
          };
          let sw = self.ctx.sweep(p, m, a)?;
@@ -2915,13 +3638,36 @@ index d0cbfb72..5adf364c 100644
          let held = roles.of_class(class);
          if held.intersects(
 diff --git a/crates/engine/genie-core/src/unit_ai/side.rs b/crates/engine/genie-core/src/unit_ai/side.rs
-index 7fd24514..a0f390a8 100644
+index 7fd24514..bfa8b3cd 100644
 --- a/crates/engine/genie-core/src/unit_ai/side.rs
 +++ b/crates/engine/genie-core/src/unit_ai/side.rs
-@@ -37,6 +37,20 @@ pub trait UnitSide {
+@@ -37,6 +37,43 @@ pub trait UnitSide {
      /// What the search does not model.
      fn closest(&mut self, search: &Search<'_>) -> Result<Found, GenieError>;
  
++    /// 188329 `0xd22c20` with its base object: [`UnitSide::closest`] measured from object
++    /// `from`'s box (none: from the unit), its second key's point the head Hunt's point
++    /// (`0xd239eb`). A side without the world searches as [`UnitSide::closest`].
++    ///
++    /// # Errors
++    ///
++    /// What the search does not model.
++    fn closest_from(
++        &mut self,
++        search: &Search<'_>,
++        from: Option<ObjectId>,
++    ) -> Result<Found, GenieError> {
++        let _ = from;
++        self.closest(search)
++    }
++
++    /// Object `id`'s place and radii as the spatial index holds them; None where the side
++    /// holds no world.
++    fn object_box(&self, id: ObjectId) -> Option<(crate::map::Position, crate::map::Footprint)> {
++        let _ = id;
++        None
++    }
++
 +    /// 188329 evasiveMoveFrom: the tile planner's path from the unit to `to` (the unit's radius
 +    /// `radii`), None where the side has no planner.
 +    ///
@@ -2939,7 +3685,7 @@ index 7fd24514..a0f390a8 100644
      /// The unit's attack command on object `target` (slot 0x338, `FUN_14120cea0`), forced or
      /// not, while its unit AI stands as `ai`: true when the unit attacks it, with the notifies
      /// the command posts to the unit AI (kind and parameters), which the AI queues.
-@@ -196,6 +210,33 @@ pub trait UnitSide {
+@@ -196,6 +233,33 @@ pub trait UnitSide {
          Err(GenieError::unsupported("a reach test without the world"))
      }
  
@@ -3092,7 +3838,7 @@ index dc286d39..4ddecf51 100644
                      }
                      (None, _) => ai
 diff --git a/crates/engine/genie-core/src/unit_ai/update.rs b/crates/engine/genie-core/src/unit_ai/update.rs
-index 1ecba910..fab670a3 100644
+index 1ecba910..e6e3b396 100644
 --- a/crates/engine/genie-core/src/unit_ai/update.rs
 +++ b/crates/engine/genie-core/src/unit_ai/update.rs
 @@ -4,6 +4,7 @@
@@ -3125,28 +3871,77 @@ index 1ecba910..fab670a3 100644
      pub(super) fn hunter_search(
          &mut self,
          n: Notify,
-@@ -409,8 +414,9 @@ impl UnitAi {
+@@ -409,15 +414,16 @@ impl UnitAi {
          let kind = civilian_kind(class, roles);
          let found = match kind {
              None => {
-+                let origin = at.position.ground();
-                 let found = side.closest(&Search {
+-                let found = side.closest(&Search {
 -                    at: at.position.ground(),
++                let origin = at.position.ground();
++                let search_of = |state: Option<ObjectState>| Search {
 +                    at: origin,
                      radius: civilian_search_radius(at.los, at.search_radius),
                      classes: &CIVILIAN_CARED,
                      size: at.size,
-@@ -430,6 +436,9 @@ impl UnitAi {
+                     pick: Pick::Closest {
+                         group: Some(class),
+                         relation: None,
+-                        state: None,
++                        state,
+                         master: None,
+                         workers: if roles.of_class(class).contains(ClassRoles::FARM) {
+                             WorkerCount::ONE
+@@ -428,8 +434,47 @@ impl UnitAi {
+                         reach: true,
+                     },
                      memory: Memory::default(),
-                 })?;
-                 self.alert(found, at.dt_seconds);
+-                })?;
+-                self.alert(found, at.dt_seconds);
++                };
++                let found = if std::env::var_os("GENIE_EXPERIMENT_HUNT_188329").is_some()
++                    && n.p[0] == AiAction::Hunt.value()
++                    && n.p[1] == 58
++                {
++                    // 188329 0xd0139f..0xd01519 (R2-D8b, case 302.4 s of replay 518470161):
++                    // livestock is searched in three passes, as after the drop
++                    // (0xbb7aa8..0xbb7c39): carcasses from the drop site, then carcasses from the
++                    // unit, then any state from the drop site
++                    let site = ObjectId::of_field(n.p[2]);
++                    let (los, sr) = (at.los.get(), at.search_radius.get());
++                    let r = if los >= sr { los } else { sr };
++                    let (my_at, my_radius) = (at.position, at.size);
++                    let gap = |side: &dyn UnitSide, id: Option<ObjectId>| -> f32 {
++                        id.and_then(|id| side.object_box(id)).map_or(f32::NAN, |(p, pr)| {
++                            let gx = ((p.x() - my_at.x()).abs() - (pr.x() + my_radius.x())).max(0.0);
++                            let gy = ((p.y() - my_at.y()).abs() - (pr.y() + my_radius.y())).max(0.0);
++                            crate::math::fmath::sqrt(gx * gx + gy * gy)
++                        })
++                    };
++                    let mut a = side.closest_from(&search_of(Some(ObjectState::Dead)), site)?;
++                    self.alert(a, at.dt_seconds);
++                    let (g, d) = (gap(&*side, a.id), a.distance.get());
++                    if a.id.is_none() || !(g < r || ((2 * d) as f32) < r) {
++                        a = side.closest_from(&search_of(Some(ObjectState::Dead)), None)?;
++                        self.alert(a, at.dt_seconds);
++                    }
++                    if a.id.is_none() || !(gap(&*side, a.id) < r) {
++                        a = side.closest_from(&search_of(None), site)?;
++                        self.alert(a, at.dt_seconds);
++                    }
++                    a
++                } else {
++                    let f = side.closest(&search_of(None))?;
++                    self.alert(f, at.dt_seconds);
++                    f
++                };
++                let found = found;
 +                if std::env::var_os("GENIE_LOG_HUNT_SEARCH").is_some() {
 +                    eprintln!("HUNTER_SEARCH origin={origin:?} class={class:?} found={:?}", found.id);
 +                }
                  match (found.id, found.position) {
                      (Some(id), Some(position)) => Some(Gatherable {
                          id,
-@@ -467,12 +476,43 @@ impl UnitAi {
+@@ -467,12 +512,43 @@ impl UnitAi {
              return Ok(GO_ON);
          };
          if roles.of_class(class).contains(ClassRoles::FARM) {
@@ -3192,7 +3987,7 @@ index 1ecba910..fab670a3 100644
      /// gather is the AI's target class, else its last, else the notify's (its second parameter);
      /// with none the target goes and the action stops (slot 0xb0 with 1; slot 0x48 hands the
 diff --git a/crates/engine/genie-core/src/unit_ai/world_view/side.rs b/crates/engine/genie-core/src/unit_ai/world_view/side.rs
-index 77dc93ea..1d405114 100644
+index 77dc93ea..b6c5eb48 100644
 --- a/crates/engine/genie-core/src/unit_ai/world_view/side.rs
 +++ b/crates/engine/genie-core/src/unit_ai/world_view/side.rs
 @@ -286,6 +286,80 @@ impl UnitSide for UnitView<'_, '_> {
@@ -3276,6 +4071,38 @@ index 77dc93ea..1d405114 100644
      fn reaches(&mut self, target: ObjectId, range: Distance) -> Result<bool, GenieError> {
          let mut plan = Planning {
              pathing: &mut self.c.w.pathing,
+@@ -322,6 +396,31 @@ impl UnitSide for UnitView<'_, '_> {
+         )
+     }
+ 
++    fn closest_from(
++        &mut self,
++        search: &Search<'_>,
++        from: Option<ObjectId>,
++    ) -> Result<Found, GenieError> {
++        use crate::map::spatial::{CLOSEST_FROM, ClosestFrom};
++        let site = from
++            .and_then(|id| self.c.w.spatial.get(id))
++            .map(|q| (q.position, q.radius));
++        // 0xd239eb: the second key's point is the head action's (the Hunt's) point
++        let point = self
++            .actions
++            .list
++            .hunt()
++            .map_or((-1.0, -1.0), |h| (h.point.x(), h.point.y()));
++        CLOSEST_FROM.with(|k| k.set(Some(ClosestFrom { site, point })));
++        let out = self.closest(search);
++        CLOSEST_FROM.with(|k| k.set(None));
++        out
++    }
++
++    fn object_box(&self, id: ObjectId) -> Option<(crate::map::Position, crate::map::Footprint)> {
++        self.c.w.spatial.get(id).map(|q| (q.position, q.radius))
++    }
++
+     fn closest(&mut self, search: &Search<'_>) -> Result<Found, GenieError> {
+         let roles = &self.c.w.model.roles.clone();
+         let seeker = match search.pick {
 diff --git a/crates/engine/genie-core/src/world/index.rs b/crates/engine/genie-core/src/world/index.rs
 index 8c22fa57..15f31bd7 100644
 --- a/crates/engine/genie-core/src/world/index.rs
@@ -7512,6 +8339,32 @@ index 99849470..cbdc9d06 100644
              if player.done() {
                  continue;
              }
+diff --git a/crates/tools/genie-oracle/src/groups.rs b/crates/tools/genie-oracle/src/groups.rs
+index 7364f8c6..f8d0474e 100644
+--- a/crates/tools/genie-oracle/src/groups.rs
++++ b/crates/tools/genie-oracle/src/groups.rs
+@@ -122,6 +122,7 @@ fn formation(f: &saved::Formation) -> Result<Formation, GenieError> {
+                 indices: l.line_indices.clone(),
+                 attack_range: Distance::new(l.attack_range),
+                 distance_back: Distance::new(l.distance_back),
++                spacing_half: Distance::ZERO,
+             })
+             .collect(),
+         transform_kind: TransformKind::of_data(f.transform_kind),
+@@ -272,6 +273,13 @@ fn group(g: &saved::UnitGroup, paths: &[saved::Path]) -> Result<UnitGroup, Genie
+         special_units: Vec::new(),
+         // the constructor's, which the load keeps
+         replaces_queue: 1,
++        // 188329's unsaved forming fields (GENIE_EXPERIMENT_FORMING_188329)
++        slowest_speed: 0.0,
++        speed_budget: 0.0,
++        formed: false,
++        forming_speeds: Vec::new(),
++        first_pass: false,
++        motion_was_new: false,
+     })
+ }
+ 
 diff --git a/crates/tools/genie-oracle/src/map_and_sight.rs b/crates/tools/genie-oracle/src/map_and_sight.rs
 index d79318cd..9410c201 100644
 --- a/crates/tools/genie-oracle/src/map_and_sight.rs
