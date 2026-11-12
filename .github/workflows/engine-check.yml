@@ -1,0 +1,67 @@
+name: Engine check
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/engine-check.yml'
+      - 'engine/**'
+permissions:
+  contents: read
+concurrency:
+  group: ssapo-aoe2-engine-check
+  cancel-in-progress: true
+jobs:
+  engine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      GENIE_COMMIT: 91d81be4
+      DATA_SHA256: d0aefd92428e2215d6f4d9b1d544901e6f171e19183f9e0b88218de5153a337f
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Engine source (genie + research patch)
+        run: |
+          git fetch --depth 1 origin research/genie-188329
+          git show FETCH_HEAD:research/genie/sorted-lists-and-truth-trace.patch | tr -d '\r' > "$RUNNER_TEMP/engine.patch"
+          sha256sum "$RUNNER_TEMP/engine.patch" | cut -d' ' -f1 > "$RUNNER_TEMP/engine.patch.sha"
+          git clone https://github.com/librematch/genie.git "$RUNNER_TEMP/genie"
+          cd "$RUNNER_TEMP/genie"
+          git checkout "$GENIE_COMMIT"
+          git apply "$RUNNER_TEMP/engine.patch"
+          echo "PATCH_SHA=$(cat "$RUNNER_TEMP/engine.patch.sha")" >> "$GITHUB_ENV"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ runner.temp }}/genie/target
+          key: genie-${{ env.GENIE_COMMIT }}-${{ env.PATCH_SHA }}
+          restore-keys: |
+            genie-${{ env.GENIE_COMMIT }}-
+      - name: Build engine
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          cd "$RUNNER_TEMP/genie"
+          cargo build --release -p genie-oracle --example census
+      - name: Game data (private)
+        env:
+          AOE2_DATA_TOKEN: ${{ secrets.AOE2_DATA_TOKEN }}
+        run: |
+          if [ -z "$AOE2_DATA_TOKEN" ]; then echo "AOE2_DATA_TOKEN is not set"; exit 1; fi
+          git clone --quiet --depth 1 "https://x-access-token:${AOE2_DATA_TOKEN}@github.com/ssapo/aoe2-data.git" "$RUNNER_TEMP/aoe2-data"
+          echo "$DATA_SHA256  $RUNNER_TEMP/aoe2-data/188329/empires2_x2_p1.dat" | sha256sum --check --quiet
+          echo "game data ok"
+      - name: Run one replay
+        run: |
+          curl -sSL -o "$RUNNER_TEMP/replay.zip" 'https://aoe.ms/replay/?gameId=518239882&profileId=26260702'
+          mkdir -p "$RUNNER_TEMP/replay" && unzip -q -o "$RUNNER_TEMP/replay.zip" -d "$RUNNER_TEMP/replay"
+          REC=$(ls "$RUNNER_TEMP"/replay/*.aoe2record | head -1)
+          set -a; . engine/switches.env; set +a
+          "$RUNNER_TEMP/genie/target/release/examples/census" "$REC" "$RUNNER_TEMP/aoe2-data/188329/empires2_x2_p1.dat" 41600 > "$RUNNER_TEMP/census.out" 2> /dev/null
+          tail -4 "$RUNNER_TEMP/census.out" | cut -c1-160
+          grep -q 'player 1: no stop; 53 checkpoints hold' "$RUNNER_TEMP/census.out"
+          grep -q 'player 2: no stop; 53 checkpoints hold' "$RUNNER_TEMP/census.out"
