@@ -1,7 +1,16 @@
 """Resource totals read from recording checkpoints.
 
-mgz interprets total_res as stockpiled resources; upstream documents the field
-semantics as guesses. Object totals cannot identify living military units.
+total_res is the player's stockpile: food, wood, stone and gold, each cut to a
+whole number, then added. Checked 2026-11-12 against the original game (build
+188329): it equals the sum read from the running game's memory at the same game
+time in 852 of 872 checkpoints of three replays; the other 20 lie within one
+memory sample (about 0.2 s) of a change. A re-simulation that rebuilds every
+checkpoint word from game state reproduces it too (README, "체크포인트 단어의 뜻").
+The time is the game clock after the tick that wrote the checkpoint.
+
+It is one sum: no split by resource, no income, no spending. Object totals
+(obj_count: everything in the player's object list) cannot identify living
+military units.
 """
 import io
 
