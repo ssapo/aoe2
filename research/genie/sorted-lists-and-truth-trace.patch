@@ -2140,6 +2140,93 @@ index a1c2993f..8753b12e 100644
      );
      let livestock = with(|f| f.group = Some(class_id(58)));
      let mut sheep = Placed {
+diff --git a/crates/engine/genie-core/src/movement/explore.rs b/crates/engine/genie-core/src/movement/explore.rs
+index bce6387c..5b011472 100644
+--- a/crates/engine/genie-core/src/movement/explore.rs
++++ b/crates/engine/genie-core/src/movement/explore.rs
+@@ -59,6 +59,15 @@ use crate::world::layer::generated::MoveToTuning;
+ const WALK_WITHOUT_READS: GenieError =
+     GenieError::unreachable("an Explore's set_state(11) without the unit's reads");
+ 
++/// 188329's Explore wait (`0xb79170` set_state, `0xb793d0` update; case 282.4 s of replay
++/// 517426097): `GENIE_EXPERIMENT_EXPLORE_WAIT_188329`. `Set_state` 3 only shows the standing
++/// sprite; the update of state 3 posts notify 0x202, sets `+0x44` to 1.0 and goes to state 2,
++/// whose update counts `+0x44` down by 0.1 and goes back to state 3 once it is used up.
++fn explore_wait_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_EXPLORE_WAIT_188329").is_some())
++}
++
+ /// A point of −1 is no point (`DAT_14330ec20`).
+ const NO_POINT: f32 = EXPLORE_NO_POINT;
+ 
+@@ -84,6 +93,9 @@ pub struct ExploreAction {
+     pub state: ExploreState,
+     /// The point it walks to (`+0x38`..`+0x40`), x −1 for none.
+     pub point: Position,
++    /// 188329's `+0x44`: the countdown of state 2 until it asks its unit AI again
++    /// (`0xb79506`, `0xb7951b`); unused without `GENIE_EXPERIMENT_EXPLORE_WAIT_188329`.
++    pub wait: f32,
+ }
+ 
+ /// What an Explore's `MoveTo` reads of its unit as `set_state(11)` makes it: [`MoveToReads`], and
+@@ -130,6 +142,7 @@ impl ExploreAction {
+         let mut a = Self {
+             state: ExploreState::New,
+             point,
++            wait: 0.0,
+         };
+         let state = if a.point.x() == NO_POINT {
+             ExploreState::Wait
+@@ -160,10 +173,18 @@ impl ExploreAction {
+             other => other,
+         };
+         Ok(match state {
++            // 188329 `0xb791ad`: the standing sprite, the action's target none (it has none),
++            // the point gone
++            ExploreState::Stopped if explore_wait_188329() => {
++                self.point = Position::from([-1.0; 3]);
++                Owner::Standing
++            }
+             ExploreState::Stopped => {
+                 self.point = Position::from([-1.0; 3]);
+                 Owner::Stopped
+             }
++            // 188329 `0xb79331`: the standing sprite only
++            ExploreState::Wait if explore_wait_188329() => Owner::Standing,
+             ExploreState::Wait => Owner::WantsPoint,
+             ExploreState::Done | ExploreState::Failed | ExploreState::Ended => Owner::Standing,
+             ExploreState::Walk { .. } => {
+@@ -254,6 +275,29 @@ impl ExploreAction {
+                 "a failed Explore (notify 0x1f9, set_state 2)",
+             )),
+             ExploreState::Walk { .. } => self.walk(c, explorer, me, roles),
++            // 188329 `0xb794d0`: notify 0x202 with 605, `+0x44` = 1.0, set_state 2
++            ExploreState::Wait if explore_wait_188329() => {
++                explorer.post_own(
++                    &mut c.w.parts.unit_ai,
++                    NotifyKind::REQUIRES_SEARCH,
++                    [AiAction::Explore.value(), 0, 0],
++                )?;
++                self.wait = 1.0;
++                let owner =
++                    self.set_state(ExploreState::Stopped, None, &c.w.model.tuning.move_to)?;
++                explorer.explore_owner(owner, c)
++            }
++            // 188329 `0xb7951b`: set_state 3 unless 0 < `+0x44`, then `+0x44` -= 0.1
++            ExploreState::Stopped if explore_wait_188329() => {
++                let mut r = Ok(());
++                if !(0.0 < self.wait) {
++                    let owner =
++                        self.set_state(ExploreState::Wait, None, &c.w.model.tuning.move_to)?;
++                    r = explorer.explore_owner(owner, c);
++                }
++                self.wait -= f32::from_bits(0x3dcc_cccd);
++                r
++            }
+             _ => Ok(()),
+         }
+     }
 diff --git a/crates/engine/genie-core/src/movement/long_walk.rs b/crates/engine/genie-core/src/movement/long_walk.rs
 index f6314358..9d7b8d8a 100644
 --- a/crates/engine/genie-core/src/movement/long_walk.rs
@@ -2207,7 +2294,7 @@ index 8ae7fee5..35ac2065 100644
              return MoveTo::Failed;
          }
 diff --git a/crates/engine/genie-core/src/movement/new_path.rs b/crates/engine/genie-core/src/movement/new_path.rs
-index 1f873756..0d4de4b7 100644
+index 1f873756..069ceae3 100644
 --- a/crates/engine/genie-core/src/movement/new_path.rs
 +++ b/crates/engine/genie-core/src/movement/new_path.rs
 @@ -65,6 +65,15 @@ impl Mover {
@@ -2240,7 +2327,7 @@ index 1f873756..0d4de4b7 100644
              for id in world.obstruction_candidates(rect, Distance::new(grow), &skip) {
                  let Some(p) = world.get(id) else { continue };
                  let gait = by_id.gait(id);
-@@ -463,6 +477,35 @@ impl Mover {
+@@ -463,6 +477,64 @@ impl Mover {
          Ok(result.reaches().then(|| path.length()))
      }
  
@@ -2271,6 +2358,35 @@ index 1f873756..0d4de4b7 100644
 +        let _ = planner.plan::<GenieError>(&req, false, &mut path, None, tile_path_tuning)?;
 +        path.measure();
 +        Ok(Some(path))
++    }
++
++    /// 188329 `AskForHelp`'s reach of a helper (`0x1116d20`): the tile planner of the unit's
++    /// restriction (`0x1058020`; none: not reached) from the unit to `to` (`0x1057a40` with the
++    /// radii `radii`, the range `range`, no closed tiles, no tile search, no smoothing unit);
++    /// reached when its result is below 2 (`0x1116f0a`).
++    pub fn plan_reaches(
++        &self,
++        at: Position,
++        world: &Spatial,
++        plan: &mut Planning<'_>,
++        to: Point,
++        (radii, range): (Distance, Distance),
++        tile_path_tuning: &TilePathTuning,
++    ) -> Result<bool, GenieError> {
++        let Some(planner) = plan.pathing.planner(self.stats.restriction, world.tiles()) else {
++            return Ok(false);
++        };
++        let req = Request {
++            from: at.ground(),
++            to,
++            radii,
++            range,
++            closed: Vec::new(),
++            full: false,
++        };
++        let mut path = Path::default();
++        let found = planner.plan::<GenieError>(&req, false, &mut path, None, tile_path_tuning)?;
++        Ok(found.reaches())
 +    }
 +
      /// The length of the tile planner's path (`FUN_140f7c530` with the radii `radii`, range 0, no
@@ -3491,6 +3607,54 @@ index 916707bf..e881fe5e 100644
          let (g, parent, sw) = if sw.found {
              (
                  through_float(delta.x().wrapping_abs()).wrapping_add(b.g),
+diff --git a/crates/engine/genie-core/src/pathing/tile_path/planning.rs b/crates/engine/genie-core/src/pathing/tile_path/planning.rs
+index 7277973c..e2ce4098 100644
+--- a/crates/engine/genie-core/src/pathing/tile_path/planning.rs
++++ b/crates/engine/genie-core/src/pathing/tile_path/planning.rs
+@@ -154,12 +154,39 @@ impl Planner {
+         levels.measure();
+         tiles.measure();
+         // no second search reads as the game's 0, off the map
+-        let (chosen, result) =
+-            if second.unwrap_or(Found::OffMap) != first || levels.length < tiles.length {
+-                (&levels, first)
++        let (chosen, result) = if std::env::var_os("GENIE_EXPERIMENT_PLANCHOICE_188329").is_some() {
++            // 188329 0x1057ea9..0x1057fa7: the tile path when its search reached the goal too
++            // and, with the levels path ending within `max(range^2, 1) + radii` (squared) of the
++            // goal, it is no longer than the levels path; with the levels path ending farther,
++            // when the tile path ends within it
++            let goal = BVector::new(req.to.x(), 0.0, req.to.y());
++            // 0x106f250: the last point, the zero point of a path under 2 points
++            let end = |p: &Path| match p.points.last() {
++                Some(&last) if 2 <= p.points.len() => last,
++                _ => BVector::new(0.0, 0.0, 0.0),
++            };
++            let e = |v: BVector| {
++                let d = v - goal;
++                d.height() * d.height() + d.x() * d.x() + d.y() * d.y()
++            };
++            let r2 = req.range.get() * req.range.get();
++            // MAXSS r2, 1.0: a NaN takes the 1
++            let lim = (if r2 > 1.0 { r2 } else { 1.0 }) + req.radii.get();
++            let take = if lim >= e(end(&levels)) {
++                levels.length.get() >= tiles.length.get()
+             } else {
+-                (&tiles, second.unwrap_or(first))
++                lim >= e(end(&tiles))
+             };
++            if second == Some(Found::Goal) && first == Found::Goal && take {
++                (&tiles, Found::Goal)
++            } else {
++                (&levels, first)
++            }
++        } else if second.unwrap_or(Found::OffMap) != first || levels.length < tiles.length {
++            (&levels, first)
++        } else {
++            (&tiles, second.unwrap_or(first))
++        };
+         out.append(chosen);
+         Ok(result)
+     }
 diff --git a/crates/engine/genie-core/src/players/game_status/stops.rs b/crates/engine/genie-core/src/players/game_status/stops.rs
 index f0e3108e..262ee402 100644
 --- a/crates/engine/genie-core/src/players/game_status/stops.rs
@@ -4065,6 +4229,405 @@ index 7a8bacbb..f5493e8f 100644
                  return Ok(());
              }
          }
+diff --git a/crates/engine/genie-core/src/unit_ai/attack_pick.rs b/crates/engine/genie-core/src/unit_ai/attack_pick.rs
+index 4bca7b20..48901595 100644
+--- a/crates/engine/genie-core/src/unit_ai/attack_pick.rs
++++ b/crates/engine/genie-core/src/unit_ai/attack_pick.rs
+@@ -9,7 +9,13 @@ use crate::map::Footprint;
+ use crate::map::Point;
+ use crate::map::Position;
+ use crate::math::fmath::maxss;
++use crate::groups::formation::top_path;
++use crate::math::fmath::{BVector, at_most_or_unordered};
++use crate::movement::Mover;
++use crate::movement::PathData;
++use crate::movement::PathFlags;
+ use crate::movement::Speed;
++use crate::unit_ai::attack_rules::{patrol_distance, patrolrange_188329};
+ use crate::objects::ObjectId;
+ use crate::objects::ObjectState;
+ use crate::objects::WorkerCount;
+@@ -286,6 +292,9 @@ pub struct Seeker {
+     pub last_target_class: Option<ClassId>,
+     /// `+0x1c0` holds a patrol path.
+     pub patrol_path: bool,
++    /// 188329 (`ai+0x1c8`): the saved patrol's points, held only for a defending unit under
++    /// `GENIE_EXPERIMENT_PATROLRANGE_188329`.
++    pub saved_patrol: Option<SavedPatrol>,
+     /// The master type of the current target as the world holds it ([`Surroundings::target`]),
+     /// which the siege unit's attack check reads.
+     ///
+@@ -293,6 +302,70 @@ pub struct Seeker {
+     pub target_master_kind: Option<MasterKind>,
+ }
+ 
++/// The most points of a saved patrol [`SavedPatrol`] holds.
++pub const SAVED_PATROL_MAX: usize = 16;
++
++/// A saved patrol's points (`ai+0x1c8` in 188329, the path's `+0x438`..`+0x440`) as the soldier's
++/// attack check reads them (`0xcf7e8e`, `0x106efd0`).
++#[derive(Clone, Copy, Debug, PartialEq)]
++pub struct SavedPatrol {
++    /// The first [`SAVED_PATROL_MAX`] points.
++    pub points: [BVector; SAVED_PATROL_MAX],
++    /// How many points the path holds.
++    pub len: usize,
++}
++
++impl SavedPatrol {
++    /// The saved patrol of `points`.
++    #[must_use]
++    pub fn of(points: &[BVector]) -> Self {
++        let mut held = [BVector::ZERO; SAVED_PATROL_MAX];
++        for (to, from) in held.iter_mut().zip(points) {
++            *to = *from;
++        }
++        Self {
++            points: held,
++            len: points.len(),
++        }
++    }
++
++    /// Its points.
++    ///
++    /// # Errors
++    ///
++    /// A path of more points than it holds.
++    pub fn get(&self) -> Result<&[BVector], GenieError> {
++        self.points.get(..self.len).ok_or(GenieError::unsupported(
++            "a saved patrol of more than 16 points (188329's patrol range)",
++        ))
++    }
++}
++
++/// What 188329's soldier attack check reads of the unit's own path in Defend: slot 0x690
++/// (`0x1218ce0`) and slot 0x4a8 (`0x1210e30`).
++#[derive(Clone, Copy, Debug)]
++pub struct PatrolRoute<'a> {
++    /// Slot 0x690: the walked level holds a path and the top path's flag LOOPS is set.
++    pub loops: bool,
++    /// Slot 0x4a8: the top path's points (the top ancestor's, else the walked level's own);
++    /// none without path data or without that path (the slot answers 0).
++    pub points: Option<&'a [BVector]>,
++}
++
++impl<'a> PatrolRoute<'a> {
++    /// The route of a unit's movement state.
++    #[must_use]
++    pub(crate) fn of(mover: Option<&'a Mover>) -> Self {
++        let paths: &[PathData] = mover.map_or(&[], |m| m.paths.as_slice());
++        let top = top_path(paths);
++        Self {
++            loops: paths.first().is_some_and(|l| l.has_path)
++                && top.is_some_and(|t| t.path_flags.contains(PathFlags::LOOPS)),
++            points: top.map(|t| t.points.as_slice()),
++        }
++    }
++}
++
+ impl Seeker {
+     /// `canMoveToAttack` with no target (slot 0x1d0 with −1, `FUN_140c48420`; the slice holds no
+     /// unit groups): with an order, or without one in a stance below 2.
+@@ -316,6 +389,23 @@ pub fn can_attack(
+     t: &Target,
+     roles: &Roles,
+     unit_ai_tuning: &UnitAiTuning,
++) -> Result<bool, GenieError> {
++    can_attack_on(me, seeker, t, roles, unit_ai_tuning, None)
++}
++
++/// [`can_attack`] with the unit's own path `route`, which 188329's soldier reads in Defend
++/// ([`PatrolRoute`]).
++///
++/// # Errors
++///
++/// As [`can_attack`].
++pub fn can_attack_on(
++    me: &Attacker,
++    seeker: &Seeker,
++    t: &Target,
++    roles: &Roles,
++    unit_ai_tuning: &UnitAiTuning,
++    route: Option<PatrolRoute<'_>>,
+ ) -> Result<bool, GenieError> {
+     match me.ai_kind {
+         UnitAiKind::Hunted => Ok(matches!(me.top_action, Some(ATTACK | ActionKind::COMBAT))),
+@@ -333,7 +423,9 @@ pub fn can_attack(
+         UnitAiKind::Civilian => Ok(civilian_may_attack(me.attack_priority, t.class, roles)),
+         UnitAiKind::Building => Ok(false),
+         UnitAiKind::Tower => tower_can_attack(me, t, roles, unit_ai_tuning),
+-        UnitAiKind::Soldier => soldier_can_attack(me, seeker, t, roles, unit_ai_tuning),
++        UnitAiKind::Soldier => {
++            soldier_can_attack_on(me, seeker, t, roles, unit_ai_tuning, route)
++        }
+         UnitAiKind::Siege => {
+             siege_can_attack(me, seeker, t, TargetRules::Own, roles, unit_ai_tuning)
+         }
+@@ -462,6 +554,22 @@ pub fn soldier_can_attack(
+     t: &Target,
+     roles: &Roles,
+     unit_ai_tuning: &UnitAiTuning,
++) -> Result<bool, GenieError> {
++    soldier_can_attack_on(me, s, t, roles, unit_ai_tuning, None)
++}
++
++/// [`soldier_can_attack`] with the unit's own path `route` ([`PatrolRoute`]).
++///
++/// # Errors
++///
++/// As [`soldier_can_attack`].
++pub fn soldier_can_attack_on(
++    me: &Attacker,
++    s: &Seeker,
++    t: &Target,
++    roles: &Roles,
++    unit_ai_tuning: &UnitAiTuning,
++    route: Option<PatrolRoute<'_>>,
+ ) -> Result<bool, GenieError> {
+     if roles.of_class(t.class).contains(ClassRoles::LAND_MINE) {
+         return Ok(false);
+@@ -504,7 +612,7 @@ pub fn soldier_can_attack(
+     if s.stance == UnitStance::NoAttack {
+         return Ok(false);
+     }
+-    if !stance_reaches(me, s, t, unit_ai_tuning)? {
++    if !stance_reaches_on(me, s, t, unit_ai_tuning, route)? {
+         return Ok(false);
+     }
+     Ok(!me.attack_priority.limited()
+@@ -547,8 +655,82 @@ pub(super) fn stance_reaches(
+     s: &Seeker,
+     t: &Target,
+     unit_ai_tuning: &UnitAiTuning,
++) -> Result<bool, GenieError> {
++    stance_reaches_on(me, s, t, unit_ai_tuning, None)
++}
++
++/// [`stance_reaches`] with the unit's own path `route`. Under
++/// `GENIE_EXPERIMENT_PATROLRANGE_188329` it is 188329's (`0xcf7c93`..`0xcf7f65`): the reach is
++/// `MAXSS(range against the target, 0.5)`; in Defend 5 more, and then, on the patrol order
++/// (711) with a looping path (slot 0x690) or on the attack move's (733), the target's place
++/// (slot 0x568) must lie within the reach of the unit's top path (slot 0x4a8, 0 without one);
++/// else with a saved patrol within the reach of that; else the squared gap test.
++///
++/// # Errors
++///
++/// As [`stance_reaches`]; under the switch a patrol test without `route`.
++pub(super) fn stance_reaches_on(
++    me: &Attacker,
++    s: &Seeker,
++    t: &Target,
++    unit_ai_tuning: &UnitAiTuning,
++    route: Option<PatrolRoute<'_>>,
+ ) -> Result<bool, GenieError> {
+     let d2 = point_gap_squared(s.state_position, t.position, t.radius);
++    if patrolrange_188329() {
++        // 0xcf7c9d, 0xcf7ca6: MAXSS(slot 0x250, 0.5)
++        let reach = Distance::new(maxss(
++            me.range_against()?.get(),
++            unit_ai_tuning.stance_range_growth,
++        ));
++        match s.stance {
++            // 0xcf7cb8
++            UnitStance::StandGround
++                if !matches!(s.order, Some(OrderKind::Defend)) && reach.squared() < d2 =>
++            {
++                return Ok(false);
++            }
++            // 0xcf7d3b
++            UnitStance::Defensive => {
++                let reach = reach + Distance::new(unit_ai_tuning.defend_growth);
++                let no_route = || {
++                    GenieError::unsupported(
++                        "a defending soldier's patrol range outside an attack test that holds its path",
++                    )
++                };
++                // 0xcf7d71..0xcf7d92
++                let on_patrol = match s.order {
++                    Some(OrderKind::Patrol) => route.ok_or_else(no_route)?.loops,
++                    Some(OrderKind::AttackMove) => true,
++                    _ => false,
++                };
++                // the target's slot 0x568: its place as x, height, y
++                let p = t.position.vector();
++                if on_patrol {
++                    // 0xcf7dbe..0xcf7df7: slot 0x4a8, 0 without a path; JBE passes
++                    let d = match route.ok_or_else(no_route)?.points {
++                        Some(points) => patrol_distance(points, p)?.get(),
++                        None => 0.0,
++                    };
++                    return Ok(at_most_or_unordered(d, reach.get()));
++                }
++                // 0xcf7e5b..0xcf7ec3: the saved patrol
++                if s.patrol_path {
++                    let saved = s.saved_patrol.ok_or(GenieError::unreachable(
++                        "a defending seeker's saved patrol without its points",
++                    ))?;
++                    let d = patrol_distance(saved.get()?, p)?.get();
++                    return Ok(at_most_or_unordered(d, reach.get()));
++                }
++                // 0xcf7efb
++                if reach.squared() < d2 {
++                    return Ok(false);
++                }
++            }
++            _ => {}
++        }
++        return Ok(true);
++    }
+     let reach = me.range_against()? + Distance::new(unit_ai_tuning.stance_range_growth);
+     match s.stance {
+         UnitStance::StandGround
+diff --git a/crates/engine/genie-core/src/unit_ai/attack_rules.rs b/crates/engine/genie-core/src/unit_ai/attack_rules.rs
+index 87f4b772..cfbad538 100644
+--- a/crates/engine/genie-core/src/unit_ai/attack_rules.rs
++++ b/crates/engine/genie-core/src/unit_ai/attack_rules.rs
+@@ -293,6 +293,15 @@ pub(super) const fn defend_patrol_range() -> Result<(), GenieError> {
+     ))
+ }
+ 
++/// 188329's soldier `CanAttack` Defend arm (`0xcf7d3b`..`0xcf7f65`: unit slots 0x690
++/// `0x1218ce0` and 0x4a8 `0x1210e30`, the path distance `0x106efd0`) in place of the stop
++/// [`defend_patrol_range`], the reach `MAXSS(range, 0.5)` (`0xcf7ca6`) and the path distance's
++/// `MINSS` (`0x106f05c`): `GENIE_EXPERIMENT_PATROLRANGE_188329`.
++pub(crate) fn patrolrange_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_PATROLRANGE_188329").is_some())
++}
++
+ /// The classes the siege unit never attacks as neutral objects (`FUN_140c1ae10`'s mask
+ /// `0x200200800830001c`: 2, 3, 4, 20, 21, 27, 39, 49, 61; the soldier's but class 19).
+ pub(super) const SIEGE_NEUTRAL_SPARED: ClassMask = ClassMask::new(0x2002_0080_0830_001c, 0x3e);
+@@ -347,7 +356,14 @@ pub(crate) fn patrol_distance(points: &[BVector], point: BVector) -> Result<Dist
+     let mut least = PATROL_FARTHEST;
+     for pair in points.windows(2) {
+         let d = line_distance(point, *pair.checked(0)?, *pair.checked(1)?);
+-        least = if least <= d.get() { least } else { d.get() };
++        least = if patrolrange_188329() {
++            // 188329 `0x106f05c`, `MINSS d, least`: a NaN distance leaves the least
++            if d.get() < least { d.get() } else { least }
++        } else if least <= d.get() {
++            least
++        } else {
++            d.get()
++        };
+     }
+     Ok(Distance::new(least))
+ }
+diff --git a/crates/engine/genie-core/src/unit_ai/flight.rs b/crates/engine/genie-core/src/unit_ai/flight.rs
+index b388f155..e8a22855 100644
+--- a/crates/engine/genie-core/src/unit_ai/flight.rs
++++ b/crates/engine/genie-core/src/unit_ai/flight.rs
+@@ -21,6 +21,7 @@ use crate::unit_ai::StopOrder;
+ use crate::unit_ai::TargetRules;
+ use crate::unit_ai::UnitAiKind;
+ use crate::unit_ai::UnitStance;
++use crate::unit_ai::{AttackAsk, AttackChecks, SurroundingFlags};
+ use crate::unit_ai::{
+     AiMove, BREAK, DEAD, Effect, GO_ON, Memory, Notify, Pick, RUN_DRAW_SCALE, RUN_EPSILON, RUN_ONE,
+     Search, Surroundings, UnitAi, UnitSide, VILLAGER_NOTIFY, alert_owner,
+@@ -331,6 +332,71 @@ impl UnitAi {
+         side.call_for_help(attacker)
+     }
+ 
++    /// 188329 `AskForHelp`'s helper that passed the tests (`0xd1da20`..`0xd1dc59`), run as the
++    /// helper's own AI (`GENIE_EXPERIMENT_HELPCALL_188329`): its reach to the `attacker`
++    /// (`0x1116d20` with its range, slot 0x248; not reached: nothing); its `bestUnitToAttack`
++    /// from its place (`0xd1ec40` with distance 0, no idle check, no path checks, no extra
++    /// object, not any class, no work state; its own search first); the target is the attacker
++    /// unless the best is another object the world holds whose squared footprint gap to the
++    /// helper is at most 0.9 of the attacker's (`0xd1daca`..`0xd1daf1`); then its `AttackObject`
++    /// (slot 0xb8) on the target, forced, by its own rules (any 0; the group flag's part never
++    /// runs).
++    ///
++    /// # Errors
++    ///
++    /// What the reach test, the search and the attack command do not model.
++    pub(super) fn answer_help(
++        &mut self,
++        attacker: ObjectId,
++        at: &Surroundings,
++        player_kind: PlayerKind,
++        side: &mut dyn UnitSide,
++    ) -> Result<(), GenieError> {
++        if !side.plan_reaches(attacker, at.weapon_range)? {
++            return Ok(());
++        }
++        let (classes, radius) = self.search_area(at, player_kind);
++        let found = side.closest(&Search {
++            at: at.position.ground(),
++            radius,
++            classes,
++            size: at.size,
++            pick: Pick::Attack {
++                lowest: if at.flags.contains(SurroundingFlags::SCENARIO)
++                    && !player_kind.is_computer()
++                {
++                    2
++                } else {
++                    0
++                },
++                seeker: self.seeker(at),
++                ask: AttackAsk {
++                    distance: Distance::ZERO,
++                    checks: AttackChecks::empty(),
++                    extra: None,
++                },
++            },
++            memory: self.memory(),
++        })?;
++        self.add_retries(&found);
++        self.attack_search_alert(found, player_kind, &at.unit_ai_tuning)?;
++        let mut target = attacker;
++        if let Some(best) = found.id.filter(|&b| b != attacker)
++            && let Some(b) = side.seen_unit(best)?
++        {
++            let t = side.seen_unit(attacker)?.ok_or(GenieError::unreachable(
++                "a call for help whose attacker left the world",
++            ))?;
++            // 0xd1dae8: COMISS gap(best), gap(attacker) * 0.9; JBE keeps the best
++            let scaled = t.gap_squared.get() * f32::from_bits(0x3f66_6666);
++            if at_most_or_unordered(b.gap_squared.get(), scaled) {
++                target = best;
++            }
++        }
++        let _ = self.attack_object(target, OrderForce::Forced, TargetRules::Own, at, side)?;
++        Ok(())
++    }
++
+     /// What a search of the unit AI covers (`FUN_140c63e20`): the classes its constructor gave
+     /// it ([`cared_classes`]), within its search radius, the line of sight plus 1 if that is
+     /// farther, plus its growth (`+0x1e8`, `FUN_140c2e080`'s fourth argument: 7 for the villager
+diff --git a/crates/engine/genie-core/src/unit_ai/idle.rs b/crates/engine/genie-core/src/unit_ai/idle.rs
+index 28ca0268..3369baf9 100644
+--- a/crates/engine/genie-core/src/unit_ai/idle.rs
++++ b/crates/engine/genie-core/src/unit_ai/idle.rs
+@@ -645,7 +645,7 @@ impl UnitAi {
+     /// What the attack tests read of the unit AI ([`Seeker`]), its current target's master type
+     /// `target_master_kind` as the world holds it.
+     #[must_use]
+-    pub(crate) const fn seeker_with(&self, target_master_kind: Option<MasterKind>) -> Seeker {
++    pub(crate) fn seeker_with(&self, target_master_kind: Option<MasterKind>) -> Seeker {
+         Seeker {
+             stance: self.stance,
+             state_position: self.state_position,
+@@ -655,6 +655,16 @@ impl UnitAi {
+             target_class: self.target_class,
+             last_target_class: self.last_target_class,
+             patrol_path: self.patrol_path.is_some(),
++            // 188329's Defend arm reads the saved patrol's points (`0xcf7e8e`)
++            saved_patrol: if crate::unit_ai::attack_rules::patrolrange_188329()
++                && self.stance == UnitStance::Defensive
++            {
++                self.patrol_path
++                    .as_ref()
++                    .map(|p| crate::unit_ai::attack_pick::SavedPatrol::of(&p.path.points))
++            } else {
++                None
++            },
+             target_master_kind,
+         }
+     }
 diff --git a/crates/engine/genie-core/src/unit_ai/idle_animals.rs b/crates/engine/genie-core/src/unit_ai/idle_animals.rs
 index bf5761c6..c4c0d925 100644
 --- a/crates/engine/genie-core/src/unit_ai/idle_animals.rs
@@ -4241,7 +4804,7 @@ index d0cbfb72..5adf364c 100644
          let held = roles.of_class(class);
          if held.intersects(
 diff --git a/crates/engine/genie-core/src/unit_ai/side.rs b/crates/engine/genie-core/src/unit_ai/side.rs
-index 7fd24514..bfa8b3cd 100644
+index 7fd24514..b0ef18a3 100644
 --- a/crates/engine/genie-core/src/unit_ai/side.rs
 +++ b/crates/engine/genie-core/src/unit_ai/side.rs
 @@ -37,6 +37,43 @@ pub trait UnitSide {
@@ -4322,8 +4885,28 @@ index 7fd24514..bfa8b3cd 100644
      /// What the base handler's case 0x216 reads ([`OffFootprint`]) for a unit sent off the
      /// footprint of `site` (its master's radii `radius`).
      ///
+@@ -240,6 +304,19 @@ pub trait UnitSide {
+         Err(GenieError::unsupported("a call for help without the world"))
+     }
+ 
++    /// 188329 `AskForHelp`'s reach of a helper (`0x1116d20`): whether the tile planner of the
++    /// unit's restriction finds its way from the unit to object `target` within `range` (the
++    /// radii the unit's and the target's, no tile search).
++    ///
++    /// # Errors
++    ///
++    /// What the reach test does not model.
++    fn plan_reaches(&mut self, _target: ObjectId, _range: Distance) -> Result<bool, GenieError> {
++        Err(GenieError::unsupported(
++            "a helper's reach test without the world",
++        ))
++    }
++
+     /// The object `id` as the unit AI reads it ([`UnitSeen`]): None when the world does not
+     /// hold it (`FUN_1415417a0`).
+     ///
 diff --git a/crates/engine/genie-core/src/unit_ai/tests.rs b/crates/engine/genie-core/src/unit_ai/tests.rs
-index 4cc9cc71..44fd49a4 100644
+index 4cc9cc71..32e0e5ef 100644
 --- a/crates/engine/genie-core/src/unit_ai/tests.rs
 +++ b/crates/engine/genie-core/src/unit_ai/tests.rs
 @@ -1397,9 +1397,8 @@ fn hunter_asked_for_another_target_hunts_what_its_search_finds() {
@@ -4338,7 +4921,15 @@ index 4cc9cc71..44fd49a4 100644
      );
      // a boar's 0x21 searches by its kind from the drop site
      let boar = resource(
-@@ -11019,10 +11018,8 @@ fn fishing_ship_builds_the_nearest_foundation_it_reaches() {
+@@ -7230,6 +7229,7 @@ const IDLE: Seeker = Seeker {
+     target_class: None,
+     last_target_class: None,
+     patrol_path: false,
++    saved_patrol: None,
+     target_master_kind: None,
+ };
+ 
+@@ -11019,10 +11019,8 @@ fn fishing_ship_builds_the_nearest_foundation_it_reaches() {
          site(43, class::GATE, at(15.3, 30.0)),
      ];
      let (r, _) = hear(PlayerKind::Human, sites);
@@ -4602,10 +5193,201 @@ index 1ecba910..e487683d 100644
      /// gather is the AI's target class, else its last, else the notify's (its second parameter);
      /// with none the target goes and the action stops (slot 0xb0 with 1; slot 0x48 hands the
 diff --git a/crates/engine/genie-core/src/unit_ai/world_view/side.rs b/crates/engine/genie-core/src/unit_ai/world_view/side.rs
-index 77dc93ea..b6c5eb48 100644
+index 77dc93ea..ca2421e5 100644
 --- a/crates/engine/genie-core/src/unit_ai/world_view/side.rs
 +++ b/crates/engine/genie-core/src/unit_ai/world_view/side.rs
-@@ -286,6 +286,80 @@ impl UnitSide for UnitView<'_, '_> {
+@@ -56,6 +56,139 @@ use crate::world::others::OthersRef;
+ use crate::world::slots::PlayerSlots;
+ use std::mem::{swap, take};
+ 
++/// 188329's `AskForHelp` (`0xd1d2e0`): every free helper answers as its own unit AI (its reach
++/// `0x1116d20`, its `bestUnitToAttack` `0xd1ec40`, its `AttackObject` `0xd1dd70`), the walk goes
++/// on over the search lists as they stand, and classes 66 and 67 never help:
++/// `GENIE_EXPERIMENT_HELPCALL_188329`.
++fn helpcall_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_HELPCALL_188329").is_some())
++}
++
++impl UnitView<'_, '_> {
++    /// 188329 `AskForHelp`'s walk (`0xd1d3d0`..`0xd1dc59`) over the search's lists of the unit's
++    /// own and its friends' objects (the globals' lists 1 and 2, read again with their counts on
++    /// every step): each record's object that passes the tests ([`UnitView::help_candidate`])
++    /// answers as its own unit AI ([`UnitAi::answer_help`]), whose `bestUnitToAttack` searches
++    /// again, so the walk goes on over the helper's lists at the next index.
++    fn call_for_help_188329(&mut self, attacker: ObjectId) -> Result<(), GenieError> {
++        if self.c.w.spatial.searched().is_none() {
++            return Err(GenieError::unsupported(
++                "a search that reads the registry's last answer (before any query)",
++            ));
++        }
++        let me = self.unit.id;
++        for relation in [UnitRelation::Own, UnitRelation::Ally] {
++            let mut i = 0_usize;
++            loop {
++                let Some(id) = self
++                    .c
++                    .w
++                    .spatial
++                    .searched()
++                    .and_then(|lists| lists[relation].get(i).map(|r| r.id))
++                else {
++                    break;
++                };
++                i += 1;
++                if id == me {
++                    continue;
++                }
++                let Some(owner) = self.help_candidate(id, attacker)? else {
++                    continue;
++                };
++                self.c
++                    .lend_at((&mut *self.unit, &mut *self.actions), |w, _, _| {
++                        let at = w.live_index(owner, id).ok_or_else(|| {
++                            GenieError::unreachable("a helper left its list").with("object", id)
++                        })?;
++                        w.run_unit_ai((owner, at), |ai, around, side, player_kind, _| {
++                            ai.answer_help(attacker, around, player_kind, side)
++                        })
++                    })?;
++            }
++        }
++        Ok(())
++    }
++
++    /// 188329 `AskForHelp`'s tests of the object `id` of a list record (`0xd1d3f0`..`0xd1da1b`):
++    /// its owner when it answers. The world's object with a unit AI in a state below 3; never
++    /// the classes 1 to 3, 18 to 21, 27, 39, 66 and 67 nor the siege tower; a villager (class
++    /// 4) only against Gaia's; the unit's own player's or an ally's; within the squared
++    /// footprint gap 9 of the unit; then [`UnitView::helper_free`]. Slot 0x2e8 with 1
++    /// (`0x113c0b0`) follows from the idle test for a helper in no group; a patrolling group's
++    /// member passes it while the group is idle on no command or a move (`0x10dd760`).
++    fn help_candidate(
++        &self,
++        id: ObjectId,
++        attacker: ObjectId,
++    ) -> Result<Option<PlayerId>, GenieError> {
++        /// The classes that never help: 1 to 3, 18 to 21, 27 and 39.
++        const NO_HELP_CLASSES: ClassMask = ClassMask::new(0x0080_083c_000e, 0x28);
++
++        let roles = &self.c.w.model.roles.clone();
++        let others = owner_view(
++            &self.c.w.players,
++            &self.c.w.index,
++            self.c.player,
++            self.new_owner,
++        )?;
++        let find = |id: ObjectId| others.find(id);
++        let gaia_attacker = find(attacker).is_some_and(|(owner, _)| owner == PlayerId::GAIA);
++        let my_radius = self
++            .unit
++            .master(self.c.w.master_tables(), self.player)?
++            .radius;
++        let Some((owner, u)) = find(id) else {
++            return Ok(None);
++        };
++        if !self.c.w.parts.unit_ai.contains(u.id) || ObjectState::Dying <= u.life.state {
++            return Ok(None);
++        }
++        let m = u.master(self.c.w.master_tables(), owner)?;
++        // 0xd1d4xx: `1 < (ushort)(class - 0x42)`
++        if NO_HELP_CLASSES.contains(m.class)
++            || m.class == ClassId::named(66)
++            || m.class == ClassId::named(67)
++            || roles.of_master(m.id).contains(MasterRoles::SIEGE_TOWER)
++        {
++            return Ok(None);
++        }
++        if !gaia_attacker && roles.of_class(m.class).contains(ClassRoles::VILLAGER) {
++            return Ok(None);
++        }
++        if owner != self.player && !self.c.w.spatial.allied_with(owner, self.player) {
++            return Ok(None);
++        }
++        let gap = footprint_gap_squared(self.unit.position(), my_radius, u.position(), m.radius);
++        if DistanceSquared::new(self.c.w.model.tuning.unit_ai.help_reach) < gap {
++            return Ok(None);
++        }
++        if !self.helper_free(
++            owner,
++            u,
++            self.c.w.parts.actions_of(u.id),
++            m,
++            attacker,
++            roles,
++        )? {
++            return Ok(None);
++        }
++        // slot 0x2e8 with 1 of a group's member (`0x113c0d8`): not `0x10dd760(group, id)`, which
++        // for a patrolling group (its path loops, `0x110ffd0`, or bit 11 of `+0x140`) is false
++        // only while the group is idle (`0x10dd870`) on no command or a move (`+0x3b0` -1 or 1)
++        if let Some(g) = u.group.id.and_then(|g| self.c.w.groups.get(g)) {
++            let free = g.is_idle()
++                && (g.current_command == crate::groups::GroupCommandKind::NONE
++                    || g.current_command == crate::groups::GroupCommandKind::MOVE);
++            if !free {
++                return Ok(None);
++            }
++        }
++        Ok(Some(owner))
++    }
++}
++
+ impl UnitSide for UnitView<'_, '_> {
+     fn table_drop_site(&mut self) -> Result<Option<DropSiteId>, GenieError> {
+         let class = self
+@@ -129,10 +262,50 @@ impl UnitSide for UnitView<'_, '_> {
+         self.own_foundation_near()
+     }
+ 
++    fn plan_reaches(&mut self, target: ObjectId, range: Distance) -> Result<bool, GenieError> {
++        // 0x1116d20: the target's radius (its master's +0x78) plus the unit's, both places
++        // plain (slot 0x568), the planner of the unit's master
++        let Some(t) = self.c.w.spatial.get_known(target)? else {
++            return Ok(false);
++        };
++        let (to, target_radius) = (t.position.ground(), t.radius.x());
++        let unit = &*self.unit;
++        let own_radius = unit
++            .master(self.c.w.master_tables(), self.player)?
++            .radius
++            .x();
++        let mover = self
++            .c
++            .w
++            .parts
++            .mover_of(unit.id)
++            .ok_or(GenieError::unsupported(
++                "the reach of a helper that does not move (188329 0x1116d20)",
++            ))?;
++        let mut plan = Planning {
++            pathing: &mut self.c.w.pathing,
++            now: self.c.w.world_time,
++            player_kind: self.player_kind,
++            object: self.c.w.streams.get(Stream::Object),
++            groups: &self.c.w.groups,
++        };
++        mover.plan_reaches(
++            unit.position(),
++            &self.c.w.spatial,
++            &mut plan,
++            to,
++            (Distance::new(own_radius + target_radius), range),
++            &self.c.w.model.tuning.tile_path,
++        )
++    }
++
+     fn call_for_help(&mut self, attacker: ObjectId) -> Result<(), GenieError> {
+         /// The classes that never help: 1 to 3, 18 to 21, 27 and 39.
+         const NO_HELP_CLASSES: ClassMask = ClassMask::new(0x0080_083c_000e, 0x28);
+ 
++        if helpcall_188329() {
++            return self.call_for_help_188329(attacker);
++        }
+         let roles = &self.c.w.model.roles.clone();
+         let lists = self.c.w.spatial.searched().ok_or(GenieError::unsupported(
+             "a search that reads the registry's last answer (before any query)",
+@@ -286,6 +459,80 @@ impl UnitSide for UnitView<'_, '_> {
          Ok(class)
      }
  
@@ -4686,7 +5468,7 @@ index 77dc93ea..b6c5eb48 100644
      fn reaches(&mut self, target: ObjectId, range: Distance) -> Result<bool, GenieError> {
          let mut plan = Planning {
              pathing: &mut self.c.w.pathing,
-@@ -322,6 +396,31 @@ impl UnitSide for UnitView<'_, '_> {
+@@ -322,6 +569,31 @@ impl UnitSide for UnitView<'_, '_> {
          )
      }
  
@@ -4718,6 +5500,75 @@ index 77dc93ea..b6c5eb48 100644
      fn closest(&mut self, search: &Search<'_>) -> Result<Found, GenieError> {
          let roles = &self.c.w.model.roles.clone();
          let seeker = match search.pick {
+diff --git a/crates/engine/genie-core/src/unit_ai/world_view/unit_view.rs b/crates/engine/genie-core/src/unit_ai/world_view/unit_view.rs
+index 9fe88757..68b124ee 100644
+--- a/crates/engine/genie-core/src/unit_ai/world_view/unit_view.rs
++++ b/crates/engine/genie-core/src/unit_ai/world_view/unit_view.rs
+@@ -17,7 +17,7 @@ use crate::players::PlayerId;
+ use crate::players::PlayerKind;
+ use crate::unit_ai::world_view::owner_view;
+ use crate::unit_ai::world_view::{UnitView, WorldPicker};
+-use crate::unit_ai::{Seeker, can_attack};
++use crate::unit_ai::Seeker;
+ use crate::world::index::ObjectsRef;
+ use crate::world::layer::Roles;
+ use crate::world::lets::{release as lets_release, take as lets_take, torn_down as lets_torn_down};
+@@ -76,12 +76,15 @@ impl UnitView<'_, '_> {
+     ) -> Result<Option<(ClassId, Position)>, GenieError> {
+         let picker = self.picker(Some(*seeker))?;
+         let (t, _) = picker.target(&self.c.w.spatial, target)?;
+-        Ok(can_attack(
++        Ok(crate::unit_ai::attack_pick::can_attack_on(
+             &self.attacker,
+             seeker,
+             &t,
+             roles,
+             &self.c.w.model.tuning.unit_ai,
++            Some(crate::unit_ai::attack_pick::PatrolRoute::of(
++                self.c.w.parts.mover_of(self.unit.id),
++            )),
+         )?
+         .then_some((t.class, t.position)))
+     }
+@@ -199,12 +202,15 @@ impl UnitView<'_, '_> {
+         };
+         let picker = self.picker(None)?;
+         let (target, _) = picker.target(&self.c.w.spatial, attacker)?;
+-        can_attack(
++        crate::unit_ai::attack_pick::can_attack_on(
+             &me,
+             &ai.seeker_with(target_master_kind),
+             &target,
+             roles,
+             &self.c.w.model.tuning.unit_ai,
++            Some(crate::unit_ai::attack_pick::PatrolRoute::of(
++                self.c.w.parts.mover_of(u.id),
++            )),
+         )
+     }
+ }
+diff --git a/crates/engine/genie-core/src/unit_ai/world_view/world_picker.rs b/crates/engine/genie-core/src/unit_ai/world_view/world_picker.rs
+index acf8fb4a..a35e54f4 100644
+--- a/crates/engine/genie-core/src/unit_ai/world_view/world_picker.rs
++++ b/crates/engine/genie-core/src/unit_ai/world_view/world_picker.rs
+@@ -541,7 +541,16 @@ impl AttackPicker for WorldPicker<'_> {
+             "an attack test outside bestUnitToAttack",
+         ))?;
+         let (target, _) = self.target(spatial, id)?;
+-        unit_ai_can_attack(self.attacker, &seeker, &target, roles, unit_ai_tuning)
++        // 188329's soldier reads the unit's own path in Defend (slots 0x690, 0x4a8)
++        let route = crate::unit_ai::attack_pick::PatrolRoute::of(self.parts.mover_of(self.me));
++        crate::unit_ai::attack_pick::can_attack_on(
++            self.attacker,
++            &seeker,
++            &target,
++            roles,
++            unit_ai_tuning,
++            Some(route),
++        )
+     }
+ 
+     fn attacks_neutral(&mut self, class: ClassId) -> Result<bool, GenieError> {
 diff --git a/crates/engine/genie-core/src/world/index.rs b/crates/engine/genie-core/src/world/index.rs
 index 8c22fa57..15f31bd7 100644
 --- a/crates/engine/genie-core/src/world/index.rs
@@ -9020,6 +9871,30 @@ index 0c6a6c44..cb07d175 100644
      let build = layer()?;
      let missile_tuning = &build.tuning.missile;
      let victory = &header.world.base_world.victory_conditions;
+diff --git a/crates/tools/genie-oracle/src/top_actions.rs b/crates/tools/genie-oracle/src/top_actions.rs
+index b2774f57..2bfe02e9 100644
+--- a/crates/tools/genie-oracle/src/top_actions.rs
++++ b/crates/tools/genie-oracle/src/top_actions.rs
+@@ -509,7 +509,10 @@ fn import_explore(saved: &Saved<'_>, actions: &mut layers::Action) -> Result<(),
+         .map(|s| saved_move_to(s, saved.graphics, Voice::Quiet))
+         .transpose()?;
+     let state = ExploreState::of_byte(base.state, move_to)?;
+-    if !matches!(state, ExploreState::Wait | ExploreState::Walk { .. }) {
++    // 188329's state 2 (the wait's countdown): `GENIE_EXPERIMENT_EXPLORE_WAIT_188329`
++    let stopped_ok = matches!(state, ExploreState::Stopped)
++        && std::env::var_os("GENIE_EXPERIMENT_EXPLORE_WAIT_188329").is_some();
++    if !stopped_ok && !matches!(state, ExploreState::Wait | ExploreState::Walk { .. }) {
+         return Err(GenieError::unsupported(
+             "a saved Explore in a state the slice does not model",
+         ));
+@@ -517,6 +520,7 @@ fn import_explore(saved: &Saved<'_>, actions: &mut layers::Action) -> Result<(),
+     actions.list.set_explore(Some(ExploreAction {
+         state,
+         point: saved.point(),
++        wait: 0.0,
+     }));
+     Ok(())
+ }
 diff --git a/crates/engine/genie-core/src/correction.rs b/crates/engine/genie-core/src/correction.rs
 new file mode 100755
 index 00000000..3f35b183
