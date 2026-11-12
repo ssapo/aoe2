@@ -2228,6 +2228,84 @@ index 7c1fba27..b523d1c2 100644
                  };
                  c.lend_at((&mut *self, &mut *actions), |w, p, i| {
                      w.order_work(p, i, &work)
+diff --git a/crates/engine/genie-core/src/orders/actions.rs b/crates/engine/genie-core/src/orders/actions.rs
+index 00aaf602..3071701a 100644
+--- a/crates/engine/genie-core/src/orders/actions.rs
++++ b/crates/engine/genie-core/src/orders/actions.rs
+@@ -15,6 +15,7 @@ use crate::objects::ObjectId;
+ use crate::objects::ObjectState;
+ use crate::objects::layers::Combat;
+ use crate::objects::layers::MotionMut;
++use crate::objects::masters::HpPercent;
+ use crate::objects::masters::Master;
+ use crate::objects::masters::MasterId;
+ use crate::objects::masters::MasterKind;
+@@ -440,13 +441,60 @@ pub(crate) fn switch_master(
+             1.0
+         };
+         let old_hp = unit.life.hp;
+-        unit.life.hp = HitPoints::new(f32::from(hp as i32 as i16));
++        // 188329 (0x1266b90: 0x1266ccc..0x1266d3d): the share goes to the hit points (`+0x130`) as
++        // the float it is, within 1 and the new master's; nothing makes it whole
++        let masterhp_188329 = std::env::var_os("GENIE_EXPERIMENT_MASTERHP_188329").is_some();
++        unit.life.hp = if masterhp_188329 {
++            HitPoints::new(hp)
++        } else {
++            HitPoints::new(f32::from(hp as i32 as i16))
++        };
+         // FUN_1411859a0: the damage share picks the damage sprites; one that stays keeps them
+         // (the object's `+0xd`, not held, taken to be the old master's share)
+-        if (old.has_damage_sprites() || next.has_damage_sprites())
+-            && (damage_share(old_hp, old.hit_points, old.class, roles)?
+-                != damage_share(unit.life.hp, next.hit_points, next.class, roles)?)
+-        {
++        let sprites_change = if masterhp_188329 {
++            // 188329 (0x12429c0, CheckDamageSprites, which 0x1266b90 runs in state 2 with the new
++            // master set): a new master without damage sprites leaves the share; a share that
++            // stays, one of 100 or more, and one that stays at the same entry (the last whose
++            // percent lies below the share) only write the share (`+0xd`). A move to another
++            // entry (attachments, two draws of the Object stream for mode 1, slot 0x70 for mode
++            // 2) is not modelled here.
++            if next.has_damage_sprites() {
++                let was = HpPercent::of_data(damage_share(
++                    old_hp,
++                    old.hit_points,
++                    old.class,
++                    roles,
++                )?);
++                let now = HpPercent::of_data(damage_share(
++                    unit.life.hp,
++                    next.hit_points,
++                    next.class,
++                    roles,
++                )?);
++                let entry =
++                    |s: HpPercent| next.damage_graphics.iter().rposition(|e| e.percent < s);
++                now != was && now < HpPercent::WHOLE && entry(now) != entry(was)
++            } else {
++                false
++            }
++        } else {
++            (old.has_damage_sprites() || next.has_damage_sprites())
++                && (damage_share(old_hp, old.hit_points, old.class, roles)?
++                    != damage_share(unit.life.hp, next.hit_points, next.class, roles)?)
++        };
++        if std::env::var_os("GENIE_TRACE_MASTERHP").is_some() {
++            eprintln!(
++                "MASTERHP id={:?} master={:?}->{:?} hp={:?}->{:?} share={hp} whole={} change={sprites_change} entries={:?}",
++                unit.id,
++                old.id,
++                next.id,
++                old_hp,
++                unit.life.hp,
++                hp as i32 as i16,
++                next.damage_graphics
++            );
++        }
++        if sprites_change {
+             return Err(GenieError::unsupported(
+                 "a master change that changes the damage sprites (FUN_1411859a0)",
+             ));
 diff --git a/crates/engine/genie-core/src/orders/drop_site.rs b/crates/engine/genie-core/src/orders/drop_site.rs
 index d65b2d84..1a6c366e 100644
 --- a/crates/engine/genie-core/src/orders/drop_site.rs
@@ -2346,10 +2424,36 @@ index 29f5d776..4e3fe984 100644
          let takes_it = !order.flags.contains(OrderFlags::QUEUED)
              && self.parts.unit_ai.get(unit.id).is_none_or(|ai| {
 diff --git a/crates/engine/genie-core/src/orders/town_bell.rs b/crates/engine/genie-core/src/orders/town_bell.rs
-index 72090fb3..214c38b0 100644
+index 72090fb3..e8c87ca2 100644
 --- a/crates/engine/genie-core/src/orders/town_bell.rs
 +++ b/crates/engine/genie-core/src/orders/town_bell.rs
-@@ -462,6 +462,10 @@ impl World {
+@@ -135,6 +135,12 @@ impl TownBell {
+     /// its point (−1, −1)). The new record ([`WorkReturn`]) is the caller's: its target, target
+     /// class, the unit AI's action, the second target and the point.
+     pub fn record(&mut self, now: BackToWork) {
++        if std::env::var_os("GENIE_TRACE_BELL").is_some() {
++            eprintln!(
++                "BELL_RECORD flag={:?} now={now:?} work={:?} before={:?}",
++                self.flag, self.work, self.before_building
++            );
++        }
+         if self.flag.is_sheltered() || now == self.work {
+             return;
+         }
+@@ -220,6 +226,12 @@ impl TownBell {
+         lookup: &dyn Fn(ObjectId) -> Result<Option<RecordTarget>, GenieError>,
+         roles: &Roles,
+     ) -> Result<(Option<RecordTarget>, BackToWork), GenieError> {
++        if std::env::var_os("GENIE_TRACE_BELL").is_some() {
++            eprintln!(
++                "BELL_BACK flag={:?} work={:?} before={:?}",
++                self.flag, self.work, self.before_building
++            );
++        }
+         let (found, out) = record_object(self.work, lookup, roles)?;
+         if found.is_some() {
+             return Ok((found, out));
+@@ -462,6 +474,10 @@ impl World {
      /// villager (class 4) or of master 1808 back to work, from the last in
      /// ([`crate::world::World::back_to_work`]; its sound, slot 0x4c0, is not simulation).
      fn workers_out(&mut self, owner: PlayerId, idx: ListIndex) -> Result<(), GenieError> {
@@ -2360,7 +2464,7 @@ index 72090fb3..214c38b0 100644
          let mut i = self.players.live(owner, idx)?.garrison.len();
          while 0 < i {
              i -= 1;
-@@ -552,7 +556,8 @@ impl World {
+@@ -552,7 +568,8 @@ impl World {
                  &Work {
                      target: Some(target),
                      point: Position::new(x, y, 0.0),

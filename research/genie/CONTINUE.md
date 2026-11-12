@@ -28,12 +28,12 @@
 - 엔진은 update 36,452(약 930초)에서 멈춘다: "a helper that answers a call for help". 멈추는 곳은 고칠 때마다 바뀐다(22번 기록 참고). 900초 누적값은 그 직전이라 아직 믿을 만하지만, 멈춤이 900초 앞으로 오면 못 쓴다.
 - 시작 시점(11-10 저녁)에는 자원 일치 134초, 위치 일치 32.5초였다. 그 사이에 넣은 것은 12절 표에 전부 있다.
 
-### 2.1 리플 3개 (2026-11-12, 스위치 17개(15개 + `ESCAPE` 37번 + `FORMING` 39번; HUNT에 가축 통지 3단계 탐색 포함, 38번) + `SEARCH_CLEAR=unit`, 실행 `J_f_239`, `J_f_161`, `J_f_097`)
+### 2.1 리플 3개 (2026-11-12, 스위치 17개(15개 + `ESCAPE` 37번 + `FORMING` 39번; HUNT에 가축 통지 3단계 탐색 포함, 38번) + `SEARCH_CLEAR=unit`, 실행 `J_f_239`, `J_f_161`, `J_f_097`; 그 위에 `MASTERHP` 40번을 더한 18개 = 지금 기본, 실행 `K_m_239`, `K_m_161`, `K_m_097`: 아래 표의 숫자는 그대로이고 518470161의 멈춤만 바뀜)
 
 | 리플 (기록) | 첫 어긋남 P1 / P2 (13.3 판정 규칙) | 위치(word 7) 첫 불일치 P1 / P2 | 자원 첫 차이(> 0.01) P1 / P2 | 자원 50 넘게 P1 / P2 | 엔진 멈춤 update |
 |---|---|---|---|---|---|
 | 518239882 (truth4) | 426.8 (word 7) / 398.8 (word 9) | 426.8 / 469.1 | 457.4 / 466.4 | 631.7 / 691.8 | 41,256 (약 1059초, P1 "a horde's command (commandHorde)") |
-| 518470161 (truth5) | 411.0 (자원, 나무 +9.4) / 457.2 (word 7·9) | 411.7 / 457.2 | 411.0 / 483.8 | 484.2 / 748.7 | 42,960 (약 560.7초, P1 "a master change that changes the damage sprites (FUN_1411859a0)"); P2 69,046 (약 900.5초, "a builder with no task for its foundation") |
+| 518470161 (truth5) | 411.0 (자원, 나무 +9.4) / 457.2 (word 7·9) | 411.7 / 457.2 | 411.0 / 483.8 | 484.2 / 748.7 | P2 69,046 (약 900.5초, "a builder with no task for its foundation"), P1 69,419 ("an object of a stopped player may be near"; P2 멈춤을 뒤따른 것). `MASTERHP` 전(`J_f_161`)에는 P1 42,960 (약 560.7초, "a master change that changes the damage sprites") |
 | 517426097 (truth6) | 262.9 (word 7) / 444.9 (word 7·9) | 262.9 / 444.9 | 324.0 / 582.1 | 579.2 / 707.6 | 70,196 (P1 "a pather query meeting a gate (its players' passage, slot 0x678)") |
 
 518239882 900초 누적(원본 대비 엔진): P1 식량 −200, 나무 −53.4; P2 식량 −439.7, 나무 −26.4. 확인 체크포인트(P1/P2): 518239882 35/33, 518470161 62/69, 517426097 39/67.
@@ -48,7 +48,7 @@
 
 새 리플 두 개를 처음 돌렸을 때(스위치 9개)는 518470161 P2 위치 8.7초·식량 35.6초, 517426097 P1 위치 93.9초·식량 123.8초였다. findings 27~38로 위처럼 늘었다. 채점: `runs/summ2.sh <이름> ../truth/analysisN`(518239882는 `../truth/analysis`, 518470161은 `analysis5`, 517426097은 `analysis6`). 두 실행 묶음 비교: `cd runs && python3 J_cmp.py <기준 접두어> <새 접두어>`(먼저 `./summ2.sh <이름> <analysis> > J_sum_<이름>.txt`).
 
-켜는 스위치(전부 `=1`): `GENIE_EXPERIMENT_SORT_LISTS`, `GENIE_EXPERIMENT_SHORT_188329`, `GENIE_EXPERIMENT_SPAWN_188329`, `GENIE_EXPERIMENT_AI_ORDER_188329`, `GENIE_EXPERIMENT_EVADE_188329`, `GENIE_EXPERIMENT_WALK_188329`, `GENIE_EXPERIMENT_HUNT_188329`, `GENIE_EXPERIMENT_UNLOAD_188329`, `GENIE_EXPERIMENT_MOVETO_188329`, `GENIE_EXPERIMENT_CORNER_188329`, `GENIE_EXPERIMENT_REWALK_188329`, `GENIE_EXPERIMENT_GRAZE_188329`, `GENIE_EXPERIMENT_BACKWORK_IGNORE_188329`, `GENIE_EXPERIMENT_TASKARGS_188329`, `GENIE_EXPERIMENT_IGNORELIST_188329`, `GENIE_EXPERIMENT_ESCAPE_188329`(37번), `GENIE_EXPERIMENT_FORMING_188329`(39번). 앞의 셋은 `runs\go.ps1`이 항상 켠다. 나머지는 `-Envs`로 준다(12.3절의 `$a`). 켜지 않는 것: `GENIE_EXPERIMENT_UPSTREAM_RELICS`, `GENIE_EXPERIMENT_UPSTREAM_CART`(upstream 동작 그대로, 원본 확인 없음; 켜도 세 리플 결과 같음, 34번), `GENIE_EXPERIMENT_FORMING_FIRSTGAP_188329`, `GENIE_EXPERIMENT_FORMING_FIRSTPLAN_188329`(39번). 추적 `GENIE_TRACE_FORMING=1`(그룹 형성 줄).
+켜는 스위치(전부 `=1`): `GENIE_EXPERIMENT_SORT_LISTS`, `GENIE_EXPERIMENT_SHORT_188329`, `GENIE_EXPERIMENT_SPAWN_188329`, `GENIE_EXPERIMENT_AI_ORDER_188329`, `GENIE_EXPERIMENT_EVADE_188329`, `GENIE_EXPERIMENT_WALK_188329`, `GENIE_EXPERIMENT_HUNT_188329`, `GENIE_EXPERIMENT_UNLOAD_188329`, `GENIE_EXPERIMENT_MOVETO_188329`, `GENIE_EXPERIMENT_CORNER_188329`, `GENIE_EXPERIMENT_REWALK_188329`, `GENIE_EXPERIMENT_GRAZE_188329`, `GENIE_EXPERIMENT_BACKWORK_IGNORE_188329`, `GENIE_EXPERIMENT_TASKARGS_188329`, `GENIE_EXPERIMENT_IGNORELIST_188329`, `GENIE_EXPERIMENT_ESCAPE_188329`(37번), `GENIE_EXPERIMENT_FORMING_188329`(39번), `GENIE_EXPERIMENT_MASTERHP_188329`(40번). 앞의 셋은 `runs\go.ps1`이 항상 켠다. 나머지는 `-Envs`로 준다(12.3절의 `$a`). 켜지 않는 것: `GENIE_EXPERIMENT_UPSTREAM_RELICS`, `GENIE_EXPERIMENT_UPSTREAM_CART`(upstream 동작 그대로, 원본 확인 없음; 켜도 세 리플 결과 같음, 34번), `GENIE_EXPERIMENT_FORMING_FIRSTGAP_188329`, `GENIE_EXPERIMENT_FORMING_FIRSTPLAN_188329`(39번). 추적 `GENIE_TRACE_FORMING=1`(그룹 형성 줄).
 
 ## 3. 지켜야 할 것
 
@@ -214,6 +214,7 @@
 | ESCAPE_188329 (2026-11-12부터 기본으로 켬) | 시작 노드 탈출 접점: 원 위(`d2 <= rr2`, 0x107f529) 포함, 무시된 도형의 접점도 둠 | `pathing/short_path/{mod,start}.rs` `escape_contacts` | escape-contact-case-215s (findings 37) | 518470161 215.4초 경로 일치(`J_v_esc`). 처음엔 뒤쪽 세 곳을 앞당겨 껐다가, 13.3의 판정 규칙 변경(2026-11-12)으로 켬: 세 리플 선수별 첫 어긋남을 앞당기지 않음(`J_f_*` 대 `J_c_*`, 2.1) |
 | FORMING_188329 (2026-11-12부터 기본으로 켬) | 그룹 형성(P20 F1~F9): 형성 필드, 새 이동의 0xc000, 가까운 멤버 수와 ×0.5/×0.8333 상한, 0.8125 앞섬(movePositionToFront 꼬리), 속도 패스와 공유 예산, steer 속도, formed, 자기 이동 1.2배 | `groups/{mod,command,order,stats,place}.rs`, `groups/formation/column_line.rs`, `groups/update/awake.rs`, `groups/steer/{to_slots,slot_steps}.rs`, `movement/step.rs`, oracle `groups.rs` | group-forming-lead-case-228s (findings 39) | 517426097 228.5초 네 점 비트 일치(`J_v_f5`). 처음엔 518239882 P2 50 넘게를 1.7초 앞당겨 껐다가, 13.3의 판정 규칙 변경(2026-11-12)으로 켬(`J_f_*`, 2.1) |
 | FORMING_FIRSTGAP_188329 / FORMING_FIRSTPLAN_188329 (켜지 않음) | 첫 속도 패스의 간격을 한 걸음 뒤에서(P20 4절 1번, 추정) / 첫 갱신의 두 움직임은 계획만(F10) | `groups/steer/to_slots.rs` / `groups/update/awake.rs` | findings 39 | 켜면 228.5초 사례가 2~4 / 5~65 ulp 어긋남 |
+| MASTERHP_188329 (2026-11-12부터 기본) | 마스터가 바뀔 때 체력 = 옛 체력 / 옛 최대 × 새 최대를 1과 새 최대 사이로 자른 **float 그대로**(정수로 자르지 않음, 0x1266ccc~0x1266d3d). 손상 그림 검사(0x12429c0)는 새 마스터에 손상 그림이 있고, 비율이 바뀌고 100 미만이며, 고르는 단계(퍼센트가 비율보다 작은 마지막 항목)가 달라질 때만 멈춤 | `orders/actions.rs` `switch_master` | masterhp-case-560s (findings 40) | 518470161 560.7초 문 10486(793 → 794, 체력 204.99872) 통과, 세 리플 첫 어긋남·자원 수치 그대로(`K_m_*`) |
 
 "근거" 열의 문서는 모두 이 폴더의 `original-188329-*.md`이다. 사례 문서는 주소와 손 계산까지 들어 있다.
 
@@ -224,7 +225,7 @@ $d="$env:USERPROFILE\genie-replays"
 # 빌드만 (약 3분; 끝은 build7.err의 "Finished"로 확인. census가 돌고 있으면 exe를 못 덮어써서 실패하니 먼저 Stop-Process -Name census)
 powershell -File $d\runs\steer.ps1
 # 실행: 이름, 갱신 수(기본 41600 = 기준 리플 끝까지; 다른 리플은 200000), 추가 환경변수, -Replay <리플 폴더 번호>(기본 518239882)
-$a='GENIE_EXPERIMENT_AI_ORDER_188329=1;GENIE_EXPERIMENT_EVADE_188329=1;GENIE_EXPERIMENT_WALK_188329=1;GENIE_EXPERIMENT_HUNT_188329=1;GENIE_EXPERIMENT_UNLOAD_188329=1;GENIE_EXPERIMENT_MOVETO_188329=1;GENIE_EXPERIMENT_CORNER_188329=1;GENIE_EXPERIMENT_REWALK_188329=1;GENIE_EXPERIMENT_GRAZE_188329=1;GENIE_EXPERIMENT_BACKWORK_IGNORE_188329=1;GENIE_EXPERIMENT_TASKARGS_188329=1;GENIE_EXPERIMENT_IGNORELIST_188329=1;GENIE_EXPERIMENT_ESCAPE_188329=1;GENIE_EXPERIMENT_FORMING_188329=1'
+$a='GENIE_EXPERIMENT_AI_ORDER_188329=1;GENIE_EXPERIMENT_EVADE_188329=1;GENIE_EXPERIMENT_WALK_188329=1;GENIE_EXPERIMENT_HUNT_188329=1;GENIE_EXPERIMENT_UNLOAD_188329=1;GENIE_EXPERIMENT_MOVETO_188329=1;GENIE_EXPERIMENT_CORNER_188329=1;GENIE_EXPERIMENT_REWALK_188329=1;GENIE_EXPERIMENT_GRAZE_188329=1;GENIE_EXPERIMENT_BACKWORK_IGNORE_188329=1;GENIE_EXPERIMENT_TASKARGS_188329=1;GENIE_EXPERIMENT_IGNORELIST_188329=1;GENIE_EXPERIMENT_ESCAPE_188329=1;GENIE_EXPERIMENT_FORMING_188329=1;GENIE_EXPERIMENT_MASTERHP_188329=1'
 # 기본에 없는 시험 스위치(필요할 때 $a 뒤에 붙인다): GENIE_EXPERIMENT_FORMING_FIRSTGAP_188329=1, GENIE_EXPERIMENT_FORMING_FIRSTPLAN_188329=1 (39번, FORMING 위). ESCAPE·FORMING은 2026-11-12부터 기본(13.3 판정 규칙). 그룹 형성 추적은 GENIE_TRACE_FORMING=1
 powershell -File $d\runs\go.ps1 -Name fX -Envs "$a;GENIE_TRACE_RES=1"                       # 전체, 자원 추적 (약 3분)
 powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OBJECTS_RANGE=14540-14700"   # 그 갱신 구간의 개체 추적
@@ -260,7 +261,7 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 12.5 미해결 (이른 순)
 
-0. (세 리플, 2026-11-12, 실행 `J_f_*` = 새 기본 17개) 가장 이른 것부터. 선수별 첫 어긋남(13.3): 517426097 P1 262.9초, 518239882 P2 398.8초, 518470161 P1 411.0초, 518239882 P1 426.8초, 517426097 P2 444.9초, 518470161 P2 457.2초.
+0. (세 리플, 2026-11-12, 실행 `J_f_*` = 17개; 지금 기본은 `MASTERHP`를 더한 18개 `K_m_*`, 첫 어긋남은 같음) 가장 이른 것부터. 선수별 첫 어긋남(13.3): 517426097 P1 262.9초, 518239882 P2 398.8초, 518470161 P1 411.0초, 518239882 P1 426.8초, 517426097 P2 444.9초, 518470161 P2 457.2초.
    - 517426097 P1 주민 3824(master 122), 258.424초(update 약 20044): 이 리플 P1의 첫 어긋남(word 7 262.9초)으로 보이는 단서(38번 끝 참고, P21 B부). 짧은 경로 끝 뒤의 다음 경유점이 다르다. 다음 첫 동작: 새 기본 `$a`(12.3)로 `GENIE_TRACE_STEER_RANGE=19960-20060`, `GENIE_TRACE_PATHS=1`, `GENIE_TRACE_OBJECT_IDS=3824`.
    - 517426097 P1 word 4·9 282.4초, P1 자원 324.0초(나무 +9.5): 미조사.
    - 518239882 P2 word 9 398.8초(이 리플 P2의 첫 어긋남; P2 word 7은 469.1초, 옛 기본에서도 398.8초): 미조사. 다음 첫 동작: `J_f_239.out`의 P2 첫 불일치 체크포인트로 update 구간을 좁혀 개체 추적 → `cmp_pos.py`·`cmp_held.py`.
@@ -269,8 +270,8 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
    - 517426097 P2 444.9초(word 7·9): 미조사.
    - 518470161 P2 word 7·9 457.2초, 자원 483.8초(나무 +10): ESCAPE로 216.7초에서 밀려남. 미조사.
    - 첫 어긋남 뒤에서 앞당겨진 것(13.3 규칙으로 판정을 막지 않지만 자원 정확도에는 중요): ESCAPE로 518239882 P2 자원 50 넘게 767.1 → 691.8초, 900초 P2 식량 −249.7 → −439.7; 517426097 P2 word 10 620.4 → 542.4초(멈춤도 73,336 → 70,196). FORMING 단독으로는 518239882 P2 50 넘게 767.1 → 765.4초(두 실행 RES가 처음 갈리는 곳 716.861초 P1 식량 +10). 다음 첫 동작: D2(무시 도형 접점 유지)만 끈 임시 실행으로 ESCAPE 쪽 원인을 가른 뒤, 517426097 P2 word 10(542.4초) 앞 구간을 `J_f_097` 대 `J_c_097` 개체 추적으로 비교.
-   - 엔진 멈춤: **518470161 P1 42,960(약 560.7초) "a master change that changes the damage sprites (FUN_1411859a0)"**(새 기본에서도 가장 이른 멈춤, 첫 어긋남 뒤), P2 69,046(약 900.5초) "a builder with no task for its foundation"; 518239882 41,256(약 1059초) P1 "a horde's command (commandHorde)"(옛 기본은 36,452 "a helper that answers a call for help", 4번); 517426097 70,196 P1 "a pather query meeting a gate (its players' passage, slot 0x678)"(옛 기본은 73,336 P2 "a horde's command"). 22번과 같은 방식(원본 동작을 읽어 오류를 대체). 다음 첫 동작: 518470161 update 42,900~42,960 개체 추적으로 어느 유닛의 master 변경인지 보고 FUN_1411859a0의 188329 대응을 읽는다.
-     - **확인 필요(2026-11-12, 사용자와 합의, 아직 안 함):** 이 멈춤은 "손상 그림(화면용)" 처리라 원본처럼 그릴 필요는 없고 건너뛰면 된다. 단 건너뛰기 전에 188329 원본에서 두 가지를 확인해야 한다: (1) 그 함수(158041 FUN_1411859a0의 188329 대응 함수, 주소 미확인)와 그 안에서 부르는 함수가 게임 난수(동기 난수 또는 AI 난수 airng)를 쓰는지 — 쓰면 건너뛸 때 뒤 난수가 전부 밀린다(findings 30과 같은 종류). (2) 같은 함수 안에 게임 상태(체력·속도·작업·공격·크기·위치·자원·타이머)를 바꾸는 부분이 섞였는지 — 섞였으면 그 부분은 구현하고 그림만 건너뛴다. 둘 다 아니면 새 스위치(예: `GENIE_EXPERIMENT_SKIP_VISUAL_188329`) 뒤에서 그림 부분만 건너뛰고, 518470161을 끝까지 돌려 560초까지의 첫 어긋남이 그대로인지·어디까지 가는지 확인한다. 앞으로 순수 화면용 처리는 같은 방식(확인 후 건너뛰기)으로 한다. 이 확인을 시작한 도우미는 사용자가 중간에 멈췄고, 엔진 소스·실행에 남긴 흔적은 없음(backup-K 없음, K_ 실행 없음, SKIP_VISUAL 코드 없음 — 확인함).
+   - 엔진 멈춤(`K_m_*`, 지금 기본 18개): 518470161 **P2 69,046(약 900.5초) "a builder with no task for its foundation"**(P1은 그 뒤 69,419 "an object of a stopped player may be near"); 518239882 41,256(약 1059초) P1 "a horde's command (commandHorde)"(옛 기본은 36,452 "a helper that answers a call for help", 4번); 517426097 70,196 P1 "a pather query meeting a gate (its players' passage, slot 0x678)"(옛 기본은 73,336 P2 "a horde's command"). 22번과 같은 방식(원본 동작을 읽어 오류를 대체). 다음 첫 동작: 518470161 update 68,950~69,046 개체 추적으로 어느 건설자·기초인지 보고 원본의 그 갈래를 읽는다.
+     - 해결(findings 40, `MASTERHP`): 518470161 P1 42,960 "a master change that changes the damage sprites"는 화면용이 아니라 **체력 계산 차이**였다(원본은 마스터가 바뀔 때 체력을 정수로 자르지 않음). 원본 손상 그림 검사 0x12429c0(CheckDamageSprites)은 통째로 건너뛰면 안 된다: 단계가 바뀌면 모드 1 항목은 Object 난수(0x144354d90)를 두 번 뽑고 모드 2는 스프라이트를 바꾸며(스프라이트 난수), 항상 체력을 0~최대로 자르고 비율 바이트(+0xd)를 쓴다. 단계가 그대로면 아무 일도 없다. **남은 일(읽음, 미구현)**: 원본은 이 검사를 상태 2 개체의 매 갱신(0x12488e0, 0x1248b56)에서 부른다. 엔진은 업그레이드 경로(`technology/upgrade.rs` `damage_sprites_at`)에서만 부르므로, 전투로 건물 체력이 단계(25/50/75%)를 넘을 때 모드 1 항목의 Object 난수 두 번을 뽑지 않는다(건물이 맞는 구간에서 난수가 밀릴 수 있음; 사례는 아직 없음). 마스터 변경으로 단계가 실제로 바뀌는 경우는 여전히 멈춘다(같은 오류 문구).
    - 해결되어 지운 것: 518470161 P2 216.7초(word 7·9)와 P2 자원 218.5초, 양치기 9381의 내려놓기 경로(37번 `ESCAPE`, 2026-11-12 기본으로 켬). 517426097 P1 230.4초 정찰병 2976의 그룹 형성 속도(39번 `FORMING`, 2026-11-12 기본으로 켬). 518470161 P1 307.7초 양치기 10406의 시체 대신 산 양(38번). 518470161 215.4초 시작 노드 손 계산(37번). 517426097 230.4초 형성 초기화·+0x178 읽기(39번).
 1. (기준 리플) Gaia 동물 마스터 2095(말, 클래스 9) **id 4285 한 마리만**: 186.6초부터 원본에서만 도망간다(정찰병 3428이 지나갈 때). 4283은 위치 일치, 4284는 양쪽 다 정지(예전의 "4283~4285 전체"는 틀린 기록). 식량 없는 동물이라 자원 영향 없음. 186.381초의 4285·3428 위치, retarget=1244, look=672는 원본과 일치. 원본 idle은 검색이 대상을 찾으면 0xd26200(도망)을 부르는데, 엔진에서 타이머 때문에 검색을 안 하는지 검색이 실패하는지 아직 못 갈랐다. 문서 `original-188329-animal-case-186s.md`, findings 26. 다음 첫 동작: 지금 빌드(진단 출력 포함, 13.4)로 `go.ps1 -Name p27 -Updates 9480 -Envs "$a;GENIE_TRACE_OBJECTS_RANGE=9430-9480;GENIE_TRACE_OBJECT_IDS=4283,4284,4285,3428;GENIE_TRACE_ANIMAL=1"` → ANIMAL_SEARCH / ANIMAL_EVADE 줄에서 4285의 검색 결과와 타이머를 본다.
 2. 383.4초 P1 나무꾼 4371(그리고 4363)(IGNORELIST를 켜도 518239882 출력이 바이트 동일이라 세션 B의 S4 후보는 아님): 벌목소로 가는 짧은 경로 모양이 다르다(원본은 y = 45.1211을 따라 동쪽으로 간 뒤 꺾음). 도착 시각은 같다. 짧은 경로 사례로 넘길 만하다.
@@ -314,6 +315,10 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 | `patch-2026-11-12-J.patch` | 이번 엔진 패치 사본(저장소 `sorted-lists-and-truth-trace.patch`와 같음) |
 | `runs\J_*` | 37~39번 실행: 확인 추적 `J_v_esc`, `J_v_hunt`, `J_v_f1`/`J_v_f2`(F10 넣기 전 빌드, FORMING / +FIRSTGAP), `J_v_f1b`·`J_v_f3`(F10 켬), `J_v_f2b`(F10+FIRSTGAP), `J_v_f4`(슬롯 변환 추적), `J_v_f5`/`J_v_f6`(지금 빌드, FORMING / +FIRSTGAP); 전체 `J_es_*`(+ESCAPE), `J_e_*`(+ESCAPE+시체 탐색), `J_f_*`(+FORMING; 2026-11-12부터 이것이 기본), `J_g_*`(+FIRSTGAP), `J_c_*`(새 기본), `J_d_*`(새 기본+FORMING). 요약 `J_sum_<이름>.txt` |
 | `runs\J_cmp.py`, `runs\J_f2976.py`, `runs\J_edit.py` | 두 실행 묶음의 선수별 비교(단어별 첫 불일치, 자원 0.01/50, 900초, 멈춤), 정찰병 2976 네 점 비트 비교, 줄 끝을 지키는 소스 편집(저장소 `tools/`에도 사본) |
+| `backup-K\` | 세션 K(40번)가 고치기 전의 엔진 파일 사본(`genie\<상대 경로>`)과 문서 사본 |
+| `patch-2026-11-12-K.patch` | 이번 엔진 패치 사본(저장소 `sorted-lists-and-truth-trace.patch`와 같음) |
+| `runs\K_*` | 40번 실행: 전체 `K_m_*`(지금 기본 18개, `GENIE_TRACE_MASTERHP=1` 포함), 3824 추적 `K_s_097`(update 19900~20060), `K_s2_097`(19300~19700, STEER 19480~19700), `K_s3_097`(17000~18100), `K_b1_097`(`GENIE_TRACE_BELL=1`, update 19450까지). 편집 명세 `K_spec1~3.py`(`J_edit.py`용), 기본 스위치 한 줄 `K_envs.txt`, 문서 편집 `K_doc*.py` |
+| `re-kit\re-focused-cases-k.tar.gz` | findings 40·41의 디컴파일 원문(`out_k/k1~k7.c`: 0x12429c0, 0x1266b90, 0x1226150, 0x12bacf0, 0x12b6910, 0x12bc7e0, 0x12baa00, 0x16ecf20, 0xd004a0)과 `realstart.py`(이어진 .pdata 조각의 진짜 시작 찾기) |
 
 
 ## 13. 일을 끝낼 때 남길 기록 (누가 하든 반드시; 다음 사람이 이것만 보고 바로 시작한다)
@@ -360,9 +365,9 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 13.4 지금 하던 일 (멈출 때마다 이 절을 덮어쓴다)
 
-- 날짜·작성: 2026-11-12, Claude.
-- 여기까지 한 일: findings 37~39(ESCAPE, 시체 먼저 먹기, FORMING)까지 넣고 기본 묶음에 켬(커밋 7a8597a). 판정 규칙 13.3 변경.
-- 멈춘 지점: 518470161의 560.7초 엔진 멈춤("손상 그림" 처리)을 건너뛸지 확인하려다 사용자 요청으로 중단. **확인해야 함**: 12.5 0번 "엔진 멈춤" 아래 "확인 필요" 항목(난수 사용 여부, 게임 상태 변경 여부)을 먼저 할 것.
-- 엔진 소스 상태: 최신 커밋 패치와 같음(반쯤 넣은 변경 없음). 돌고 있는 실행 없음. 최신 기본 실행 `J_f_239`, `J_f_161`, `J_f_097`.
-- 그다음: 12.5의 0번 목록(517426097 P1 3824 258.4초 → 518239882 P2 word 9 398.8초 → 518470161 P1 411초).
-- 도우미용 공통 안내는 PC `runs\helper-common.txt`(기본 스위치 묶음 포함)를 쓴다.
+- 날짜·작성: 2026-11-12, Claude (세션 K).
+- 여기까지 한 일: findings 40(`MASTERHP`: 마스터가 바뀔 때 체력을 자르지 않음; 518470161의 560.7초 멈춤 해결)을 넣고 기본 묶음에 켬. 12.5 0번의 "확인 필요"는 끝남(난수도 쓰고 상태도 바꾸므로 건너뛰기는 하지 않음).
+- 지금 보던 것: 517426097 P1 주민 3824(12.5 0번 첫 항목). 여기까지 확인: (1) 258.4초의 어긋남은 경로가 아니라 **이동 목표**가 다르다. 원본은 (85.6976, 84.0561)로, 엔진은 (84.93693, 88.53648)로 간다(`K_s2_097`의 SHORTPATH `to:`, truth6의 `ao` +0x38). (2) 이 이동은 252.9초 "일하러 돌아가기"(건물 2942에서 나옴)이고 목표는 종 기록의 점이다. (3) 원본의 점 (85.6976, 84.0561)은 233.919초(update 17773) 주둔 명령(UNIT_ORDER 0x75, 동작 5)을 받은 순간의 유닛 위치다. 엔진은 그 명령에서 기록을 쓰지 않아(`K_b1_097`의 BELL_RECORD 줄에 없음) 225.5초의 옛 기록(Move, 점 (84.93693, 88.53648))이 남는다. (4) 원본에서 기록을 쓰는 곳: 0x12bacf0(직접 호출 0xbb6b4f Hunt, 0xd025f2 주민 AI 통지 0x21a, 0x16ede2a UNIT_ORDER 6~8, 0x12babca = 0x12baa00 안), 0x12baa00의 호출자는 0x12c78e8(들어간 뒤)과 0x12df845(주민 작업 명령 slot 0x8a8 = 0x12df320)뿐. 주둔 명령 0x16ecf20(동작 5)은 0x16f0680으로 유닛을 건물에 나눠 보낸다(아직 안 읽음). **다음 첫 동작**: 0x16f0680부터 주민의 작업 명령(0x12df320 → 0x12baa00(유닛, 건물, 3))까지 가는 길을 읽고, 엔진 `commands/unit_order.rs` `garrison_order` → `garrison/enter.rs` `enter_command`에 `town_bell_order(…, Some(GARRISON))`가 빠진 것인지 확인해 스위치 뒤에 넣는다.
+- 엔진 소스 상태: 빌드되는 상태, 최신 커밋 패치와 같음. 진단 출력 `GENIE_TRACE_MASTERHP`, `GENIE_TRACE_BELL`이 들어 있다(끄면 영향 없음). 돌고 있는 실행 없음. 최신 기본 실행 `K_m_239`, `K_m_161`, `K_m_097`(18개 스위치, 한 줄로 `runs\K_envs.txt`).
+- 그다음: 12.5의 0번 목록(518239882 P2 word 9 398.8초 → 518470161 P1 411초 → …).
+- 도우미용 공통 안내는 PC `runs\helper-common.txt`(기본 스위치 묶음 포함)를 쓴다. 원본 분석 환경은 세션마다 새로 차려야 한다(7절; `re-kit`의 압축 세 개 + Ghidra 11.3.2를 받아 푼다, 10분).
