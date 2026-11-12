@@ -295,7 +295,7 @@
   const randomMark='<span class="civ-random" title="랜덤으로 고른 문명"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="13" rx="3"/><circle cx="5.2" cy="5.2" r="1.25"/><circle cx="10.8" cy="10.8" r="1.25"/><circle cx="8" cy="8" r="1.25"/></svg>랜덤</span>';
   function civBadge(civ,side,random){
     const name=civNames[civ]||civ||'문명 확인 전';
-    const icon=Object.hasOwn(civNames,civ)?`<img src="assets/civs/${civIconFiles[civ]||civ.toLowerCase()}.png" alt="" width="28" height="28" loading="lazy">`:'';
+    const icon=Object.hasOwn(civNames,civ)?`<img src="assets/civs/${civIconFiles[civ]||civ.toLowerCase()}.png" alt="" width="28" height="28" loading="lazy"${window.SSAPOCivInfo?.lines(civ)?` data-civ="${esc(civ)}" data-civ-name="${esc(name)}" title="${esc(name)} 문명 특성 보기"`:''}>`:'';
     return `<span class="civ-badge ${side==='나'?'own-civ':'opponent-civ'}" title="${esc(civ||name)}"><small>${esc(side)}</small>${icon}<span>${esc(name)}</span>${random===true?randomMark:''}</span>`;
   }
   function matchCivs(m){
