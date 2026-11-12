@@ -112,7 +112,7 @@ index 06cee5e6..b3191e77 100644
  
  [[package]]
 diff --git a/Cargo.toml b/Cargo.toml
-index e1267700..89494a13 100644
+index e1267700..dffb7d64 100644
 --- a/Cargo.toml
 +++ b/Cargo.toml
 @@ -52,7 +52,7 @@ flate2 = { version = "1.0.24", features = [
@@ -142,7 +142,7 @@ index e1267700..89494a13 100644
 +opt-level = 0
 +codegen-units = 16
 diff --git a/builds/158041.ncl b/builds/158041.ncl
-index 5bba0718..e9fe112e 100644
+index 5bba0718..a49e6ab1 100644
 --- a/builds/158041.ncl
 +++ b/builds/158041.ncl
 @@ -11,7 +11,7 @@
@@ -155,7 +155,7 @@ index 5bba0718..e9fe112e 100644
    tuning = {
      artifact = {
 diff --git a/contracts/genie.ncl b/contracts/genie.ncl
-index b59b79b7..74dbe27a 100644
+index b59b79b7..a7d5572b 100644
 --- a/contracts/genie.ncl
 +++ b/contracts/genie.ncl
 @@ -64,6 +64,7 @@
@@ -189,7 +189,7 @@ index b59b79b7..74dbe27a 100644
      pasture_food | AttributeId | doc "The owner's attribute of a pasture's food, which its livestock share.",
      pasture_livestock | AttributeId | doc "The owner's attribute of the livestock a pasture holds.",
 diff --git a/crates/engine/genie-command-codec/Cargo.toml b/crates/engine/genie-command-codec/Cargo.toml
-index 6e4842c4..16d9a971 100644
+index 6e4842c4..aa3ad013 100644
 --- a/crates/engine/genie-command-codec/Cargo.toml
 +++ b/crates/engine/genie-command-codec/Cargo.toml
 @@ -8,7 +8,7 @@ repository.workspace = true
@@ -202,7 +202,7 @@ index 6e4842c4..16d9a971 100644
  [lints]
  workspace = true
 diff --git a/crates/engine/genie-core/src/commands/mod.rs b/crates/engine/genie-core/src/commands/mod.rs
-index d2edcddb..717eaa39 100644
+index d2edcddb..eca0bff9 100644
 --- a/crates/engine/genie-core/src/commands/mod.rs
 +++ b/crates/engine/genie-core/src/commands/mod.rs
 @@ -290,13 +290,32 @@ impl World {
@@ -266,7 +266,7 @@ index d2edcddb..717eaa39 100644
 +        .or(Some(id))
 +}
 diff --git a/crates/engine/genie-core/src/construction/building_update.rs b/crates/engine/genie-core/src/construction/building_update.rs
-index d42efbec..febca2c6 100644
+index d42efbec..87c7f139 100644
 --- a/crates/engine/genie-core/src/construction/building_update.rs
 +++ b/crates/engine/genie-core/src/construction/building_update.rs
 @@ -32,6 +32,7 @@ use crate::objects::sprite::new_sprite;
@@ -327,7 +327,7 @@ index e526db7f..d4937d04 100644
                  "an unload whose unit finds no spot (its later rings)",
              ));
 diff --git a/crates/engine/genie-core/src/garrison/transport/work.rs b/crates/engine/genie-core/src/garrison/transport/work.rs
-index cdd56c6d..9cc5f443 100644
+index cdd56c6d..98b73d04 100644
 --- a/crates/engine/genie-core/src/garrison/transport/work.rs
 +++ b/crates/engine/genie-core/src/garrison/transport/work.rs
 @@ -4,7 +4,9 @@
@@ -400,7 +400,7 @@ index d8742d52..8d4a2c63 100644
          Ok(())
      }
 diff --git a/crates/engine/genie-core/src/garrison/unload.rs b/crates/engine/genie-core/src/garrison/unload.rs
-index 0f3076d6..69934cd7 100644
+index 0f3076d6..86fbdc9c 100644
 --- a/crates/engine/genie-core/src/garrison/unload.rs
 +++ b/crates/engine/genie-core/src/garrison/unload.rs
 @@ -372,6 +372,11 @@ impl World {
@@ -472,7 +472,7 @@ index 0f3076d6..69934cd7 100644
      /// at an index) or outside (None): the work to go back to ([`TownBell::back_to_work`]: the
      /// town-bell records' object the world holds); with none but a record of an action and a
 diff --git a/crates/engine/genie-core/src/gathering/closest_resource.rs b/crates/engine/genie-core/src/gathering/closest_resource.rs
-index 9510abdd..5721c4a1 100644
+index 9510abdd..74c7e5d5 100644
 --- a/crates/engine/genie-core/src/gathering/closest_resource.rs
 +++ b/crates/engine/genie-core/src/gathering/closest_resource.rs
 @@ -3,7 +3,6 @@
@@ -552,8 +552,26 @@ index 9510abdd..5721c4a1 100644
          gather_search_tuning,
      )
  }
+diff --git a/crates/engine/genie-core/src/gathering/gather/work.rs b/crates/engine/genie-core/src/gathering/gather/work.rs
+index b1ab9a1e..d502f97b 100644
+--- a/crates/engine/genie-core/src/gathering/gather/work.rs
++++ b/crates/engine/genie-core/src/gathering/gather/work.rs
+@@ -64,6 +64,13 @@ impl GatherAction {
+                 "a gather's set_state 6 on master 1893 or 1897",
+             ));
+         }
++        // 188329 `set_state(6)` (0xb7f773..0xb7f78d): a target of class 8, 32 or 15 pulls the unit
++        // against it (0x1116f60), as the Hunt's does (finding 49)
++        if std::env::var_os("GENIE_EXPERIMENT_GATHER_SNAP_188329").is_some()
++            && matches!(target.class.get(), 8 | 32 | 15)
++        {
++            crate::gathering::snap_to_resource(c, unit, target.id, roles)?;
++        }
+         self.timer = Seconds::ZERO;
+         Self::show(c, unit, self.walk_sprite(unit, r).or(r.sprites.standing));
+         Ok(Next::Stay)
 diff --git a/crates/engine/genie-core/src/gathering/gather_search.rs b/crates/engine/genie-core/src/gathering/gather_search.rs
-index b8879db5..95f512d6 100644
+index b8879db5..2f5c2997 100644
 --- a/crates/engine/genie-core/src/gathering/gather_search.rs
 +++ b/crates/engine/genie-core/src/gathering/gather_search.rs
 @@ -440,6 +440,10 @@ pub fn closest_resource_at<W>(
@@ -927,10 +945,10 @@ index 2945a9b1..79aa24d9 100644
          [one] => Ok(Some(**one)),
          [] if on_tile.iter().all(open) => Ok(None),
 diff --git a/crates/engine/genie-core/src/gathering/hunt/gathering.rs b/crates/engine/genie-core/src/gathering/hunt/gathering.rs
-index 2df7dd4b..f5744a6e 100644
+index 2df7dd4b..ec70d0c3 100644
 --- a/crates/engine/genie-core/src/gathering/hunt/gathering.rs
 +++ b/crates/engine/genie-core/src/gathering/hunt/gathering.rs
-@@ -175,6 +175,41 @@ impl HuntAction {
+@@ -175,6 +175,14 @@ impl HuntAction {
                  return Ok(HuntNext::Stay);
              }
          }
@@ -940,40 +958,13 @@ index 2df7dd4b..f5744a6e 100644
 +        if std::env::var_os("GENIE_EXPERIMENT_HUNT_188329").is_some()
 +            && matches!(f.victim.class.get(), 8 | 32 | 15)
 +        {
-+            if let Some((tp, tr)) = c.w.spatial.get_known(self.target)?.map(|t| (t.position, t.radius)) {
-+                let here = unit.place.position();
-+                let dx = (tp.x() as i32) - (here.x() as i32);
-+                let dy = (tp.y() as i32) - (here.y() as i32);
-+                if let Some(mover) = c.w.parts.mover_mut(unit.id) {
-+                    let mr = mover.stats.radius;
-+                    let at = if dx != 0 && dy == 0 {
-+                        Some(crate::map::Position::new(tp.x() - (mr.x() + tr.x()) * dx as f32, here.y(), here.z()))
-+                    } else if dx == 0 && dy != 0 {
-+                        Some(crate::map::Position::new(here.x(), tp.y() - (mr.y() + tr.y()) * dy as f32, here.z()))
-+                    } else {
-+                        None
-+                    };
-+                    if let Some(at) = at {
-+                        let at = mover.set_position(at, c.w.spatial.map, &c.w.model.tuning.movement);
-+                        let at = mover.grounded(at, c.w.spatial.terrain.as_ref());
-+                        mover.mark_move(at, c.w.world_time);
-+                        mover.new_position(
-+                            &mut unit.place,
-+                            unit.id,
-+                            at,
-+                            (&mut c.w.spatial, Some(&mut c.w.pathing)),
-+                            roles,
-+                            c.w.model.tuning.visibility,
-+                        )?;
-+                    }
-+                }
-+            }
++            crate::gathering::snap_to_resource(c, unit, self.target, roles)?;
 +        }
          self.begin_face(c, unit, r);
          Ok(HuntNext::Stay)
      }
 diff --git a/crates/engine/genie-core/src/gathering/hunt/hunter.rs b/crates/engine/genie-core/src/gathering/hunt/hunter.rs
-index 3e35c7a5..a0add649 100644
+index 3e35c7a5..1b0f0179 100644
 --- a/crates/engine/genie-core/src/gathering/hunt/hunter.rs
 +++ b/crates/engine/genie-core/src/gathering/hunt/hunter.rs
 @@ -140,6 +140,20 @@ impl Unit {
@@ -1130,7 +1121,7 @@ index 0c37a95e..2b5397e0 100644
  
      /// Nothing found after the drop (`LAB_140ac9509`): a computer player's hunt of a kind but
 diff --git a/crates/engine/genie-core/src/gathering/hunt/update.rs b/crates/engine/genie-core/src/gathering/hunt/update.rs
-index ce4ef0b7..e443ed65 100644
+index ce4ef0b7..5275d250 100644
 --- a/crates/engine/genie-core/src/gathering/hunt/update.rs
 +++ b/crates/engine/genie-core/src/gathering/hunt/update.rs
 @@ -196,6 +196,24 @@ impl HuntAction {
@@ -1158,8 +1149,57 @@ index ce4ef0b7..e443ed65 100644
              4 | 5 => self
                  .lost_on_the_way(c, unit, r, roles)
                  .map(|()| HuntNext::Stay),
+diff --git a/crates/engine/genie-core/src/gathering/mod.rs b/crates/engine/genie-core/src/gathering/mod.rs
+index 005a4467..9977e1c8 100644
+--- a/crates/engine/genie-core/src/gathering/mod.rs
++++ b/crates/engine/genie-core/src/gathering/mod.rs
+@@ -36,3 +36,44 @@ pub use self::queue_count::QueueCount;
+ pub(crate) fn both_food(a: Option<AttributeId>, b: Option<AttributeId>) -> bool {
+     a.is_some_and(AttributeId::is_food_load) && b.is_some_and(AttributeId::is_food_load)
+ }
++
++/// 188329 `0x1116f60` (called from the Hunt's and the Gather's `set_state(6)` for a target of class
++/// 8, 32 or 15): the unit is pulled against the resource when their tiles (truncated coordinates)
++/// differ on exactly one axis: that coordinate becomes the target's minus both radii times the
++/// whole tile difference; then the position setter (unit slot 0x60).
++pub(crate) fn snap_to_resource(
++    c: &mut crate::world::step::Step<'_>,
++    unit: &mut crate::objects::unit::Unit,
++    target: impl crate::objects::ObjectKey,
++    roles: &crate::world::layer::Roles,
++) -> Result<(), crate::GenieError> {
++    if let Some((tp, tr)) = c.w.spatial.get_known(target)?.map(|t| (t.position, t.radius)) {
++        let here = unit.place.position();
++        let dx = (tp.x() as i32) - (here.x() as i32);
++        let dy = (tp.y() as i32) - (here.y() as i32);
++        if let Some(mover) = c.w.parts.mover_mut(unit.id) {
++            let mr = mover.stats.radius;
++            let at = if dx != 0 && dy == 0 {
++                Some(crate::map::Position::new(tp.x() - (mr.x() + tr.x()) * dx as f32, here.y(), here.z()))
++            } else if dx == 0 && dy != 0 {
++                Some(crate::map::Position::new(here.x(), tp.y() - (mr.y() + tr.y()) * dy as f32, here.z()))
++            } else {
++                None
++            };
++            if let Some(at) = at {
++                let at = mover.set_position(at, c.w.spatial.map, &c.w.model.tuning.movement);
++                let at = mover.grounded(at, c.w.spatial.terrain.as_ref());
++                mover.mark_move(at, c.w.world_time);
++                mover.new_position(
++                    &mut unit.place,
++                    unit.id,
++                    at,
++                    (&mut c.w.spatial, Some(&mut c.w.pathing)),
++                    roles,
++                    c.w.model.tuning.visibility,
++                )?;
++            }
++        }
++    }
++    Ok(())
++}
 diff --git a/crates/engine/genie-core/src/gathering/mule_cart.rs b/crates/engine/genie-core/src/gathering/mule_cart.rs
-index c9f58b16..cd8759ba 100644
+index c9f58b16..c6df3d71 100644
 --- a/crates/engine/genie-core/src/gathering/mule_cart.rs
 +++ b/crates/engine/genie-core/src/gathering/mule_cart.rs
 @@ -215,19 +215,25 @@ impl World {
@@ -1192,7 +1232,7 @@ index c9f58b16..cd8759ba 100644
          self.order_work(p, idx, &work)
      }
 diff --git a/crates/engine/genie-core/src/groups/command.rs b/crates/engine/genie-core/src/groups/command.rs
-index cc0b4325..ece1041b 100644
+index cc0b4325..677c5bac 100644
 --- a/crates/engine/genie-core/src/groups/command.rs
 +++ b/crates/engine/genie-core/src/groups/command.rs
 @@ -71,6 +71,11 @@ bitflags::bitflags! {
@@ -1231,7 +1271,7 @@ index cc0b4325..ece1041b 100644
              )?;
          }
 diff --git a/crates/engine/genie-core/src/groups/formation/column_line.rs b/crates/engine/genie-core/src/groups/formation/column_line.rs
-index 24636f40..f8d712a1 100644
+index 24636f40..7fb0849f 100644
 --- a/crates/engine/genie-core/src/groups/formation/column_line.rs
 +++ b/crates/engine/genie-core/src/groups/formation/column_line.rs
 @@ -358,6 +358,8 @@ fn lay_category(
@@ -1244,7 +1284,7 @@ index 24636f40..f8d712a1 100644
              formation,
              cat,
 diff --git a/crates/engine/genie-core/src/groups/formation/passability.rs b/crates/engine/genie-core/src/groups/formation/passability.rs
-index 25d0c676..e867d51e 100644
+index 25d0c676..9d18d973 100644
 --- a/crates/engine/genie-core/src/groups/formation/passability.rs
 +++ b/crates/engine/genie-core/src/groups/formation/passability.rs
 @@ -80,6 +80,17 @@ impl World {
@@ -1266,7 +1306,7 @@ index 25d0c676..e867d51e 100644
          let dt = self.dt_seconds;
          let yaw = g
 diff --git a/crates/engine/genie-core/src/groups/mod.rs b/crates/engine/genie-core/src/groups/mod.rs
-index 7787900f..fe88c3a1 100644
+index 7787900f..a5caed15 100644
 --- a/crates/engine/genie-core/src/groups/mod.rs
 +++ b/crates/engine/genie-core/src/groups/mod.rs
 @@ -204,6 +204,8 @@ pub struct FormationLine {
@@ -1359,7 +1399,7 @@ index 7787900f..fe88c3a1 100644
          }
      }
 diff --git a/crates/engine/genie-core/src/groups/order.rs b/crates/engine/genie-core/src/groups/order.rs
-index 398a973c..7e09814f 100644
+index 398a973c..00a5aef8 100644
 --- a/crates/engine/genie-core/src/groups/order.rs
 +++ b/crates/engine/genie-core/src/groups/order.rs
 @@ -83,7 +83,7 @@ impl World {
@@ -1372,7 +1412,7 @@ index 398a973c..7e09814f 100644
              flags.set(MoveFlags::DIRECT, order.direct);
              moved = self.command_move_to(
 diff --git a/crates/engine/genie-core/src/groups/place.rs b/crates/engine/genie-core/src/groups/place.rs
-index 51f6a791..fc1d741e 100644
+index 51f6a791..f1506038 100644
 --- a/crates/engine/genie-core/src/groups/place.rs
 +++ b/crates/engine/genie-core/src/groups/place.rs
 @@ -386,15 +386,20 @@ impl World {
@@ -1563,7 +1603,7 @@ index 51f6a791..fc1d741e 100644
      /// restriction (`+0x606`) in the map's table (`FUN_141054630`).
      ///
 diff --git a/crates/engine/genie-core/src/groups/stats.rs b/crates/engine/genie-core/src/groups/stats.rs
-index e101e2d0..487bea72 100644
+index e101e2d0..f7de2eaa 100644
 --- a/crates/engine/genie-core/src/groups/stats.rs
 +++ b/crates/engine/genie-core/src/groups/stats.rs
 @@ -110,9 +110,19 @@ impl World {
@@ -1641,7 +1681,7 @@ index e101e2d0..487bea72 100644
      /// index it has then, and the objects of their searches.
      fn member_views(
 diff --git a/crates/engine/genie-core/src/groups/steer/slot_steps.rs b/crates/engine/genie-core/src/groups/steer/slot_steps.rs
-index d9156f6d..a69f7d0b 100644
+index d9156f6d..fd81e8ea 100644
 --- a/crates/engine/genie-core/src/groups/steer/slot_steps.rs
 +++ b/crates/engine/genie-core/src/groups/steer/slot_steps.rs
 @@ -220,6 +220,33 @@ impl World {
@@ -1679,7 +1719,7 @@ index d9156f6d..a69f7d0b 100644
          let near =
              !within && !below_or_unordered(radius * self.model.tuning.group.slot_reach, gap.get());
 diff --git a/crates/engine/genie-core/src/groups/steer/to_slots.rs b/crates/engine/genie-core/src/groups/steer/to_slots.rs
-index 999d44b5..9365bd08 100644
+index 999d44b5..cd1cf6e1 100644
 --- a/crates/engine/genie-core/src/groups/steer/to_slots.rs
 +++ b/crates/engine/genie-core/src/groups/steer/to_slots.rs
 @@ -61,6 +61,9 @@ impl World {
@@ -1812,7 +1852,7 @@ index 999d44b5..9365bd08 100644
      /// `MoveTo` (slot 0x538 with 1), its top action is not in state 4, 5 or 11 (slot 0x2b0) and
      /// it moves (slot 0x5c8).
 diff --git a/crates/engine/genie-core/src/groups/update/awake.rs b/crates/engine/genie-core/src/groups/update/awake.rs
-index 4ce9b2f7..7ed0dbfe 100644
+index 4ce9b2f7..c0872e13 100644
 --- a/crates/engine/genie-core/src/groups/update/awake.rs
 +++ b/crates/engine/genie-core/src/groups/update/awake.rs
 @@ -106,6 +106,7 @@ impl World {
@@ -1889,7 +1929,7 @@ index 0e406949..ed5ae5a2 100644
          }
          if self.current_command == GroupCommandKind::MOVE && self.patrols() {
 diff --git a/crates/engine/genie-core/src/groups/update/release.rs b/crates/engine/genie-core/src/groups/update/release.rs
-index 7464c59f..2833cc6a 100644
+index 7464c59f..48cd9bc2 100644
 --- a/crates/engine/genie-core/src/groups/update/release.rs
 +++ b/crates/engine/genie-core/src/groups/update/release.rs
 @@ -91,9 +91,11 @@ impl World {
@@ -1907,7 +1947,7 @@ index 7464c59f..2833cc6a 100644
                  } else {
                      OrderSource::Direct
 diff --git a/crates/engine/genie-core/src/groups/update/send.rs b/crates/engine/genie-core/src/groups/update/send.rs
-index d2241f9d..63a257d8 100644
+index d2241f9d..2470dee0 100644
 --- a/crates/engine/genie-core/src/groups/update/send.rs
 +++ b/crates/engine/genie-core/src/groups/update/send.rs
 @@ -78,9 +78,10 @@ impl World {
@@ -1924,7 +1964,7 @@ index d2241f9d..63a257d8 100644
                  } else {
                      OrderSource::Queued
 diff --git a/crates/engine/genie-core/src/lib.rs b/crates/engine/genie-core/src/lib.rs
-index f639a3e9..ce64ea50 100644
+index f639a3e9..62cfedb6 100644
 --- a/crates/engine/genie-core/src/lib.rs
 +++ b/crates/engine/genie-core/src/lib.rs
 @@ -34,6 +34,7 @@ pub use genie_error::{ErrorKind, GenieError, GenieResult};
@@ -1936,7 +1976,7 @@ index f639a3e9..ce64ea50 100644
  pub mod garrison;
  pub mod gathering;
 diff --git a/crates/engine/genie-core/src/map/spatial/grid.rs b/crates/engine/genie-core/src/map/spatial/grid.rs
-index 9f616e05..5980f354 100644
+index 9f616e05..7f01861b 100644
 --- a/crates/engine/genie-core/src/map/spatial/grid.rs
 +++ b/crates/engine/genie-core/src/map/spatial/grid.rs
 @@ -251,6 +251,19 @@ impl Spatial {
@@ -1960,7 +2000,7 @@ index 9f616e05..5980f354 100644
      /// until the next call.
      pub const fn set_manager_buffer(&mut self, buffer: Option<Distance>) {
 diff --git a/crates/engine/genie-core/src/map/spatial/mod.rs b/crates/engine/genie-core/src/map/spatial/mod.rs
-index 4cc3b283..0a931928 100644
+index 4cc3b283..36f7407d 100644
 --- a/crates/engine/genie-core/src/map/spatial/mod.rs
 +++ b/crates/engine/genie-core/src/map/spatial/mod.rs
 @@ -46,6 +46,7 @@ mod objects;
@@ -2103,7 +2143,7 @@ index 877228f6..2b5b448e 100644
  /// goes to the lower id (a NaN distance so far gives way).
  pub(super) fn nearer(best: Option<(ObjectId, f32)>, record: &Record) -> Option<(ObjectId, f32)> {
 diff --git a/crates/engine/genie-core/src/map/spatial/tests.rs b/crates/engine/genie-core/src/map/spatial/tests.rs
-index a1c2993f..8753b12e 100644
+index a1c2993f..e019e22a 100644
 --- a/crates/engine/genie-core/src/map/spatial/tests.rs
 +++ b/crates/engine/genie-core/src/map/spatial/tests.rs
 @@ -2286,7 +2286,8 @@ fn closest_object_keeps_the_nearest_record_and_on_tie_the_lower_id() {
@@ -2141,7 +2181,7 @@ index a1c2993f..8753b12e 100644
      let livestock = with(|f| f.group = Some(class_id(58)));
      let mut sheep = Placed {
 diff --git a/crates/engine/genie-core/src/movement/explore.rs b/crates/engine/genie-core/src/movement/explore.rs
-index bce6387c..5b011472 100644
+index bce6387c..613cb811 100644
 --- a/crates/engine/genie-core/src/movement/explore.rs
 +++ b/crates/engine/genie-core/src/movement/explore.rs
 @@ -59,6 +59,15 @@ use crate::world::layer::generated::MoveToTuning;
@@ -2227,6 +2267,199 @@ index bce6387c..5b011472 100644
              _ => Ok(()),
          }
      }
+diff --git a/crates/engine/genie-core/src/movement/fly.rs b/crates/engine/genie-core/src/movement/fly.rs
+index fbef4ed9..2335262d 100644
+--- a/crates/engine/genie-core/src/movement/fly.rs
++++ b/crates/engine/genie-core/src/movement/fly.rs
+@@ -14,7 +14,9 @@ use crate::math::rng::{Stream, Well512};
+ use crate::movement::MoveState;
+ use crate::movement::move_to::{ListUpdate, update_sub_actions};
+ use crate::movement::move_to::{MoveToAction, graphic_of};
++use crate::movement::Speed;
+ use crate::movement::{Me, Mover};
++use crate::players::tracker::ListKey;
+ use crate::objects::SpriteId;
+ use crate::objects::UpdateCode;
+ use crate::objects::Voice;
+@@ -139,6 +141,7 @@ impl Fly {
+                 self.set_state_of(bird, FlyState::Choosing, c)
+             }
+             FlyState::Choosing => {
++                let away = self.keep_away(c)?;
+                 let mover = c.w.parts.mover_of(bird.id).ok_or(NO_MOVER)?;
+                 let sprites = FlightSprites {
+                     walking: bird
+@@ -148,8 +151,20 @@ impl Fly {
+                     graphics: &c.w.model.graphics,
+                 };
+                 let action = c.w.streams.get(Stream::Action);
+-                let dropped =
+-                    self.choose(bird.position(), mover, c.w.spatial.map, action, &sprites)?;
++                let mut anim = None;
++                let dropped = self.choose(
++                    bird.position(),
++                    mover,
++                    c.w.spatial.map,
++                    action,
++                    &sprites,
++                    (&away, &mut anim),
++                )?;
++                // 188329 0xb767c0..0xb767e6: an accepted point with a distance factor sets the
++                // bird's animation speed (+0x350) to its speed times the factor
++                if let (Some(speed), Some(m)) = (anim, c.w.parts.mover_mut(bird.id)) {
++                    m.animated.speed = speed;
++                }
+                 stop_if(c.w.parts.mover_mut(bird.id), dropped)
+             }
+             FlyState::Flying { .. } => {
+@@ -200,8 +215,8 @@ impl Fly {
+     /// speed × time left × the task's distance factor (1 for none); from the bird the point that
+     /// far along the angle (the y axis turned by it), tried at most 12 times, 80° on each time:
+     /// it must lie inside the map and, with a leash, the bird must be within it of its centre or
+-    /// the point nearer the centre than the bird. A terrain the point must have and objects of a
+-    /// class to keep away from are not modelled. The flight's sprite ([`Fly::flight_sprite`]):
++    /// the point nearer the centre than the bird. A terrain the point must have is not modelled; a
++    /// point within the task's range of a kept-away object is refused ([`Fly::kept_away`]). The flight's sprite ([`Fly::flight_sprite`]):
+     /// a task with sprites draws one, else the master's walking sprite. The `MoveTo` to the point
+     /// at the bird's height within 0 with that sprite starts (state 3) and the bird flies
+     /// (`set_state` 4); with no distance or no point it rests. The answer: whether the rest
+@@ -213,6 +228,7 @@ impl Fly {
+         map: GridSize,
+         action: &mut Well512,
+         sprites: &FlightSprites<'_>,
++        (away, anim): (&[(Position, Footprint)], &mut Option<Speed>),
+     ) -> Result<MoveToDrop, GenieError> {
+         let t = self.task;
+         let (speed, position) = (mover.stats.speed, at);
+@@ -244,26 +260,25 @@ impl Fly {
+             if inside
+                 && (leash <= EPSILON || self.near_home(position, radius, Point::new(px, py), leash))
+             {
+-                break [px, py];
++                // 188329 0xb76030 state 3: the terrain and the keep-away tests are inside the
++                // try loop, after the leash; a refused point goes on to the next angle
++                if !t.terrain.is_none() {
++                    return Err(GenieError::unsupported(
++                        "a flight to a terrain of its task's",
++                    ));
++                }
++                let range = t.work_range.get();
++                if !Self::kept_away(away, position, radius, [px, py], range * range) {
++                    break [px, py];
++                }
+             }
+             if TRIES - 1 < tries {
+                 return Ok(self.set_state(FlyState::Resting, action));
+             }
+         };
+-        if !t.terrain.is_none() {
+-            return Err(GenieError::unsupported(
+-                "a flight to a terrain of its task's",
+-            ));
+-        }
+-        if t.work_val2.get() as i32 as i16 != -1 && Distance::ZERO < t.work_range {
+-            return Err(GenieError::unsupported(
+-                "a flight keeping away from a class",
+-            ));
+-        }
++        // 0xb767c0..0xb767e6: the animation speed (+0x350) is the speed times the factor
+         if EPSILON < t.work_val1.get() {
+-            return Err(GenieError::unsupported(
+-                "a flight's animation speed (+0x7b8)",
+-            ));
++            *anim = Some(Speed::new(speed.get() * t.work_val1.get()));
+         }
+         let sprite = graphic_of(sprites.graphics, Self::flight_sprite(t, action, sprites)?)?;
+         // FUN_140aa0d30 to the point within 0 with the flight's sprite, not quiet, then
+@@ -285,6 +300,63 @@ impl Fly {
+         Ok(MoveToDrop::NoneDropped)
+     }
+ 
++    /// 188329 `0xb76570..0xb76794`, the objects a flight's point keeps away from: the task's work
++    /// value 2 as `(short)(int)` is a raw tracker key (`0x111a690`; −1 for none; the snake's 109 is
++    /// the done list of Town Centers) and each player's list of it, in player order, gives the
++    /// objects (place and master radii).
++    fn keep_away(&self, c: &Step<'_>) -> Result<Vec<(Position, Footprint)>, GenieError> {
++        let key = self.task.work_val2.get() as i32 as i16;
++        let mut away = Vec::new();
++        if key == -1 {
++            return Ok(away);
++        }
++        for p in &c.w.players {
++            for id in p
++                .tracker
++                .list(ListKey::raw(i32::from(key)))
++                .iter()
++                .copied()
++                .flatten()
++            {
++                // the game reads the object by id without a null test
++                let o = c.w.spatial.get_known(id)?.ok_or(GenieError::unsupported(
++                    "a flight keeping away from an object without a place",
++                ))?;
++                away.push((o.position, o.radius));
++            }
++        }
++        Ok(away)
++    }
++
++    /// The keep-away test of one point (`0xb76570..0xb76794`): refused when the point's squared
++    /// edge gap to such an object (`0xb75ce0`, the object's radii only) is below the squared
++    /// range, unless the bird's own squared edge gap to it (`0x124daf0`, both radii) is below
++    /// the squared range and no more than the point's.
++    fn kept_away(
++        away: &[(Position, Footprint)],
++        bird: Position,
++        radius: Footprint,
++        point: [f32; 2],
++        r2: f32,
++    ) -> bool {
++        away.iter().any(|&(o, or)| {
++            let gx = (point[0] - o.x()).abs() - or.x();
++            let gx = if 0.0 <= gx { gx } else { 0.0 };
++            let gy = (point[1] - o.y()).abs() - or.y();
++            let gy = if 0.0 <= gy { gy } else { 0.0 };
++            let dp = gy * gy + gx * gx;
++            if !(dp < r2) {
++                return false;
++            }
++            let bx = (bird.x() - o.x()).abs() - (radius.x() + or.x());
++            let bx = if bx <= 0.0 { 0.0 } else { bx };
++            let by = (bird.y() - o.y()).abs() - (radius.y() + or.y());
++            let by = if by <= 0.0 { 0.0 } else { by };
++            let db = bx * bx + by * by;
++            !(db < r2 && db <= dp)
++        })
++    }
++
+     /// The sprite of state 3's `MoveTo`: a task with a moving (`+0x40`), proceeding (`+0x48`) or
+     /// carrying (`+0x58`) sprite draws `r % 3` from the Action stream and takes the first there
+     /// from that index on among its moving, working (`+0x50`) and proceeding sprites; a task with
+@@ -636,7 +708,7 @@ mod tests {
+                 walking: None,
+                 graphics: &graphics,
+             };
+-            let got = fly.choose(AT, mover, map, &mut r, &sprites);
++            let got = fly.choose(AT, mover, map, &mut r, &sprites, (&[], &mut None));
+             (got, r.draws)
+         };
+         let mut fly = hawk(FlyState::Choosing, 0.0);
+@@ -662,15 +734,6 @@ mod tests {
+                 terrain: TaskTerrain::of_data(2),
+                 ..unsprited
+             },
+-            Task {
+-                work_val2: WorkValue::new(4.0),
+-                work_range: Distance::new(3.0),
+-                ..unsprited
+-            },
+-            Task {
+-                work_val1: WorkValue::new(2.0),
+-                ..unsprited
+-            },
+             Task {
+                 sprites: TaskSprites::of_data([-1, -1, -1, 5]),
+                 ..unsprited
 diff --git a/crates/engine/genie-core/src/movement/long_walk.rs b/crates/engine/genie-core/src/movement/long_walk.rs
 index f6314358..9d7b8d8a 100644
 --- a/crates/engine/genie-core/src/movement/long_walk.rs
@@ -2393,7 +2626,7 @@ index 1f873756..069ceae3 100644
      /// closed tiles, the tile search for a human player, no smoothing) from the unit to `to`, and
      /// the planner's result; None without a planner for the unit's restriction.
 diff --git a/crates/engine/genie-core/src/movement/path_end.rs b/crates/engine/genie-core/src/movement/path_end.rs
-index 8dd9623e..40bd3b95 100644
+index 8dd9623e..529ee464 100644
 --- a/crates/engine/genie-core/src/movement/path_end.rs
 +++ b/crates/engine/genie-core/src/movement/path_end.rs
 @@ -31,7 +31,7 @@ use crate::movement::{
@@ -2762,7 +2995,7 @@ index a4790a15..9dff401e 100644
      pub fn push(&mut self, unit: Unit) {
          self.units.push(unit);
 diff --git a/crates/engine/genie-core/src/objects/unit/stop.rs b/crates/engine/genie-core/src/objects/unit/stop.rs
-index 7c1fba27..b523d1c2 100644
+index 7c1fba27..0e8d1c60 100644
 --- a/crates/engine/genie-core/src/objects/unit/stop.rs
 +++ b/crates/engine/genie-core/src/objects/unit/stop.rs
 @@ -267,12 +267,20 @@ impl Unit {
@@ -2789,7 +3022,7 @@ index 7c1fba27..b523d1c2 100644
                  c.lend_at((&mut *self, &mut *actions), |w, p, i| {
                      w.order_work(p, i, &work)
 diff --git a/crates/engine/genie-core/src/orders/actions.rs b/crates/engine/genie-core/src/orders/actions.rs
-index 00aaf602..3071701a 100644
+index 00aaf602..3ac37dc9 100644
 --- a/crates/engine/genie-core/src/orders/actions.rs
 +++ b/crates/engine/genie-core/src/orders/actions.rs
 @@ -15,6 +15,7 @@ use crate::objects::ObjectId;
@@ -2867,7 +3100,7 @@ index 00aaf602..3071701a 100644
                  "a master change that changes the damage sprites (FUN_1411859a0)",
              ));
 diff --git a/crates/engine/genie-core/src/orders/drop_site.rs b/crates/engine/genie-core/src/orders/drop_site.rs
-index d65b2d84..1a6c366e 100644
+index d65b2d84..ecf8ab20 100644
 --- a/crates/engine/genie-core/src/orders/drop_site.rs
 +++ b/crates/engine/genie-core/src/orders/drop_site.rs
 @@ -304,14 +304,28 @@ impl World {
@@ -2908,7 +3141,7 @@ index d65b2d84..1a6c366e 100644
              return Ok(());
          };
 diff --git a/crates/engine/genie-core/src/orders/mod.rs b/crates/engine/genie-core/src/orders/mod.rs
-index b97f7d35..7a6fb1d0 100644
+index b97f7d35..6772fb30 100644
 --- a/crates/engine/genie-core/src/orders/mod.rs
 +++ b/crates/engine/genie-core/src/orders/mod.rs
 @@ -183,6 +183,19 @@ impl OrderSource {
@@ -3002,7 +3235,7 @@ index 29f5d776..5e243a42 100644
              ai.orders.clear();
          }
 diff --git a/crates/engine/genie-core/src/orders/start_work.rs b/crates/engine/genie-core/src/orders/start_work.rs
-index b0488a3d..de076359 100644
+index b0488a3d..6f5d131a 100644
 --- a/crates/engine/genie-core/src/orders/start_work.rs
 +++ b/crates/engine/genie-core/src/orders/start_work.rs
 @@ -20,7 +20,6 @@ use crate::GenieError;
@@ -3023,7 +3256,7 @@ index b0488a3d..de076359 100644
                      )
                  },
 diff --git a/crates/engine/genie-core/src/orders/town_bell.rs b/crates/engine/genie-core/src/orders/town_bell.rs
-index 72090fb3..c5207a6d 100644
+index 72090fb3..3f1a775d 100644
 --- a/crates/engine/genie-core/src/orders/town_bell.rs
 +++ b/crates/engine/genie-core/src/orders/town_bell.rs
 @@ -135,6 +135,12 @@ impl TownBell {
@@ -3090,7 +3323,7 @@ index 72090fb3..c5207a6d 100644
                      source: OrderSource::Queued,
                  },
 diff --git a/crates/engine/genie-core/src/pathing/long_path/cost.rs b/crates/engine/genie-core/src/pathing/long_path/cost.rs
-index bce9f3c0..1039b8f3 100644
+index bce9f3c0..9b7ea512 100644
 --- a/crates/engine/genie-core/src/pathing/long_path/cost.rs
 +++ b/crates/engine/genie-core/src/pathing/long_path/cost.rs
 @@ -32,6 +32,11 @@ impl LongCost {
@@ -3106,7 +3339,7 @@ index bce9f3c0..1039b8f3 100644
      pub(super) const fn turned(self) -> Self {
          Self(self.0.wrapping_add(1))
 diff --git a/crates/engine/genie-core/src/pathing/long_path/mod.rs b/crates/engine/genie-core/src/pathing/long_path/mod.rs
-index 65cff0cf..9d07c25f 100644
+index 65cff0cf..ad2f674d 100644
 --- a/crates/engine/genie-core/src/pathing/long_path/mod.rs
 +++ b/crates/engine/genie-core/src/pathing/long_path/mod.rs
 @@ -212,6 +212,9 @@ enum Searched {
@@ -3491,7 +3724,7 @@ index 6b1e956f..bd77ed9d 100644
              let foot = if dx != 0 {
                  FixedPoint::new(gv, a.y())
 diff --git a/crates/engine/genie-core/src/pathing/short_path/raycast.rs b/crates/engine/genie-core/src/pathing/short_path/raycast.rs
-index d952fd6e..3f0c1f1d 100644
+index d952fd6e..5e502aa5 100644
 --- a/crates/engine/genie-core/src/pathing/short_path/raycast.rs
 +++ b/crates/engine/genie-core/src/pathing/short_path/raycast.rs
 @@ -368,6 +368,41 @@ impl Ctx<'_> {
@@ -3608,7 +3841,7 @@ index 916707bf..e881fe5e 100644
              (
                  through_float(delta.x().wrapping_abs()).wrapping_add(b.g),
 diff --git a/crates/engine/genie-core/src/pathing/tile_path/planning.rs b/crates/engine/genie-core/src/pathing/tile_path/planning.rs
-index 7277973c..e2ce4098 100644
+index 7277973c..778db9c6 100644
 --- a/crates/engine/genie-core/src/pathing/tile_path/planning.rs
 +++ b/crates/engine/genie-core/src/pathing/tile_path/planning.rs
 @@ -154,12 +154,39 @@ impl Planner {
@@ -3656,7 +3889,7 @@ index 7277973c..e2ce4098 100644
          Ok(result)
      }
 diff --git a/crates/engine/genie-core/src/players/game_status/stops.rs b/crates/engine/genie-core/src/players/game_status/stops.rs
-index f0e3108e..262ee402 100644
+index f0e3108e..d471880a 100644
 --- a/crates/engine/genie-core/src/players/game_status/stops.rs
 +++ b/crates/engine/genie-core/src/players/game_status/stops.rs
 @@ -13,6 +13,7 @@ use crate::gathering::DropSiteId;
@@ -3676,8 +3909,26 @@ index f0e3108e..262ee402 100644
              _ => {
                  return Err(GenieError::unsupported(
                      "a stop of an action whose slot 0x38 is not modelled",
+diff --git a/crates/engine/genie-core/src/players/tracker.rs b/crates/engine/genie-core/src/players/tracker.rs
+index 2294f68c..8843f690 100644
+--- a/crates/engine/genie-core/src/players/tracker.rs
++++ b/crates/engine/genie-core/src/players/tracker.rs
+@@ -82,6 +82,13 @@ impl ListKey {
+         Self(i32::from(class.get()) + CLASS_KEY)
+     }
+ 
++    /// The list of the game's integer `key` unchanged (188329 `0x111a690`, which the Fly's
++    /// keep-away test calls with its task's work value 2).
++    #[must_use]
++    pub const fn raw(key: i32) -> Self {
++        Self(key)
++    }
++
+     /// The pending list of the same key (+ 90000).
+     #[must_use]
+     pub const fn pending(self) -> Self {
 diff --git a/crates/engine/genie-core/src/players/world_player/income.rs b/crates/engine/genie-core/src/players/world_player/income.rs
-index e920970d..3636b3fc 100644
+index e920970d..e2a0a10a 100644
 --- a/crates/engine/genie-core/src/players/world_player/income.rs
 +++ b/crates/engine/genie-core/src/players/world_player/income.rs
 @@ -6,6 +6,7 @@ use crate::map::Tile;
@@ -4131,7 +4382,7 @@ index e5f89e13..04e9c49d 100644
  /// below it (down), left of it or right of it (out).
  #[derive(Clone, Copy)]
 diff --git a/crates/engine/genie-core/src/testing/build_158041.rs b/crates/engine/genie-core/src/testing/build_158041.rs
-index 1a1bfc98..bd4aaa03 100644
+index 1a1bfc98..bdca75be 100644
 --- a/crates/engine/genie-core/src/testing/build_158041.rs
 +++ b/crates/engine/genie-core/src/testing/build_158041.rs
 @@ -974,6 +974,7 @@ const fn attribute_slots() -> AttributeSlots {
@@ -4230,7 +4481,7 @@ index 7a8bacbb..f5493e8f 100644
              }
          }
 diff --git a/crates/engine/genie-core/src/unit_ai/attack_pick.rs b/crates/engine/genie-core/src/unit_ai/attack_pick.rs
-index 4bca7b20..48901595 100644
+index 4bca7b20..05c44079 100644
 --- a/crates/engine/genie-core/src/unit_ai/attack_pick.rs
 +++ b/crates/engine/genie-core/src/unit_ai/attack_pick.rs
 @@ -9,7 +9,13 @@ use crate::map::Footprint;
@@ -4479,7 +4730,7 @@ index 4bca7b20..48901595 100644
      match s.stance {
          UnitStance::StandGround
 diff --git a/crates/engine/genie-core/src/unit_ai/attack_rules.rs b/crates/engine/genie-core/src/unit_ai/attack_rules.rs
-index 87f4b772..cfbad538 100644
+index 87f4b772..a360891f 100644
 --- a/crates/engine/genie-core/src/unit_ai/attack_rules.rs
 +++ b/crates/engine/genie-core/src/unit_ai/attack_rules.rs
 @@ -293,6 +293,15 @@ pub(super) const fn defend_patrol_range() -> Result<(), GenieError> {
@@ -4515,7 +4766,7 @@ index 87f4b772..cfbad538 100644
      Ok(Distance::new(least))
  }
 diff --git a/crates/engine/genie-core/src/unit_ai/flight.rs b/crates/engine/genie-core/src/unit_ai/flight.rs
-index b388f155..e8a22855 100644
+index b388f155..d2925c47 100644
 --- a/crates/engine/genie-core/src/unit_ai/flight.rs
 +++ b/crates/engine/genie-core/src/unit_ai/flight.rs
 @@ -21,6 +21,7 @@ use crate::unit_ai::StopOrder;
@@ -4599,7 +4850,7 @@ index b388f155..e8a22855 100644
      /// it ([`cared_classes`]), within its search radius, the line of sight plus 1 if that is
      /// farther, plus its growth (`+0x1e8`, `FUN_140c2e080`'s fourth argument: 7 for the villager
 diff --git a/crates/engine/genie-core/src/unit_ai/idle.rs b/crates/engine/genie-core/src/unit_ai/idle.rs
-index 28ca0268..3369baf9 100644
+index 28ca0268..32b392f0 100644
 --- a/crates/engine/genie-core/src/unit_ai/idle.rs
 +++ b/crates/engine/genie-core/src/unit_ai/idle.rs
 @@ -645,7 +645,7 @@ impl UnitAi {
@@ -4629,7 +4880,7 @@ index 28ca0268..3369baf9 100644
          }
      }
 diff --git a/crates/engine/genie-core/src/unit_ai/idle_animals.rs b/crates/engine/genie-core/src/unit_ai/idle_animals.rs
-index bf5761c6..c4c0d925 100644
+index bf5761c6..06742498 100644
 --- a/crates/engine/genie-core/src/unit_ai/idle_animals.rs
 +++ b/crates/engine/genie-core/src/unit_ai/idle_animals.rs
 @@ -29,6 +29,38 @@ use crate::world::layer::ClassRoles;
@@ -4906,7 +5157,7 @@ index 7fd24514..b0ef18a3 100644
      /// hold it (`FUN_1415417a0`).
      ///
 diff --git a/crates/engine/genie-core/src/unit_ai/tests.rs b/crates/engine/genie-core/src/unit_ai/tests.rs
-index 4cc9cc71..32e0e5ef 100644
+index 4cc9cc71..b603cd5e 100644
 --- a/crates/engine/genie-core/src/unit_ai/tests.rs
 +++ b/crates/engine/genie-core/src/unit_ai/tests.rs
 @@ -1397,9 +1397,8 @@ fn hunter_asked_for_another_target_hunts_what_its_search_finds() {
@@ -5501,7 +5752,7 @@ index 77dc93ea..ca2421e5 100644
          let roles = &self.c.w.model.roles.clone();
          let seeker = match search.pick {
 diff --git a/crates/engine/genie-core/src/unit_ai/world_view/unit_view.rs b/crates/engine/genie-core/src/unit_ai/world_view/unit_view.rs
-index 9fe88757..68b124ee 100644
+index 9fe88757..f8bf962f 100644
 --- a/crates/engine/genie-core/src/unit_ai/world_view/unit_view.rs
 +++ b/crates/engine/genie-core/src/unit_ai/world_view/unit_view.rs
 @@ -17,7 +17,7 @@ use crate::players::PlayerId;
@@ -5548,7 +5799,7 @@ index 9fe88757..68b124ee 100644
      }
  }
 diff --git a/crates/engine/genie-core/src/unit_ai/world_view/world_picker.rs b/crates/engine/genie-core/src/unit_ai/world_view/world_picker.rs
-index acf8fb4a..a35e54f4 100644
+index acf8fb4a..6372fe05 100644
 --- a/crates/engine/genie-core/src/unit_ai/world_view/world_picker.rs
 +++ b/crates/engine/genie-core/src/unit_ai/world_view/world_picker.rs
 @@ -541,7 +541,16 @@ impl AttackPicker for WorldPicker<'_> {
@@ -5610,7 +5861,7 @@ index 8c22fa57..15f31bd7 100644
          let out = list.out_at(i);
          let gone = list.swap_remove(i)?;
 diff --git a/crates/engine/genie-core/src/world/world_update.rs b/crates/engine/genie-core/src/world/world_update.rs
-index f127e410..d5e27ea2 100644
+index f127e410..c81b0510 100644
 --- a/crates/engine/genie-core/src/world/world_update.rs
 +++ b/crates/engine/genie-core/src/world/world_update.rs
 @@ -49,6 +49,8 @@ impl World {
@@ -5623,7 +5874,7 @@ index f127e410..d5e27ea2 100644
              let stopped: Vec<bool> = self
                  .players
 diff --git a/crates/engine/genie-import/Cargo.toml b/crates/engine/genie-import/Cargo.toml
-index bab1493b..1df87146 100644
+index bab1493b..15f99b24 100644
 --- a/crates/engine/genie-import/Cargo.toml
 +++ b/crates/engine/genie-import/Cargo.toml
 @@ -13,7 +13,7 @@ genie-model = { path = "../genie-model", features = ["schema"] }
@@ -5636,7 +5887,7 @@ index bab1493b..1df87146 100644
  genie-save = { version = "0.1.0", path = "../../formats/genie-save" }
  serde_json.workspace = true
 diff --git a/crates/engine/genie-import/src/dat.rs b/crates/engine/genie-import/src/dat.rs
-index 8b58e128..849f8cc4 100644
+index 8b58e128..cda336a8 100644
 --- a/crates/engine/genie-import/src/dat.rs
 +++ b/crates/engine/genie-import/src/dat.rs
 @@ -276,6 +276,10 @@ impl TerrainTable {
@@ -5668,7 +5919,7 @@ index 8b58e128..849f8cc4 100644
              graphics: Graphics::default(),
              terrain: TerrainTable::default(),
 diff --git a/crates/engine/genie-import/src/dat/dat_work.rs b/crates/engine/genie-import/src/dat/dat_work.rs
-index b4034340..0bf005e5 100644
+index b4034340..d6b0ea25 100644
 --- a/crates/engine/genie-import/src/dat/dat_work.rs
 +++ b/crates/engine/genie-import/src/dat/dat_work.rs
 @@ -76,6 +76,14 @@ pub(super) fn sound_event(event: u32, sound: i16, sounds: &[Sound]) -> i32 {
@@ -5697,7 +5948,7 @@ index b4034340..0bf005e5 100644
          combat_level: t.enable_targeting,
          combat_level_flag: TaskFlags::from_bits_retain(t.combat_level_flag),
 diff --git a/crates/engine/genie-import/src/install.rs b/crates/engine/genie-import/src/install.rs
-index 77f51e58..8edbe3be 100644
+index 77f51e58..f71f9582 100644
 --- a/crates/engine/genie-import/src/install.rs
 +++ b/crates/engine/genie-import/src/install.rs
 @@ -23,11 +23,13 @@ use std::io::ErrorKind;
@@ -5776,7 +6027,7 @@ index 77f51e58..8edbe3be 100644
                  linked_techs,
                  unit_lines,
 diff --git a/crates/engine/genie-import/src/install/tests.rs b/crates/engine/genie-import/src/install/tests.rs
-index 959aa7e6..b06707dc 100644
+index 959aa7e6..d5a6d690 100644
 --- a/crates/engine/genie-import/src/install/tests.rs
 +++ b/crates/engine/genie-import/src/install/tests.rs
 @@ -20,7 +20,7 @@ fn imported() -> MasterTable {
@@ -5826,7 +6077,7 @@ index 959aa7e6..b06707dc 100644
 +    assert_eq!(crate::cache::decode(&crate::cache::encode(&table).unwrap()).unwrap(),table);
 +}
 diff --git a/crates/engine/genie-model/src/layer/generated.rs b/crates/engine/genie-model/src/layer/generated.rs
-index e28b10a7..dc3a6723 100644
+index e28b10a7..e4ecfe66 100644
 --- a/crates/engine/genie-model/src/layer/generated.rs
 +++ b/crates/engine/genie-model/src/layer/generated.rs
 @@ -652,6 +652,8 @@ pub struct AttributeSlots {
@@ -5868,7 +6119,7 @@ index e28b10a7..dc3a6723 100644
      pub world_effect: AttributeId,
      /// The owner's attribute of a pasture's food, which its livestock share.
 diff --git a/crates/engine/genie-model/src/objects/masters/task.rs b/crates/engine/genie-model/src/objects/masters/task.rs
-index a34c2460..21814ba3 100644
+index a34c2460..6fde0173 100644
 --- a/crates/engine/genie-model/src/objects/masters/task.rs
 +++ b/crates/engine/genie-model/src/objects/masters/task.rs
 @@ -27,6 +27,8 @@ pub struct Task {
@@ -5902,7 +6153,7 @@ index a34c2460..21814ba3 100644
 +    }
 +}
 diff --git a/crates/formats/genie-cpx/Cargo.toml b/crates/formats/genie-cpx/Cargo.toml
-index af397724..cff7038c 100644
+index af397724..f9e25c3d 100644
 --- a/crates/formats/genie-cpx/Cargo.toml
 +++ b/crates/formats/genie-cpx/Cargo.toml
 @@ -1,6 +1,6 @@
@@ -5923,7 +6174,7 @@ index af397724..cff7038c 100644
  
  [dev-dependencies]
 diff --git a/crates/formats/genie-cpx/src/lib.rs b/crates/formats/genie-cpx/src/lib.rs
-index 367f5e15..38926083 100644
+index 367f5e15..7bdbd163 100644
 --- a/crates/formats/genie-cpx/src/lib.rs
 +++ b/crates/formats/genie-cpx/src/lib.rs
 @@ -104,7 +104,7 @@ where
@@ -5989,7 +6240,7 @@ index 367f5e15..38926083 100644
          Ok(())
      }
 diff --git a/crates/formats/genie-cpx/src/read.rs b/crates/formats/genie-cpx/src/read.rs
-index d55e6181..2726209e 100644
+index d55e6181..1a422ad5 100644
 --- a/crates/formats/genie-cpx/src/read.rs
 +++ b/crates/formats/genie-cpx/src/read.rs
 @@ -3,7 +3,6 @@ use byteorder::{LE, ReadBytesExt};
@@ -6108,7 +6359,7 @@ index d55e6181..2726209e 100644
          assert_eq!(c.version(), AOE2_DE);
          assert_eq!(c.name(), "rcam3");
 diff --git a/crates/formats/genie-cpx/src/write.rs b/crates/formats/genie-cpx/src/write.rs
-index a61bf9dc..e2dc87f7 100644
+index a61bf9dc..07e77df5 100644
 --- a/crates/formats/genie-cpx/src/write.rs
 +++ b/crates/formats/genie-cpx/src/write.rs
 @@ -235,7 +235,7 @@ impl<W: Write> CampaignWriter<W> {
@@ -6154,7 +6405,7 @@ index a61bf9dc..e2dc87f7 100644
  
          for scen in &self.scenarios {
 diff --git a/crates/formats/genie-dat/Cargo.toml b/crates/formats/genie-dat/Cargo.toml
-index 9e3803ce..2fd85036 100644
+index 9e3803ce..31490e1a 100644
 --- a/crates/formats/genie-dat/Cargo.toml
 +++ b/crates/formats/genie-dat/Cargo.toml
 @@ -1,6 +1,6 @@
@@ -6174,7 +6425,7 @@ index 9e3803ce..2fd85036 100644
  
  [dev-dependencies]
 diff --git a/crates/formats/genie-dat/src/civ.rs b/crates/formats/genie-dat/src/civ.rs
-index 57f87e68..0d7509a4 100644
+index 57f87e68..b26bb223 100644
 --- a/crates/formats/genie-dat/src/civ.rs
 +++ b/crates/formats/genie-dat/src/civ.rs
 @@ -152,7 +152,7 @@ impl Civilization {
@@ -6187,7 +6438,7 @@ index 57f87e68..0d7509a4 100644
          self.unit_kinds
              .get(usize::from(id))
 diff --git a/crates/formats/genie-dat/src/lib.rs b/crates/formats/genie-dat/src/lib.rs
-index e93e3035..9c5e4e38 100644
+index e93e3035..856d2c24 100644
 --- a/crates/formats/genie-dat/src/lib.rs
 +++ b/crates/formats/genie-dat/src/lib.rs
 @@ -48,6 +48,7 @@ use std::str::from_utf8;
@@ -6244,7 +6495,7 @@ index e93e3035..9c5e4e38 100644
          self.sprites.get(usize::from(id)).and_then(Option::as_ref)
      }
 diff --git a/crates/formats/genie-dat/src/tech_tree/mod.rs b/crates/formats/genie-dat/src/tech_tree/mod.rs
-index 3d9e43fb..ff790a91 100644
+index 3d9e43fb..902ba5be 100644
 --- a/crates/formats/genie-dat/src/tech_tree/mod.rs
 +++ b/crates/formats/genie-dat/src/tech_tree/mod.rs
 @@ -6,16 +6,16 @@ use crate::unit_kind::UnitKindId;
@@ -6543,7 +6794,7 @@ index 3d9e43fb..ff790a91 100644
 -    }
 -}
 diff --git a/crates/formats/genie-dat/src/tech_tree/nodes.rs b/crates/formats/genie-dat/src/tech_tree/nodes.rs
-index ba0f1201..431210c6 100644
+index ba0f1201..0164e847 100644
 --- a/crates/formats/genie-dat/src/tech_tree/nodes.rs
 +++ b/crates/formats/genie-dat/src/tech_tree/nodes.rs
 @@ -113,7 +113,7 @@ impl TechTreeAge {
@@ -6654,7 +6905,7 @@ index ba0f1201..431210c6 100644
      }
  }
 diff --git a/crates/formats/genie-dat/src/unit_kind/mod.rs b/crates/formats/genie-dat/src/unit_kind/mod.rs
-index f82b282b..1897e937 100644
+index f82b282b..a8a05dee 100644
 --- a/crates/formats/genie-dat/src/unit_kind/mod.rs
 +++ b/crates/formats/genie-dat/src/unit_kind/mod.rs
 @@ -42,6 +42,7 @@ use std::result::Result as StdResult;
@@ -6666,7 +6917,7 @@ index f82b282b..1897e937 100644
      /// The base unit type, for units that do not do anything.
      Static = 10,
 diff --git a/crates/formats/genie-formats/CHANGELOG.md b/crates/formats/genie-formats/CHANGELOG.md
-index d81b69f3..1748cc53 100644
+index d81b69f3..e50c474b 100644
 --- a/crates/formats/genie-formats/CHANGELOG.md
 +++ b/crates/formats/genie-formats/CHANGELOG.md
 @@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
@@ -6686,7 +6937,7 @@ index d81b69f3..1748cc53 100644
  * **(breaking)** scx: fix Age of Empires 2: Definitive Edition tile data types. `MapTile.layered_terrain` now contains a u16 instead of a u8.
  * **(breaking)** scx: read versioned map data from Age of Empires 2: Definitive Edition.
 diff --git a/crates/formats/genie-formats/Cargo.toml b/crates/formats/genie-formats/Cargo.toml
-index 83e3f409..7ab4caba 100644
+index 83e3f409..c2ad329c 100644
 --- a/crates/formats/genie-formats/Cargo.toml
 +++ b/crates/formats/genie-formats/Cargo.toml
 @@ -1,6 +1,6 @@
@@ -6720,7 +6971,7 @@ index 83e3f409..7ab4caba 100644
  
  [dev-dependencies]
 diff --git a/crates/formats/genie-formats/examples/displayaochotkeys.rs b/crates/formats/genie-formats/examples/displayaochotkeys.rs
-index 02dd7944..d3b5b93b 100644
+index 02dd7944..a68bf51b 100644
 --- a/crates/formats/genie-formats/examples/displayaochotkeys.rs
 +++ b/crates/formats/genie-formats/examples/displayaochotkeys.rs
 @@ -40,9 +40,9 @@ fn main() -> anyhow::Result<()> {
@@ -6736,7 +6987,7 @@ index 02dd7944..d3b5b93b 100644
      Ok(())
  }
 diff --git a/crates/formats/genie-formats/examples/displayhotkey.rs b/crates/formats/genie-formats/examples/displayhotkey.rs
-index 49ad3187..832ef232 100644
+index 49ad3187..601979cf 100644
 --- a/crates/formats/genie-formats/examples/displayhotkey.rs
 +++ b/crates/formats/genie-formats/examples/displayhotkey.rs
 @@ -32,7 +32,7 @@ struct DisplayHotkey {
@@ -6749,7 +7000,7 @@ index 49ad3187..832ef232 100644
      let hotkey = group.hotkey(cli_input.hotkey_index).unwrap();
      println!("{hotkey}");
 diff --git a/crates/formats/genie-formats/examples/extractcpx.rs b/crates/formats/genie-formats/examples/extractcpx.rs
-index f14def6c..efa1c8be 100644
+index f14def6c..bb03dc75 100644
 --- a/crates/formats/genie-formats/examples/extractcpx.rs
 +++ b/crates/formats/genie-formats/examples/extractcpx.rs
 @@ -36,7 +36,7 @@ enum Cli {
@@ -6771,7 +7022,7 @@ index f14def6c..efa1c8be 100644
      let names = campaign
          .entries()
 diff --git a/crates/formats/genie-formats/examples/probe.rs b/crates/formats/genie-formats/examples/probe.rs
-index b946a170..8c93cddf 100644
+index b946a170..ff624cd7 100644
 --- a/crates/formats/genie-formats/examples/probe.rs
 +++ b/crates/formats/genie-formats/examples/probe.rs
 @@ -63,7 +63,7 @@ fn scenario(bytes: &[u8]) -> Outcome {
@@ -6784,7 +7035,7 @@ index b946a170..8c93cddf 100644
          Err(e) => return failed(e),
      };
 diff --git a/crates/formats/genie-formats/examples/sethotkey.rs b/crates/formats/genie-formats/examples/sethotkey.rs
-index 3eac2c9e..02a57b28 100644
+index 3eac2c9e..f5f345c4 100644
 --- a/crates/formats/genie-formats/examples/sethotkey.rs
 +++ b/crates/formats/genie-formats/examples/sethotkey.rs
 @@ -48,7 +48,7 @@ struct SetHotkey {
@@ -6797,7 +7048,7 @@ index 3eac2c9e..02a57b28 100644
          cli_input.group_index as usize,
          cli_input.hotkey_index as usize,
 diff --git a/crates/formats/genie-hki/Cargo.toml b/crates/formats/genie-hki/Cargo.toml
-index a0eb3d6d..603090e6 100644
+index a0eb3d6d..c4de1716 100644
 --- a/crates/formats/genie-hki/Cargo.toml
 +++ b/crates/formats/genie-hki/Cargo.toml
 @@ -1,6 +1,6 @@
@@ -6818,7 +7069,7 @@ index a0eb3d6d..603090e6 100644
  
  [dev-dependencies]
 diff --git a/crates/formats/genie-hki/src/catalogue.rs b/crates/formats/genie-hki/src/catalogue.rs
-index 36e1522f..fda62be9 100644
+index 36e1522f..1f30a80f 100644
 --- a/crates/formats/genie-hki/src/catalogue.rs
 +++ b/crates/formats/genie-hki/src/catalogue.rs
 @@ -5,6 +5,7 @@
@@ -6964,7 +7215,7 @@ index 36e1522f..fda62be9 100644
 +#[non_exhaustive]
  pub enum BlacksmithHotkeys {}
 diff --git a/crates/formats/genie-hki/src/file.rs b/crates/formats/genie-hki/src/file.rs
-index 01b2354b..afb84688 100644
+index 01b2354b..7d1ed5d0 100644
 --- a/crates/formats/genie-hki/src/file.rs
 +++ b/crates/formats/genie-hki/src/file.rs
 @@ -22,12 +22,12 @@ pub struct HotkeyInfo {
@@ -7047,7 +7298,7 @@ index 01b2354b..afb84688 100644
          format!("Version: {}\n{}", self.version, groups.join("\n"))
      }
 diff --git a/crates/formats/genie-hki/src/group.rs b/crates/formats/genie-hki/src/group.rs
-index 2141aa96..1acf5fea 100644
+index 2141aa96..c34d2234 100644
 --- a/crates/formats/genie-hki/src/group.rs
 +++ b/crates/formats/genie-hki/src/group.rs
 @@ -18,11 +18,11 @@ pub struct HotkeyGroup {
@@ -7096,7 +7347,7 @@ index 2141aa96..1acf5fea 100644
          format!("{}{}", group_name, hotkeys.join("\n  "))
      }
 diff --git a/crates/formats/genie-hki/src/key.rs b/crates/formats/genie-hki/src/key.rs
-index 51de3ec8..3c6f2448 100644
+index 51de3ec8..f7f21c4b 100644
 --- a/crates/formats/genie-hki/src/key.rs
 +++ b/crates/formats/genie-hki/src/key.rs
 @@ -164,7 +164,7 @@ impl Hotkey {
@@ -7126,7 +7377,7 @@ index 51de3ec8..3c6f2448 100644
          let alt = if self.alt { "ctrl-" } else { "" };
          let shift = if self.shift { "ctrl-" } else { "" };
 diff --git a/crates/formats/genie-hki/src/tests.rs b/crates/formats/genie-hki/src/tests.rs
-index 0d77e598..6ce51d8c 100644
+index 0d77e598..a8adf69d 100644
 --- a/crates/formats/genie-hki/src/tests.rs
 +++ b/crates/formats/genie-hki/src/tests.rs
 @@ -6,7 +6,7 @@ use std::fs::File;
@@ -7286,7 +7537,7 @@ index 0d77e598..6ce51d8c 100644
      }
      Ok(())
 diff --git a/crates/formats/genie-lang/Cargo.toml b/crates/formats/genie-lang/Cargo.toml
-index 2c90de05..f49086aa 100644
+index 2c90de05..1636cfc9 100644
 --- a/crates/formats/genie-lang/Cargo.toml
 +++ b/crates/formats/genie-lang/Cargo.toml
 @@ -1,6 +1,6 @@
@@ -7298,7 +7549,7 @@ index 2c90de05..f49086aa 100644
  authors.workspace = true
  edition.workspace = true
 diff --git a/crates/formats/genie-lang/src/lib.rs b/crates/formats/genie-lang/src/lib.rs
-index 8a31254f..bb1e4118 100644
+index 8a31254f..0a4b429b 100644
 --- a/crates/formats/genie-lang/src/lib.rs
 +++ b/crates/formats/genie-lang/src/lib.rs
 @@ -10,14 +10,14 @@
@@ -7379,7 +7630,7 @@ index 8a31254f..bb1e4118 100644
      /// An AoK/AoC-style DLL file with language resource strings.
      Dll,
 diff --git a/crates/formats/genie-lang/src/map.rs b/crates/formats/genie-lang/src/map.rs
-index aac9f9c3..15828a18 100644
+index aac9f9c3..4274778a 100644
 --- a/crates/formats/genie-lang/src/map.rs
 +++ b/crates/formats/genie-lang/src/map.rs
 @@ -30,11 +30,10 @@ impl LangFile {
@@ -7637,7 +7888,7 @@ index aac9f9c3..15828a18 100644
      ///
      /// for v in lang_file.values_mut() { v.push('A'); }
 diff --git a/crates/formats/genie-rec/Cargo.toml b/crates/formats/genie-rec/Cargo.toml
-index 7f32a359..0d802f35 100644
+index 7f32a359..ff8f0e17 100644
 --- a/crates/formats/genie-rec/Cargo.toml
 +++ b/crates/formats/genie-rec/Cargo.toml
 @@ -1,6 +1,6 @@
@@ -7662,7 +7913,7 @@ index 7f32a359..0d802f35 100644
      "strings",
  ] }
 diff --git a/crates/formats/genie-rec/src/actions/game.rs b/crates/formats/genie-rec/src/actions/game.rs
-index b501828e..3579f587 100644
+index b501828e..cf59d213 100644
 --- a/crates/formats/genie-rec/src/actions/game.rs
 +++ b/crates/formats/genie-rec/src/actions/game.rs
 @@ -7,6 +7,7 @@ use std::io::Read;
@@ -7736,7 +7987,7 @@ index b501828e..3579f587 100644
      }
  }
 diff --git a/crates/formats/genie-rec/src/actions/mod.rs b/crates/formats/genie-rec/src/actions/mod.rs
-index 042eec39..5d5de9b2 100644
+index 042eec39..c68e6976 100644
 --- a/crates/formats/genie-rec/src/actions/mod.rs
 +++ b/crates/formats/genie-rec/src/actions/mod.rs
 @@ -160,6 +160,7 @@ impl ObjectsList {
@@ -7823,7 +8074,7 @@ index 042eec39..5d5de9b2 100644
      /// A player command (operation 1).
      Command(Command),
 diff --git a/crates/formats/genie-rec/src/actions/tasks.rs b/crates/formats/genie-rec/src/actions/tasks.rs
-index 86eade3e..66f18716 100644
+index 86eade3e..32a77743 100644
 --- a/crates/formats/genie-rec/src/actions/tasks.rs
 +++ b/crates/formats/genie-rec/src/actions/tasks.rs
 @@ -96,9 +96,9 @@ pub struct UngarrisonCommand {
@@ -7840,7 +8091,7 @@ index 86eade3e..66f18716 100644
      /// not).
      pub location: Option<Location2>,
 diff --git a/crates/formats/genie-rec/src/actions/tests.rs b/crates/formats/genie-rec/src/actions/tests.rs
-index e65f75ad..44d4538f 100644
+index e65f75ad..46e6755c 100644
 --- a/crates/formats/genie-rec/src/actions/tests.rs
 +++ b/crates/formats/genie-rec/src/actions/tests.rs
 @@ -333,11 +333,21 @@ fn the_commands_without_writers_read_their_fields() {
@@ -7892,7 +8143,7 @@ index e65f75ad..44d4538f 100644
 +    assert!(matches!(command, Command::Unknown { id: 0x68, ref bytes } if bytes.is_empty()));
  }
 diff --git a/crates/formats/genie-rec/src/de/body.rs b/crates/formats/genie-rec/src/de/body.rs
-index ce4be142..9bbfd839 100644
+index ce4be142..b41e15e9 100644
 --- a/crates/formats/genie-rec/src/de/body.rs
 +++ b/crates/formats/genie-rec/src/de/body.rs
 @@ -69,6 +69,7 @@ pub struct TriggerSync {
@@ -7904,7 +8155,7 @@ index ce4be142..9bbfd839 100644
      /// Op 5 as the first record of a recording: the recording settings.
      Pregame(Pregame),
 diff --git a/crates/formats/genie-rec/src/element.rs b/crates/formats/genie-rec/src/element.rs
-index 97cba25d..58f6436f 100644
+index 97cba25d..6c38a582 100644
 --- a/crates/formats/genie-rec/src/element.rs
 +++ b/crates/formats/genie-rec/src/element.rs
 @@ -12,23 +12,6 @@ pub trait OptionalReadableElement: Sized {
@@ -7969,7 +8220,7 @@ index 97cba25d..58f6436f 100644
  ///
  /// # Errors
 diff --git a/crates/formats/genie-rec/src/lib.rs b/crates/formats/genie-rec/src/lib.rs
-index 6fb7e269..0e841ee9 100644
+index 6fb7e269..7b45aef6 100644
 --- a/crates/formats/genie-rec/src/lib.rs
 +++ b/crates/formats/genie-rec/src/lib.rs
 @@ -57,7 +57,6 @@ use crate::element::ReadableHeaderElement;
@@ -8148,7 +8399,7 @@ index 6fb7e269..0e841ee9 100644
              (Error::NotRead("x"), MissingData),
              (Error::NotWritten, MissingData),
 diff --git a/crates/formats/genie-rec/src/unit_action.rs b/crates/formats/genie-rec/src/unit_action.rs
-index af1a56cf..f0214295 100644
+index af1a56cf..acc9d5cd 100644
 --- a/crates/formats/genie-rec/src/unit_action.rs
 +++ b/crates/formats/genie-rec/src/unit_action.rs
 @@ -110,6 +110,7 @@ impl UnitAction {
@@ -8160,7 +8411,7 @@ index af1a56cf..f0214295 100644
      /// Move to a position or object (type 1).
      MoveTo(ActionMoveTo),
 diff --git a/crates/formats/genie-rec/src/version.rs b/crates/formats/genie-rec/src/version.rs
-index cd588b97..426cd81c 100644
+index cd588b97..12f7cb69 100644
 --- a/crates/formats/genie-rec/src/version.rs
 +++ b/crates/formats/genie-rec/src/version.rs
 @@ -5,6 +5,7 @@ use std::io::Read;
@@ -8172,7 +8423,7 @@ index cd588b97..426cd81c 100644
      /// A trial version, either `AoC` or `AoE`
      Trial,
 diff --git a/crates/formats/genie-rec/tests/de_corpus.rs b/crates/formats/genie-rec/tests/de_corpus.rs
-index 8c4efd19..b333d553 100644
+index 8c4efd19..43fe2104 100644
 --- a/crates/formats/genie-rec/tests/de_corpus.rs
 +++ b/crates/formats/genie-rec/tests/de_corpus.rs
 @@ -90,7 +90,11 @@ fn tier_1_recordings_read_and_round_trip() {
@@ -8189,7 +8440,7 @@ index 8c4efd19..b333d553 100644
                  if chapter.index == 0 && i == 0 && !matches!(op, Op::Pregame(_)) {
                      problems.push(format!(
 diff --git a/crates/formats/genie-save/src/generated/world.rs b/crates/formats/genie-save/src/generated/world.rs
-index f3876c52..ae080305 100644
+index f3876c52..c88e80fc 100644
 --- a/crates/formats/genie-save/src/generated/world.rs
 +++ b/crates/formats/genie-save/src/generated/world.rs
 @@ -101,7 +101,7 @@ pub struct PlayerCivilization {
@@ -8615,7 +8866,7 @@ index f3876c52..ae080305 100644
      }
  }
 diff --git a/crates/formats/genie-save/src/lib.rs b/crates/formats/genie-save/src/lib.rs
-index 83eaaa03..83de9376 100644
+index 83eaaa03..6afa46d8 100644
 --- a/crates/formats/genie-save/src/lib.rs
 +++ b/crates/formats/genie-save/src/lib.rs
 @@ -126,6 +126,50 @@ impl Header {
@@ -8670,7 +8921,7 @@ index 83eaaa03..83de9376 100644
      /// where it ends).
      ///
 diff --git a/crates/formats/genie-save/src/objects.rs b/crates/formats/genie-save/src/objects.rs
-index deebaa01..72b44a2a 100644
+index deebaa01..3b8d4ee7 100644
 --- a/crates/formats/genie-save/src/objects.rs
 +++ b/crates/formats/genie-save/src/objects.rs
 @@ -37,6 +37,22 @@ impl Player {
@@ -8697,7 +8948,7 @@ index deebaa01..72b44a2a 100644
      #[must_use]
      pub fn objects(&self) -> Option<&PlayerObjects> {
 diff --git a/crates/formats/genie-scx/Cargo.toml b/crates/formats/genie-scx/Cargo.toml
-index 157d445d..ae880c99 100644
+index 157d445d..3f21289c 100644
 --- a/crates/formats/genie-scx/Cargo.toml
 +++ b/crates/formats/genie-scx/Cargo.toml
 @@ -1,6 +1,6 @@
@@ -8709,7 +8960,7 @@ index 157d445d..ae880c99 100644
  authors.workspace = true
  edition.workspace = true
 diff --git a/crates/formats/genie-scx/src/ai.rs b/crates/formats/genie-scx/src/ai.rs
-index e54774e4..c2e604c5 100644
+index e54774e4..7770fb53 100644
 --- a/crates/formats/genie-scx/src/ai.rs
 +++ b/crates/formats/genie-scx/src/ai.rs
 @@ -1,15 +1,13 @@
@@ -8765,7 +9016,7 @@ index e54774e4..c2e604c5 100644
      }
  }
 diff --git a/crates/formats/genie-scx/src/format/tribe_read.rs b/crates/formats/genie-scx/src/format/tribe_read.rs
-index a4b9c09e..853dfac0 100644
+index a4b9c09e..97031acd 100644
 --- a/crates/formats/genie-scx/src/format/tribe_read.rs
 +++ b/crates/formats/genie-scx/src/format/tribe_read.rs
 @@ -7,7 +7,6 @@ use crate::values::{DiplomaticStance, StartingAge};
@@ -8848,7 +9099,7 @@ index a4b9c09e..853dfac0 100644
      }
  }
 diff --git a/crates/formats/genie-scx/src/header.rs b/crates/formats/genie-scx/src/header.rs
-index af845dba..2e40479f 100644
+index af845dba..1b295ebc 100644
 --- a/crates/formats/genie-scx/src/header.rs
 +++ b/crates/formats/genie-scx/src/header.rs
 @@ -33,17 +33,17 @@ impl DlcOptions {
@@ -8882,7 +9133,7 @@ index af845dba..2e40479f 100644
  
          Ok(Self {
 diff --git a/crates/formats/genie-scx/src/lib.rs b/crates/formats/genie-scx/src/lib.rs
-index 526cf7a4..cb11cb1f 100644
+index 526cf7a4..86b8fb14 100644
 --- a/crates/formats/genie-scx/src/lib.rs
 +++ b/crates/formats/genie-scx/src/lib.rs
 @@ -79,24 +79,6 @@ pub enum Error {
@@ -8983,7 +9234,7 @@ index 526cf7a4..cb11cb1f 100644
                  Error::IoError(io::Error::other("x")),
                  Io,
 diff --git a/crates/formats/genie-scx/src/values.rs b/crates/formats/genie-scx/src/values.rs
-index 3ec25539..91bf34a6 100644
+index 3ec25539..1ac1353a 100644
 --- a/crates/formats/genie-scx/src/values.rs
 +++ b/crates/formats/genie-scx/src/values.rs
 @@ -2,7 +2,6 @@
@@ -9379,7 +9630,7 @@ index 3ec25539..91bf34a6 100644
 +    }
  }
 diff --git a/crates/formats/genie-scx/src/victory.rs b/crates/formats/genie-scx/src/victory.rs
-index bd768bdc..14c766f0 100644
+index bd768bdc..a3b37579 100644
 --- a/crates/formats/genie-scx/src/victory.rs
 +++ b/crates/formats/genie-scx/src/victory.rs
 @@ -1,8 +1,7 @@
@@ -9454,7 +9705,7 @@ index bd768bdc..14c766f0 100644
          let mut entries = Vec::with_capacity(num_conditions as usize);
          for _ in 0..num_conditions {
 diff --git a/crates/formats/genie-support/src/ids.rs b/crates/formats/genie-support/src/ids.rs
-index 170a4ff1..c47ffdf6 100644
+index 170a4ff1..c4905cb9 100644
 --- a/crates/formats/genie-support/src/ids.rs
 +++ b/crates/formats/genie-support/src/ids.rs
 @@ -143,8 +143,7 @@ impl StringKey {
@@ -9487,7 +9738,7 @@ index 170a4ff1..c47ffdf6 100644
          } else {
              panic!();
 diff --git a/crates/formats/genie-support/src/macros.rs b/crates/formats/genie-support/src/macros.rs
-index 222a1cdf..9c9db7d0 100644
+index 222a1cdf..873928b7 100644
 --- a/crates/formats/genie-support/src/macros.rs
 +++ b/crates/formats/genie-support/src/macros.rs
 @@ -11,9 +11,12 @@
@@ -9534,7 +9785,7 @@ index 222a1cdf..9c9db7d0 100644
  macro_rules! fallible_try_from {
      ($to:ty, $from:ident) => {
 diff --git a/crates/formats/genie-support/src/read.rs b/crates/formats/genie-support/src/read.rs
-index e15a0f14..f7e7c3a9 100644
+index e15a0f14..f6ccc037 100644
 --- a/crates/formats/genie-support/src/read.rs
 +++ b/crates/formats/genie-support/src/read.rs
 @@ -8,13 +8,16 @@ use std::io::{self, Error, ErrorKind, Read, Result};
@@ -9576,7 +9827,7 @@ index e15a0f14..f7e7c3a9 100644
  ///
  /// # Errors
 diff --git a/crates/formats/jascpal/src/lib.rs b/crates/formats/jascpal/src/lib.rs
-index 4b918f85..f6ae272a 100644
+index 4b918f85..e528224e 100644
 --- a/crates/formats/jascpal/src/lib.rs
 +++ b/crates/formats/jascpal/src/lib.rs
 @@ -14,10 +14,11 @@
@@ -9602,7 +9853,7 @@ index 4b918f85..f6ae272a 100644
  
  #![deny(future_incompatible)]
 diff --git a/crates/tools/genie-oracle/Cargo.toml b/crates/tools/genie-oracle/Cargo.toml
-index ab4dccd9..7469dec3 100644
+index ab4dccd9..1dcfbb0f 100644
 --- a/crates/tools/genie-oracle/Cargo.toml
 +++ b/crates/tools/genie-oracle/Cargo.toml
 @@ -12,7 +12,7 @@ publish = false
@@ -9627,7 +9878,7 @@ index ab4dccd9..7469dec3 100644
  serde_json.workspace = true
  
 diff --git a/crates/tools/genie-oracle/examples/census.rs b/crates/tools/genie-oracle/examples/census.rs
-index 90a8616f..f4b3e703 100644
+index 90a8616f..77c5309d 100644
 --- a/crates/tools/genie-oracle/examples/census.rs
 +++ b/crates/tools/genie-oracle/examples/census.rs
 @@ -26,6 +26,7 @@ fn main() -> Result<(), Box<dyn Error>> {
@@ -9639,7 +9890,7 @@ index 90a8616f..f4b3e703 100644
      let masters = install_read(dat.as_ref())?;
      let run = census_run(&recording, Some(&masters), limit)?;
 diff --git a/crates/tools/genie-oracle/src/census.rs b/crates/tools/genie-oracle/src/census.rs
-index 99849470..cbdc9d06 100644
+index 99849470..7b6d13cd 100644
 --- a/crates/tools/genie-oracle/src/census.rs
 +++ b/crates/tools/genie-oracle/src/census.rs
 @@ -112,7 +112,20 @@ pub fn census_run(
@@ -9806,7 +10057,7 @@ index 99849470..cbdc9d06 100644
                  continue;
              }
 diff --git a/crates/tools/genie-oracle/src/groups.rs b/crates/tools/genie-oracle/src/groups.rs
-index 7364f8c6..f8d0474e 100644
+index 7364f8c6..c9b2aecd 100644
 --- a/crates/tools/genie-oracle/src/groups.rs
 +++ b/crates/tools/genie-oracle/src/groups.rs
 @@ -122,6 +122,7 @@ fn formation(f: &saved::Formation) -> Result<Formation, GenieError> {
@@ -9832,7 +10083,7 @@ index 7364f8c6..f8d0474e 100644
  }
  
 diff --git a/crates/tools/genie-oracle/src/map_and_sight.rs b/crates/tools/genie-oracle/src/map_and_sight.rs
-index d79318cd..9410c201 100644
+index d79318cd..9bc800f3 100644
 --- a/crates/tools/genie-oracle/src/map_and_sight.rs
 +++ b/crates/tools/genie-oracle/src/map_and_sight.rs
 @@ -234,8 +234,13 @@ pub(super) fn spatial(
@@ -9852,7 +10103,7 @@ index d79318cd..9410c201 100644
                      // the object's type: the save's factory types 70 and 80, any other below
                      kind: if o.tribe_combat_object.is_some() {
 diff --git a/crates/tools/genie-oracle/src/setup.rs b/crates/tools/genie-oracle/src/setup.rs
-index 0c6a6c44..cb07d175 100644
+index 0c6a6c44..bb683526 100644
 --- a/crates/tools/genie-oracle/src/setup.rs
 +++ b/crates/tools/genie-oracle/src/setup.rs
 @@ -99,6 +99,15 @@ pub fn layer() -> Result<&'static BuildLayer, GenieError> {
@@ -9872,7 +10123,7 @@ index 0c6a6c44..cb07d175 100644
      let missile_tuning = &build.tuning.missile;
      let victory = &header.world.base_world.victory_conditions;
 diff --git a/crates/tools/genie-oracle/src/top_actions.rs b/crates/tools/genie-oracle/src/top_actions.rs
-index b2774f57..2bfe02e9 100644
+index b2774f57..522ab704 100644
 --- a/crates/tools/genie-oracle/src/top_actions.rs
 +++ b/crates/tools/genie-oracle/src/top_actions.rs
 @@ -509,7 +509,10 @@ fn import_explore(saved: &Saved<'_>, actions: &mut layers::Action) -> Result<(),
@@ -9896,8 +10147,8 @@ index b2774f57..2bfe02e9 100644
      Ok(())
  }
 diff --git a/crates/engine/genie-core/src/correction.rs b/crates/engine/genie-core/src/correction.rs
-new file mode 100755
-index 00000000..3f35b183
+new file mode 100644
+index 00000000..235e801f
 --- /dev/null
 +++ b/crates/engine/genie-core/src/correction.rs
 @@ -0,0 +1,296 @@
@@ -10198,8 +10449,8 @@ index 00000000..3f35b183
 +    }
 +}
 diff --git a/crates/tools/genie-oracle/examples/cache_probe.rs b/crates/tools/genie-oracle/examples/cache_probe.rs
-new file mode 100755
-index 00000000..6db7cc85
+new file mode 100644
+index 00000000..4758ca6e
 --- /dev/null
 +++ b/crates/tools/genie-oracle/examples/cache_probe.rs
 @@ -0,0 +1,15 @@
@@ -10219,8 +10470,8 @@ index 00000000..6db7cc85
 + println!("DAT direct/cold-cache/warm-cache equal; civ tables={} canonical names={}",direct.civilization_count,direct.civilization_names.len());Ok(())
 +}
 diff --git a/crates/tools/genie-oracle/examples/capture_probe.rs b/crates/tools/genie-oracle/examples/capture_probe.rs
-new file mode 100755
-index 00000000..36501c8b
+new file mode 100644
+index 00000000..9521a7dd
 --- /dev/null
 +++ b/crates/tools/genie-oracle/examples/capture_probe.rs
 @@ -0,0 +1,5 @@
@@ -10230,8 +10481,8 @@ index 00000000..36501c8b
 +let b=std::fs::read(std::env::args().nth(1).unwrap())?;let h=genie_rec::de::chapters(&b)?[0].header()?;
 +for (p,s) in h.players().iter().enumerate(){for o in s.live_objects(){if let Some(st)=o.static_part(){if st.master_obj==1245 || st.master_obj==448 {if let Some(c)=o.combat(){println!("tribe_extra={:?}",c.extra_v68_9);let c=&c.rge_combat_object;let mut out=std::io::Cursor::new(Vec::new());c.write_le_args(&mut out,())?;let mut a=std::io::Cursor::new(Vec::new());c.rge_action_object.write_le_args(&mut a,())?;let offset=a.position() as usize;println!("player={p} id={} master={} action_end={} capture={} tail={:02x?}",st.id,st.master_obj,offset,c.capture_flag,&out.get_ref()[offset.saturating_sub(32)..]);}}}}}Ok(())}
 diff --git a/crates/tools/genie-oracle/examples/civ_probe.rs b/crates/tools/genie-oracle/examples/civ_probe.rs
-new file mode 100755
-index 00000000..062149b2
+new file mode 100644
+index 00000000..d9008150
 --- /dev/null
 +++ b/crates/tools/genie-oracle/examples/civ_probe.rs
 @@ -0,0 +1,10 @@
@@ -10246,8 +10497,8 @@ index 00000000..062149b2
 +    Ok(())
 +}
 diff --git a/crates/tools/genie-oracle/examples/command_probe.rs b/crates/tools/genie-oracle/examples/command_probe.rs
-new file mode 100755
-index 00000000..de832a63
+new file mode 100644
+index 00000000..178d2967
 --- /dev/null
 +++ b/crates/tools/genie-oracle/examples/command_probe.rs
 @@ -0,0 +1,29 @@
@@ -10281,8 +10532,8 @@ index 00000000..de832a63
 +    Ok(())
 +}
 diff --git a/crates/tools/genie-oracle/examples/dat_probe.rs b/crates/tools/genie-oracle/examples/dat_probe.rs
-new file mode 100755
-index 00000000..6e37d250
+new file mode 100644
+index 00000000..2bc7c317
 --- /dev/null
 +++ b/crates/tools/genie-oracle/examples/dat_probe.rs
 @@ -0,0 +1,13 @@
@@ -10300,8 +10551,8 @@ index 00000000..6e37d250
 + println!("invalid_class_tasks={n}");Ok(())
 +}
 diff --git a/crates/tools/genie-oracle/examples/header_probe.rs b/crates/tools/genie-oracle/examples/header_probe.rs
-new file mode 100755
-index 00000000..3fea849c
+new file mode 100644
+index 00000000..41e0120a
 --- /dev/null
 +++ b/crates/tools/genie-oracle/examples/header_probe.rs
 @@ -0,0 +1,9 @@
@@ -10315,8 +10566,8 @@ index 00000000..3fea849c
 + Ok(())
 +}
 diff --git a/crates/tools/genie-oracle/examples/identity_probe.rs b/crates/tools/genie-oracle/examples/identity_probe.rs
-new file mode 100755
-index 00000000..e840bcda
+new file mode 100644
+index 00000000..14a22fc8
 --- /dev/null
 +++ b/crates/tools/genie-oracle/examples/identity_probe.rs
 @@ -0,0 +1,13 @@
@@ -10334,8 +10585,8 @@ index 00000000..e840bcda
 + Ok(())
 +}
 diff --git a/crates/tools/genie-oracle/examples/lobby_probe.rs b/crates/tools/genie-oracle/examples/lobby_probe.rs
-new file mode 100755
-index 00000000..2a739fa1
+new file mode 100644
+index 00000000..48b62a5a
 --- /dev/null
 +++ b/crates/tools/genie-oracle/examples/lobby_probe.rs
 @@ -0,0 +1,13 @@
@@ -10353,8 +10604,8 @@ index 00000000..2a739fa1
 +    Ok(())
 +}
 diff --git a/crates/tools/genie-oracle/examples/roundtrip_probe.rs b/crates/tools/genie-oracle/examples/roundtrip_probe.rs
-new file mode 100755
-index 00000000..c8812a4a
+new file mode 100644
+index 00000000..55106c2e
 --- /dev/null
 +++ b/crates/tools/genie-oracle/examples/roundtrip_probe.rs
 @@ -0,0 +1,17 @@
@@ -10376,8 +10627,8 @@ index 00000000..c8812a4a
 +    Ok(())
 +}
 diff --git a/crates/tools/genie-oracle/examples/sync_probe.rs b/crates/tools/genie-oracle/examples/sync_probe.rs
-new file mode 100755
-index 00000000..2ffe7627
+new file mode 100644
+index 00000000..83813f4d
 --- /dev/null
 +++ b/crates/tools/genie-oracle/examples/sync_probe.rs
 @@ -0,0 +1,27 @@
@@ -10409,8 +10660,8 @@ index 00000000..2ffe7627
 +    Ok(())
 +}
 diff --git a/crates/tools/genie-oracle/examples/task_probe.rs b/crates/tools/genie-oracle/examples/task_probe.rs
-new file mode 100755
-index 00000000..f714a6a8
+new file mode 100644
+index 00000000..3140b125
 --- /dev/null
 +++ b/crates/tools/genie-oracle/examples/task_probe.rs
 @@ -0,0 +1,26 @@
@@ -10441,8 +10692,8 @@ index 00000000..f714a6a8
 +    Ok(())
 +}
 diff --git a/crates/tools/genie-oracle/examples/unit_probe.rs b/crates/tools/genie-oracle/examples/unit_probe.rs
-new file mode 100755
-index 00000000..acbbfdde
+new file mode 100644
+index 00000000..098b2829
 --- /dev/null
 +++ b/crates/tools/genie-oracle/examples/unit_probe.rs
 @@ -0,0 +1,13 @@
