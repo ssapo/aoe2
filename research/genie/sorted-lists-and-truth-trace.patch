@@ -265,6 +265,37 @@ index d2edcddb..eca0bff9 100644
 +        .and_then(|&(_, to)| ObjectId::of_field(to))
 +        .or(Some(id))
 +}
+diff --git a/crates/engine/genie-core/src/commands/new_building.rs b/crates/engine/genie-core/src/commands/new_building.rs
+index 12e38a35..73eb2561 100644
+--- a/crates/engine/genie-core/src/commands/new_building.rs
++++ b/crates/engine/genie-core/src/commands/new_building.rs
+@@ -331,6 +331,7 @@ impl World {
+             place: Static::at(position),
+             flags: UnitFlags::ATTACKABLE,
+             last_human_order: WorldTime::ZERO,
++            extra: Vec::new(),
+             pasture: None,
+             my_pasture: None,
+             group: GroupLink::default(),
+diff --git a/crates/engine/genie-core/src/construction/build/states.rs b/crates/engine/genie-core/src/construction/build/states.rs
+index 76304cf8..0b379550 100644
+--- a/crates/engine/genie-core/src/construction/build/states.rs
++++ b/crates/engine/genie-core/src/construction/build/states.rs
+@@ -127,6 +127,14 @@ impl BuildAction {
+         c.give_load(kind, amount)?;
+         builder.life.attribute_kind = None;
+         builder.life.amount = Amount::ZERO;
++        // 188329: then each additional resource of the load (`0xb9f496` to `0xb9f4d7`,
++        // [`crate::gathering::extra`])
++        for (extra, more) in std::mem::take(&mut builder.extra) {
++            if std::env::var_os("GENIE_TRACE_EXTRA").is_some() {
++                eprintln!("EXTRA build id={} resource={extra} amount={}", builder.id, more.get());
++            }
++            c.give_load(extra, more)?;
++        }
+         Ok(())
+     }
+ 
 diff --git a/crates/engine/genie-core/src/construction/building_update.rs b/crates/engine/genie-core/src/construction/building_update.rs
 index d42efbec..87c7f139 100644
 --- a/crates/engine/genie-core/src/construction/building_update.rs
@@ -376,10 +407,25 @@ index cdd56c6d..98b73d04 100644
      /// found (its `+0x48`): the top action's slot 0x48 ([`TransportAction::work`] at the work's
      /// point, from the unit itself when the target is the unit), then the unit AI's notify as
 diff --git a/crates/engine/genie-core/src/garrison/unit.rs b/crates/engine/genie-core/src/garrison/unit.rs
-index d8742d52..8d4a2c63 100644
+index d8742d52..912ec5db 100644
 --- a/crates/engine/genie-core/src/garrison/unit.rs
 +++ b/crates/engine/genie-core/src/garrison/unit.rs
-@@ -466,7 +466,18 @@ impl Unit {
+@@ -353,6 +353,14 @@ impl Unit {
+                 c.w.players.player_mut(c.player)?.add_attributes(adds)?;
+                 self.life.attribute_kind = None;
+                 self.life.amount = Amount::ZERO;
++                // 188329: then each additional resource of the load (`0xb77b6c` to `0xb77bb7`,
++                // [`crate::gathering::extra`])
++                for (extra, more) in std::mem::take(&mut self.extra) {
++                    if std::env::var_os("GENIE_TRACE_EXTRA").is_some() {
++                        eprintln!("EXTRA enter id={} resource={extra} amount={}", self.id, more.get());
++                    }
++                    c.give_load(extra, more)?;
++                }
+             }
+         }
+         if bm.kind == MasterKind::BUILDING
+@@ -466,7 +474,18 @@ impl Unit {
          self.enter_sight(c, target, at, building_radius, placed, bm)?;
          let mut bell = c.w.parts.town_bell_of(id);
          let ai = c.w.parts.unit_ai.get(id);
@@ -552,8 +598,74 @@ index 9510abdd..74c7e5d5 100644
          gather_search_tuning,
      )
  }
+diff --git a/crates/engine/genie-core/src/gathering/gather/mod.rs b/crates/engine/genie-core/src/gathering/gather/mod.rs
+index 88cd0044..e6259455 100644
+--- a/crates/engine/genie-core/src/gathering/gather/mod.rs
++++ b/crates/engine/genie-core/src/gathering/gather/mod.rs
+@@ -14,6 +14,7 @@
+ //! `point_walks.rs`; the face, the work, the drop-off's update and the random waits after a failed
+ //! walk or a drop-off out of reach (the Action stream's `"update"` draws) are in `work.rs`.
+ 
++use crate::gathering::extra::ExtraRules;
+ use crate::gathering::FarmStops;
+ use crate::gathering::StopIndex;
+ use crate::gathering::hunt::{HuntSprites, HuntTask};
+@@ -218,6 +219,8 @@ pub(crate) struct GatherReads {
+     pub(crate) capacity: Amount,
+     /// The player's attribute the task's `attribute_type2` names, when above 0; else 1.
+     pub(crate) productivity: Amount,
++    /// The master's additional resource tasks (type 164, [`ExtraRules`]).
++    pub(crate) extras: ExtraRules,
+     /// The sprites the gather shows.
+     pub(crate) sprites: HuntSprites,
+     /// The unit's master's class: a villager's `MoveTo` waits once when the motion step gives up.
+diff --git a/crates/engine/genie-core/src/gathering/gather/tests.rs b/crates/engine/genie-core/src/gathering/gather/tests.rs
+index 5226b21a..cf93d62b 100644
+--- a/crates/engine/genie-core/src/gathering/gather/tests.rs
++++ b/crates/engine/genie-core/src/gathering/gather/tests.rs
+@@ -56,6 +56,7 @@ fn reads() -> GatherReads {
+         work_rate: WorkRate::new(0.31),
+         capacity: Amount::new(10.0),
+         productivity: Amount::new(1.0),
++        extras: Default::default(),
+         sprites: HuntSprites::default(),
+         class: class::VILLAGER,
+         defaults: MoveDefaults::default(),
+diff --git a/crates/engine/genie-core/src/gathering/gather/unit.rs b/crates/engine/genie-core/src/gathering/gather/unit.rs
+index a7e36539..efea1edf 100644
+--- a/crates/engine/genie-core/src/gathering/gather/unit.rs
++++ b/crates/engine/genie-core/src/gathering/gather/unit.rs
+@@ -1,5 +1,6 @@
+ //! A builder's and a gatherer's drop-off and a gatherer's update and search.
+ 
++use crate::gathering::extra::ExtraRules;
+ use crate::GenieError;
+ use crate::combat::abilities::Look;
+ use crate::combat::victims::file_kill;
+@@ -177,6 +178,7 @@ impl Unit {
+                 .copied()
+                 .filter(|&v| Amount::ZERO < v)
+                 .unwrap_or(Amount::new(1.0)),
++            extras: ExtraRules::of(master, attributes)?,
+             sprites: HuntSprites {
+                 moving: g(task.sprites.moving),
+                 working: g(task.sprites.working),
+@@ -301,6 +303,13 @@ impl Unit {
+         roles: &Roles,
+     ) -> Result<HeadCode, GenieError> {
+         c.give_load(kind, amount)?;
++        // 188329: then each additional resource of the load (`0xb81e93` to `0xb81edc`)
++        for (extra, more) in std::mem::take(&mut self.extra) {
++            if std::env::var_os("GENIE_TRACE_EXTRA").is_some() {
++                eprintln!("EXTRA gather id={} resource={extra} amount={}", self.id, more.get());
++            }
++            c.give_load(extra, more)?;
++        }
+         let gather = actions.list.gather().ok_or(NO_GATHER)?;
+         if gather.target.is_none() {
+             return self.gather_after_drop(actions, c, roles);
 diff --git a/crates/engine/genie-core/src/gathering/gather/work.rs b/crates/engine/genie-core/src/gathering/gather/work.rs
-index b1ab9a1e..d502f97b 100644
+index b1ab9a1e..def983f8 100644
 --- a/crates/engine/genie-core/src/gathering/gather/work.rs
 +++ b/crates/engine/genie-core/src/gathering/gather/work.rs
 @@ -64,6 +64,13 @@ impl GatherAction {
@@ -570,6 +682,29 @@ index b1ab9a1e..d502f97b 100644
          self.timer = Seconds::ZERO;
          Self::show(c, unit, self.walk_sprite(unit, r).or(r.sprites.standing));
          Ok(Next::Stay)
+@@ -102,6 +109,8 @@ impl GatherAction {
+         if held != kind && !both_food(kind, held) {
+             unit.life.attribute_kind = kind;
+             unit.life.amount = Amount::ZERO;
++            // 188329: the additional resources go with the load (`0xb7f905`)
++            unit.extra.clear();
+         }
+         Self::show(c, unit, r.sprites.working.or(r.sprites.standing));
+     }
+@@ -146,10 +155,13 @@ impl GatherAction {
+             target.amount = Amount::ZERO;
+         }
+         *held += gain;
++        // 188329: each gain earns the master's additional resources (`0xb81877`, `0xb8190b`)
++        (r.extras).gain(&mut unit.extra, gain, target.master_id, target.class);
+         let over = (*held - capacity).abs();
+         if *held < capacity && over < REMAINDER && over <= target.amount {
+             target.amount += -over;
+             *held += over;
++            (r.extras).gain(&mut unit.extra, over, target.master_id, target.class);
+         }
+         // a farm's food sold at once (attribute 96): the load goes to the player as food (slot
+         // 0xf8 with 1), the unit holds none, and the gathering goes on
 diff --git a/crates/engine/genie-core/src/gathering/gather_search.rs b/crates/engine/genie-core/src/gathering/gather_search.rs
 index b8879db5..2f5c2997 100644
 --- a/crates/engine/genie-core/src/gathering/gather_search.rs
@@ -945,7 +1080,7 @@ index 2945a9b1..79aa24d9 100644
          [one] => Ok(Some(**one)),
          [] if on_tile.iter().all(open) => Ok(None),
 diff --git a/crates/engine/genie-core/src/gathering/hunt/gathering.rs b/crates/engine/genie-core/src/gathering/hunt/gathering.rs
-index 2df7dd4b..ec70d0c3 100644
+index 2df7dd4b..bf2a6475 100644
 --- a/crates/engine/genie-core/src/gathering/hunt/gathering.rs
 +++ b/crates/engine/genie-core/src/gathering/hunt/gathering.rs
 @@ -175,6 +175,14 @@ impl HuntAction {
@@ -963,8 +1098,31 @@ index 2df7dd4b..ec70d0c3 100644
          self.begin_face(c, unit, r);
          Ok(HuntNext::Stay)
      }
+@@ -223,6 +231,8 @@ impl HuntAction {
+             unit.life.amount = if keeps {
+                 unit.life.amount
+             } else {
++                // 188329: the additional resources go with the load (`0xbb5d03`)
++                unit.extra.clear();
+                 Amount::ZERO
+             };
+             unit.life.attribute_kind = kind;
+@@ -277,10 +287,13 @@ impl HuntAction {
+             victim.amount = Amount::ZERO;
+         }
+         *held += gain;
++        // 188329: each gain earns the master's additional resources (`0xbb75a1`, `0xbb762a`)
++        (r.extras).gain(&mut unit.extra, gain, victim.master_id, victim.class);
+         let over = (*held - capacity).abs();
+         if *held < capacity && over < REMAINDER && over <= victim.amount {
+             victim.amount -= over;
+             *held += over;
++            (r.extras).gain(&mut unit.extra, over, victim.master_id, victim.class);
+         }
+         if roles
+             .of_class(victim.class)
 diff --git a/crates/engine/genie-core/src/gathering/hunt/hunter.rs b/crates/engine/genie-core/src/gathering/hunt/hunter.rs
-index 3e35c7a5..1b0f0179 100644
+index 3e35c7a5..3974ec4f 100644
 --- a/crates/engine/genie-core/src/gathering/hunt/hunter.rs
 +++ b/crates/engine/genie-core/src/gathering/hunt/hunter.rs
 @@ -140,6 +140,20 @@ impl Unit {
@@ -988,6 +1146,73 @@ index 3e35c7a5..1b0f0179 100644
              Some(HuntState::Drop { .. }) if timer < Seconds::ZERO => {
                  self.hunt_drop_wait(actions, c, roles)?;
              }
+@@ -271,6 +285,13 @@ impl Unit {
+                 // the local player's tracker (FUN_14097daf0) are not held; a sharing player's
+                 // allies' share (+0x1426) is not modelled
+                 c.give_load(kind, amount)?;
++                // 188329: then each additional resource of the load (`0xbb7905` to `0xbb7947`)
++                for (extra, more) in std::mem::take(&mut self.extra) {
++                    if std::env::var_os("GENIE_TRACE_EXTRA").is_some() {
++                        eprintln!("EXTRA hunt id={} resource={extra} amount={}", self.id, more.get());
++                    }
++                    c.give_load(extra, more)?;
++                }
+                 return self.hunt_after_drop(actions, c, roles);
+             }
+             Dropped::Again => {
+diff --git a/crates/engine/genie-core/src/gathering/hunt/hunter_strike.rs b/crates/engine/genie-core/src/gathering/hunt/hunter_strike.rs
+index 0b192fdd..43cb344c 100644
+--- a/crates/engine/genie-core/src/gathering/hunt/hunter_strike.rs
++++ b/crates/engine/genie-core/src/gathering/hunt/hunter_strike.rs
+@@ -1,6 +1,7 @@
+ //! The hunt's strike as the hunter's update runs it: the hunter as a gatherer and an attacker,
+ //! the herd it leads, the hunt's update and what follows.
+ 
++use crate::gathering::extra::ExtraRules;
+ use crate::GenieError;
+ use crate::combat::AttackTargetId;
+ use crate::combat::attack::{AttackReads, Fight};
+@@ -136,6 +137,7 @@ impl Unit {
+                 + master.action_part().work_rate,
+             capacity: Amount::of_master(master.capacity),
+             productivity,
++            extras: ExtraRules::of(master, &owner.attributes)?,
+             decay: if owner.attributes.get(292) == Some(&Amount::new(1.0)) {
+                 DecayRule::Stops
+             } else {
+diff --git a/crates/engine/genie-core/src/gathering/hunt/mod.rs b/crates/engine/genie-core/src/gathering/hunt/mod.rs
+index 617e311c..d012669e 100644
+--- a/crates/engine/genie-core/src/gathering/hunt/mod.rs
++++ b/crates/engine/genie-core/src/gathering/hunt/mod.rs
+@@ -7,6 +7,7 @@
+ //! 158041: constructor `FUN_140ac2dd0`, start (slot 5) `0x140ac49b0`, update (slot 6)
+ //! `0x140ac7a00`, `set_state` (slot 16) `0x140ac60e0`.
+ 
++use crate::gathering::extra::ExtraRules;
+ use crate::combat::attack::{Arms, AttackReads, Engagement};
+ use crate::map::Distance;
+ use crate::map::DistanceSquared;
+@@ -202,6 +203,8 @@ pub(crate) struct HuntReads {
+     pub(crate) capacity: Amount,
+     /// The player's attribute the task's `attribute_type2` names, when above 0; else 1.
+     pub(crate) productivity: Amount,
++    /// The master's additional resource tasks (type 164, [`ExtraRules`]).
++    pub(crate) extras: ExtraRules,
+     /// Whether a task whose `attribute_type4` is 0x124 stops the target's decay
+     /// (`FUN_140ac44b0`): the player's attribute 292 is 1.
+     pub(crate) decay: DecayRule,
+diff --git a/crates/engine/genie-core/src/gathering/hunt/tests.rs b/crates/engine/genie-core/src/gathering/hunt/tests.rs
+index 8ea13ae4..62dccbae 100644
+--- a/crates/engine/genie-core/src/gathering/hunt/tests.rs
++++ b/crates/engine/genie-core/src/gathering/hunt/tests.rs
+@@ -69,6 +69,7 @@ pub(crate) fn hunt_reads() -> HuntReads {
+         work_rate: WorkRate::new(1.0),
+         capacity: Amount::new(10.0),
+         productivity: Amount::new(1.0),
++        extras: Default::default(),
+         decay: DecayRule::Runs,
+         has_ai: true,
+         ai_class: None,
 diff --git a/crates/engine/genie-core/src/gathering/hunt/unit.rs b/crates/engine/genie-core/src/gathering/hunt/unit.rs
 index 0c37a95e..2b5397e0 100644
 --- a/crates/engine/genie-core/src/gathering/hunt/unit.rs
@@ -1150,10 +1375,18 @@ index ce4ef0b7..5275d250 100644
                  .lost_on_the_way(c, unit, r, roles)
                  .map(|()| HuntNext::Stay),
 diff --git a/crates/engine/genie-core/src/gathering/mod.rs b/crates/engine/genie-core/src/gathering/mod.rs
-index 005a4467..9977e1c8 100644
+index 005a4467..22cc562c 100644
 --- a/crates/engine/genie-core/src/gathering/mod.rs
 +++ b/crates/engine/genie-core/src/gathering/mod.rs
-@@ -36,3 +36,44 @@ pub use self::queue_count::QueueCount;
+@@ -9,6 +9,7 @@ pub(crate) mod closest_resource;
+ pub(crate) mod drop_off;
+ pub mod drop_site_id;
+ pub(crate) mod drop_sites;
++pub(crate) mod extra;
+ pub mod farm_queue;
+ mod farm_stops;
+ pub mod gather;
+@@ -36,3 +37,44 @@ pub use self::queue_count::QueueCount;
  pub(crate) fn both_food(a: Option<AttributeId>, b: Option<AttributeId>) -> bool {
      a.is_some_and(AttributeId::is_food_load) && b.is_some_and(AttributeId::is_food_load)
  }
@@ -2994,6 +3227,31 @@ index a4790a15..9dff401e 100644
      /// `unit` goes to the end of the list.
      pub fn push(&mut self, unit: Unit) {
          self.units.push(unit);
+diff --git a/crates/engine/genie-core/src/objects/unit/mod.rs b/crates/engine/genie-core/src/objects/unit/mod.rs
+index e8e94a15..fbfa090c 100644
+--- a/crates/engine/genie-core/src/objects/unit/mod.rs
++++ b/crates/engine/genie-core/src/objects/unit/mod.rs
+@@ -13,6 +13,8 @@ use crate::world::WorldTime;
+ use genie_diff::Diff;
+ 
+ use crate::GenieError;
++use crate::players::Amount;
++use crate::players::attribute::AttributeId;
+ use crate::construction::FootprintWaits;
+ use crate::gathering::{DropSiteId, PastureId};
+ use crate::groups::GroupLink;
+@@ -117,6 +119,11 @@ pub struct Unit {
+     /// `+0x650`, `mLastHumanOrderTime`: the world time of the last order a human gave it
+     /// (`FUN_140e5e780`, for a unit with a unit AI); an animal's idle check lowers it to 5000.
+     pub last_human_order: WorldTime,
++    /// 188329's map of additional resources (the game's `+0x460`): what its master's type-164
++    /// tasks have earned on its load, by resource, in the order they came
++    /// ([`crate::gathering::extra`]); the drop-off pays it and a load of another kind clears it.
++    #[diff(unsaved, eq)]
++    pub extra: Vec<(AttributeId, Amount)>,
+     /// The slice could not model one of its updates: it freezes (its place is known only within
+     /// its speed since) while the rest of its player's objects go on.
+     pub stopped: bool,
 diff --git a/crates/engine/genie-core/src/objects/unit/stop.rs b/crates/engine/genie-core/src/objects/unit/stop.rs
 index 7c1fba27..0e8d1c60 100644
 --- a/crates/engine/genie-core/src/objects/unit/stop.rs
@@ -6076,6 +6334,24 @@ index 959aa7e6..d5a6d690 100644
 +    let table=with_beside(table, Beside{civilizations:Some(good),..Beside::default()}).unwrap();
 +    assert_eq!(crate::cache::decode(&crate::cache::encode(&table).unwrap()).unwrap(),table);
 +}
+diff --git a/crates/engine/genie-import/src/save.rs b/crates/engine/genie-import/src/save.rs
+index 2c36cb00..97483037 100644
+--- a/crates/engine/genie-import/src/save.rs
++++ b/crates/engine/genie-import/src/save.rs
+@@ -271,6 +271,13 @@ pub fn work_masters(
+                     Ok(tasks) => tasks,
+                     Err(e) => return Some(Err(e)),
+                 };
++                if std::env::var_os("GENIE_TRACE_TASK164").is_some() {
++                    for t in &p.tasks {
++                        if t.action_kind.get() == 164 {
++                            eprintln!("TASK164 civ={civ:?} master={} {t:?}", work.id);
++                        }
++                    }
++                }
+             }
+         } else {
+             work.action = None;
 diff --git a/crates/engine/genie-model/src/layer/generated.rs b/crates/engine/genie-model/src/layer/generated.rs
 index e28b10a7..e4ecfe66 100644
 --- a/crates/engine/genie-model/src/layer/generated.rs
@@ -10446,6 +10722,123 @@ index 00000000..235e801f
 +            here.y(),
 +            (dx * dx + dy * dy).sqrt()
 +        );
++    }
++}
+diff --git a/crates/engine/genie-core/src/gathering/extra.rs b/crates/engine/genie-core/src/gathering/extra.rs
+new file mode 100644
+index 00000000..d2a51e54
+--- /dev/null
++++ b/crates/engine/genie-core/src/gathering/extra.rs
+@@ -0,0 +1,111 @@
++//! 188329's "additional resource" tasks (task type 164, `0xa4`): a civilization bonus that pays a
++//! second resource for what a gatherer gathers (Danes: food on food; Varangians: gold on meat;
++//! Portuguese: wood on berries). The game's unit holds a table of its master's type-164 tasks
++//! (`0x12b71f0`: the resource `+0x24`, a key, `work_val1` and the player's attribute `+0x22`) and
++//! a map from resource to amount; each gain of the load (`0x113e4d0`, slot 0x110 with its flag 1)
++//! adds `(gain × work_val1) × attribute` to the map for each entry whose key is the target's
++//! master, the target's class plus 900 or -1; a drop-off gives the load, then each map entry, and
++//! clears the map (Hunt `0xbb78eb` to `0xbb7947`, Gather `0xb81e77` to `0xb81edc`); a load of
++//! another kind clears it too (`0xbb5d03`, `0xb7f905`). Research finding 51.
++
++use crate::GenieError;
++use crate::objects::masters::ActionKind;
++use crate::objects::masters::ClassId;
++use crate::objects::masters::Master;
++use crate::objects::masters::MasterId;
++use crate::players::Amount;
++use crate::players::attribute::AttributeId;
++
++/// The task type of an additional resource (164).
++const ADDITIONAL_RESOURCE: ActionKind = ActionKind::named(0xa4);
++/// What the game adds to a class to make its key (`0x384`).
++const CLASS_KEY: i32 = 900;
++/// The rules a gatherer's reads hold at most.
++const MOST: usize = 4;
++
++/// One type-164 task as the game's table holds it (`0x12b71f0`, 16 bytes).
++#[derive(Clone, Copy, Debug, PartialEq)]
++struct ExtraRule {
++    /// `+0`: the resource it pays (the task's `+0x24`).
++    resource: AttributeId,
++    /// `+4`: the task's class plus 900, else its master, else -1.
++    key: i32,
++    /// `+8`: the task's `work_val1`.
++    share: f32,
++    /// `+0xc`: the player's attribute the task's `+0x22` names. The game copies it when it
++    /// builds the table (the unit's setup and refresh); here it is read as the update starts.
++    scale: f32,
++}
++
++/// A gatherer's master's type-164 tasks, in the tasks' order; none for most masters.
++#[derive(Clone, Copy, Debug, Default)]
++pub(crate) struct ExtraRules {
++    /// How many of `rules` are set.
++    count: usize,
++    /// The rules.
++    rules: [Option<ExtraRule>; MOST],
++}
++
++impl ExtraRules {
++    /// The rules of `master` for a player whose attributes are `attributes`.
++    ///
++    /// # Errors
++    ///
++    /// A master with more type-164 tasks than the reads hold.
++    pub(crate) fn of(master: &Master, attributes: &[Amount]) -> Result<Self, GenieError> {
++        let mut out = Self::default();
++        for t in &master.action_part().tasks {
++            if t.action_kind != ADDITIONAL_RESOURCE {
++                continue;
++            }
++            // a task without a resource pays none
++            let Some(resource) = t.attribute_kind3 else {
++                continue;
++            };
++            let key = match (t.object_group, t.object_id) {
++                (Some(class), _) => i32::from(class.get()) + CLASS_KEY,
++                (None, Some(master)) => i32::from(i16::from(master)),
++                (None, None) => -1,
++            };
++            let scale = (t.attribute_kind2)
++                .and_then(|i| attributes.get(i.index()))
++                .map_or(0.0, |a| a.get());
++            let slot = out.rules.get_mut(out.count).ok_or(GenieError::unsupported(
++                "a master with more than four additional resource tasks (type 164)",
++            ))?;
++            *slot = Some(ExtraRule {
++                resource,
++                key,
++                share: t.work_val1.get(),
++                scale,
++            });
++            out.count += 1;
++        }
++        Ok(out)
++    }
++
++    /// A gain `gain` of the load from a target of `master` and `class` (`0x113e523` to
++    /// `0x113e589`): each matching rule adds `(gain × share) × scale` to its resource's amount in
++    /// `extra`, in `f32` and in that order.
++    pub(crate) fn gain(
++        &self,
++        extra: &mut Vec<(AttributeId, Amount)>,
++        gain: Amount,
++        master: MasterId,
++        class: ClassId,
++    ) {
++        let by_master = i32::from(i16::from(master));
++        let by_class = i32::from(class.get()) + CLASS_KEY;
++        for r in self.rules.iter().flatten() {
++            if r.key != by_master && r.key != by_class && r.key != -1 {
++                continue;
++            }
++            let add = (gain.get() * r.share) * r.scale;
++            if let Some(e) = extra.iter_mut().find(|e| e.0 == r.resource) {
++                e.1 = Amount::new(add + e.1.get());
++            } else {
++                extra.push((r.resource, Amount::new(add + 0.0)));
++            }
++        }
 +    }
 +}
 diff --git a/crates/tools/genie-oracle/examples/cache_probe.rs b/crates/tools/genie-oracle/examples/cache_probe.rs
