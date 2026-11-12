@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MAX_DOWNLOAD = 64 * 1024 * 1024
 MAX_REPLAY = 256 * 1024 * 1024
 AGE_IDS = {101: '봉건', 102: '성주', 103: '왕정'}
-ANALYSIS_REVISION = 14
+ANALYSIS_REVISION = 15
 
 
 def now():
@@ -301,12 +301,17 @@ def analyze_replay(raw, own_id):
         housed = housing(decoded, match, own)
     except Exception:
         housed = None
+    try:
+        from engine_income import engine_income
+        earned = engine_income(decoded, match, own)
+    except Exception:
+        earned = None
     opponents = [{'name': p.name, 'civilization': p.civilization, 'random_civ': randoms.get(p.profile_id), 'metrics': dict(command_metrics(match, p), **detailed_metrics(match, p), food_evidence=food.get(p.number), berry_switches=berry.get(p.number))}
                  for p in match.players if p.number != own.number and p not in (own.team or [])]
     return {
         'parser': 'mgz', 'analysis_revision': ANALYSIS_REVISION, 'duration_game_seconds': seconds(match.duration + match.restored_at),
         'civilization': own.civilization, 'random_civ': randoms.get(own.profile_id), 'map': match.map.name, 'map_view': map_view,
-        'metrics': own_metrics, 'opponents': opponents, 'state_curve': curve, 'housing': housed,
+        'metrics': own_metrics, 'opponents': opponents, 'state_curve': curve, 'housing': housed, 'engine_income': earned,
         'insights': coaching(own_metrics, opponents, len(match.players)),
         'limitations': ['생산 지시량은 양수 amount의 합. 생산 완료·생존 수가 아니며 취소·자원 부족·인구 제한을 반영하지 않습니다. 건설·연구 명령도 실제 완료와 다를 수 있습니다.',
                         '시대 도달 시각은 시스템 알림이 있는 경우에만 표시합니다. 생산 지시량으로 실제 주민 수를 추정하지 않습니다.',

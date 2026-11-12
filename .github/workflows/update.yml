@@ -13,6 +13,7 @@ on:
     paths:
       - 'site/**'
       - 'scripts/**'
+      - 'engine/**'
       - 'config.json'
       - 'requirements.txt'
       - '.github/workflows/update.yml'
@@ -26,7 +27,7 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -45,6 +46,41 @@ jobs:
         run: |
           python -m unittest discover -s tests -v
           node --test tests/*.cjs
+      - name: Engine source (genie + research patch)
+        id: engine_source
+        continue-on-error: true
+        run: |
+          git fetch --depth 1 origin research/genie-188329
+          git show FETCH_HEAD:research/genie/sorted-lists-and-truth-trace.patch | tr -d '\r' > "$RUNNER_TEMP/engine.patch"
+          git clone https://github.com/librematch/genie.git "$RUNNER_TEMP/genie"
+          cd "$RUNNER_TEMP/genie"
+          git checkout 91d81be4
+          git apply "$RUNNER_TEMP/engine.patch"
+          echo "ENGINE_PATCH_SHA=$(sha256sum "$RUNNER_TEMP/engine.patch" | cut -d' ' -f1)" >> "$GITHUB_ENV"
+      - uses: actions/cache@v4
+        if: steps.engine_source.outcome == 'success'
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ runner.temp }}/genie/target
+          key: genie-91d81be4-${{ env.ENGINE_PATCH_SHA }}
+          restore-keys: |
+            genie-91d81be4-
+      - name: Build engine and fetch private game data
+        if: steps.engine_source.outcome == 'success'
+        continue-on-error: true
+        env:
+          AOE2_DATA_TOKEN: ${{ secrets.AOE2_DATA_TOKEN }}
+        run: |
+          if [ -z "$AOE2_DATA_TOKEN" ]; then echo "AOE2_DATA_TOKEN is not set: engine results are skipped"; exit 1; fi
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          (cd "$RUNNER_TEMP/genie" && cargo build --release -p genie-oracle --example census)
+          git clone --quiet --depth 1 "https://x-access-token:${AOE2_DATA_TOKEN}@github.com/ssapo/aoe2-data.git" "$RUNNER_TEMP/aoe2-data"
+          echo "d0aefd92428e2215d6f4d9b1d544901e6f171e19183f9e0b88218de5153a337f  $RUNNER_TEMP/aoe2-data/188329/empires2_x2_p1.dat" | sha256sum --check --quiet
+          echo "AOE2_ENGINE_BIN=$RUNNER_TEMP/genie/target/release/examples/census" >> "$GITHUB_ENV"
+          echo "AOE2_ENGINE_DATA=$RUNNER_TEMP/aoe2-data/188329/empires2_x2_p1.dat" >> "$GITHUB_ENV"
       - name: Collect public matches
         id: collect
         continue-on-error: true
