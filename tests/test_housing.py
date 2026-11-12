@@ -144,6 +144,46 @@ class HousingTests(TestCase):
         free = H.player_housing([queue(1, 5)], p, 'Franks', 30)
         self.assertEqual(free['refused_queue'], 0)
 
+    def test_counted_births_overrule_the_food_estimate(self):
+        # 200 food pays four villagers; the estimate refuses the fifth, the checkpoints show it born.
+        p = player(villagers=0, scout=False)
+        objects = {o.instance_id: (o.name, o.position.x, o.position.y) for o in p.objects}
+        checkpoints = [(10.0, 500.0), (100.0, 500.0)]
+        orders = [queue(1, 4), queue(90, 1)]
+        seen = lambda born: [(t, t + 10.0, int(t in born), int(t in born)) for t in range(0, 140, 10)]
+        guess = H.player_housing(orders, p, 'Franks', 140, checkpoints, objects)
+        self.assertEqual((guess['refused_queue'], guess['timeline'][-1][1], guess['births']), (1, 4, None))
+        r = H.player_housing(orders, p, 'Franks', 140, checkpoints, objects, seen({20, 50, 70, 100, 120}))
+        self.assertEqual((r['refused_queue'], r['timeline'][-1][1]), (0, 5))
+        self.assertEqual(r['births'], {'source': 'recording_checkpoints', 'corrected_queue': 1,
+                                       'counted_seconds': 140.0, 'estimated': []})
+        # the other way: the estimate accepts a unit that the checkpoints never show
+        r = H.player_housing(orders, p, 'Franks', 140, checkpoints, objects, seen({20, 50, 70}))
+        self.assertEqual((r['refused_queue'], r['timeline'][-1][1]), (2, 3))
+
+    def test_uncounted_interval_keeps_the_estimate(self):
+        p = player(villagers=0, scout=False)
+        counted = [(t, t + 10.0, 0, 0) for t in range(0, 60, 10)]
+        counted[2] = (20.0, 30.0, None, None)        # the birth at 26 falls where nothing was counted
+        r = H.player_housing([queue(1, 1)], p, 'Franks', 60, counted=counted)
+        self.assertEqual(r['timeline'][-1][1], 1)
+        self.assertEqual(r['births']['estimated'], [[20.0, 30.0]])
+        self.assertEqual(r['births']['counted_seconds'], 50.0)
+        # counted as no birth: an order nothing explains is skipped, the estimate stands, the interval is marked
+        counted[2] = (20.0, 30.0, 0, 0)
+        counted[4] = (40.0, 50.0, 2, 2)
+        r = H.player_housing([queue(1, 1)], p, 'Franks', 60, counted=counted)
+        self.assertEqual(r['births']['estimated'], [[40.0, 50.0]])
+
+    def test_block_says_whether_its_births_were_counted(self):
+        orders = [queue(0, 3), build(40, [20], 22.0, 23.0)]
+        counted = [(t, t + 10.0, int(t in (20, 90)), int(t in (20, 90))) for t in range(0, 200, 10)]
+        r = H.player_housing(orders, player(), 'Franks', 200, counted=counted)
+        self.assertEqual([(b['from_seconds'], b['counted']) for b in r['blocks']], [(25.0, True)])
+        counted[3] = (30.0, 40.0, None, None)
+        r = H.player_housing(orders, player(), 'Franks', 200, counted=counted)
+        self.assertEqual([(b['from_seconds'], b['counted']) for b in r['blocks']], [(25.0, False)])
+
     def test_gathering_is_split_by_villager_tasks(self):
         p = player()
         objects = {o.instance_id: (o.name, o.position.x, o.position.y) for o in p.objects}

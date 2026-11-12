@@ -15,13 +15,16 @@ The recording has no population value, so this replays each player's dark-age pr
 Values come from the DE data file (train and research times, civilization bonuses that touch
 them). Not known from the recording: where a builder stands (estimated from its last ordered
 point at 0.8 tiles/s), villagers dying, the food at a queue order (estimated from the
-checkpoints' stockpile sums, split by what the villagers were sent to gather). Each block is
-therefore an estimate, and short ones are not reported. A player who starts without a Town
+checkpoints' stockpile sums, split by what the villagers were sent to gather). The food
+estimate only makes the first guess of which queue orders were accepted: the units that the
+checkpoints show appearing (births.py) set it right, wherever they can be counted. Each block
+is still an estimate, and short ones are not reported. A player who starts without a Town
 Center (Steppe, nomad) is left out: the map sets that start's population cap.
 """
 import io
 import math
 import struct
+from bisect import bisect_left
 
 VILLAGER_SPEED = 0.8       # tiles per second
 REACH = 1.5                # a builder stops this far from the foundation's centre
@@ -68,7 +71,8 @@ def read_orders(decoded, restored):
     fast.meta(handle)
     offsets = _flag_offsets()
     wanted = {fast.Action.DE_QUEUE, fast.Action.RESEARCH, fast.Action.BUILD, fast.Action.MOVE,
-              fast.Action.ORDER, fast.Action.STOP, fast.Action.PATROL, fast.Action.GATHER_POINT}
+              fast.Action.ORDER, fast.Action.STOP, fast.Action.PATROL, fast.Action.GATHER_POINT,
+              fast.Action.WALL, fast.Action.GATE}
     clock, rows = 0, []
     while True:
         start = handle.tell()
@@ -347,6 +351,12 @@ class Economy:
             self.stock[k] += v
             self.spent_since -= v
 
+    def charge(self, cost, count=1):
+        """Pays `count` whatever the estimate holds: the checkpoints showed the units."""
+        for k, v in cost.items():
+            self.stock[k] -= v * count
+            self.spent_since += v * count
+
     def pay(self, cost, count=1):
         """How many of `count` the stock pays (each costing `cost`), paying them."""
         paid = 0
@@ -414,6 +424,7 @@ class Production:
         self.cap_times = sorted({w for w, _ in caps if w > 0})
         self.state, self.t, self.in_training = {}, 0.0, 0
         self.timeline, self.blocks, self.on_birth = [(0.0, pop, self.cap_at(0.0))], [], None
+        self.births, self.held = [], set()     # birth times; those of units that had waited at the cap
 
     def cap_at(self, t):
         return sum(c for when, c in self.caps if when <= t)
@@ -473,6 +484,7 @@ class Production:
                     if s['wait_from'] is None:
                         s['wait_from'] = self.t
                     continue
+                s['waited'] = kind == 'unit' and s['wait_from'] is not None
                 if s['wait_from'] is not None:
                     self.blocks.append((s['wait_from'], self.t))
                     s['wait_from'] = None
@@ -496,6 +508,9 @@ class Production:
                     if s['unit'] is not None:
                         self.in_training -= 1
                         self.pop += 1
+                        self.births.append(self.t)
+                        if s.get('waited'):
+                            self.held.add(self.t)
                         if self.on_birth:
                             self.on_birth(s['unit'])
                     s['busy_until'], s['unit'], s['item'] = None, None, None
@@ -511,11 +526,13 @@ class Production:
                 self.blocks.append((s['wait_from'], until))
 
 
-def player_housing(orders, player, civ, until, checkpoints=(), objects=None):
+def player_housing(orders, player, civ, until, checkpoints=(), objects=None, counted=None):
     """Housed intervals of one player before `until` (Feudal click), plus the pop timeline.
 
     `checkpoints` [(seconds, stockpile sum)] let the queue orders be checked against the food
-    they need; `objects` {id: (name, x, y)} name what a villager was sent to."""
+    they need; `objects` {id: (name, x, y)} name what a villager was sent to. `counted`
+    [(from_seconds, to_seconds, fewest, most)] are the units the checkpoints show appearing
+    (births.counted); a queue order the food estimate got wrong is then set right by them."""
     if civ in NO_HOUSES:
         return None
     own = [o for o in orders if o[1] == player.number]
@@ -542,7 +559,14 @@ def player_housing(orders, player, civ, until, checkpoints=(), objects=None):
     builders.advance(until)
     caps = sorted([(0.0, tc_pop * len(tcs))] + builders.caps(tc_pop, house_pop))
 
-    production, refused = _replay(own, player, civ, until, caps, tcs, home, checkpoints, objects, pop)
+    run = lambda forced: _replay(own, player, civ, until, caps, tcs, home, checkpoints, objects, pop, forced)
+    if counted:
+        (production, refused, _), forced, skipped = _settle(run, counted, until)
+        loose = [(a, min(b, until)) for i, (a, b, fewest, _) in enumerate(counted)
+                 if a < until and (fewest is None or i in skipped)]
+    else:
+        production, refused, _ = run({})
+        forced, loose = {}, None
     merged = []
     for a, b in sorted(production.blocks):
         if merged and a <= merged[-1][1]:
@@ -553,12 +577,109 @@ def player_housing(orders, player, civ, until, checkpoints=(), objects=None):
     tenth = lambda v: math.floor(v * 10) / 10      # never past the Feudal click it stops at
     shown = [{'from_seconds': tenth(a), 'to_seconds': tenth(b), 'seconds': round(b - a, 1),
               'population': _pop_at(timeline, a)} for a, b in merged if b - a >= MIN_BLOCK]
-    return {'until_seconds': round(until, 1), 'blocks': shown, 'refused_queue': refused,
+    births = None
+    if loose is not None:
+        # where the checkpoints do not show the births, the population is the replay's estimate
+        for block in shown:
+            block['counted'] = not any(a < block['to_seconds'] and block['from_seconds'] < b for a, b in loose)
+        spans = []
+        for a, b in loose:
+            if spans and a <= spans[-1][1]:
+                spans[-1][1] = b
+            else:
+                spans.append([a, b])
+        start = counted[0][0]
+        births = {'source': 'recording_checkpoints', 'corrected_queue': len(forced),
+                  'counted_seconds': round(max(0.0, until - start - sum(b - a for a, b in spans)), 1),
+                  'estimated': [[round(a, 1), round(b, 1)] for a, b in spans]}
+    return {'until_seconds': round(until, 1), 'blocks': shown, 'refused_queue': refused, 'births': births,
             'blocked_seconds': round(sum(x['seconds'] for x in shown), 1), 'timeline': timeline}
 
 
-def _replay(own, player, civ, until, caps, tcs, home, checkpoints, objects, pop):
-    """The production replay: queue orders paid from the estimated stock, units trained in turn."""
+TOLERANCE = 2.5            # seconds a replayed birth may lie from the checkpoint that shows it
+HELD_TOLERANCE = 10.0      # the same for a unit that waited at the cap (house times are estimates)
+SETTLE_LIMIT = 200
+SETTLE_PICKS = 8           # orders tried for one difference, the latest first
+
+
+def _miss(births, counted, skipped, until, held=()):
+    """(interval, +1 too many or -1 too few, differences in all, seconds): the first checkpoint
+    interval where the replay's births are not the counted ones. Each counted unit wants one
+    replayed birth inside its interval (give or take TOLERANCE); a replayed birth without a
+    counted unit is one too many unless its interval was not counted. A unit that waited at
+    the population cap (`held`) starts when the replay's house is done, which is an estimate:
+    its birth may lie HELD_TOLERANCE off."""
+    slots, free, ends = [], [], []
+    for i, (start, end, fewest, most) in enumerate(counted):
+        if start >= until:
+            break
+        ends.append(end)
+        if fewest is None or i in skipped or end > until:
+            free.append((start - TOLERANCE, end + TOLERANCE))
+            continue
+        if most > fewest:
+            free.append((start - TOLERANCE, end + TOLERANCE))
+        slots += [(start - TOLERANCE, end + TOLERANCE, i)] * fewest
+    odd, k = [], 0
+    for born in births:
+        slack = HELD_TOLERANCE if born in held else 0.0
+        while k < len(slots) and slots[k][1] + slack < born:
+            odd.append((slots[k][2], -1, slots[k][1]))
+            k += 1
+        if k < len(slots) and slots[k][0] - slack <= born:
+            k += 1
+        elif not any(a - slack <= born <= b + slack for a, b in free):
+            odd.append((min(bisect_left(ends, born), len(ends) - 1) if ends else 0, 1, born))
+    odd += [(i, -1, end) for _, end, i in slots[k:]]
+    if not odd:
+        return None
+    i, sign, when = min(odd)
+    return i, sign, len(odd), when
+
+
+def _settle(run, counted, until):
+    """Replays with the queue orders' accept/refuse changed until the births are the counted
+    ones. `run(forced)` replays with {order index: units accepted}. An interval that no change
+    explains is skipped (the replay's own estimate stands there) and its changes are undone."""
+    forced, way, skipped = {}, {}, set()
+    result = run(forced)
+    work = None                      # (interval, the state before it was worked on)
+    for _ in range(SETTLE_LIMIT):
+        miss = _miss(result[0].births, counted, skipped, until, result[0].held)
+        if miss is None:
+            break
+        i, sign, gap, when = miss
+        if work is None or work[0] != i:
+            work = (i, (dict(forced), dict(way), result))
+        if sign < 0:      # a unit the estimate refused was made: an order that could have made it
+            picks = [d for d in result[2] if d[3] < d[2] and d[1] + d[4] <= when and way.get(d[0]) != -1]
+        else:             # a unit the estimate accepted never came
+            picks = [d for d in result[2] if d[3] > 0 and d[1] + d[4] <= when + 0.01 and way.get(d[0]) != 1]
+        moved = False
+        for index, _, _, got, _ in sorted(picks, key=lambda d: -d[1])[:SETTLE_PICKS]:
+            trial = dict(forced)
+            trial[index] = got - sign
+            attempt = run(trial)
+            again = _miss(attempt[0].births, counted, skipped, until, attempt[0].held)
+            if again is None or again[0] > i or (again[0] == i and again[2] < gap):
+                forced, result = trial, attempt
+                way[index] = -sign
+                moved = True
+                break
+        if moved:
+            continue
+        forced, way, result = work[1]
+        skipped.add(i)
+        work = None
+    return result, forced, skipped
+
+
+def _replay(own, player, civ, until, caps, tcs, home, checkpoints, objects, pop, forced=None):
+    """The production replay: queue orders paid from the estimated stock, units trained in turn.
+
+    `forced` {order index: units accepted} overrules the stock estimate. Returns the production,
+    the refused units and [(order index, seconds, units asked, units accepted, train seconds)]."""
+    forced, decisions = forced or {}, []
     economy = None
     if checkpoints:
         economy = Economy(civ, checkpoints, objects or {}, home)
@@ -588,7 +709,7 @@ def _replay(own, player, civ, until, caps, tcs, home, checkpoints, objects, pop)
     instant = INSTANT.get(civ, set())
     cost_scale = UNIT_COST_SCALE.get(civ, {})
     researched, tc_ids, refused, last = set(), {o.instance_id for o in tcs}, 0, []
-    for at, _, kind, payload, flags in own:
+    for index, (at, _, kind, payload, flags) in enumerate(own):
         if at >= until:
             break
         production.advance(at)
@@ -624,11 +745,18 @@ def _replay(own, player, civ, until, caps, tcs, home, checkpoints, objects, pop)
             if unit not in TRAIN:
                 continue
             if amount > 0:
-                if economy:
-                    cost = {k: v * cost_scale.get(unit, 1.0) for k, v in UNIT_COST.get(unit, {}).items()}
-                    got = economy.pay(cost, amount)
-                    refused += amount - got
-                    amount = got
+                cost = {k: v * cost_scale.get(unit, 1.0) for k, v in UNIT_COST.get(unit, {}).items()}
+                got = economy.pay(cost, amount) if economy else amount
+                if index in forced:
+                    want = max(0, min(amount, forced[index]))
+                    if economy and want > got:
+                        economy.charge(cost, want - got)
+                    elif economy and want < got:
+                        economy.refund({k: v * (got - want) for k, v in cost.items()})
+                    got = want
+                decisions.append((index, at, amount, got, TRAIN[unit] / rate))
+                refused += amount - got
+                amount = got
                 for _ in range(amount):
                     production.add(building, ('unit', TRAIN[unit] / rate, unit))
             elif amount < 0:
@@ -643,7 +771,7 @@ def _replay(own, player, civ, until, caps, tcs, home, checkpoints, objects, pop)
             seconds = 0.0 if tech in instant else RESEARCH[tech] * scale.get(tech, 1.0) / rate
             production.add(building, ('tech', seconds, tech))
     production.finish(until)
-    return production, refused
+    return production, refused, decisions
 
 
 def _pop_at(timeline, t):
@@ -670,15 +798,19 @@ def housing(decoded, match, own):
     offset = match.restored_at.total_seconds()
     orders = read_orders(decoded, offset)
     end = (match.duration + match.restored_at).total_seconds()
-    from state_curve import read_checkpoints
-    checkpoints = read_checkpoints(decoded)
+    import births
+    checkpoints = births.read_words(decoded)
+    clicks = [feudal_click(orders, p.number) for p in match.players]
+    counted = births.counted(match, [(ms, {n: w[1:] for n, w in row.items()}) for ms, row in checkpoints],
+                             orders, offset, LIVESTOCK, None if None in clicks else max(clicks))
     objects = {o.instance_id: (o.name, o.position.x, o.position.y)
                for o in list(match.gaia) + [o for p in match.players for o in p.objects]}
     result = {'source': 'replayed_orders', 'min_block_seconds': MIN_BLOCK}
     for key, p in (('own', own), ('opponent', opponents[0])):
         click = feudal_click(orders, p.number)
         cps = [(ms / 1000 + offset, row[p.number][0]) for ms, row in checkpoints if p.number in row]
-        row = player_housing(orders, p, p.civilization, click if click is not None else end, cps, objects)
+        row = player_housing(orders, p, p.civilization, click if click is not None else end, cps, objects,
+                             counted.get(p.number))
         if row is not None:
             row.pop('timeline')
             row['feudal_clicked'] = click is not None
