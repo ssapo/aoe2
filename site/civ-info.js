@@ -11,10 +11,10 @@
   }
   let box=null,anchor=null;
   function hide(){if(box){box.remove();box=null;anchor=null;}}
-  function show(target){
+  function show(target,keep){
     const civ=target.dataset.civ,content=html(civ,target.dataset.civName);
     if(!content)return false;
-    if(anchor===target){hide();return true;}
+    if(anchor===target){if(!keep)hide();return true;}
     hide();
     box=document.createElement('div');box.className='civ-info';box.setAttribute('role','tooltip');box.innerHTML=content;
     (target.closest('dialog')||document.body).appendChild(box);
@@ -29,11 +29,17 @@
   function install(){
     if(typeof document==='undefined')return;
     // capture phase: a tap on a civ icon inside a match card shows the bonuses instead of opening the match
+    const hovers=typeof window.matchMedia==='function'&&window.matchMedia('(hover: hover)').matches;
     document.addEventListener('click',e=>{
       const icon=e.target instanceof Element?e.target.closest('img[data-civ]'):null;
-      if(icon){if(show(icon)){e.preventDefault();e.stopPropagation();}return;}
+      if(icon){if(show(icon,hovers)){e.preventDefault();e.stopPropagation();}return;}
       if(box&&!(e.target instanceof Element&&e.target.closest('.civ-info')))hide();
     },true);
+    if(hovers){
+      // with a mouse the bonuses show on hover, at once
+      document.addEventListener('mouseover',e=>{const icon=e.target instanceof Element?e.target.closest('img[data-civ]'):null;if(icon)show(icon,true);});
+      document.addEventListener('mouseout',e=>{if(anchor&&e.target===anchor)hide();});
+    }
     document.addEventListener('keydown',e=>{if(e.key==='Escape')hide();});
     window.addEventListener('scroll',hide,true);
     window.addEventListener('resize',hide);
