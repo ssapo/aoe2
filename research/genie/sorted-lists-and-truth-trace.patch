@@ -619,6 +619,39 @@ index 88cd0044..e6259455 100644
      /// The sprites the gather shows.
      pub(crate) sprites: HuntSprites,
      /// The unit's master's class: a villager's `MoveTo` waits once when the motion step gives up.
+diff --git a/crates/engine/genie-core/src/gathering/gather/start.rs b/crates/engine/genie-core/src/gathering/gather/start.rs
+index 01be8685..81ddbdc9 100644
+--- a/crates/engine/genie-core/src/gathering/gather/start.rs
++++ b/crates/engine/genie-core/src/gathering/gather/start.rs
+@@ -134,6 +134,13 @@ pub fn productivity_of(
+         .unwrap_or(Amount::ZERO)
+ }
+ 
++/// 188329's farm stop draw (`0xb7edb0`..`0xb7ee3b`, case 559.5 s of replay 517426097):
++/// `GENIE_EXPERIMENT_FARMSPOT_188329`.
++pub(crate) fn farmspot_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_FARMSPOT_188329").is_some())
++}
++
+ /// `set_state(4)`'s point of a farm's next stop (`0x140a8cd40` case 4): a tile of the farm's
+ /// footprint (its place `position` less its radii `radius`, plus a draw of the Action stream
+ /// modulo twice each radius, its centre 0.5 in), drawn again while it is the last stop's, at
+@@ -157,6 +164,14 @@ pub fn stop_point(
+         (position.x() - radius.x()) as i32,
+         (position.y() - radius.y()) as i32,
+     );
++    if farmspot_188329() {
++        // 188329 0xb7edb0..0xb7ee3b: the first candidate that passes ok() (0xb7aa90) is taken; no
++        // test against the last stop. ok() is taken as true: farther than 16 passes, else the point
++        // reach test (0x120fec0) within 16.0 of the point, which a unit within 16 of it passes.
++        let x = ((rng.rand15() as i32) % ix + left) as f32 + gather_tuning.stop_centre;
++        let y = ((rng.rand15() as i32) % iy + bottom) as f32 + gather_tuning.stop_centre;
++        return Point::new(x, y);
++    }
+     let (mut x, mut y) = (last.x(), last.y());
+     let mut draws = 0;
+     while x == last.x() && y == last.y() && draws < STOP_DRAWS {
 diff --git a/crates/engine/genie-core/src/gathering/gather/tests.rs b/crates/engine/genie-core/src/gathering/gather/tests.rs
 index 5226b21a..cf93d62b 100644
 --- a/crates/engine/genie-core/src/gathering/gather/tests.rs
@@ -1539,7 +1572,7 @@ index 25d0c676..9d18d973 100644
          let dt = self.dt_seconds;
          let yaw = g
 diff --git a/crates/engine/genie-core/src/groups/mod.rs b/crates/engine/genie-core/src/groups/mod.rs
-index 7787900f..a5caed15 100644
+index 7787900f..317dacee 100644
 --- a/crates/engine/genie-core/src/groups/mod.rs
 +++ b/crates/engine/genie-core/src/groups/mod.rs
 @@ -204,6 +204,8 @@ pub struct FormationLine {
@@ -1551,7 +1584,7 @@ index 7787900f..a5caed15 100644
  }
  
  /// A formation (`BFormation`, read by `FUN_1410180b0`).
-@@ -469,6 +471,71 @@ pub struct UnitGroup {
+@@ -469,6 +471,78 @@ pub struct UnitGroup {
      /// (`BUnitGroup::command` sets it), so its next move empties the command queue first;
      /// `checkQueuedOrders` (`FUN_14100d460`) clears it.
      pub replaces_queue: u8,
@@ -1580,6 +1613,13 @@ index 7787900f..a5caed15 100644
 +pub(crate) fn forming_188329() -> bool {
 +    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
 +    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_FORMING_188329").is_some())
++}
++
++/// 188329's end of a group move (`0x110d3a0`, case update 64,092 of replay 516956894):
++/// `GENIE_EXPERIMENT_MOVEEND_188329`.
++pub(crate) fn moveend_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_MOVEEND_188329").is_some())
 +}
 +
 +/// On top of [`forming_188329`], SUSPECTED (not read): a group's first speed pass measures each
@@ -1623,7 +1663,7 @@ index 7787900f..a5caed15 100644
  }
  
  impl Motion {
-@@ -536,6 +603,7 @@ impl UnitGroup {
+@@ -536,6 +610,7 @@ impl UnitGroup {
              current_target: TargetData::default(),
              differentiator_id: Differentiator::NONE,
              replaces_queue: 1,
@@ -2161,6 +2201,125 @@ index 0e406949..ed5ae5a2 100644
              return true;
          }
          if self.current_command == GroupCommandKind::MOVE && self.patrols() {
+diff --git a/crates/engine/genie-core/src/groups/update/moves.rs b/crates/engine/genie-core/src/groups/update/moves.rs
+index a7ba8750..fadb5204 100644
+--- a/crates/engine/genie-core/src/groups/update/moves.rs
++++ b/crates/engine/genie-core/src/groups/update/moves.rs
+@@ -151,6 +151,9 @@ impl World {
+             *relayout = true;
+             return Ok(Progress::Going);
+         }
++        if crate::groups::moveend_188329() {
++            return self.move_update_188329(group, relayout);
++        }
+         let walks = g
+             .motion
+             .paths
+@@ -221,6 +224,104 @@ impl World {
+         self.move_members_on(group, walks, patrolling)
+     }
+ 
++    /// 188329's move update past the new motion's test (`0x110d3cc`..`0x110d5d9`,
++    /// `GENIE_EXPERIMENT_MOVEEND_188329`); it has no `AutomaticMoveUnitsToDesiredPositions`. A
++    /// moving group that does not follow asks for a layout anew; one that follows a held target
++    /// goes on following when its top path ends farther from the target than half its lead's line
++    /// of sight (unit slot 0x228 = `0x1245c70`, times `0x31b1420` = 0.5; squared, strictly
++    /// above), else asks for a layout. A standing group that follows goes on following; one with
++    /// wait delays, a walked level wanting a path, a looping top path, or a patrol whose walked
++    /// level holds a path goes on. Else every slot not in its place (state 3) must name a member
++    /// with at least 3 failures (`+0xf8[i].+0x1c`; the steering's own limit, 10 at `0x10efc25`,
++    /// is another constant) and no member's unit AI may hold a current order (`0x10d19a0`): the
++    /// command clears and the move is finished.
++    fn move_update_188329(
++        &mut self,
++        group: GroupId,
++        relayout: &mut bool,
++    ) -> Result<Progress, GenieError> {
++        let g = self.groups.held(group)?;
++        let follows = g.flags.contains(GroupFlags::FOLLOWED);
++        if g.motion.moving() {
++            if !follows {
++                *relayout = true;
++                return Ok(Progress::Going);
++            }
++            let Some(target) = self.world_object(g.current_target.target) else {
++                return Ok(Progress::Going);
++            };
++            // the original calls the lead's slot 0x228 without a null test
++            let leader = self
++                .lead_object(&g.motion)
++                .ok_or_else(|| member_gone(g.motion.lead))?;
++            let r = self
++                .master(leader.player(), leader.master_id(self.model.slots))?
++                .line_of_sight
++                .get()
++                * 0.5;
++            let Some(top) = top_path(&g.motion.paths) else {
++                *relayout = true;
++                return Ok(Progress::Going);
++            };
++            let end = match top.points.as_slice() {
++                [.., _, last] => *last,
++                _ => BVector::ZERO,
++            };
++            let d = end - target.moved_vector();
++            let squared = d.x() * d.x() + d.height() * d.height() + d.y() * d.y();
++            // COMISS, JA: not for a NaN
++            if squared > r * r {
++                self.groups.held_mut(group)?.current_command = FOLLOW;
++            } else {
++                *relayout = true;
++            }
++            return Ok(Progress::Going);
++        }
++        if follows {
++            self.groups.held_mut(group)?.current_command = FOLLOW;
++            return Ok(Progress::Going);
++        }
++        if g.motion.number_wait_delays != DelayCount::ZERO || g.motion.waits_to_move() {
++            return Ok(Progress::Going);
++        }
++        if top_path(&g.motion.paths).is_some_and(|p| p.path_flags.contains(PathFlags::LOOPS)) {
++            return Ok(Progress::Going);
++        }
++        if g.flags.contains(GroupFlags::PATROL) && g.motion.paths.first().is_some_and(|l| l.has_path)
++        {
++            return Ok(Progress::Going);
++        }
++        if let Some(f) = g.current_formation.as_ref() {
++            for s in &f.slots {
++                if s.state == SlotState::InPlace {
++                    continue;
++                }
++                let Some(m) = s
++                    .unit_id
++                    .and_then(|u| g.members.iter().find(|m| m.id == u))
++                else {
++                    return Ok(Progress::Going);
++                };
++                if m.specific_move.consecutive_move_failures < 3 {
++                    return Ok(Progress::Going);
++                }
++            }
++        }
++        for m in &g.members {
++            if let Some((_, u)) = self.object(m.id)
++                && self
++                    .parts
++                    .unit_ai
++                    .get(u.id)
++                    .is_some_and(|ai| ai.current_order.is_some())
++            {
++                return Ok(Progress::Going);
++            }
++        }
++        self.groups.held_mut(group)?.current_command = NO_COMMAND;
++        Ok(Progress::Finished)
++    }
++
+     /// [`World::move_update`] of a group whose motion moves: a following group
+     /// ([`GroupFlags::FOLLOWED`]) whose top path ends at least `GroupTuning::close` from its target
+     /// goes on following; any other asks for a layout anew. The update does not end.
 diff --git a/crates/engine/genie-core/src/groups/update/release.rs b/crates/engine/genie-core/src/groups/update/release.rs
 index 7464c59f..48cd9bc2 100644
 --- a/crates/engine/genie-core/src/groups/update/release.rs
