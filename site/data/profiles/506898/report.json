@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-12T11:55:25.333774+00:00",
-  "last_checked_at": "2026-11-12T11:54:22.061130+00:00",
+  "updated_at": "2026-11-12T17:09:55.360776+00:00",
+  "last_checked_at": "2026-11-12T17:09:06.339269+00:00",
   "sync_error": null,
   "profile": {
     "id": 506898,
@@ -37,7 +37,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 15,
+        "analysis_revision": 16,
         "duration_game_seconds": 1952.94,
         "civilization": "Maya",
         "random_civ": true,
@@ -49076,22 +49076,57 @@
                 "from_seconds": 275.7,
                 "to_seconds": 377.4,
                 "seconds": 101.8,
-                "population": "15/15"
+                "population": "15/15",
+                "counted": false
               }
             ],
             "refused_queue": 2,
+            "births": {
+              "source": "recording_checkpoints",
+              "corrected_queue": 0,
+              "counted_seconds": 338.5,
+              "estimated": [
+                [
+                  8.7,
+                  21.7
+                ],
+                [
+                  73.7,
+                  80.2
+                ],
+                [
+                  294.7,
+                  301.2
+                ],
+                [
+                  320.7,
+                  327.2
+                ],
+                [
+                  346.7,
+                  353.2
+                ]
+              ]
+            },
             "blocked_seconds": 101.8,
             "feudal_clicked": true
           },
           "opponent": {
             "until_seconds": 412.6,
             "blocks": [],
-            "refused_queue": 4,
+            "refused_queue": 1,
+            "births": {
+              "source": "recording_checkpoints",
+              "corrected_queue": 3,
+              "counted_seconds": 412.6,
+              "estimated": []
+            },
             "blocked_seconds": 0,
             "feudal_clicked": true
           }
         },
         "engine_income": null,
+        "game_build": 188329,
         "insights": [
           {
             "kind": "strength",
@@ -49468,7 +49503,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 15,
+        "analysis_revision": 16,
         "duration_game_seconds": 659.63,
         "civilization": "Danes",
         "random_civ": true,
@@ -80116,19 +80151,37 @@
           "own": {
             "until_seconds": 396.4,
             "blocks": [],
-            "refused_queue": 5,
+            "refused_queue": 3,
+            "births": {
+              "source": "recording_checkpoints",
+              "corrected_queue": 2,
+              "counted_seconds": 396.4,
+              "estimated": []
+            },
             "blocked_seconds": 0,
             "feudal_clicked": true
           },
           "opponent": {
             "until_seconds": 421.0,
             "blocks": [],
-            "refused_queue": 6,
+            "refused_queue": 2,
+            "births": {
+              "source": "recording_checkpoints",
+              "corrected_queue": 4,
+              "counted_seconds": 414.5,
+              "estimated": [
+                [
+                  262.2,
+                  268.7
+                ]
+              ]
+            },
             "blocked_seconds": 0,
             "feudal_clicked": true
           }
         },
         "engine_income": null,
+        "game_build": 188329,
         "insights": [
           {
             "kind": "strength",
@@ -136868,8 +136921,7 @@
         }
       },
       "attempts": 1,
-      "source_url": "https://www.aoe2insights.com/match/519160626/",
-      "analysis_note": "명령 기록 분석 완료"
+      "source_url": "https://www.aoe2insights.com/match/519160626/"
     },
     {
       "id": 518944495,
@@ -192401,8 +192453,7 @@
         }
       },
       "attempts": 1,
-      "source_url": "https://www.aoe2insights.com/match/518944495/",
-      "analysis_note": "명령 기록 분석 완료"
+      "source_url": "https://www.aoe2insights.com/match/518944495/"
     },
     {
       "id": 518938382,

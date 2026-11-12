@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-12T11:54:19.515504+00:00",
-  "last_checked_at": "2026-11-12T11:54:18.242980+00:00",
+  "updated_at": "2026-11-12T17:09:04.115506+00:00",
+  "last_checked_at": "2026-11-12T17:08:22.353486+00:00",
   "sync_error": null,
   "profile": {
     "id": 199325,
@@ -37,7 +37,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 15,
+        "analysis_revision": 16,
         "duration_game_seconds": 1368.5,
         "civilization": "Franks",
         "random_civ": true,
@@ -38198,7 +38198,13 @@
           "own": {
             "until_seconds": 424.5,
             "blocks": [],
-            "refused_queue": 7,
+            "refused_queue": 5,
+            "births": {
+              "source": "recording_checkpoints",
+              "corrected_queue": 2,
+              "counted_seconds": 424.5,
+              "estimated": []
+            },
             "blocked_seconds": 0,
             "feudal_clicked": true
           },
@@ -38206,18 +38212,43 @@
             "until_seconds": 399.7,
             "blocks": [
               {
-                "from_seconds": 322.9,
+                "from_seconds": 280.4,
                 "to_seconds": 399.6,
-                "seconds": 76.7,
-                "population": "15/15"
+                "seconds": 119.2,
+                "population": "15/15",
+                "counted": false
               }
             ],
-            "refused_queue": 3,
-            "blocked_seconds": 76.7,
+            "refused_queue": 1,
+            "births": {
+              "source": "recording_checkpoints",
+              "corrected_queue": 2,
+              "counted_seconds": 373.2,
+              "estimated": [
+                [
+                  304.3,
+                  310.8
+                ],
+                [
+                  323.8,
+                  330.3
+                ],
+                [
+                  350.3,
+                  357.4
+                ],
+                [
+                  376.9,
+                  383.4
+                ]
+              ]
+            },
+            "blocked_seconds": 119.2,
             "feudal_clicked": true
           }
         },
         "engine_income": null,
+        "game_build": 188329,
         "insights": [
           {
             "kind": "review",
@@ -38559,7 +38590,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 15,
+        "analysis_revision": 16,
         "duration_game_seconds": 1213.08,
         "civilization": "Jurchens",
         "random_civ": true,
@@ -78611,7 +78642,13 @@
           "own": {
             "until_seconds": 376.2,
             "blocks": [],
-            "refused_queue": 5,
+            "refused_queue": 2,
+            "births": {
+              "source": "recording_checkpoints",
+              "corrected_queue": 3,
+              "counted_seconds": 376.2,
+              "estimated": []
+            },
             "blocked_seconds": 0,
             "feudal_clicked": true
           },
@@ -78622,21 +78659,103 @@
                 "from_seconds": 25.7,
                 "to_seconds": 212.6,
                 "seconds": 187.0,
-                "population": "5/5"
+                "population": "5/5",
+                "counted": false
               },
               {
                 "from_seconds": 337.6,
                 "to_seconds": 411.5,
                 "seconds": 73.9,
-                "population": "10/10"
+                "population": "10/10",
+                "counted": false
               }
             ],
             "refused_queue": 8,
+            "births": {
+              "source": "recording_checkpoints",
+              "corrected_queue": 0,
+              "counted_seconds": 242.6,
+              "estimated": [
+                [
+                  0.0,
+                  52.0
+                ],
+                [
+                  70.8,
+                  77.3
+                ],
+                [
+                  96.8,
+                  103.3
+                ],
+                [
+                  122.8,
+                  129.3
+                ],
+                [
+                  148.8,
+                  155.3
+                ],
+                [
+                  168.3,
+                  181.3
+                ],
+                [
+                  194.3,
+                  200.8
+                ],
+                [
+                  246.3,
+                  252.8
+                ],
+                [
+                  259.3,
+                  265.8
+                ],
+                [
+                  272.3,
+                  278.8
+                ],
+                [
+                  285.3,
+                  291.8
+                ],
+                [
+                  298.3,
+                  304.8
+                ],
+                [
+                  311.3,
+                  317.8
+                ],
+                [
+                  324.3,
+                  330.8
+                ],
+                [
+                  337.3,
+                  343.8
+                ],
+                [
+                  350.3,
+                  356.8
+                ],
+                [
+                  369.8,
+                  376.3
+                ],
+                [
+                  395.8,
+                  402.3
+                ]
+              ]
+            },
             "blocked_seconds": 260.9,
             "feudal_clicked": true
           }
         },
         "engine_income": null,
+        "game_build": 188329,
         "insights": [
           {
             "kind": "strength",

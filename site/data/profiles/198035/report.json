@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-12T09:35:02.568029+00:00",
-  "last_checked_at": "2026-11-12T09:34:27.201102+00:00",
+  "updated_at": "2026-11-12T17:10:29.311801+00:00",
+  "last_checked_at": "2026-11-12T17:09:55.801528+00:00",
   "sync_error": null,
   "profile": {
     "id": 198035,
@@ -37,7 +37,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 15,
+        "analysis_revision": 16,
         "duration_game_seconds": 1375.86,
         "civilization": "Georgians",
         "random_civ": true,
@@ -27454,7 +27454,22 @@
           "own": {
             "until_seconds": 355.1,
             "blocks": [],
-            "refused_queue": 1,
+            "refused_queue": 0,
+            "births": {
+              "source": "recording_checkpoints",
+              "corrected_queue": 1,
+              "counted_seconds": 342.1,
+              "estimated": [
+                [
+                  21.7,
+                  28.2
+                ],
+                [
+                  47.7,
+                  54.2
+                ]
+              ]
+            },
             "blocked_seconds": 0,
             "feudal_clicked": true
           },
@@ -27462,18 +27477,71 @@
             "until_seconds": 392.9,
             "blocks": [
               {
-                "from_seconds": 194.8,
+                "from_seconds": 191.6,
                 "to_seconds": 338.1,
-                "seconds": 143.3,
-                "population": "10/10"
+                "seconds": 146.6,
+                "population": "10/10",
+                "counted": false
               }
             ],
             "refused_queue": 2,
-            "blocked_seconds": 143.3,
+            "births": {
+              "source": "recording_checkpoints",
+              "corrected_queue": 1,
+              "counted_seconds": 321.4,
+              "estimated": [
+                [
+                  21.7,
+                  28.2
+                ],
+                [
+                  47.7,
+                  54.2
+                ],
+                [
+                  171.2,
+                  177.7
+                ],
+                [
+                  197.2,
+                  203.7
+                ],
+                [
+                  223.2,
+                  229.7
+                ],
+                [
+                  249.2,
+                  255.7
+                ],
+                [
+                  275.2,
+                  281.7
+                ],
+                [
+                  294.7,
+                  301.2
+                ],
+                [
+                  320.7,
+                  327.2
+                ],
+                [
+                  372.7,
+                  379.2
+                ],
+                [
+                  385.7,
+                  392.2
+                ]
+              ]
+            },
+            "blocked_seconds": 146.6,
             "feudal_clicked": true
           }
         },
         "engine_income": null,
+        "game_build": 188329,
         "insights": [
           {
             "kind": "strength",
