@@ -570,10 +570,26 @@ index 3e35c7a5..a0add649 100644
                  self.hunt_drop_wait(actions, c, roles)?;
              }
 diff --git a/crates/engine/genie-core/src/gathering/hunt/unit.rs b/crates/engine/genie-core/src/gathering/hunt/unit.rs
-index 0c37a95e..12586d1c 100644
+index 0c37a95e..2b5397e0 100644
 --- a/crates/engine/genie-core/src/gathering/hunt/unit.rs
 +++ b/crates/engine/genie-core/src/gathering/hunt/unit.rs
-@@ -422,7 +422,15 @@ impl Unit {
+@@ -83,9 +83,12 @@ impl Unit {
+     ) -> Result<(), GenieError> {
+         let hunt = actions.list.hunt_mut().ok_or(NO_HUNT)?;
+         let task = hunt.task;
+-        if roles
+-            .of_some_class(hunt.target_class)
+-            .contains(ClassRoles::PREDATOR)
++        // 188329 (0xbb65b0 -> 0xbb7e86 set_state(3); case 3 at 0xbb4aec has no class test): a
++        // hunt of class 10 searches like any other (notify 0x202, standing sprite, timer -10)
++        if std::env::var_os("GENIE_EXPERIMENT_HUNT_188329").is_none()
++            && roles
++                .of_some_class(hunt.target_class)
++                .contains(ClassRoles::PREDATOR)
+         {
+             // a human player's hunt is done (set_state 2), a computer player's ends (1)
+             if c.w.players.player(c.player)?.kind.is_computer() {
+@@ -422,7 +425,15 @@ impl Unit {
                  "slot 0x1b0 of another unit AI than the civilian's",
              ));
          }
@@ -590,7 +606,7 @@ index 0c37a95e..12586d1c 100644
          let found = match kind {
              None if roles
                  .of_some_class(hunt.target_class)
-@@ -430,6 +438,44 @@ impl Unit {
+@@ -430,6 +441,44 @@ impl Unit {
              {
                  None
              }
@@ -635,7 +651,7 @@ index 0c37a95e..12586d1c 100644
              None => self.hunt_closest_object(actions, c, class, roles)?,
              Some(group) => {
                  let cap = if group == GatherGroup::WOOD {
-@@ -455,6 +501,19 @@ impl Unit {
+@@ -455,6 +504,19 @@ impl Unit {
          class: Option<ClassId>,
          roles: &Roles,
      ) -> Result<Option<ObjectId>, GenieError> {
@@ -655,7 +671,7 @@ index 0c37a95e..12586d1c 100644
          let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
          if self.my_pasture.is_some() {
              return Err(GenieError::unsupported(
-@@ -473,7 +532,7 @@ impl Unit {
+@@ -473,7 +535,7 @@ impl Unit {
              pick: Pick::Closest {
                  group: class,
                  relation: None,
@@ -664,7 +680,7 @@ index 0c37a95e..12586d1c 100644
                  master: None,
                  workers: if roles.of_some_class(class).contains(ClassRoles::FARM) {
                      WorkerCount::ONE
-@@ -541,7 +600,19 @@ impl Unit {
+@@ -541,7 +603,19 @@ impl Unit {
                      "a hunt without a unit AI after its drop-off",
                  ))?;
          ai.alert(result, c.dt.seconds());
@@ -2372,10 +2388,10 @@ index b97f7d35..7a6fb1d0 100644
  /// (x, y, z), the work command's carried-resource test and task filter, and the unit's `+0xa14`
  /// while it runs ([`OrderSource`]): only a direct order's new action's notify clears the unit
 diff --git a/crates/engine/genie-core/src/orders/moves.rs b/crates/engine/genie-core/src/orders/moves.rs
-index 29f5d776..4e3fe984 100644
+index 29f5d776..5e243a42 100644
 --- a/crates/engine/genie-core/src/orders/moves.rs
 +++ b/crates/engine/genie-core/src/orders/moves.rs
-@@ -91,12 +91,10 @@ impl World {
+@@ -91,12 +91,18 @@ impl World {
              .live(player, idx)?
              .master(self.master_tables(), player)?;
          let speed = master.move_stats.as_ref().map_or(Speed::ZERO, |m| m.speed);
@@ -2385,6 +2401,14 @@ index 29f5d776..4e3fe984 100644
 -                    "a queued move of an object that does not move",
 -                ));
 -            }
++        // 188329 0x12cbca0 (the villager's slot 0x148; 0x12cbd38: class 4): the move clears the
++        // town-bell flag (`+0x664`), so a later garrison order records its work again
++        let bell_free_188329 = std::env::var_os("GENIE_EXPERIMENT_GARRISON_RECORD_188329").is_some()
++            && self
++                .model
++                .roles
++                .of_class(master.class)
++                .contains(ClassRoles::VILLAGER);
 +        // 188329 0x16ebc20: an object that does not move is skipped only when the move is not
 +        // queued; a queued move goes into its unit AI's queue like a mover's
 +        let non_mover = master.kind < MasterKind::MOVING || speed <= Speed::ZERO;
@@ -2392,7 +2416,7 @@ index 29f5d776..4e3fe984 100644
              return Ok(());
          }
          let target = self
-@@ -104,16 +102,20 @@ impl World {
+@@ -104,16 +110,20 @@ impl World {
              .map(|(tp, t)| (t.life.master_id, tp));
          let unit = self.players.live_mut(player, idx)?;
          // FUN_141197da0, then slot 0x2a0 with 1: it waits to move
@@ -2423,8 +2447,18 @@ index 29f5d776..4e3fe984 100644
          }
          let takes_it = !order.flags.contains(OrderFlags::QUEUED)
              && self.parts.unit_ai.get(unit.id).is_none_or(|ai| {
+@@ -151,6 +161,9 @@ impl World {
+         }
+         // slot 0x138 (FUN_141216f10): a villager's town-bell flag (not held) and, `+0xa14` being
+         // 1, the unit AI's order queue empties (FUN_140c5e010); then FUN_14106d340
++        if bell_free_188329 {
++            self.parts.set_town_bell_flag(unit.id, BellShelter::Free);
++        }
+         if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
+             ai.orders.clear();
+         }
 diff --git a/crates/engine/genie-core/src/orders/town_bell.rs b/crates/engine/genie-core/src/orders/town_bell.rs
-index 72090fb3..e8c87ca2 100644
+index 72090fb3..c5207a6d 100644
 --- a/crates/engine/genie-core/src/orders/town_bell.rs
 +++ b/crates/engine/genie-core/src/orders/town_bell.rs
 @@ -135,6 +135,12 @@ impl TownBell {
@@ -2453,7 +2487,23 @@ index 72090fb3..e8c87ca2 100644
          let (found, out) = record_object(self.work, lookup, roles)?;
          if found.is_some() {
              return Ok((found, out));
-@@ -462,6 +474,10 @@ impl World {
+@@ -232,7 +244,14 @@ impl TownBell {
+             return Ok((found, out));
+         }
+         let none = Point::new(-1.0, -1.0);
+-        if self.work.point == none {
++        // 188329 0x12b6a26..0x12b6a9e: the second record also when the first has neither an
++        // action nor a target class and the second has both
++        let second_188329 = std::env::var_os("GENIE_EXPERIMENT_GARRISON_RECORD_188329").is_some()
++            && self.work.action.is_none()
++            && self.work.target_class.is_none()
++            && before.action.is_some()
++            && before.target_class.is_some();
++        if self.work.point == none || second_188329 {
+             Ok((None, before))
+         } else {
+             Ok((None, self.work))
+@@ -462,6 +481,10 @@ impl World {
      /// villager (class 4) or of master 1808 back to work, from the last in
      /// ([`crate::world::World::back_to_work`]; its sound, slot 0x4c0, is not simulation).
      fn workers_out(&mut self, owner: PlayerId, idx: ListIndex) -> Result<(), GenieError> {
@@ -2464,7 +2514,7 @@ index 72090fb3..e8c87ca2 100644
          let mut i = self.players.live(owner, idx)?.garrison.len();
          while 0 < i {
              i -= 1;
-@@ -552,7 +568,8 @@ impl World {
+@@ -552,7 +575,8 @@ impl World {
                  &Work {
                      target: Some(target),
                      point: Position::new(x, y, 0.0),
@@ -3942,7 +3992,7 @@ index dc286d39..4ddecf51 100644
                      }
                      (None, _) => ai
 diff --git a/crates/engine/genie-core/src/unit_ai/update.rs b/crates/engine/genie-core/src/unit_ai/update.rs
-index 1ecba910..e6e3b396 100644
+index 1ecba910..e487683d 100644
 --- a/crates/engine/genie-core/src/unit_ai/update.rs
 +++ b/crates/engine/genie-core/src/unit_ai/update.rs
 @@ -4,6 +4,7 @@
@@ -3975,8 +4025,20 @@ index 1ecba910..e6e3b396 100644
      pub(super) fn hunter_search(
          &mut self,
          n: Notify,
-@@ -409,15 +414,16 @@ impl UnitAi {
-         let kind = civilian_kind(class, roles);
+@@ -406,18 +411,27 @@ impl UnitAi {
+             self.stop_current(StopOrder::Keep, at, side, rng)?;
+             return Ok(GO_ON);
+         };
+-        let kind = civilian_kind(class, roles);
++        let mut kind = civilian_kind(class, roles);
++        // 188329 (0xcf9c60 -> 0xcf9c95): slot 0x1b0 gives kind 5 for class 10, so the notify of a
++        // boar hunt searches by kind (slot 0x80), not ClosestObject over live boars
++        if kind.is_none()
++            && std::env::var_os("GENIE_EXPERIMENT_HUNT_188329").is_some()
++            && class.get() == 10
++        {
++            kind = Some(GatherGroup::from(5_u8));
++        }
          let found = match kind {
              None => {
 -                let found = side.closest(&Search {
@@ -3995,7 +4057,7 @@ index 1ecba910..e6e3b396 100644
                          master: None,
                          workers: if roles.of_class(class).contains(ClassRoles::FARM) {
                              WorkerCount::ONE
-@@ -428,8 +434,47 @@ impl UnitAi {
+@@ -428,8 +442,47 @@ impl UnitAi {
                          reach: true,
                      },
                      memory: Memory::default(),
@@ -4045,7 +4107,7 @@ index 1ecba910..e6e3b396 100644
                  match (found.id, found.position) {
                      (Some(id), Some(position)) => Some(Gatherable {
                          id,
-@@ -467,12 +512,43 @@ impl UnitAi {
+@@ -467,12 +520,43 @@ impl UnitAi {
              return Ok(GO_ON);
          };
          if roles.of_class(class).contains(ClassRoles::FARM) {
