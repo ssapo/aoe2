@@ -446,10 +446,18 @@ index d8742d52..912ec5db 100644
          Ok(())
      }
 diff --git a/crates/engine/genie-core/src/garrison/unload.rs b/crates/engine/genie-core/src/garrison/unload.rs
-index 0f3076d6..86fbdc9c 100644
+index 0f3076d6..2f75756b 100644
 --- a/crates/engine/genie-core/src/garrison/unload.rs
 +++ b/crates/engine/genie-core/src/garrison/unload.rs
-@@ -372,6 +372,11 @@ impl World {
+@@ -9,6 +9,7 @@ use crate::garrison::WorkReturn;
+ use crate::map::Distance;
+ use crate::map::Footprint;
+ use crate::map::Point;
++use crate::map::Position;
+ use crate::objects::HitPoints;
+ use crate::objects::ListIndex;
+ use crate::objects::ObjectId;
+@@ -372,6 +373,11 @@ impl World {
              if b.master(self.master_tables(), p)?.kind != MasterKind::BUILDING {
                  continue;
              }
@@ -461,7 +469,7 @@ index 0f3076d6..86fbdc9c 100644
              let mut i = b.garrison.len();
              while 0 < i {
                  i -= 1;
-@@ -403,6 +408,55 @@ impl World {
+@@ -403,6 +409,55 @@ impl World {
          Ok(())
      }
  
@@ -517,6 +525,62 @@ index 0f3076d6..86fbdc9c 100644
      /// `FUN_1412081e0` for the unit `id`, `from` the building it is inside (player `p`'s object
      /// at an index) or outside (None): the work to go back to ([`TownBell::back_to_work`]: the
      /// town-bell records' object the world holds); with none but a record of an action and a
+@@ -446,7 +501,54 @@ impl World {
+         };
+         let (found, record) = bell.back_to_work(&lookup, &self.model.roles)?;
+         self.parts.set_town_bell(id, bell);
+-        if found.is_none() && record.target_class.is_some() && record.action.is_some() {
++        // 188329 0x12bc7e0 (GENIE_EXPERIMENT_BACKWORK_ORDER_188329, case 520596921 P2 305.5 s):
++        // the search is asked only after the unit went (0x12a16e0 / slot 0x370 first), with the
++        // unit AI's target and last target forgotten (0xd27410) before the action is set
++        // (0xd40980) and notify 0x202 posted; the let-out's move no longer replaces the action
++        let order_188329 = std::env::var_os("GENIE_EXPERIMENT_BACKWORK_ORDER_188329").is_some();
++        let search = found.is_none() && record.target_class.is_some() && record.action.is_some();
++        if order_188329 {
++            let went = match from {
++                None => self.back_outside(id, found.map(|f| f.id), record.point)?,
++                Some((p, building)) => {
++                    if self.let_out(p, building, id, record.point, (found.map(|f| f.id), true))?
++                        == LetOut::Out
++                    {
++                        WorkReturn::Went
++                    } else {
++                        WorkReturn::Stayed
++                    }
++                }
++            };
++            if went != WorkReturn::Went {
++                return Ok(went);
++            }
++            if search && let Some(Place::Live(up, ui)) = self.place(id) {
++                let unit = self.players.live_mut(up, ui)?;
++                if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
++                    ai.current_target = None;
++                    ai.target_class = None;
++                    ai.last_target = None;
++                    ai.last_target_class = None;
++                    ai.target_point = Position::from([-1.0; 3]);
++                    ai.set_action(record.action);
++                }
++                unit.post_own(
++                    &mut self.parts.unit_ai,
++                    NotifyKind::REQUIRES_SEARCH,
++                    [
++                        AiAction::field(record.action),
++                        i32::from(ClassId::field(record.target_class)),
++                        ObjectId::field(record.target),
++                    ],
++                )?;
++            }
++            if self.object(id).is_some() {
++                self.parts.set_town_bell_flag(id, BellShelter::Free);
++            }
++            return Ok(WorkReturn::Went);
++        }
++        if search {
+             let unit = self.players.live_mut(up, ui)?;
+             if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
+                 ai.set_action(record.action);
 diff --git a/crates/engine/genie-core/src/gathering/closest_resource.rs b/crates/engine/genie-core/src/gathering/closest_resource.rs
 index 9510abdd..74c7e5d5 100644
 --- a/crates/engine/genie-core/src/gathering/closest_resource.rs
@@ -5700,7 +5764,7 @@ index dc286d39..4ddecf51 100644
                      }
                      (None, _) => ai
 diff --git a/crates/engine/genie-core/src/unit_ai/update.rs b/crates/engine/genie-core/src/unit_ai/update.rs
-index 1ecba910..e487683d 100644
+index 1ecba910..2359a475 100644
 --- a/crates/engine/genie-core/src/unit_ai/update.rs
 +++ b/crates/engine/genie-core/src/unit_ai/update.rs
 @@ -4,6 +4,7 @@
@@ -5815,7 +5879,7 @@ index 1ecba910..e487683d 100644
                  match (found.id, found.position) {
                      (Some(id), Some(position)) => Some(Gatherable {
                          id,
-@@ -467,12 +520,43 @@ impl UnitAi {
+@@ -467,9 +520,54 @@ impl UnitAi {
              return Ok(GO_ON);
          };
          if roles.of_class(class).contains(ClassRoles::FARM) {
@@ -5823,10 +5887,25 @@ index 1ecba910..e487683d 100644
 +            // upstream 5617e484 (before: an unsupported stop)
 +            return self.task_to_farm(found.id, at, side, rng);
          }
-         self.hunt_object(found.id, found.class, found.position, at, side, rng)?;
-         Ok(BREAK)
-     }
- 
+-        self.hunt_object(found.id, found.class, found.position, at, side, rng)?;
++        match self.hunt_object(found.id, found.class, found.position, at, side, rng) {
++            // 188329 0xd27a74 (HuntObject, slot 0xc8: the unit's hunt command, slot 0x390, not
++            // answering 1 returns 0) and 0xd004a0's tail after it (0xd38f90, slot 0xb0 with 1,
++            // slot 0x48): the target goes and the action stops (GENIE_EXPERIMENT_BACKWORK_ORDER_188329;
++            // a back-to-work search of a class the unit has no task for, 520397411 P1 update 28046)
++            Err(e)
++                if std::env::var_os("GENIE_EXPERIMENT_BACKWORK_ORDER_188329").is_some()
++                    && format!("{e:?}").contains("a hunt command without a task") =>
++            {
++                self.remove_target();
++                self.stop_current(StopOrder::Keep, at, side, rng)?;
++                return Ok(GO_ON);
++            }
++            r => r?,
++        }
++        Ok(BREAK)
++    }
++
 +    /// The hunt's farm found (class 49, `FUN_140c22bf0`'s case 0x202 on action 0x265 in 158041,
 +    /// upstream 5617e484): the world's object of its id, at whose place the unit works it after
 +    /// the AI's stop (slot 0xb0 with 1; the unit's slot 0x140: slot 0x7e8 with the
@@ -5854,12 +5933,9 @@ index 1ecba910..e487683d 100644
 +            self,
 +            rng,
 +        )?;
-+        Ok(BREAK)
-+    }
-+
-     /// The villager's case 0x202 on its gather (`FUN_140c22bf0`, action 0x261): the class to
-     /// gather is the AI's target class, else its last, else the notify's (its second parameter);
-     /// with none the target goes and the action stops (slot 0xb0 with 1; slot 0x48 hands the
+         Ok(BREAK)
+     }
+ 
 diff --git a/crates/engine/genie-core/src/unit_ai/world_view/side.rs b/crates/engine/genie-core/src/unit_ai/world_view/side.rs
 index 77dc93ea..ca2421e5 100644
 --- a/crates/engine/genie-core/src/unit_ai/world_view/side.rs
