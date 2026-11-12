@@ -300,7 +300,7 @@
     const rev=Number(a.analysis_revision)||0,notes=[];
     const curve=window.SSAPOStateCurve?.valid?.(a.state_curve)??!!a.state_curve;
     if(!curve)notes.push(rev<10?`자원 그래프 없음 · 예전 분석(개정 ${rev||'?'})이라 자원 기록을 읽지 않았어요. 다시 분석되면 나와요.`:'자원 그래프 없음 · 이 리플에서 자원 기록을 읽지 못했어요.');
-    if(!window.SSAPOEngineIncome?.valid(a.engine_income))notes.push(rev<15?`자원별 누적 수입 없음 · 예전 분석(개정 ${rev||'?'})이에요. 자동 수집에서 다시 분석되면 나와요.`:'자원별 누적 수입 없음 · 경기 재현이 5분 이상 확인되지 않았거나, 사이트에서 직접 수집한 경기예요.');
+    if(!window.SSAPOEngineIncome?.valid(a.engine_income))notes.push(Number(a.game_build)&&Number(a.game_build)!==188329?`자원별 누적 수입 없음 · 이 경기는 게임 버전(빌드 ${Number(a.game_build)})이 달라요. 경기 재현은 빌드 188329 경기만 돼요.`:rev<15?`자원별 누적 수입 없음 · 예전 분석(개정 ${rev||'?'})이에요. 자동 수집에서 다시 분석되면 나와요.`:'자원별 누적 수입 없음 · 경기 재현이 5분 이상 확인되지 않았거나, 사이트에서 직접 수집한 경기예요.');
     return notes.length?`<p class="missing-note">${notes.map(esc).join('<br>')}</p>`:'';
   }
   function civBadge(civ,side,random){

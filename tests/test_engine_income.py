@@ -45,6 +45,17 @@ class EngineIncomeTest(unittest.TestCase):
         self.assertIsNone(income(self.lines(), 1, 3))
         self.assertEqual(parse_output(['noise', 'RES {bad'])[0], {})
 
+    def test_another_game_build_is_not_run(self):
+        from types import SimpleNamespace as N
+        from datetime import timedelta
+        import engine_income as e
+        own=N(number=1);match=N(players=[own,N(number=2)],restored_at=timedelta(0),build_version=185872)
+        called=[];old=e.run_engine;e.run_engine=lambda r:called.append(1) or []
+        try:
+            self.assertIsNone(e.engine_income(b'',match,own));self.assertEqual(called,[])
+            match.build_version=e.ENGINE_BUILD;e.engine_income(b'',match,own);self.assertEqual(called,[1])
+        finally:e.run_engine=old
+
     def test_without_the_engine_nothing_runs(self):
         import os
         old = {k: os.environ.pop(k, None) for k in ('AOE2_ENGINE_BIN', 'AOE2_ENGINE_DATA')}

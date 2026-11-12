@@ -124,11 +124,16 @@ def run_engine(recording):
         return err.read_text(encoding='utf-8', errors='replace').splitlines()
 
 
+ENGINE_BUILD = 188329
+
+
 def engine_income(recording, match, own):
     """`analysis.engine_income` of `own` and its 1v1 opponent, or None."""
     opponents = [p for p in match.players if p.number != own.number]
     if len(opponents) != 1 or match.restored_at.total_seconds() > 0:
         return None
+    if getattr(match, 'build_version', None) not in (None, ENGINE_BUILD):
+        return None  # the engine and its data mirror one game build only
     lines = run_engine(recording)
     if not lines:
         return None

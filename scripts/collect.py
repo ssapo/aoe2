@@ -311,7 +311,7 @@ def analyze_replay(raw, own_id):
     return {
         'parser': 'mgz', 'analysis_revision': ANALYSIS_REVISION, 'duration_game_seconds': seconds(match.duration + match.restored_at),
         'civilization': own.civilization, 'random_civ': randoms.get(own.profile_id), 'map': match.map.name, 'map_view': map_view,
-        'metrics': own_metrics, 'opponents': opponents, 'state_curve': curve, 'housing': housed, 'engine_income': earned,
+        'metrics': own_metrics, 'opponents': opponents, 'state_curve': curve, 'housing': housed, 'engine_income': earned, 'game_build': getattr(match, 'build_version', None),
         'insights': coaching(own_metrics, opponents, len(match.players)),
         'limitations': ['생산 지시량은 양수 amount의 합. 생산 완료·생존 수가 아니며 취소·자원 부족·인구 제한을 반영하지 않습니다. 건설·연구 명령도 실제 완료와 다를 수 있습니다.',
                         '시대 도달 시각은 시스템 알림이 있는 경우에만 표시합니다. 생산 지시량으로 실제 주민 수를 추정하지 않습니다.',
