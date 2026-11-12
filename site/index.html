@@ -8,7 +8,7 @@
   <title>AoE2 리플 분석</title>
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="style.css?v=20261112-notes">
+  <link rel="stylesheet" href="style.css?v=20261112-featured">
   <script defer src="collection-watch.js?v=20261106-age-resources"></script>
   <script defer src="building-map.js?v=20261106-age-resources"></script>
   <script defer src="player-search.js?v=20261106-age-resources"></script>
@@ -21,12 +21,12 @@
   <script defer src="civ-info.js?v=20261112-civhover"></script>
   <script defer src="opening.js?v=20261107-openings"></script>
   <script defer src="ranked-benchmarks.js?v=20261107-openings"></script>
-  <script defer src="app.js?v=20261112-notes"></script>
+  <script defer src="app.js?v=20261112-featured"></script>
 </head>
 <body>
   <main id="overview">
     <header class="topbar"><h1>AoE2 리플 분석</h1><div class="toolbar"><button class="subtle" id="refresh">새로고침</button><button class="subtle" id="open-settings">계정</button><a id="source-link" href="https://github.com/ssapo/aoe2" target="_blank" rel="noopener noreferrer">GitHub</a></div></header>
-    <section class="player-search" aria-labelledby="player-search-title"><div class="section-heading"><h2 id="player-search-title">유저 찾기</h2><div class="profile-shortcuts"><button data-profile-id="26260702" data-profile-name="ssapo">내 기록</button><button data-profile-id="199325" data-profile-name="Hera">Hera</button></div></div><form id="player-search-form"><input id="player-query" type="search" placeholder="닉네임 또는 게임 프로필 ID" aria-label="닉네임 또는 게임 프로필 ID" maxlength="80" required><button type="submit" id="player-search-submit">검색</button></form><section class="connection" id="connection" aria-live="polite"></section><p id="player-search-status" class="compact-note" role="status"></p><div id="player-results"></div><p id="profile-view-note" class="compact-note"></p></section>
+    <section class="player-search" aria-labelledby="player-search-title"><div class="section-heading"><h2 id="player-search-title">유저 찾기</h2><div class="profile-shortcuts"><button data-profile-id="26260702" data-profile-name="ssapo">내 기록</button></div></div><form id="player-search-form"><input id="player-query" type="search" placeholder="닉네임 또는 게임 프로필 ID" aria-label="닉네임 또는 게임 프로필 ID" maxlength="80" required><button type="submit" id="player-search-submit">검색</button></form><section class="connection" id="connection" aria-live="polite"></section><p id="player-search-status" class="compact-note" role="status"></p><div id="player-results"></div><p id="profile-view-note" class="compact-note"></p></section>
     <section id="collection-feedback" class="collection-feedback" aria-live="polite" hidden><div><strong id="collection-title"></strong><p id="collection-hint"></p></div><button id="collection-dismiss" aria-label="수집 결과 자동 확인 닫기">닫기</button></section>
     <div class="section-heading"><h2><span id="player-name"></span> 요약</h2><span id="updated">연결 대기</span></div>
     <section class="stats" aria-label="경기 통계"><article><span>저장된 경기</span><strong id="stat-games">—</strong><small>저장된 경기 기준</small></article><article><span>승률</span><strong id="stat-win">—</strong><small id="stat-record">결과 확인 경기 기준</small></article><article><span>최근 레이팅</span><strong id="stat-rating">—</strong><small id="stat-delta">—</small></article><article><span>분석 완료</span><strong id="stat-analysis">—</strong><small>리플 분석</small></article></section>

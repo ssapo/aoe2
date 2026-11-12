@@ -20,7 +20,9 @@
   }
   let toastTimer;
   let selectedProfile=window.SSAPOPlayers.profileId(new URL(location.href).searchParams.get('profile'))||26260702;
-  let selectedName=selectedProfile===26260702?'ssapo':selectedProfile===199325?'Hera':`프로필 ${selectedProfile}`;
+  let featured=[{id:199325,name:'Hera'},{id:506898,name:'Liereyy'}];
+  const knownName=id=>id===26260702?'ssapo':(featured.find(f=>f.id===id)||{}).name||`프로필 ${id}`;
+  let selectedName=knownName(selectedProfile);
   let catalog=null,searchSequence=0,collectBusy=false,collectionRequestSerial=0;
   const liveReports=new Map();
   const Stored=window.SSAPOReportStore,reportStore=Stored.createStore();
@@ -521,13 +523,25 @@
     id=window.SSAPOPlayers.profileId(id);if(!id)return;
     collectionWatch.stop();directCollection.stop();collectionRequestSerial++;collectBusy=false;$('#collection-feedback').hidden=true;
     $('#match-dialog').close();document.body.classList.remove('review-open');
-    selectedProfile=id;selectedName=name||(id===26260702?'ssapo':id===199325?'Hera':`프로필 ${id}`);
+    selectedProfile=id;selectedName=name||knownName(id);
     report={profile:{id,name:selectedName},matches:[]};filter='all';visible=12;syncFilter();
     if(writeUrl){const u=new URL(location.href);if(id===26260702)u.searchParams.delete('profile');else u.searchParams.set('profile',String(id));history.pushState({},'',u);}
     $('#profile-view-note').textContent=id===26260702?'':'비교표의 ‘나’는 선택한 유저예요.';
     render();await load();
   }
-  document.querySelectorAll('[data-profile-id]').forEach(b=>b.addEventListener('click',()=>selectProfile(b.dataset.profileId,b.dataset.profileName)));
+  const shortcuts=document.querySelector('.profile-shortcuts');
+  shortcuts.addEventListener('click',e=>{const b=e.target.closest('[data-profile-id]');if(b)selectProfile(b.dataset.profileId,b.dataset.profileName);});
+  function renderShortcuts(){
+    shortcuts.querySelectorAll('[data-featured]').forEach(b=>b.remove());
+    for(const f of featured){const b=document.createElement('button');b.dataset.featured='1';b.dataset.profileId=f.id;b.dataset.profileName=f.name;b.textContent=f.name;if(f.nickname&&f.nickname!==f.name)b.title=f.nickname;shortcuts.appendChild(b);}
+  }
+  renderShortcuts();
+  fetch(`data/featured.json?t=${Date.now()}`,{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{
+    const rows=(d&&Array.isArray(d.profiles)?d.profiles:[]).map(f=>({id:Number(f.id),name:String(f.name||'').slice(0,24),nickname:String(f.nickname||'')})).filter(f=>Number.isInteger(f.id)&&f.id>0&&f.id!==26260702&&f.name);
+    if(!rows.length)return;
+    featured=rows;renderShortcuts();
+    if(selectedName===`프로필 ${selectedProfile}`&&knownName(selectedProfile)!==selectedName){selectedName=knownName(selectedProfile);render();}
+  }).catch(()=>{});
   window.addEventListener('popstate',()=>selectProfile(window.SSAPOPlayers.profileId(new URL(location.href).searchParams.get('profile'))||26260702,null,false));
   $('#player-search-form').addEventListener('submit',async e=>{
     e.preventDefault();const seq=++searchSequence,q=$('#player-query').value.trim();if(!q)return;
@@ -542,9 +556,9 @@
       $('#player-search-status').textContent=found.length?`${found.length}명 표시 · RM 1v1 랭킹 명단 ${date(catalog.updated_at)} 갱신${catalog.complete?'':' · 일부 명단만 수집됨'}`:'일치하는 유저가 없어요. 비랭크·미등록 계정은 게임 서버 프로필 ID로 찾아주세요.';
     }catch(error){
       if(seq!==searchSequence)return;
-      const id=window.SSAPOPlayers.profileId(q)||(['hera','헤라'].includes(q.toLowerCase())?199325:null);
-      if(id){await selectProfile(id,id===199325?'Hera':null);$('#player-search-status').textContent='이름 명단을 불러오지 못해 프로필 ID로 이동했어요.';}
-      else $('#player-search-status').textContent='검색 명단을 불러오지 못했어요. Hera 바로가기나 숫자 프로필 ID를 이용해 주세요.';
+      const id=window.SSAPOPlayers.profileId(q)||(featured.find(f=>[f.name,f.nickname].some(n=>n&&n.toLowerCase()===q.toLowerCase()))||{}).id||(['hera','헤라'].includes(q.toLowerCase())?199325:null);
+      if(id){await selectProfile(id,null);$('#player-search-status').textContent='이름 명단을 불러오지 못해 프로필 ID로 이동했어요.';}
+      else $('#player-search-status').textContent='검색 명단을 불러오지 못했어요. 위 바로가기나 숫자 프로필 ID를 이용해 주세요.';
     }finally{if(seq===searchSequence)$('#player-search-submit').disabled=false;}
   });
   function collectionMessage(title,hint){
