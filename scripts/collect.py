@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MAX_DOWNLOAD = 64 * 1024 * 1024
 MAX_REPLAY = 256 * 1024 * 1024
 AGE_IDS = {101: '봉건', 102: '성주', 103: '왕정'}
-ANALYSIS_REVISION = 17
+ANALYSIS_REVISION = 18
 
 
 def now():

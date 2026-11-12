@@ -148,7 +148,7 @@ def foundations(kind, payload):
 
 
 def read_words(decoded):
-    """[(game_ms, {player: (stockpile sum, object count, id sum)})] in recording order."""
+    """[(game_ms, {player: (stockpile sum, object count, id sum, state sum)})] in recording order."""
     import io
     import struct
     from mgz import fast
@@ -169,7 +169,7 @@ def read_words(decoded):
         handle.seek(start + 12)                 # operation type, time increment, zero marker
         words = struct.unpack('<88I', handle.read(352))
         handle.seek(end)
-        players = {words[i + 8]: (words[i + 1], words[i + 6], words[i + 10])
+        players = {words[i + 8]: (words[i + 1], words[i + 6], words[i + 10], words[i + 3])
                    for i in range(0, 88, 11) if words[i + 1]}
         if players:
             rows.append((value[2].get('current_time', 0), players))

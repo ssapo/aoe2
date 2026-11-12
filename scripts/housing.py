@@ -13,8 +13,9 @@ The recording has no population value, so this replays each player's dark-age pr
   foundation (an ORDER whose point is the foundation's) puts a villager on it.
 
 Values come from the DE data file (train and research times, civilization bonuses that touch
-them). Not known from the recording: where a builder stands (estimated from its last ordered
-point at 0.8 tiles/s), villagers dying, the food at a queue order (estimated from the
+them). Where the checkpoints show in which interval a building was finished (foundations.py),
+the house's finish is its estimate moved into that interval. Not known from the recording:
+where a builder stands (estimated from its last ordered point at 0.8 tiles/s), villagers dying, the food at a queue order (estimated from the
 checkpoints' stockpile sums, split by what the villagers were sent to gather). The food
 estimate only makes the first guess of which queue orders were accepted: the units that the
 checkpoints show appearing (births.py) set it right, wherever they can be counted. Each block
@@ -26,6 +27,9 @@ import math
 import struct
 from bisect import bisect_left
 
+import births
+import foundations
+
 VILLAGER_SPEED = 0.8       # tiles per second
 REACH = 1.5                # a builder stops this far from the foundation's centre
 MIN_BLOCK = 10.0           # seconds; shorter blocks are within the estimate's error
@@ -36,6 +40,11 @@ TC_BUILD = 150.0
 TC_IDS = {109, 71, 141, 142}
 TC_FOUNDATIONS = {109, 621}
 HOUSE_IDS = {70}
+# Build times of the other dark-age buildings (seconds; the game's published values, used only
+# to tell which building a finish seen in the checkpoints belongs to).
+BUILD_TIME = {562: 35.0, 68: 35.0, 584: 35.0, 50: 15.0, 12: 50.0, 45: 35.0, 598: 15.0, 72: 6.0, 1734: 35.0}
+GATE_BUILD = 30.0
+OTHER_BUILD = 35.0
 LOOM, FEUDAL = 22, 101
 TRAIN = {83: 25.0, 293: 25.0, 74: 21.0, 13: 40.0, 545: 45.0}  # dark-age units
 RESEARCH = {LOOM: 25.0, FEUDAL: 130.0}
@@ -130,9 +139,10 @@ def _point(payload):
 class Builders:
     """Houses (and Town Centers) under construction, advanced in time with the orders."""
 
-    def __init__(self, where, home):
+    def __init__(self, where, home, spans=None):
         self.where, self.home, self.rally = where, home, None
-        self.sites = []                       # {point, build, pop, progress, done, crew{b: arrive}}
+        self.sites = []                       # {point, build, tc, house, at, progress, done, crew{b: arrive}}
+        self.spans = spans or {}              # site index: (after, by) its finish is known to lie in
         self.on, self.queue, self.pending = {}, {}, set()
         self.now = 0.0
 
@@ -159,12 +169,18 @@ class Builders:
         while True:
             best = None
             for k, s in enumerate(self.sites):
-                if s['done'] is not None or not s['crew']:
+                if s['done'] is not None:
                     continue
+                after, by = self.spans.get(k, (0.0, math.inf))
                 here = [a for a in s['crew'].values() if a <= self.now]
+                finish = None
                 if here:
                     rate = (len(here) + 2) / (3 * s['build'])
-                    finish = self.now + (1 - s['progress']) / rate
+                    finish = self.now + max(0.0, 1 - s['progress']) / rate
+                elif by < math.inf:           # finished in the span, whoever built it
+                    finish = by if s['crew'] else (max(after, s['at']) + by) / 2
+                if finish is not None:
+                    finish = max(self.now, min(max(finish, after), by))
                     if best is None or finish < best[0]:
                         best = (finish, 'done', k)
                 later = [a for a in s['crew'].values() if a > self.now]
@@ -198,11 +214,11 @@ class Builders:
         building = payload.get('building_id')
         queued, direct = 'q' in flags, 'd' in flags
         k = None
-        if kind == 'BUILD' and point is not None and (building in HOUSE_IDS or building in TC_FOUNDATIONS):
-            tc = building in TC_FOUNDATIONS
-            self.sites.append({'point': point, 'build': TC_BUILD if tc else HOUSE_BUILD, 'tc': tc,
-                               'progress': 0.0, 'done': None, 'crew': {}})
-            k = len(self.sites) - 1
+        if kind == 'BUILD' and point is not None:
+            k = self._site(at, point, building)
+        elif kind == 'WALL' and point is not None:
+            k = self._site(at, point, payload.get('building_id'), 72)
+            queued = True                     # its queued flag is not read: taken as behind the work in hand
         elif kind == 'ORDER' and point is not None:
             k = next((i for i, s in enumerate(self.sites) if math.dist(s['point'], point) < 0.01), None)
         for b in ids:
@@ -226,8 +242,17 @@ class Builders:
             if point is not None:
                 self.where[b] = point
 
+    def _site(self, at, point, building, like=None):
+        tc, house = building in TC_FOUNDATIONS, building in HOUSE_IDS
+        build = TC_BUILD if tc else HOUSE_BUILD if house else GATE_BUILD if building in births.GATES \
+            else BUILD_TIME.get(building, BUILD_TIME.get(like, OTHER_BUILD))
+        self.sites.append({'point': point, 'build': build, 'tc': tc, 'house': house, 'at': at,
+                           'progress': 0.0, 'done': None, 'crew': {}})
+        return len(self.sites) - 1
+
     def caps(self, tc_pop, house_pop):
-        return [(s['done'], tc_pop if s['tc'] else house_pop) for s in self.sites if s['done'] is not None]
+        return [(s['done'], tc_pop if s['tc'] else house_pop) for s in self.sites
+                if s['done'] is not None and (s['tc'] or s['house'])]
 
 
 FOOD_NAMES = {'Forage Bush', 'Fruit Bush', 'Berry Bush', 'Deer', 'Wild Boar', 'Iron Boar', 'Javelina',
@@ -526,13 +551,16 @@ class Production:
                 self.blocks.append((s['wait_from'], until))
 
 
-def player_housing(orders, player, civ, until, checkpoints=(), objects=None, counted=None):
+def player_housing(orders, player, civ, until, checkpoints=(), objects=None, counted=None, lists=None):
     """Housed intervals of one player before `until` (Feudal click), plus the pop timeline.
 
     `checkpoints` [(seconds, stockpile sum)] let the queue orders be checked against the food
     they need; `objects` {id: (name, x, y)} name what a villager was sent to. `counted`
     [(from_seconds, to_seconds, fewest, most)] are the units the checkpoints show appearing
-    (births.counted); a queue order the food estimate got wrong is then set right by them."""
+    (births.counted); a queue order the food estimate got wrong is then set right by them.
+    `lists` [(seconds, object count, state sum)] are the player's checkpoints from the start of
+    the game: the buildings they show finished (foundations.py) set the houses' finish times,
+    each to its estimate moved into the checkpoint interval it was seen in."""
     if civ in NO_HOUSES:
         return None
     own = [o for o in orders if o[1] == player.number]
@@ -544,19 +572,42 @@ def player_housing(orders, player, civ, until, checkpoints=(), objects=None, cou
     if not tcs or pop > tc_pop * len(tcs):
         return None       # a start without a Town Center (Steppe, nomad): its population cap is not known
     where = {o.instance_id: (o.position.x, o.position.y) for o in player.objects if o.class_id == 70}
-    builders, last = Builders(where, home), []
     tc_ids = {o.instance_id for o in tcs}
-    for at, _, kind, payload, flags in own:
-        if at >= until:
-            break
-        if kind == 'GATHER_POINT' and set(payload.get('object_ids') or []) & tc_ids:
-            builders.rally = _point(payload)
-        if kind not in COMMANDS:
-            continue
-        ids = payload.get('object_ids') or last     # a repeated selection is sent as "the last commanded"
-        last = ids
-        builders.order(at, kind, ids, payload, flags)
-    builders.advance(until)
+
+    def built(spans):
+        builders, last = Builders(dict(where), home, spans), []
+        for at, _, kind, payload, flags in own:
+            if at >= until:
+                break
+            if kind == 'GATHER_POINT' and set(payload.get('object_ids') or []) & tc_ids:
+                builders.rally = _point(payload)
+            if kind not in COMMANDS and not (kind == 'WALL' and births.foundations(kind, payload) == (1, 1)):
+                continue                                # a wall line is left out, as its builders' way along it is
+            ids = payload.get('object_ids') or last     # a repeated selection is sent as "the last commanded"
+            last = ids
+            builders.order(at, kind, ids, payload, flags)
+        builders.advance(until)
+        return builders
+
+    builders, houses = built(None), None
+    if lists:
+        laid = [(at,) + births.foundations(kind, payload) for at, _, kind, payload, _ in own
+                if kind in ('BUILD', 'WALL')]
+        # Past the first wall line the finishes are mostly wall tiles, and which one is a house
+        # cannot be told: the houses keep their estimates from there.
+        line = min((at for at, fewest, most in laid if (fewest, most) != (1, 1)), default=math.inf)
+        found, known_until = foundations.finished([row for row in lists if row[0] <= line], laid)
+        sites = [(s['at'], s['done']) for s in builders.sites]
+        spans = foundations.assign(sites, found, known_until)
+        if counted and not any(s['tc'] for s in builders.sites):
+            spans = foundations.narrow(spans, sites, {k for k, s in enumerate(builders.sites) if s['house']},
+                                       _deadlines(counted, own, civ, pop, tc_pop * len(tcs), house_pop))
+        builders = built(spans)
+        done = [(s['done'], spans.get(k, (0, math.inf))[1] < math.inf) for k, s in enumerate(builders.sites)
+                if s['house'] and s['done'] is not None]
+        houses = {'source': 'recording_checkpoints', 'counted': sum(1 for _, seen in done if seen),
+                  'counted_until_seconds': round(min(known_until, until), 1),
+                  'estimated': [round(t, 1) for t, seen in done if not seen]}
     caps = sorted([(0.0, tc_pop * len(tcs))] + builders.caps(tc_pop, house_pop))
 
     run = lambda forced: _replay(own, player, civ, until, caps, tcs, home, checkpoints, objects, pop, forced)
@@ -577,7 +628,7 @@ def player_housing(orders, player, civ, until, checkpoints=(), objects=None, cou
     tenth = lambda v: math.floor(v * 10) / 10      # never past the Feudal click it stops at
     shown = [{'from_seconds': tenth(a), 'to_seconds': tenth(b), 'seconds': round(b - a, 1),
               'population': _pop_at(timeline, a)} for a, b in merged if b - a >= MIN_BLOCK]
-    births = None
+    born = None
     if loose is not None:
         # where the checkpoints do not show the births, the population is the replay's estimate
         for block in shown:
@@ -589,11 +640,27 @@ def player_housing(orders, player, civ, until, checkpoints=(), objects=None, cou
             else:
                 spans.append([a, b])
         start = counted[0][0]
-        births = {'source': 'recording_checkpoints', 'corrected_queue': len(forced),
+        born = {'source': 'recording_checkpoints', 'corrected_queue': len(forced),
                   'counted_seconds': round(max(0.0, until - start - sum(b - a for a, b in spans)), 1),
                   'estimated': [[round(a, 1), round(b, 1)] for a, b in spans]}
-    return {'until_seconds': round(until, 1), 'blocks': shown, 'refused_queue': refused, 'births': births,
+    return {'until_seconds': round(until, 1), 'blocks': shown, 'refused_queue': refused, 'births': born,
+            'houses': houses,
             'blocked_seconds': round(sum(x['seconds'] for x in shown), 1), 'timeline': timeline}
+
+
+def _deadlines(counted, own, civ, pop, cap, house_pop):
+    """[seconds]: when the first, second, ... house must stand at the latest. The unit that
+    takes the population past the cap of that time was born in a counted interval, so its
+    training began, with room for it, a training time before the interval's end."""
+    train = min([TRAIN[o[3]['unit_id']] for o in own if o[2] == 'DE_QUEUE' and o[3].get('unit_id') in TRAIN]
+                or [min(TRAIN.values())]) / TC_WORK.get(civ, 1.0)
+    out = []
+    for _, end, fewest, _ in counted:
+        pop += fewest or 0
+        while pop > cap:
+            out.append(end - train)
+            cap += house_pop
+    return out
 
 
 TOLERANCE = 2.5            # seconds a replayed birth may lie from the checkpoint that shows it
@@ -798,10 +865,9 @@ def housing(decoded, match, own):
     offset = match.restored_at.total_seconds()
     orders = read_orders(decoded, offset)
     end = (match.duration + match.restored_at).total_seconds()
-    import births
     checkpoints = births.read_words(decoded)
     clicks = [feudal_click(orders, p.number) for p in match.players]
-    counted = births.counted(match, [(ms, {n: w[1:] for n, w in row.items()}) for ms, row in checkpoints],
+    counted = births.counted(match, [(ms, {n: w[1:3] for n, w in row.items()}) for ms, row in checkpoints],
                              orders, offset, LIVESTOCK, None if None in clicks else max(clicks))
     objects = {o.instance_id: (o.name, o.position.x, o.position.y)
                for o in list(match.gaia) + [o for p in match.players for o in p.objects]}
@@ -809,8 +875,11 @@ def housing(decoded, match, own):
     for key, p in (('own', own), ('opponent', opponents[0])):
         click = feudal_click(orders, p.number)
         cps = [(ms / 1000 + offset, row[p.number][0]) for ms, row in checkpoints if p.number in row]
+        # a restored game does not start with empty building sites: no finishes read there
+        lists = None if offset else [(ms / 1000, row[p.number][1], row[p.number][3])
+                                     for ms, row in checkpoints if p.number in row]
         row = player_housing(orders, p, p.civilization, click if click is not None else end, cps, objects,
-                             counted.get(p.number))
+                             counted.get(p.number), lists)
         if row is not None:
             row.pop('timeline')
             row['feudal_clicked'] = click is not None
