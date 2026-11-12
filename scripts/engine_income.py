@@ -23,6 +23,7 @@ from pathlib import Path
 STEP = 10                 # seconds between stored points
 MIN_VERIFIED = 300        # a shorter verified span is not shown
 TIMEOUT = 600
+UPDATES = '90000'         # about 20 game minutes: longer than any span verified so far
 ORDER = (0, 1, 3, 2)      # engine: food, wood, stone, gold -> stored: food, wood, gold, stone
 _CP = re.compile(r'CPWORDS syncs=\d+ world_ms=(\d+) player=(\d+) rec=\[(.*?)\] eng=\[(.*?)\]')
 
@@ -116,7 +117,7 @@ def run_engine(recording):
         rec.write_bytes(recording)
         try:
             with err.open('wb') as sink:
-                subprocess.run([binary, str(rec), data, '2000000'], env=env, stdout=subprocess.DEVNULL,
+                subprocess.run([binary, str(rec), data, UPDATES], env=env, stdout=subprocess.DEVNULL,
                                stderr=sink, timeout=TIMEOUT, check=False)
         except (OSError, subprocess.TimeoutExpired):
             return None

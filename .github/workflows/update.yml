@@ -60,13 +60,8 @@ jobs:
       - uses: actions/cache@v4
         if: steps.engine_source.outcome == 'success'
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            ${{ runner.temp }}/genie/target
-          key: genie-91d81be4-${{ env.ENGINE_PATCH_SHA }}
-          restore-keys: |
-            genie-91d81be4-
+          path: ${{ runner.temp }}/engine-bin
+          key: genie-bin-91d81be4-${{ env.ENGINE_PATCH_SHA }}
       - name: Build engine and fetch private game data
         if: steps.engine_source.outcome == 'success'
         continue-on-error: true
@@ -74,12 +69,16 @@ jobs:
           AOE2_DATA_TOKEN: ${{ secrets.AOE2_DATA_TOKEN }}
         run: |
           if [ -z "$AOE2_DATA_TOKEN" ]; then echo "AOE2_DATA_TOKEN is not set: engine results are skipped"; exit 1; fi
-          rustup toolchain install stable --profile minimal
-          rustup default stable
-          (cd "$RUNNER_TEMP/genie" && cargo build --release -p genie-oracle --example census)
+          if [ ! -x "$RUNNER_TEMP/engine-bin/census" ]; then
+            rustup toolchain install stable --profile minimal
+            rustup default stable
+            (cd "$RUNNER_TEMP/genie" && cargo build --release -p genie-oracle --example census)
+            mkdir -p "$RUNNER_TEMP/engine-bin"
+            cp "$RUNNER_TEMP/genie/target/release/examples/census" "$RUNNER_TEMP/engine-bin/census"
+          fi
           git clone --quiet --depth 1 "https://x-access-token:${AOE2_DATA_TOKEN}@github.com/ssapo/aoe2-data.git" "$RUNNER_TEMP/aoe2-data"
           echo "d0aefd92428e2215d6f4d9b1d544901e6f171e19183f9e0b88218de5153a337f  $RUNNER_TEMP/aoe2-data/188329/empires2_x2_p1.dat" | sha256sum --check --quiet
-          echo "AOE2_ENGINE_BIN=$RUNNER_TEMP/genie/target/release/examples/census" >> "$GITHUB_ENV"
+          echo "AOE2_ENGINE_BIN=$RUNNER_TEMP/engine-bin/census" >> "$GITHUB_ENV"
           echo "AOE2_ENGINE_DATA=$RUNNER_TEMP/aoe2-data/188329/empires2_x2_p1.dat" >> "$GITHUB_ENV"
       - name: Collect public matches
         id: collect
