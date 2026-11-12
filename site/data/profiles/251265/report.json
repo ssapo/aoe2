@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-12T09:22:23.377888+00:00",
-  "last_checked_at": "2026-11-12T09:21:48.175314+00:00",
+  "updated_at": "2026-11-12T20:07:29.505553+00:00",
+  "last_checked_at": "2026-11-12T20:06:45.657453+00:00",
   "sync_error": null,
   "profile": {
     "id": 251265,
@@ -37,7 +37,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 15,
+        "analysis_revision": 17,
         "duration_game_seconds": 2183.39,
         "civilization": "Persians",
         "random_civ": true,
@@ -47758,6 +47758,25 @@
             "until_seconds": 357.9,
             "blocks": [],
             "refused_queue": 2,
+            "births": {
+              "source": "recording_checkpoints",
+              "corrected_queue": 2,
+              "counted_seconds": 331.9,
+              "estimated": [
+                [
+                  173.5,
+                  186.5
+                ],
+                [
+                  284.0,
+                  290.5
+                ],
+                [
+                  310.0,
+                  316.5
+                ]
+              ]
+            },
             "blocked_seconds": 0,
             "feudal_clicked": true
           },
@@ -47765,18 +47784,63 @@
             "until_seconds": 505.4,
             "blocks": [
               {
-                "from_seconds": 344.3,
+                "from_seconds": 275.7,
                 "to_seconds": 505.3,
-                "seconds": 161.1,
-                "population": "15/15"
+                "seconds": 229.6,
+                "population": "15/15",
+                "counted": false
               }
             ],
-            "refused_queue": 5,
-            "blocked_seconds": 161.1,
+            "refused_queue": 3,
+            "births": {
+              "source": "recording_checkpoints",
+              "corrected_queue": 2,
+              "counted_seconds": 433.9,
+              "estimated": [
+                [
+                  297.0,
+                  303.5
+                ],
+                [
+                  323.0,
+                  329.5
+                ],
+                [
+                  349.0,
+                  355.5
+                ],
+                [
+                  362.0,
+                  368.5
+                ],
+                [
+                  375.0,
+                  381.5
+                ],
+                [
+                  394.5,
+                  407.5
+                ],
+                [
+                  420.5,
+                  427.0
+                ],
+                [
+                  446.5,
+                  459.5
+                ],
+                [
+                  472.5,
+                  479.0
+                ]
+              ]
+            },
+            "blocked_seconds": 229.6,
             "feudal_clicked": true
           }
         },
         "engine_income": null,
+        "game_build": 188329,
         "insights": [
           {
             "kind": "strength",
@@ -107737,8 +107801,7 @@
         }
       },
       "attempts": 1,
-      "source_url": "https://www.aoe2insights.com/match/520508900/",
-      "analysis_note": "명령 기록 분석 완료"
+      "source_url": "https://www.aoe2insights.com/match/520508900/"
     },
     {
       "id": 520501827,

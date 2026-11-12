@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-12T19:29:40.978529+00:00",
-  "last_checked_at": "2026-11-12T19:27:20.783412+00:00",
+  "updated_at": "2026-11-12T20:03:56.081441+00:00",
+  "last_checked_at": "2026-11-12T19:59:30.917192+00:00",
   "sync_error": null,
   "profile": {
     "id": 26260702,
@@ -173663,7 +173663,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 15,
+        "analysis_revision": 17,
         "duration_game_seconds": 1808.14,
         "civilization": "Franks",
         "random_civ": false,
@@ -212611,26 +212611,601 @@
           "own": {
             "until_seconds": 442.9,
             "blocks": [],
-            "refused_queue": 4,
+            "refused_queue": 3,
+            "births": {
+              "source": "recording_checkpoints",
+              "corrected_queue": 1,
+              "counted_seconds": 442.9,
+              "estimated": []
+            },
             "blocked_seconds": 0,
             "feudal_clicked": true
           },
           "opponent": {
             "until_seconds": 465.5,
-            "blocks": [
-              {
-                "from_seconds": 300.7,
-                "to_seconds": 334.0,
-                "seconds": 33.3,
-                "population": "15/15"
-              }
-            ],
-            "refused_queue": 4,
-            "blocked_seconds": 33.3,
+            "blocks": [],
+            "refused_queue": 5,
+            "births": {
+              "source": "recording_checkpoints",
+              "corrected_queue": 1,
+              "counted_seconds": 418.4,
+              "estimated": [
+                [
+                  203.9,
+                  216.9
+                ],
+                [
+                  229.9,
+                  242.9
+                ],
+                [
+                  444.4,
+                  465.5
+                ]
+              ]
+            },
+            "blocked_seconds": 0,
             "feudal_clicked": true
           }
         },
-        "engine_income": null,
+        "engine_income": {
+          "source": "engine_resimulation",
+          "columns": [
+            "seconds",
+            "own_food",
+            "own_wood",
+            "own_gold",
+            "own_stone",
+            "opponent_food",
+            "opponent_wood",
+            "opponent_gold",
+            "opponent_stone"
+          ],
+          "points": [
+            [
+              0.0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              10.0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              20.0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              30.0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              40.0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              50.0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              60.0,
+              0,
+              0,
+              0,
+              0,
+              11,
+              0,
+              0,
+              0
+            ],
+            [
+              70.0,
+              40,
+              0,
+              0,
+              0,
+              32,
+              0,
+              0,
+              0
+            ],
+            [
+              80.0,
+              40,
+              0,
+              0,
+              0,
+              42,
+              0,
+              0,
+              0
+            ],
+            [
+              90.0,
+              87,
+              0,
+              0,
+              0,
+              90,
+              0,
+              0,
+              0
+            ],
+            [
+              100.0,
+              87,
+              0,
+              0,
+              0,
+              90,
+              0,
+              0,
+              0
+            ],
+            [
+              110.0,
+              87,
+              0,
+              0,
+              0,
+              90,
+              0,
+              0,
+              0
+            ],
+            [
+              120.0,
+              97,
+              0,
+              0,
+              0,
+              121,
+              0,
+              0,
+              0
+            ],
+            [
+              130.0,
+              147,
+              0,
+              0,
+              0,
+              153,
+              0,
+              0,
+              0
+            ],
+            [
+              140.0,
+              176,
+              0,
+              0,
+              0,
+              184,
+              0,
+              0,
+              0
+            ],
+            [
+              150.0,
+              176,
+              0,
+              0,
+              0,
+              188,
+              0,
+              0,
+              0
+            ],
+            [
+              160.0,
+              176,
+              0,
+              0,
+              0,
+              188,
+              0,
+              0,
+              0
+            ],
+            [
+              170.0,
+              229,
+              0,
+              0,
+              0,
+              230,
+              0,
+              0,
+              0
+            ],
+            [
+              180.0,
+              229,
+              10,
+              0,
+              0,
+              241,
+              0,
+              0,
+              0
+            ],
+            [
+              190.0,
+              266,
+              10,
+              0,
+              0,
+              276,
+              20,
+              0,
+              0
+            ],
+            [
+              200.0,
+              266,
+              20,
+              0,
+              0,
+              276,
+              20,
+              0,
+              0
+            ],
+            [
+              210.0,
+              266,
+              30,
+              0,
+              0,
+              276,
+              30,
+              0,
+              0
+            ],
+            [
+              220.0,
+              316,
+              30,
+              0,
+              0,
+              276,
+              50,
+              0,
+              0
+            ],
+            [
+              230.0,
+              325,
+              50,
+              0,
+              0,
+              276,
+              60,
+              0,
+              0
+            ],
+            [
+              240.0,
+              363,
+              50,
+              0,
+              0,
+              276,
+              60,
+              0,
+              0
+            ],
+            [
+              250.0,
+              363,
+              60,
+              0,
+              0,
+              276,
+              80,
+              0,
+              0
+            ],
+            [
+              260.0,
+              363,
+              70,
+              0,
+              0,
+              282,
+              100,
+              0,
+              0
+            ],
+            [
+              270.0,
+              363,
+              70,
+              0,
+              0,
+              282,
+              100,
+              0,
+              0
+            ],
+            [
+              280.0,
+              448,
+              80,
+              0,
+              0,
+              511,
+              100,
+              0,
+              0
+            ],
+            [
+              290.0,
+              518,
+              90,
+              0,
+              0,
+              511,
+              130,
+              0,
+              0
+            ],
+            [
+              300.0,
+              559,
+              110,
+              0,
+              0,
+              511,
+              130,
+              0,
+              0
+            ],
+            [
+              310.0,
+              559,
+              120,
+              0,
+              0,
+              511,
+              130,
+              0,
+              0
+            ],
+            [
+              320.0,
+              559,
+              130,
+              0,
+              0,
+              560,
+              160,
+              0,
+              0
+            ],
+            [
+              330.0,
+              634,
+              150,
+              0,
+              0,
+              560,
+              160,
+              0,
+              0
+            ],
+            [
+              340.0,
+              647,
+              160,
+              0,
+              0,
+              710,
+              170,
+              0,
+              0
+            ],
+            [
+              350.0,
+              647,
+              190,
+              0,
+              0,
+              710,
+              190,
+              0,
+              0
+            ],
+            [
+              360.0,
+              681,
+              190,
+              0,
+              0,
+              710,
+              190,
+              0,
+              0
+            ],
+            [
+              370.0,
+              681,
+              200,
+              0,
+              0,
+              783,
+              200,
+              0,
+              0
+            ],
+            [
+              380.0,
+              811,
+              230,
+              0,
+              0,
+              930,
+              220,
+              0,
+              0
+            ],
+            [
+              390.0,
+              870,
+              232,
+              0,
+              0,
+              1159,
+              230,
+              0,
+              0
+            ],
+            [
+              400.0,
+              930,
+              262,
+              0,
+              0,
+              1159,
+              250,
+              0,
+              0
+            ],
+            [
+              410.0,
+              940,
+              262,
+              0,
+              0,
+              1209,
+              250,
+              0,
+              0
+            ],
+            [
+              420.0,
+              960,
+              272,
+              0,
+              0,
+              1308,
+              250,
+              0,
+              0
+            ],
+            [
+              430.0,
+              1192,
+              292,
+              0,
+              0,
+              1308,
+              280,
+              0,
+              0
+            ],
+            [
+              440.0,
+              1206,
+              292,
+              0,
+              0,
+              1308,
+              280,
+              0,
+              0
+            ],
+            [
+              450.0,
+              1225,
+              302,
+              0,
+              0,
+              1360,
+              300,
+              0,
+              0
+            ],
+            [
+              460.0,
+              1225,
+              332,
+              0,
+              0,
+              1405,
+              300,
+              0,
+              0
+            ],
+            [
+              470.0,
+              1370,
+              332,
+              0,
+              0,
+              1436,
+              300,
+              0,
+              0
+            ]
+          ],
+          "verified_until_seconds": 476.9,
+          "own_total": [
+            1380,
+            342,
+            0,
+            0
+          ],
+          "opponent_total": [
+            1436,
+            310,
+            0,
+            0
+          ]
+        },
+        "game_build": 188329,
         "insights": [
           {
             "kind": "strength",
@@ -213093,7 +213668,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 15,
+        "analysis_revision": 17,
         "duration_game_seconds": 1978.96,
         "civilization": "Franks",
         "random_civ": false,
@@ -247509,14 +248084,108 @@
           "own": {
             "until_seconds": 483.3,
             "blocks": [],
-            "refused_queue": 11,
+            "refused_queue": 9,
+            "births": {
+              "source": "recording_checkpoints",
+              "corrected_queue": 3,
+              "counted_seconds": 370.5,
+              "estimated": [
+                [
+                  0.0,
+                  8.9
+                ],
+                [
+                  28.4,
+                  34.9
+                ],
+                [
+                  47.9,
+                  54.4
+                ],
+                [
+                  93.4,
+                  99.9
+                ],
+                [
+                  125.9,
+                  132.4
+                ],
+                [
+                  171.4,
+                  177.9
+                ],
+                [
+                  197.4,
+                  203.9
+                ],
+                [
+                  223.4,
+                  229.9
+                ],
+                [
+                  242.9,
+                  255.9
+                ],
+                [
+                  275.4,
+                  281.9
+                ],
+                [
+                  327.4,
+                  333.9
+                ],
+                [
+                  392.4,
+                  398.9
+                ],
+                [
+                  431.4,
+                  444.4
+                ],
+                [
+                  470.4,
+                  483.3
+                ]
+              ]
+            },
             "blocked_seconds": 0,
             "feudal_clicked": true
           },
           "opponent": {
             "until_seconds": 411.6,
             "blocks": [],
-            "refused_queue": 4,
+            "refused_queue": 2,
+            "births": {
+              "source": "recording_checkpoints",
+              "corrected_queue": 3,
+              "counted_seconds": 372.6,
+              "estimated": [
+                [
+                  15.4,
+                  21.9
+                ],
+                [
+                  28.4,
+                  34.9
+                ],
+                [
+                  73.9,
+                  80.4
+                ],
+                [
+                  93.4,
+                  99.9
+                ],
+                [
+                  177.9,
+                  184.4
+                ],
+                [
+                  346.9,
+                  353.4
+                ]
+              ]
+            },
             "blocked_seconds": 0,
             "feudal_clicked": true
           }
@@ -247891,6 +248560,7 @@
             0
           ]
         },
+        "game_build": 188329,
         "insights": [
           {
             "kind": "review",
@@ -248381,7 +249051,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 15,
+        "analysis_revision": 17,
         "duration_game_seconds": 1858.0,
         "civilization": "Franks",
         "random_civ": false,
@@ -293895,17 +294565,35 @@
                 "from_seconds": 282.6,
                 "to_seconds": 306.4,
                 "seconds": 23.7,
-                "population": "15/15"
+                "population": "15/15",
+                "counted": true
               }
             ],
             "refused_queue": 2,
+            "births": {
+              "source": "recording_checkpoints",
+              "corrected_queue": 0,
+              "counted_seconds": 435.0,
+              "estimated": []
+            },
             "blocked_seconds": 23.7,
             "feudal_clicked": true
           },
           "opponent": {
             "until_seconds": 431.1,
             "blocks": [],
-            "refused_queue": 4,
+            "refused_queue": 3,
+            "births": {
+              "source": "recording_checkpoints",
+              "corrected_queue": 2,
+              "counted_seconds": 418.1,
+              "estimated": [
+                [
+                  203.9,
+                  216.9
+                ]
+              ]
+            },
             "blocked_seconds": 0,
             "feudal_clicked": true
           }
@@ -294346,6 +295034,7 @@
             0
           ]
         },
+        "game_build": 188329,
         "insights": [
           {
             "kind": "review",
@@ -294793,7 +295482,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 15,
+        "analysis_revision": 17,
         "duration_game_seconds": 2801.2,
         "civilization": "Vikings",
         "random_civ": false,
@@ -345780,15 +346469,44 @@
           "min_block_seconds": 10.0,
           "own": {
             "until_seconds": 481.9,
-            "blocks": [],
-            "refused_queue": 2,
-            "blocked_seconds": 0,
+            "blocks": [
+              {
+                "from_seconds": 275.9,
+                "to_seconds": 320.3,
+                "seconds": 44.5,
+                "population": "15/15",
+                "counted": true
+              }
+            ],
+            "refused_queue": 0,
+            "births": {
+              "source": "recording_checkpoints",
+              "corrected_queue": 2,
+              "counted_seconds": 462.4,
+              "estimated": [
+                [
+                  203.9,
+                  216.9
+                ],
+                [
+                  366.4,
+                  372.9
+                ]
+              ]
+            },
+            "blocked_seconds": 44.5,
             "feudal_clicked": true
           },
           "opponent": {
             "until_seconds": 440.7,
             "blocks": [],
-            "refused_queue": 4,
+            "refused_queue": 2,
+            "births": {
+              "source": "recording_checkpoints",
+              "corrected_queue": 2,
+              "counted_seconds": 440.7,
+              "estimated": []
+            },
             "blocked_seconds": 0,
             "feudal_clicked": true
           }
@@ -346372,6 +347090,7 @@
             0
           ]
         },
+        "game_build": 188329,
         "insights": [
           {
             "kind": "review",
@@ -346904,7 +347623,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 15,
+        "analysis_revision": 17,
         "duration_game_seconds": 2497.19,
         "civilization": "Britons",
         "random_civ": false,
@@ -393581,7 +394300,454 @@
           "own": null,
           "opponent": null
         },
-        "engine_income": null,
+        "engine_income": {
+          "source": "engine_resimulation",
+          "columns": [
+            "seconds",
+            "own_food",
+            "own_wood",
+            "own_gold",
+            "own_stone",
+            "opponent_food",
+            "opponent_wood",
+            "opponent_gold",
+            "opponent_stone"
+          ],
+          "points": [
+            [
+              0.0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              10.0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              20.0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              30.0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              40.0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              50.0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              60.0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              70.0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              80.0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              90.0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              100.0,
+              40,
+              0,
+              0,
+              0,
+              63,
+              0,
+              0,
+              0
+            ],
+            [
+              110.0,
+              60,
+              0,
+              0,
+              0,
+              63,
+              0,
+              0,
+              0
+            ],
+            [
+              120.0,
+              90,
+              0,
+              0,
+              0,
+              63,
+              0,
+              0,
+              0
+            ],
+            [
+              130.0,
+              125,
+              0,
+              0,
+              0,
+              143,
+              0,
+              0,
+              0
+            ],
+            [
+              140.0,
+              146,
+              0,
+              0,
+              0,
+              143,
+              0,
+              0,
+              0
+            ],
+            [
+              150.0,
+              150,
+              0,
+              0,
+              0,
+              143,
+              0,
+              0,
+              0
+            ],
+            [
+              160.0,
+              210,
+              0,
+              0,
+              0,
+              196,
+              0,
+              0,
+              0
+            ],
+            [
+              170.0,
+              220,
+              0,
+              0,
+              0,
+              227,
+              0,
+              0,
+              0
+            ],
+            [
+              180.0,
+              240,
+              0,
+              0,
+              0,
+              227,
+              0,
+              0,
+              0
+            ],
+            [
+              190.0,
+              318,
+              0,
+              0,
+              0,
+              289,
+              0,
+              0,
+              0
+            ],
+            [
+              200.0,
+              319,
+              0,
+              0,
+              0,
+              289,
+              0,
+              0,
+              0
+            ],
+            [
+              210.0,
+              329,
+              0,
+              0,
+              0,
+              289,
+              0,
+              0,
+              0
+            ],
+            [
+              220.0,
+              399,
+              0,
+              0,
+              0,
+              373,
+              0,
+              0,
+              0
+            ],
+            [
+              230.0,
+              399,
+              0,
+              0,
+              0,
+              373,
+              0,
+              0,
+              0
+            ],
+            [
+              240.0,
+              429,
+              10,
+              0,
+              0,
+              433,
+              20,
+              0,
+              0
+            ],
+            [
+              250.0,
+              481,
+              20,
+              0,
+              0,
+              450,
+              20,
+              0,
+              0
+            ],
+            [
+              260.0,
+              493,
+              30,
+              0,
+              0,
+              450,
+              30,
+              0,
+              0
+            ],
+            [
+              270.0,
+              512,
+              40,
+              0,
+              0,
+              450,
+              50,
+              0,
+              0
+            ],
+            [
+              280.0,
+              533,
+              50,
+              0,
+              0,
+              450,
+              50,
+              0,
+              0
+            ],
+            [
+              290.0,
+              533,
+              60,
+              0,
+              0,
+              482,
+              80,
+              0,
+              0
+            ],
+            [
+              300.0,
+              533,
+              70,
+              0,
+              0,
+              496,
+              80,
+              0,
+              0
+            ],
+            [
+              310.0,
+              583,
+              90,
+              0,
+              0,
+              507,
+              100,
+              0,
+              0
+            ],
+            [
+              320.0,
+              583,
+              100,
+              0,
+              0,
+              538,
+              100,
+              0,
+              0
+            ],
+            [
+              330.0,
+              583,
+              110,
+              0,
+              0,
+              570,
+              100,
+              0,
+              0
+            ],
+            [
+              340.0,
+              613,
+              120,
+              0,
+              0,
+              648,
+              120,
+              0,
+              0
+            ],
+            [
+              350.0,
+              633,
+              130,
+              0,
+              0,
+              795,
+              130,
+              0,
+              0
+            ],
+            [
+              360.0,
+              643,
+              150,
+              0,
+              0,
+              816,
+              130,
+              0,
+              0
+            ],
+            [
+              370.0,
+              686,
+              160,
+              0,
+              0,
+              837,
+              160,
+              0,
+              0
+            ]
+          ],
+          "verified_until_seconds": 372.9,
+          "own_total": [
+            686,
+            160,
+            0,
+            0
+          ],
+          "opponent_total": [
+            837,
+            160,
+            0,
+            0
+          ]
+        },
+        "game_build": 188329,
         "insights": [
           {
             "kind": "review",

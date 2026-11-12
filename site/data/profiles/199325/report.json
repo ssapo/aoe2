@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-12T19:30:15.221607+00:00",
-  "last_checked_at": "2026-11-12T19:29:42.101000+00:00",
+  "updated_at": "2026-11-12T20:05:23.520984+00:00",
+  "last_checked_at": "2026-11-12T20:03:57.858165+00:00",
   "sync_error": null,
   "profile": {
     "id": 199325,
@@ -79064,7 +79064,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 15,
+        "analysis_revision": 17,
         "duration_game_seconds": 2875.65,
         "civilization": "Varangians",
         "random_civ": false,
@@ -147879,20 +147879,102 @@
           "min_block_seconds": 10.0,
           "own": {
             "until_seconds": 731.1,
-            "blocks": [],
-            "refused_queue": 11,
-            "blocked_seconds": 0,
+            "blocks": [
+              {
+                "from_seconds": 451.1,
+                "to_seconds": 479.3,
+                "seconds": 28.2,
+                "population": "29/30",
+                "counted": false
+              },
+              {
+                "from_seconds": 554.3,
+                "to_seconds": 581.9,
+                "seconds": 27.6,
+                "population": "35/35",
+                "counted": false
+              }
+            ],
+            "refused_queue": 7,
+            "births": {
+              "source": "recording_checkpoints",
+              "corrected_queue": 6,
+              "counted_seconds": 653.1,
+              "estimated": [
+                [
+                  400.5,
+                  407.0
+                ],
+                [
+                  472.0,
+                  478.5
+                ],
+                [
+                  524.0,
+                  530.5
+                ],
+                [
+                  576.0,
+                  582.5
+                ],
+                [
+                  615.0,
+                  628.0
+                ],
+                [
+                  647.5,
+                  660.5
+                ],
+                [
+                  686.5,
+                  699.5
+                ],
+                [
+                  706.0,
+                  712.5
+                ],
+                [
+                  719.0,
+                  725.5
+                ]
+              ]
+            },
+            "blocked_seconds": 55.8,
             "feudal_clicked": true
           },
           "opponent": {
             "until_seconds": 428.0,
             "blocks": [],
             "refused_queue": 1,
+            "births": {
+              "source": "recording_checkpoints",
+              "corrected_queue": 0,
+              "counted_seconds": 383.5,
+              "estimated": [
+                [
+                  0.0,
+                  23.5
+                ],
+                [
+                  355.0,
+                  368.0
+                ],
+                [
+                  400.5,
+                  407.0
+                ],
+                [
+                  426.5,
+                  428.0
+                ]
+              ]
+            },
             "blocked_seconds": 0,
             "feudal_clicked": true
           }
         },
         "engine_income": null,
+        "game_build": 188329,
         "insights": [
           {
             "kind": "review",
@@ -148320,7 +148402,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 15,
+        "analysis_revision": 17,
         "duration_game_seconds": 2019.21,
         "civilization": "Goths",
         "random_civ": true,
@@ -201131,6 +201213,12 @@
             "until_seconds": 426.1,
             "blocks": [],
             "refused_queue": 0,
+            "births": {
+              "source": "recording_checkpoints",
+              "corrected_queue": 0,
+              "counted_seconds": 426.1,
+              "estimated": []
+            },
             "blocked_seconds": 0,
             "feudal_clicked": true
           },
@@ -201141,15 +201229,40 @@
                 "from_seconds": 276.1,
                 "to_seconds": 392.1,
                 "seconds": 116.0,
-                "population": "15/15"
+                "population": "15/15",
+                "counted": false
               }
             ],
             "refused_queue": 1,
+            "births": {
+              "source": "recording_checkpoints",
+              "corrected_queue": 0,
+              "counted_seconds": 371.5,
+              "estimated": [
+                [
+                  298.9,
+                  305.4
+                ],
+                [
+                  324.9,
+                  331.4
+                ],
+                [
+                  350.9,
+                  357.4
+                ],
+                [
+                  370.4,
+                  376.9
+                ]
+              ]
+            },
             "blocked_seconds": 116.0,
             "feudal_clicked": true
           }
         },
         "engine_income": null,
+        "game_build": 188329,
         "insights": [
           {
             "kind": "review",
