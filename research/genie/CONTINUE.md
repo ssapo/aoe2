@@ -46,6 +46,8 @@
 
 **2026-11-13 (세션 M5·M6, `M4_*`·`Q_<리플>` → `M6_*`, 열한 리플, `runs/M5_cmp.py M4 M6`, 앞당겨진 것 없음)**: `BACKWORK_ORDER`(54번, 종이 풀린 뒤 일터로 돌아가기의 순서 + 사냥 명령이 작업을 못 찾을 때)를 기본으로 켰다(스위치 28개; `-Envs` 한 줄은 `runs\M5_envs.txt`). 세 연구 리플과 연구 밖 셋은 수치 그대로(518239882 확인 체크포인트 55/54). 바뀐 것은 최신 다섯 리플(아래 표)뿐.
 
+**2026-11-13 (세션 M6, `M6_*` → `M6h_*`(단어만) → `M6f_*`(자원 추적, 지금 기본), 앞당겨진 것 없음)**: `HORDE`(55번, commandHorde)를 기본으로 켰다(스위치 29개; `-Envs` 한 줄은 `runs\M6_envs.txt`). 열한 리플 모든 선수의 첫 어긋남과 확인 체크포인트 수가 그대로이고, 519700670 P2 54,997과 520394236 P2 48,747의 멈춤 "a horde's command"가 없어져 둘 다 75,000까지 멈추지 않는다(아래 표의 그 두 멈춤은 `M6_*` 때 값).
+
 최신 다섯 리플(원본 기록 없음, 체크포인트 단어만; `Q_<리플>` → `M6_q_411/236/901/921/057`, update 75,000까지; 열한 리플을 한 번에: `powershell -File runs\M5_launch.ps1 -Prefix <접두어> -EnvFile M5_envs.txt -Extra 'GENIE_TRACE_RES=1'`, 약 20분):
 
 | 리플 | 첫 어긋남 P1 / P2 (이전 → 지금) | 확인 체크포인트 P1 / P2 | 엔진 멈춤 (가장 이른 선수) |
@@ -258,6 +260,7 @@
 | FARMSPOT_188329 (2026-11-13부터 기본) | Gather `set_state(4)`의 농장 자리 뽑기(0xb7edb0~0xb7ee3b): x, y를 한 번씩 뽑아 ok()(0xb7aa90)를 통과한 첫 후보를 쓴다. "지금 자리와 같으면 다시 뽑기"는 원본에 없다(같은 타일이 뽑히면 제자리에서 4 update 쉬고 계속 일함) | `gathering/gather/start.rs` `stop_point`, `farmspot_188329` | farm-stop-case-559s (findings 52) | 517426097 농부 3824: 상태 4가 update 42822·43188·43554, 첫 증가 42826(2.5010827), 43554의 보유량 `8d1ed540`(원본과 같음; `M4_t1`). 세 리플 첫 어긋남 늦춰짐. ok()는 항상 참으로 둠(미구현) |
 | MOVEEND_188329 (2026-11-13부터 기본) | 그룹 이동 갱신(0x110d3a0~0x110d5d9)의 끝: 188329에는 AutomaticMoveUnitsToDesiredPositions가 없다. 서 있는 그룹은 자리에 못 간 칸(상태 3 아님)마다 그 멤버의 실패 수가 3 이상이고, 어느 멤버도 유닛 AI의 현재 명령이 없을 때만 끝난다(명령 = −1). 따라가는 그룹의 거리 기준은 (0.5 × 선두의 시야)²보다 클 때(초과) | `groups/update/moves.rs` `move_update_188329`, `groups/mod.rs` `moveend_188329` | group-move-end (findings 53) | 516956894·519686090이 그 멈춤 없이 75,000까지. 여섯 리플 첫 어긋남 그대로. 원본 기록과 값 비교는 못 함(첫 어긋남 뒤의 일) |
 | BACKWORK_ORDER_188329 (2026-11-13부터 기본) | 종이 풀린 뒤 일터로 돌아가기 0x12bc7e0의 순서: 내보내기(0x12a16e0 / slot 0x370) → AI 대상 잊기(0xd27410) → 액션(0xd40980) → 통지 0x202. 사냥 명령 0xd279c0이 작업을 못 찾으면(0xd27a74) 대상이 사라지고 액션이 멈춘다(0xd004a0 꼬리) | `garrison/unload.rs` `back_to_work`, `unit_ai/update.rs` `hunter_search` | findings 54(사례 문서 없음) | 실행 확인(열한 리플, 앞당김 없음; 520596921 P2 315.2 → 431.6초) |
+| HORDE_188329 (2026-11-13부터 기본) | commandHorde 0x10d86e0: 대형 유닛이 없는 그룹은 대형으로 움직이지 않는다. 대상 자료 초기화, 선두 = (0,0,0)에 가장 가까운 멤버, 선두에서 한 번 계획한 경로를 멤버마다 미래 경로(+0x3f8)로 주고 보통의 작업 명령, 플래그 0x40(다음 갱신에 그룹이 사라짐). MoveTo의 경로 요청 0x120e560은 미래 경로를 그대로 걷는다 | `groups/horde.rs` `command_horde`, `groups/order.rs`, `groups/command.rs`, `movement/mod.rs` `Mover.future`, `movement/path_end.rs` `request_path_asked` | findings 55, `runs\C_out\command-horde.md` | 실행 확인(열한 리플, 앞당김 없음; 멈춤 둘 없어짐). 값 재현은 못 함(원본 기록 구간에 사례 없음) |
 
 "근거" 열의 문서는 모두 이 폴더의 `original-188329-*.md`이다. 사례 문서는 주소와 손 계산까지 들어 있다.
 
@@ -380,7 +383,7 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 13.1 사례 하나를 끝낼 때마다 (고쳤든 못 고쳤든)
 
-`truth-log-findings.md` 맨 끝에 번호를 이어 한 절을 쓴다(지금 마지막은 54번). 형식:
+`truth-log-findings.md` 맨 끝에 번호를 이어 한 절을 쓴다(지금 마지막은 55번). 형식:
 
 ```
 ## <번호>. <한 줄 제목> (스위치 `GENIE_EXPERIMENT_...`에 추가 / 새 스위치 / 스위치 없음)
@@ -419,7 +422,7 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 ### 13.4 지금 하던 일 (멈출 때마다 이 절을 덮어쓴다)
 
 - 날짜·작성: 2026-11-13, Claude (세션 M6; 아래 M4 기록 위에 덧붙임).
-- **세션 M6 진행**: (1) 54번(`BACKWORK_ORDER`, 세션 M5가 넣음)을 열한 리플로 확인하고 기록·패치·커밋함 — 지금 기본은 스위치 28개(`runs\M5_envs.txt`), 최신 기본 실행 `M6_p_*`, `M6_n_*`, `M6_q_*`. 도구: `tools/M5_launch.ps1`(열한 리플 실행), `tools/M5_cmp.py`(비교), `tools/M6_mkpatch.ps1` + `tools/M3_striplf.py`(패치). (2) 다음은 55번 commandHorde(`runs\C_out\command-horde.md`), (3) 사이트용 `GENIE_TRACE_GAIN`. 이 줄 아래에 결과를 이어 적는다.
+- **세션 M6 진행**: (2) 55번(`HORDE`, commandHorde)을 넣고 기본으로 켬 — 지금 기본은 스위치 29개(`runs\M6_envs.txt`), 패치에는 3단계의 `GENIE_TRACE_GAIN` 출력 코드(`gain_trace.rs`, 동작 변화 없음)가 이미 들어 있다. **main에서 할 일**: `engine/switches.env`에 `GENIE_EXPERIMENT_BACKWORK_ORDER_188329=1`, `GENIE_EXPERIMENT_HORDE_188329=1`을 더한다(518239882 기대값 55/54는 그대로). (1) 54번(`BACKWORK_ORDER`, 세션 M5가 넣음)을 열한 리플로 확인하고 기록·패치·커밋함 — 지금 기본은 스위치 28개(`runs\M5_envs.txt`), 최신 기본 실행 `M6_p_*`, `M6_n_*`, `M6_q_*`. 도구: `tools/M5_launch.ps1`(열한 리플 실행), `tools/M5_cmp.py`(비교), `tools/M6_mkpatch.ps1` + `tools/M3_striplf.py`(패치). (2) 다음은 55번 commandHorde(`runs\C_out\command-horde.md`), (3) 사이트용 `GENIE_TRACE_GAIN`. 이 줄 아래에 결과를 이어 적는다.
 - 세션 M4가 한 일: findings 52(`FARMSPOT`, 농장 자리 뽑기)와 53(`MOVEEND`, 그룹 이동의 끝)을 넣고 둘 다 기본으로 켰다. 실행 `M4_p_239/161/097`, `M4_n_894/090/670`(2.1). 지금 기본은 스위치 27개(`-Envs`로 주는 24개가 한 줄로 `runs\M4_envs.txt`, 나머지 셋은 `go.ps1`이 켬).
 - 그 전: 세션 M3 = findings 51(덤 자원 작업 164, 스위치 없음), 세션 M2 = 49(`GATHER_SNAP`)·50(뱀의 Fly, 스위치 없음).
 - **main에서 할 일(이 브랜치에서는 안 건드림)**: `engine/switches.env`에 `GENIE_EXPERIMENT_FARMSPOT_188329=1`, `GENIE_EXPERIMENT_MOVEEND_188329=1`을 더한다(`GATHER_SNAP`·`PLANCHOICE`가 아직 없으면 그것도; `runs\K_envs.txt` 뒤에 생긴 스위치는 이 넷). 패치가 바뀌었으니 엔진 빌드 캐시 키가 바뀐다. **`engine-check.yml`의 기대값이 바뀐다: 518239882 확인 체크포인트 P1 55개, P2 54개**(전 53/53).
