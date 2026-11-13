@@ -10,7 +10,7 @@
 
 엔진 후보 1 / Codex: **완료 — 검토 브랜치에 푸시, 운영 연구 브랜치에는 미반영**. `FormationLine.spacing_half` 초기화 누락 2곳과 기존 AI 변경을 반영하지 못한 테스트 2건을 보완했다. 엔진 실행 규칙 변경 없이 **genie-core 단위테스트 2,061개 통과·실패/무시 0개**. GitHub 연구 패치만 적용한 별도 소스에서도 재확인했다. [수정 근거·검증·통합/증분 패치](https://github.com/ssapo/aoe2/blob/codex/engine-test-build-repair-20261113/research/genie/sessions/codex-20261113/ENGINE-TEST-BUILD-REPAIR.md), 커밋 `9c0ffd1`. 기존 '단위테스트 컴파일 불가' 기록은 수정 전 상태이며, 이번 결과는 위 검토 브랜치의 패치 기준이다. 실제 리플 정확도는 이번 검증 대상이 아니다. 남겨 둔 실행 없음.
 
-ENG-05·ENG-10 수정의 GitHub 위치(Claude, 2026-11-13 17:10 KST): PC에만 있던 연구 커밋 4개(`87dc7be`, `e6d6d4b` ENG-05 멈춤 셋 57~59, `76a5beb` 업그레이드된 유닛의 이동 속도 60, `7655e16` 인계서 13.4)를 **검토용 브랜치 [`research/genie-188329-local-20261113`](https://github.com/ssapo/aoe2/tree/research/genie-188329-local-20261113)에 올렸다.** 운영 수집이 읽는 `research/genie-188329`(`1d36b5e`)에는 합치지 않았다(그 위에 rebase가 필요하고, 합치면 운영 엔진에 반영되므로 사용자 확인 뒤에 한다). [엔진 작업 후보](docs/engine-next-work.md)의 2번(업그레이드 때 걷는 유닛의 속도 갱신)은 이 브랜치의 `76a5beb`와 같은 범위이니 새로 구현하기 전에 그 패치를 먼저 대조한다.
+ENG-05·ENG-10 수정의 GitHub 위치(Claude, 2026-11-13 17:10 KST): PC에만 있던 연구 커밋 4개(`87dc7be`, `e6d6d4b` ENG-05 멈춤 셋 57~59, `76a5beb` 업그레이드된 유닛의 이동 속도 60, `7655e16` 인계서 13.4)를 **검토용 브랜치 [`research/genie-188329-local-20261113`](https://github.com/ssapo/aoe2/tree/research/genie-188329-local-20261113)에 올렸다.** **17:30 KST 사용자 확인 뒤 운영 수집이 읽는 `research/genie-188329`에 합쳤다(`1d36b5e` → `1de34ac`, 내용은 검토용 브랜치와 같음).** 운영 엔진 반영 여부는 Engine check 실행 결과로 확인한다. [엔진 작업 후보](docs/engine-next-work.md)의 2번(업그레이드 때 걷는 유닛의 속도 갱신)은 이 브랜치의 `76a5beb`와 같은 범위이니 새로 구현하기 전에 그 패치를 먼저 대조한다.
 
 | 작업 ID / 담당 | 상태 | 범위·결과·다음 동작 | 마지막 갱신 (한국 시간) |
 |---|---|---|---|
