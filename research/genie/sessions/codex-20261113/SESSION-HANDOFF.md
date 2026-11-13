@@ -135,9 +135,12 @@ No engine jobs are left running by this session.
 
 ## Shared coordination
 
-The shared `CONTINUE.md` received an active-scope ledger in commit `0f21078`.
-At session end it is updated to **static investigation complete / runtime
-materials blocked**, with links to these reports and the diagnostic. This
-status is advisory, not a distributed mutex. A new worker should fetch the
-latest research branch, claim the narrow next execution task, and update the
-same ledger before starting. Do not reserve the whole engine indefinitely.
+Historical note: `CONTINUE.md` first received a ledger in commit `0f21078`.
+The user subsequently requested a common entry point that is independent of
+engine research. The authoritative task ledger is now **main's root
+ONBOARDING.md**, not this research branch or this historical report.
+This investigation's outcome remains static investigation complete / runtime
+materials blocked. A new worker should claim the narrow next task in the common
+ledger, then read the engine handoff only when taking on engine research.
+Status is advisory, not a distributed mutex; do not reserve the whole engine
+indefinitely.
