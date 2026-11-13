@@ -14,7 +14,7 @@ def metrics(events,feudal=600,castle=1300,**extra):
 
 class ReviewTests(unittest.TestCase):
     def test_opening_sequence_is_independent_of_first_unit_and_later_totals(self):
-        cases=json.loads((Path(__file__).parent/'fixtures/openings.json').read_text())
+        cases=json.loads((Path(__file__).parent/'fixtures/openings.json').read_text(encoding='utf-8'))
         for case in cases:
             with self.subTest(case['name']):
                 self.assertEqual(classify(case['metrics'],case['duration'])['opening'],case['opening'])

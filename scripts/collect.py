@@ -324,7 +324,7 @@ def analyze_replay(raw, own_id):
 def civilization_names():
     import aocref
     data=Path(aocref.__file__).parent/'data/datasets/100.json'
-    return {int(k):v['name'] for k,v in json.loads(data.read_text())['civilizations'].items()}
+    return {int(k):v['name'] for k,v in json.loads(data.read_text(encoding='utf-8'))['civilizations'].items()}
 
 
 def civilization_name(value):

@@ -62,11 +62,11 @@ class CollectorTests(unittest.TestCase):
             collect.write_json(path,original)
             with patch.object(sys,'argv',['collect','--profile-id','1234','--output',str(path)]), patch.object(collect,'fetch',side_effect=OSError('offline')):
                 with self.assertRaises(OSError):collect.main()
-            saved=json.loads(path.read_text())
+            saved=json.loads(path.read_text(encoding='utf-8'))
             self.assertEqual(saved['matches'],original['matches'])
             self.assertEqual(saved['updated_at'],'original')
             self.assertTrue(saved['sync_error'])
-            status=json.loads((path.parent/'status.json').read_text())
+            status=json.loads((path.parent/'status.json').read_text(encoding='utf-8'))
             self.assertEqual(status['last_checked_at'],saved['last_checked_at'])
             self.assertEqual(status['updated_at'],'original')
             self.assertEqual(status['sync_error'],saved['sync_error'])
@@ -80,7 +80,7 @@ class CollectorTests(unittest.TestCase):
             collect.write_json(path,{'profile':{'id':111},'matches':[{'id':1,'analysis_status':'complete'}]})
             with patch.object(sys,'argv',['collect','--profile-id','222','--limit','0','--output',str(path)]),patch.object(collect,'fetch',return_value=json.dumps(payload).encode()):
                 collect.main()
-            saved=json.loads(path.read_text())
+            saved=json.loads(path.read_text(encoding='utf-8'))
             self.assertEqual([m['id'] for m in saved['matches']],[99])
             self.assertEqual(saved['profile']['id'],222)
             self.assertEqual(saved['matches'][0]['civilization'],'문명 ID 0')
@@ -92,11 +92,11 @@ class CollectorTests(unittest.TestCase):
             payload={'result':{'code':0},'profiles':[],'matchHistoryStats':[]}
             with patch.object(sys,'argv',['collect','--profile-id','1234','--limit','0','--output',str(path)]),patch.object(collect,'fetch',return_value=json.dumps(payload).encode()):
                 collect.main()
-            self.assertEqual(json.loads(path.read_text())['profile']['id'],1234)
-            status=json.loads((path.parent/'status.json').read_text())
+            self.assertEqual(json.loads(path.read_text(encoding='utf-8'))['profile']['id'],1234)
+            status=json.loads((path.parent/'status.json').read_text(encoding='utf-8'))
             self.assertIsNone(status['sync_error'])
             self.assertEqual(status['schema_version'],1)
-            self.assertEqual(status['last_checked_at'],json.loads(path.read_text())['last_checked_at'])
+            self.assertEqual(status['last_checked_at'],json.loads(path.read_text(encoding='utf-8'))['last_checked_at'])
 
     def test_upgrade_failure_keeps_success_and_has_bounded_retries(self):
         old={'analysis':{'analysis_revision':4,'metrics':{'preserved':True}},'analysis_status':'complete'}

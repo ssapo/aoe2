@@ -44,7 +44,7 @@ def building_map(match, own):
     import aocref
     from pathlib import Path
     import json
-    terrain=json.loads((Path(aocref.__file__).parent/'data/datasets/100.json').read_text())['terrain']
+    terrain=json.loads((Path(aocref.__file__).parent/'data/datasets/100.json').read_text(encoding='utf-8'))['terrain']
     names={str(t):terrain.get(str(t),str(t)) for t in {v[0] for v in runs}}
     return {'size':size,'terrain_runs':runs,'terrain_names':names,'initial_buildings':initial,
             'resources':resources,'basis':'initial_terrain_and_recorded_build_targets'}

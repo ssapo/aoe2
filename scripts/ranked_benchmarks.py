@@ -146,13 +146,13 @@ def build(reports, index, now=None, existing=None):
 
 def main():
     data = ROOT/'site/data'
-    reports = [json.loads(p.read_text()) for p in [data/'report.json', *sorted((data/'profiles').glob('*/report.json'))] if p.exists()]
-    index = json.loads((data/'players.json').read_text())
+    reports = [json.loads(p.read_text(encoding='utf-8')) for p in [data/'report.json', *sorted((data/'profiles').glob('*/report.json'))] if p.exists()]
+    index = json.loads((data/'players.json').read_text(encoding='utf-8'))
     target = data/'ranked-benchmarks.json'
-    existing = json.loads(target.read_text()) if target.exists() else None
+    existing = json.loads(target.read_text(encoding='utf-8')) if target.exists() else None
     result = build(reports, index, existing=existing)
     temporary = target.with_suffix('.tmp')
-    temporary.write_text(json.dumps(result, ensure_ascii=False, separators=(',', ':'))+'\n')
+    temporary.write_text(json.dumps(result, ensure_ascii=False, separators=(',', ':'))+'\n', encoding='utf-8')
     temporary.replace(target)
     print(f"Benchmark observations: {len(result['samples'])} / players: {len({s['profile_id'] for s in result['samples']})}")
 

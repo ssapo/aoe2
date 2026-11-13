@@ -64,7 +64,7 @@ test('zoomed base view draws no wall text, no overlapping labels, and keeps ever
  for(const match of [samples[0],walled].filter(Boolean))for(const width of [720,330]){
   const a=match.analysis,texts=[],rects=[],state={font:''};let clicked;
   const ctx=new Proxy(state,{get:(o,key)=>key in o?o[key]:key==='fillText'?(text,x,y)=>texts.push({text,x,y,font:parseFloat(o.font.split(' ')[1])}):
-   key==='fillRect'?(x,y,w,h)=>rects.push({x,y,w,h}):key==='measureText'?()=>undefined:()=>{},set:(o,k,v)=>(o[k]=v,true)});
+   key==='fillRect'?(x,y,w,h)=>rects.push({x,y,w,h}):key==='fill'?()=>rects.push({path:true}):key==='measureText'?()=>undefined:()=>{},set:(o,k,v)=>(o[k]=v,true)});
   global.document={createElement:()=>({getContext:()=>new Proxy({},{get:()=>()=>{},set:()=>true})})};
   const canvas={getContext:()=>ctx,addEventListener:(_,fn)=>{clicked=fn;},getBoundingClientRect:()=>({left:0,top:0,width,height:width*420/720})};
   const events=[a.metrics,...a.opponents.map(p=>p.metrics)].flatMap((m,i)=>m.full_timeline.map(e=>({...e,side:i?'theirs':'mine'})));
@@ -80,9 +80,48 @@ test('zoomed base view draws no wall text, no overlapping labels, and keeps ever
    const tc=a.map_view.initial_buildings.find(e=>e.side===side&&e.label==='Town Center'),c=project(tc.x*120/a.map_view.size,tc.y*120/a.map_view.size,120);
    for(const e of shown.filter(e=>!e.initial).slice(0,12)){
     const p=project(e.x*120/a.map_view.size,e.y*120/a.map_view.size,120),sx=(p.x-c.x)*2.6+360,sy=(p.y-c.y)*2.6+210,want=` ${e.x}, ${e.y}`;
-    let found=false;for(let i=0;i<8&&!found;i++){clicked({clientX:sx*width/720,clientY:sy*width/720});found=info.textContent.includes(want)&&info.textContent.includes(e.label);}
+    let found=false;for(let i=0;i<40&&!found;i++){clicked({clientX:sx*width/720,clientY:sy*width/720});found=info.textContent.includes(want)&&info.textContent.includes(e.label);}
     assert.ok(found,`${e.label} ${e.x},${e.y}`);
    }
   }
  }
+});
+const {footprint,markerShape,resourcePatches,legendItems,hitRadius,stackRadius}=require('../site/building-map.js');
+test('known footprints become tile-aligned diamonds and unknown buildings keep the square',()=>{
+ assert.equal(footprint('House'),2);assert.equal(footprint('Farm'),3);assert.equal(footprint('Town Center'),4);assert.equal(footprint('Watch Tower'),1);
+ for(const name of ['Yurt E','Building 2556','Stone Wall','toString',undefined])assert.equal(footprint(name),null,String(name));
+ // One tile is 6x3 px on the 120-tile canvas, so a 2x2 house is 12x6 and a 4x4 town center 24x12.
+ assert.deepEqual(markerShape('House'),{diamond:true,tiles:2,hw:6,hh:3});
+ assert.deepEqual(markerShape('Town Center'),{diamond:true,tiles:4,hw:12,hh:6});
+ // Smaller maps are stretched onto the same canvas, and tiny markers are widened, never shrunk.
+ assert.deepEqual(markerShape('Farm',120/96),{diamond:true,tiles:3,hw:11.25,hh:5.625});
+ assert.deepEqual(markerShape('Watch Tower',1,7),{diamond:true,tiles:1,hw:7,hh:3.5});
+ assert.deepEqual(markerShape('House',1,4),{diamond:true,tiles:2,hw:6,hh:3});
+ assert.deepEqual(markerShape('Yurt E',1,7),{diamond:false,tiles:null,hw:5,hh:5});
+ // The recorded centres agree with the table: even sizes on whole tiles, odd sizes on half tiles.
+ const report=require('../site/data/report.json');
+ for(const m of report.matches){const a=m.analysis;if(!a?.map_view)continue;
+  for(const e of [...a.map_view.initial_buildings,...[a.metrics,...a.opponents.map(p=>p.metrics)].flatMap(p=>p.full_timeline.filter(e=>e.kind==='BUILD'))]){
+   const tiles=footprint(e.label);if(!tiles||!Number.isFinite(e.x))continue;
+   assert.equal(Math.abs(e.x%1)===.5,tiles%2===1,`${e.label} ${e.x}`);
+  }
+ }
+});
+test('starting resources group into patches by kind without inventing amounts',()=>{
+ const r=(kind,x,y)=>({kind,x,y});
+ const patches=resourcePatches([r('gold',10.5,10.5),r('gold',11.5,10.5),r('stone',12.5,10.5),r('gold',13.5,11.5),r('gold',40.5,40.5),r('berries',NaN,1),r('gold',11.5,11.5)]);
+ assert.deepEqual(patches.map(p=>[p.kind,p.count]),[['gold',4],['stone',1],['gold',1]]);
+ assert.deepEqual([patches[0].x,patches[0].y],[11.75,11]);
+ assert.deepEqual(Object.keys(patches[0]).sort(),['count','kind','x','y']);
+ assert.deepEqual(resourcePatches(undefined),[]);
+});
+test('map key lists only what the match shows and touch reach grows on small screens',()=>{
+ const wall={label:'Stone Wall'},house={kind:'BUILD',label:'House'},gate={kind:'BUILD',label:'Palisade Gate'};
+ assert.deepEqual(legendItems({initial_buildings:[],resources:[]},[house]).map(i=>i.key),['build']);
+ assert.deepEqual(legendItems({initial_buildings:[wall],resources:[{kind:'stone'},{kind:'gold'}]},[house]),
+  [{key:'build',text:'건설 요청'},{key:'wall',text:'성벽·성문'},{key:'resources',kinds:['gold','stone'],text:'시작 위치'}]);
+ assert.deepEqual(legendItems({initial_buildings:[]},[gate]).map(i=>i.key),['build','wall']);
+ // 22 CSS px of reach: 18 canvas px is enough on a wide canvas, a 310 px wide phone canvas needs about 51.
+ assert.equal(hitRadius(1.3),18);assert.ok(Math.abs(hitRadius(310/720)-51.1)<.1);assert.equal(hitRadius(0),22);
+ assert.equal(stackRadius(1),8);assert.ok(stackRadius(310/720)>11&&stackRadius(310/720)<12);
 });

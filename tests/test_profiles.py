@@ -10,7 +10,7 @@ class ProfileTests(unittest.TestCase):
         jobs=targets('12345')
         self.assertEqual(jobs[0][0],26260702)
         self.assertEqual(len({str(p) for _,p,_ in jobs}),len(jobs))
-        self.assertTrue(str(jobs[-1][1]).endswith('/profiles/12345/report.json'))
+        self.assertTrue(jobs[-1][1].as_posix().endswith('/profiles/12345/report.json'))
         self.assertEqual(len(targets('199325')),1+len(FEATURED))
         self.assertEqual(len(targets('26260702')),1+len(FEATURED))
 

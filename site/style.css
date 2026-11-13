@@ -249,6 +249,15 @@ body.review-open{overflow:hidden}
 .map-toolbar .map-focus{margin:0;gap:5px}
 .map-toolbar .map-focus button{padding:5px 8px;min-height:34px;font-size:11px}
 .map-note{margin-top:6px}.map-note summary{font-size:11px}.map-note .compact-note{margin-top:4px}
+/* Map key: one small row under the canvas. Swatch colours come from building-map.js. */
+.map-key{display:flex;flex-wrap:wrap;align-items:center;gap:0 10px;margin:5px 0 0;padding:0;list-style:none;font-size:10px;line-height:16px;color:var(--replay-muted)}
+.map-key li{display:inline-flex;align-items:center;gap:3px;white-space:nowrap}
+.map-key i{display:inline-block;flex:none;box-sizing:border-box;border:1px solid #18271e}
+.map-key .key-build{width:8px;height:8px;margin:0 1px;transform:scaleY(.5) rotate(45deg)}
+.map-key .key-wall{width:5px;height:5px}
+.map-key .key-resource{width:7px;height:7px;border-color:#8d9684}
+.map-key small{margin-left:2px;font-size:10px}
+#building-map-host>.map-key+#building-map-info{margin-top:2px}
 
 /* Random civ marker: a small pill that wraps with the name on phones. */
 .civ-random{display:inline-flex;align-items:center;gap:3px;margin-left:2px;padding:1px 6px 1px 4px;border:1px solid #d8ddcc;border-radius:999px;background:#f3f5ee;color:#5f6d57;font-size:10px;font-weight:600;line-height:1.5;white-space:nowrap;vertical-align:middle}
