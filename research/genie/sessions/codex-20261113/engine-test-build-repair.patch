@@ -1,0 +1,81 @@
+--- a/crates/engine/genie-core/src/groups/layout.rs
++++ b/crates/engine/genie-core/src/groups/layout.rs
+@@ -890,7 +890,7 @@
+ 
+     /// `FUN_141008f50`: a line of no width or of a negative depth is left as it is (false);
+     /// else its places are -1, its depth set, its attack range 0 (true). Its callers' clear
+-    /// before it keeps only the distance back.
++    /// before it keeps the distance back and the line's half-spacing.
+     #[test]
+     fn line_reset_needs_width_and_depth_not_below_0() {
+         let line = FormationLine {
+@@ -898,6 +898,7 @@
+             indices: vec![7],
+             attack_range: Distance::new(1.5),
+             distance_back: Distance::new(4.0),
++            spacing_half: Distance::new(0.75),
+         };
+         let mut l = line.clone();
+         assert_eq!(reset_line(&mut l, 0, 1), Layout::NotLaid);
+@@ -912,6 +913,7 @@
+                 indices: vec![u32::MAX; 2],
+                 attack_range: Distance::ZERO,
+                 distance_back: Distance::new(4.0),
++                spacing_half: Distance::new(0.75),
+             }
+         );
+         let mut l = line;
+@@ -920,6 +922,7 @@
+             l,
+             FormationLine {
+                 distance_back: Distance::new(4.0),
++                spacing_half: Distance::new(0.75),
+                 ..FormationLine::default()
+             }
+         );
+--- a/crates/engine/genie-core/src/unit_ai/tests.rs
++++ b/crates/engine/genie-core/src/unit_ai/tests.rs
+@@ -2461,15 +2461,16 @@
+         retarget_disabled: 1,
+         ..unit(Some(OrderKind::Attack), Some(AiAction::Attack))
+     };
+-    assert!(
++    // 188329 clears the disabled byte when the target is no longer in the world.
++    assert_eq!(
+         run(
+             &mut u,
+             invalid(AiAction::Attack.value(), 0),
+             PlayerKind::Human
+-        )
+-        .0
+-        .is_err()
+-    );
++        ),
++        gone
++    );
++    assert_eq!(u.retarget_disabled, 0);
+     let mut u = unit(None, Some(AiAction::Move));
+     assert_eq!(
+         run(
+@@ -10250,12 +10251,17 @@
+     let mut u = UnitAi {
+         current_order: Some(OrderKind::AttackMove),
+         adjusted_idle_timeout: Millis::new(750),
++        // Leaving this order redraws from the base timeout before checking its place.
++        idle_timeout: Millis::new(1000),
+         ..idle(UnitAiKind::Soldier)
+     };
+-    assert!(
+-        u.stop_with(StopOrder::Keep, None, &mut Vec::new(), &mut rng(), &roles())
+-            .is_err()
+-    );
++    let error = u.stop_with(StopOrder::Keep, None, &mut Vec::new(), &mut rng(), &roles())
++        .unwrap_err();
++    assert_eq!(
++        error.reason(),
++        "a stop ending an order without the unit's place"
++    );
++    assert!((750..1250).contains(&u.adjusted_idle_timeout.get()));
+ }
+ 
+ /// The order's tail (`LAB_140c5d611`) and the Build's end (`FUN_140c64b60` with −1): leaving
