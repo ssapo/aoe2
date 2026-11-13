@@ -476,6 +476,8 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 - 엔진 소스 `genie`: 빌드됨, 저장소 패치와 같음(PC 사본 `runs\E6s.patch`, sha256은 커밋 메시지). 스위치를 안 켠 실행 다섯(`E6s_{p_239,p_161,p_097,q_057,n_894}`)의 체크포인트 줄이 `E6r_*`와 같다. 새 기본 스위치 없음 → main 쪽 바꿀 것 없음.
 - 다음 첫 동작(63번): `detour.rs`에 "형성 전에는 첫 시도를 건너뛰고 칸 쪽 1타일"을 FRONTPATH 스위치 위에 얹어 3430의 첫 1타일(기울기 +0.0701)이 나오는지 본다 → 0x10533b0의 범위 인자와 0x1059760을 읽어 4472의 간격(엔진 1.52, 기록 역산 1.11)을 맞춘다. 실행: `bash runs/E5_go.sh <이름> 518239882 27500 "GENIE_EXPERIMENT_FRONTPATH_188329=1;GENIE_TRACE_OBJECT_IDS=3430,4464,4472;GENIE_TRACE_OBJECTS_RANGE=27405-27500;GENIE_TRACE_FORMING=1"` 뒤 `python E6r_cmp.py <이름>.err ../truth/truth4.jsonl 2`.
 - 사이트에 동물별 값을 넣는 데 필요한 것은 67번 끝에 적었다(수집기·화면은 안 고침).
+- **푸시 상태(2026-11-13 밤, 사용자 부재):** 커밋 `0d88d16`과 이 기록 커밋은 **PC `aoe2-push`에만 있다.** 연구 브랜치 푸시는 "매번 사용자에게 묻는다"가 사용자 본인의 규칙이고, 부재 중 "묻지 말고 올려라"는 다른 세션을 거쳐 전달된 것이라 그 규칙을 푸는 승인으로 쓰지 않았다. 별도 브랜치(`…-wip-…`)로 올리는 것도 시도했으나 이 세션의 권한에서 막혔다. 사용자가 승인하면 `aoe2-push`에서 `git fetch origin` → `git push origin research/genie-188329` 한 번이면 된다(앞서 있는 커밋 둘, 빨리 감기). 패치는 진단 출력과 기본 꺼진 실험 스위치만 더했고 기본 실행은 전과 같으므로 Engine check 기대값은 55 / 54 그대로다. 핵심 결과 요약은 main `ONBOARDING.md`의 ENG-06 행에 있다.
+- **이 PC 없이(GitHub만으로) 할 수 있는 것:** 문서 읽기, `detour.rs`·`place.rs` 코드 작업과 컴파일(패치를 기준 커밋에 적용), 사이트 수집기에 `GAINA` 파싱 넣기(67번 끝)와 그 단위 검사 — 단 67번과 실험 스위치는 위 커밋이 푸시된 뒤에야 GitHub에서 보인다. **이 PC에서만 되는 것:** 엔진을 리플로 돌리기(리플·DAT가 PC와 비공개 저장소에만 있음), 원본 메모리 기록(`truth	ruth4.jsonl` 등)과의 대조, 원본 EXE 디컴파일 읽기(`re-kit`). GitHub Actions의 Engine check는 518239882 한 리플의 체크포인트 수만 본다.
 
 아래는 같은 날 저녁의 기록이다.
 
