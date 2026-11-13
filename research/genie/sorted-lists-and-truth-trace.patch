@@ -5146,7 +5146,7 @@ index e5f89e13..04e9c49d 100644
  /// below it (down), left of it or right of it (out).
  #[derive(Clone, Copy)]
 diff --git a/crates/engine/genie-core/src/technology/effect/completion.rs b/crates/engine/genie-core/src/technology/effect/completion.rs
-index 00dffb2a..e50904d6 100644
+index 00dffb2a..147bee40 100644
 --- a/crates/engine/genie-core/src/technology/effect/completion.rs
 +++ b/crates/engine/genie-core/src/technology/effect/completion.rs
 @@ -25,7 +25,6 @@ use crate::technology::TechMode;
@@ -5157,7 +5157,27 @@ index 00dffb2a..e50904d6 100644
  use crate::world::Seconds;
  use crate::world::World;
  use crate::world::layer::AttributeRoles;
-@@ -463,9 +462,9 @@ impl World {
+@@ -76,6 +75,9 @@ impl World {
+         }
+         self.research_effect_known(p, tech)?;
+         self.players.player_mut(p)?.techs.checked_mut(t)?.state = ResearchState::Researched;
++        if std::env::var_os("GENIE_TRACE_RESEARCH").is_some() {
++            eprintln!("RESEARCH ms={} player={} tech={t} building={building:?}", self.world_time.millis(), p.get());
++        }
+         let effect = self.players.player(p)?.techs.checked(t)?.effect(&def);
+         self.do_table_effect(p, effect, None)?;
+         self.update_dependents(p, tech)?;
+@@ -270,6 +272,9 @@ impl World {
+             self.players.player_mut(p)?.techs.checked_mut(d)?.state = ResearchState::Disabled;
+             return Ok(counted);
+         }
++        if std::env::var_os("GENIE_TRACE_RESEARCH").is_some() {
++            eprintln!("DEPENDENT ms={} player={} tech={d} of={} state={:?}", self.world_time.millis(), p.get(), t.index(), self.players.player(p)?.techs.checked(d)?);
++        }
+         counted += 1;
+         let techs = &self.players.player(p)?.techs;
+         let met = def
+@@ -463,9 +468,9 @@ impl World {
      /// against `+0x260` is taken to hold). Without `one` building (a third argument of 1) and
      /// its object, the master's slot 0x58 (`FUN_141126280`) sets `available` unless it is
      /// `disabled` (the byte, held as its test against 0). The sprites' loading on an enable
@@ -5170,7 +5190,7 @@ index 00dffb2a..e50904d6 100644
      pub(super) fn enable_master(
          &mut self,
          p: PlayerId,
-@@ -484,14 +483,12 @@ impl World {
+@@ -484,14 +489,12 @@ impl World {
                  .of_master(master)
                  .contains(MasterRoles::MODE_TESTED)
          {
@@ -5233,6 +5253,130 @@ index c1bcbf84..01e8ae0a 100644
      t.do_effect(PlayerId::new(0), &[attribute(2, 4, 0, -1, 0.0)], None)
          .unwrap();
      assert!(!(t.model.masters[0].get(master_id(4)).unwrap().available).is_available());
+diff --git a/crates/engine/genie-core/src/technology/effect/upgrade.rs b/crates/engine/genie-core/src/technology/effect/upgrade.rs
+index 14f3fa1b..ad1df2b6 100644
+--- a/crates/engine/genie-core/src/technology/effect/upgrade.rs
++++ b/crates/engine/genie-core/src/technology/effect/upgrade.rs
+@@ -75,7 +75,8 @@ impl World {
+     /// take slot 0x98. Upgrades to 0x67f and 0x6a1 move the tracker's list of `from` to `to`'s
+     /// (`FUN_14104fd10`, [`crate::players::tracker::Tracker::move_all`]). In modes −1 and 3 two masters of
+     /// one type end with `from` taking `to`'s values ([`Master::copy_from`]; the masters' slot
+-    /// 0xa8, their graphics' loading, is not simulation).
++    /// 0xa8, their graphics' loading, is not simulation), which the objects reading `from` read
++    /// from then on ([`World::read_moving_values`]: a walking unit's speed).
+     pub(crate) fn upgrade_objects(
+         &mut self,
+         p: PlayerId,
+@@ -125,6 +126,33 @@ impl World {
+             && let Some(m) = Arc::make_mut(self.model.masters.checked_mut(p.index())?).get_mut(from)
+         {
+             m.copy_from(&new);
++            let copied = m.clone();
++            self.readers_read_moving_values(p, from, &copied)?;
++        }
++        Ok(())
++    }
++
++    /// After a kept master `from` of player `p` took another's values ([`Master::copy_from`]):
++    /// the objects that read it (live and sleeping, without a master of their own) read its
++    /// moving values as they are now ([`World::read_moving_values`]).
++    fn readers_read_moving_values(
++        &mut self,
++        p: PlayerId,
++        from: MasterId,
++        master: &Master,
++    ) -> Result<(), GenieError> {
++        use crate::world::index::Place;
++        for i in self.players.player(p)?.objects.places() {
++            let u = self.players.live(p, i)?;
++            if u.life.master_id == from && !self.parts.own_master.contains(u.id) {
++                self.read_moving_values(Place::Live(p, i), master)?;
++            }
++        }
++        for i in self.players.player(p)?.sleeping.places() {
++            let u = self.players.asleep(p, i)?;
++            if u.life.master_id == from && !self.parts.own_master.contains(u.id) {
++                self.read_moving_values(Place::Sleeping(p, i), master)?;
++            }
+         }
+         Ok(())
+     }
+@@ -143,6 +171,7 @@ impl World {
+                 if let Some(own) = self.parts.own_master.get_mut(id) {
+                     own.copy_from(new);
+                 }
++                self.read_moving_values(place, new)?;
+             }
+         }
+         Ok(())
+@@ -183,6 +212,7 @@ impl World {
+                 if let Some(m) = self.parts.own_master.get_mut(id) {
+                     m.copy_from(new);
+                 }
++                self.read_moving_values(place, new)?;
+             }
+         }
+         for i in self.players.player(p)?.sleeping.places() {
+diff --git a/crates/engine/genie-core/src/technology/upgrade.rs b/crates/engine/genie-core/src/technology/upgrade.rs
+index e535cdbb..f2c11db0 100644
+--- a/crates/engine/genie-core/src/technology/upgrade.rs
++++ b/crates/engine/genie-core/src/technology/upgrade.rs
+@@ -116,7 +116,8 @@ impl World {
+     ///   standing, second standing, dying or undead sprite it shows `new`'s; a combat object of
+     ///   two masters with charges takes the change of the maximum (`+0x9e0`); in state 2 the
+     ///   damage sprites again with `new`; with [`UpgradeMaster::Replaced`] the master is `new` and the class
+-    ///   counters take it back (+1);
++    ///   counters take it back (+1); a moving object then reads `new`'s moving values
++    ///   ([`World::read_moving_values`]);
+     /// - a combat object whose class changes takes a new unit AI ([`class_changes`],
+     ///   `FUN_141215a90`); a building with an adjacent mode turns its facets (`FUN_1411ce890`,
+     ///   drawn).
+@@ -176,6 +177,7 @@ impl World {
+         self.upgrade_hit_points(place, (old, new))?;
+         if keep == UpgradeMaster::Replaced {
+             self.object_at_mut(place)?.life.master_id = new.id;
++            self.read_moving_values(place, new)?;
+             if MasterKind::COMBAT <= kind {
+                 count_class(
+                     &mut self.players.player_mut(p)?.attributes,
+@@ -564,6 +566,37 @@ impl World {
+         Ok(())
+     }
+ 
++    /// The moving values the object at `place` reads once its master is `master` (an upgrade
++    /// replaced its master, or copied the new master's values into the one it reads, slot 8): in
++    /// the game a moving object reads its master each time (its speed `+0x740` through slot 65,
++    /// its radii, its turn values), so the walk of a unit upgraded on its way goes on at the new
++    /// speed (replay 520592057: the Bulgarians' free Man-at-Arms, 0.96, on three walking Militia,
++    /// 0.9, as their Feudal Age ends). The slice's copy of those values ([`Mover::stats`]) takes
++    /// the master's, the top speed with the sprite the object shows. A master that does not move
++    /// leaves them.
++    ///
++    /// [`Mover::stats`]: crate::movement::Mover::stats
++    pub(crate) fn read_moving_values(
++        &mut self,
++        place: Place,
++        master: &Master,
++    ) -> Result<(), GenieError> {
++        let Some(stats) = master.move_stats else {
++            return Ok(());
++        };
++        let u = match place {
++            Place::Live(q, i) => self.players.live(q, i)?,
++            Place::Sleeping(q, i) => self.players.asleep(q, i)?,
++        };
++        if let Some(m) = self.parts.mover_mut(u.id) {
++            m.stats = stats;
++            if let Some(shown) = u.sprite.as_ref().map(|s| &s.graphic) {
++                m.stats.show(Some(shown));
++            }
++        }
++        Ok(())
++    }
++
+     /// The object at `place`.
+     ///
+     /// # Errors
 diff --git a/crates/engine/genie-core/src/testing/build_158041.rs b/crates/engine/genie-core/src/testing/build_158041.rs
 index 1a1bfc98..bdca75be 100644
 --- a/crates/engine/genie-core/src/testing/build_158041.rs
@@ -11877,6 +12021,77 @@ index 00000000..2bc7c317
 + let mut n=0;
 + for (ci,c) in d.civs.iter().enumerate() { for (ui,u) in c.units.iter().enumerate() { if let Some(u)=u {if let Some(b)=&u.bird {for t in &b.tasks {if t.class_id < -1 {n+=1;if n<8 {println!("civ={ci} unit={ui} task={t:?}");}}}}}}}
 + println!("invalid_class_tasks={n}");Ok(())
++}
+diff --git a/crates/tools/genie-oracle/examples/e6_tech.rs b/crates/tools/genie-oracle/examples/e6_tech.rs
+new file mode 100644
+index 00000000..bdf0f645
+--- /dev/null
++++ b/crates/tools/genie-oracle/examples/e6_tech.rs
+@@ -0,0 +1,65 @@
++//! Prints the effect commands of the techs named on the command line (a diagnosis tool).
++fn main() -> Result<(), Box<dyn std::error::Error>> {
++    let mut args = std::env::args().skip(1);
++    let bytes = std::fs::read(args.next().unwrap())?;
++    let d = genie_dat::de::DatFile::read_from(&bytes[..])?;
++    for a in args {
++        let (kind, n) = a.split_at(1);
++        let n: usize = n.parse()?;
++        if kind == "s" {
++            // every effect command on attribute n of a unit or class, with the techs that use the effect
++            for (ei, e) in d.effects.iter().enumerate() {
++                for c in &e.commands {
++                    if matches!(c.kind, 0 | 4 | 5 | 10 | 14 | 15) && c.c as usize == n {
++                        let techs: Vec<String> = d.techs.iter().enumerate().filter(|(_, t)| t.effect_id as usize == ei && t.effect_id >= 0).map(|(i, t)| format!("{i}:{}:civ{}:req{:?}", String::from_utf8_lossy(&t.name.bytes), t.civ, t.required_techs)).collect();
++                        println!("effect {ei} {:?} kind={} a={} b={} d={} techs={:?}", String::from_utf8_lossy(&e.name.bytes), c.kind, c.a, c.b, c.d, techs);
++                    }
++                }
++            }
++            continue;
++        }
++        if kind == "c" {
++            // every tech of civ n, in full
++            for (i, t) in d.techs.iter().enumerate() {
++                if t.civ as usize == n && t.civ >= 0 {
++                    println!("tech {i} {:?}: {t:?}", String::from_utf8_lossy(&t.name.bytes));
++                    if t.effect_id >= 0 {
++                        for c in &d.effects[t.effect_id as usize].commands {
++                            println!("    kind={} a={} b={} c={} d={}", c.kind, c.a, c.b, c.c, c.d);
++                        }
++                    }
++                }
++            }
++            continue;
++        }
++        if kind == "f" {
++            println!("tech {n}: {:?}", d.techs[n]);
++            continue;
++        }
++        if kind == "r" {
++            for (i, t) in d.techs.iter().enumerate() {
++                if t.required_techs.contains(&(n as i16)) {
++                    println!("tech {i} {:?} civ={} effect={} required={:?} need={} time={:?} locs={:?}", String::from_utf8_lossy(&t.name.bytes), t.civ, t.effect_id, t.required_techs, t.required_tech_count, t.queue_time, t.research_location_count);
++                    if t.effect_id >= 0 {
++                        for c in &d.effects[t.effect_id as usize].commands {
++                            println!("    kind={} a={} b={} c={} d={}", c.kind, c.a, c.b, c.c, c.d);
++                        }
++                    }
++                }
++            }
++            continue;
++        }
++        let e = if kind == "t" {
++            let t = &d.techs[n];
++            println!("tech {n} {:?} civ={} effect={} required={:?}", t.name, t.civ, t.effect_id, t.required_techs);
++            if t.effect_id < 0 { continue; }
++            t.effect_id as usize
++        } else { n };
++        let e = &d.effects[e];
++        println!(" effect {:?}", e.name);
++        for c in &e.commands {
++            println!("  kind={} a={} b={} c={} d={}", c.kind, c.a, c.b, c.c, c.d);
++        }
++    }
++    Ok(())
 +}
 diff --git a/crates/tools/genie-oracle/examples/header_probe.rs b/crates/tools/genie-oracle/examples/header_probe.rs
 new file mode 100644
