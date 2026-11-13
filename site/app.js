@@ -46,7 +46,27 @@
     'Forging':'근접 공격 1단계','Iron Casting':'근접 공격 2단계','Blast Furnace':'근접 공격 3단계',
     'Scale Barding Armor':'기병 방어 1단계','Chain Barding Armor':'기병 방어 2단계',
     'Plate Barding Armor':'기병 방어 3단계','Bloodlines':'혈통','Husbandry':'사육술','Ballistics':'탄도학',
-    'Feudal Age':'봉건 시대','Castle Age':'성주 시대','Imperial Age':'왕정 시대'
+    'Feudal Age':'봉건 시대','Castle Age':'성주 시대','Imperial Age':'왕정 시대',
+    'Militia':'시민군','Man-at-Arms':'무장 병사','Long Swordsman':'장검병','Two-Handed Swordsman':'양손 검병',
+    'Longbowman':'장궁병','Elite Longbowman':'정예 장궁병','Petard':'폭파병','Ghulam':'굴람','Elite Ghulam':'정예 굴람',
+    'Mounted Crossbowman':'기마 석궁병','Onager':'아너저 투석기','Trebuchet':'트레뷰셋 투석기','Scorpion':'스콜피온',
+    'Bombard Cannon':'사석포','Hand Cannoneer':'총통병','Armored Elephant':'장갑 코끼리','Battle Elephant':'전투 코끼리',
+    'Elephant Archer':'코끼리 궁사','Berserk':'버서커','Camel Scout':'낙타 정찰병','Chu Ko Nu':'연노병',
+    'Mangudai':'만구다이','Elite Mangudai':'정예 만구다이','Fire Lancer':'화창기병','Genoese Crossbowman':'제노바 석궁병',
+    'Hei Guang Cavalry':'흑광 기병','Hussar':'후사르','Light Cavalry':'경기병','Janissary':'예니체리','Kona':'코나',
+    'Konnik':'콘니크','Leitis':'레이티스','Ratha':'라타 전차','Rocket Cart':'로켓 수레','Samurai':'사무라이',
+    'Shotel Warrior':'쇼텔 전사','Throwing Axeman':'도끼투척병','Trade Cart':'교역 마차','Varangian Guard':'바랑인 친위대',
+    'Imperial Skirmisher':'제국 척후병',
+    'Watch Tower':'망루','Outpost':'감시 초소','Gate':'성문','Palisade Gate':'나무 성문','Krepost':'크레포스트',
+    'Fortified Wall':'대형 성벽',
+    'Padded Archer Armor':'패드 궁사 갑옷','Leather Archer Armor':'가죽 궁사 갑옷','Ring Archer Armor':'링 궁사 갑옷',
+    'Scale Mail Armor':'비늘 갑옷','Chain Mail Armor':'체인 갑옷','Plate Mail Armor':'금속 갑옷',
+    'Gold Shaft Mining':'금 수직갱 채광','Stone Shaft Mining':'석재 수직갱 채광',
+    'Town Watch':'마을 감시','Town Patrol':'마을 순찰','Thumb Ring':'손가락 보호대','Squires':'종자','Yeomen':'요먼',
+    'Arson':'방화','Chemistry':'화학','Conscription':'징병','Treadmill Crane':'기중기','Fervor':'신앙심',
+    'Murder Holes':'살인 구멍','Sanctity':'신성','Siege Engineers':'공성 기술자','Chieftains':'족장',
+    'Chivalry':'기사도','Drill':'훈련','Gambesons':'갬비슨','Grand Trunk Road':'그랜드 트렁크 로드',
+    'Masonry':'석공술','Redemption':'구원','Shatagni':'화승총','Warwolf':'워울프'
   };
   const label = value => names[value] || value;
   const ageList = ['봉건','성주','왕정'];
@@ -479,7 +499,7 @@
         return `<button class="highlight ${d.delta===null||d.delta===0?'':d.delta<0?'ahead':'behind'}" data-open-panel="ages" data-open-age="${age}"><span>${age} ${d.reached?'도달':'클릭'}</span><strong>${esc(d.text)}</strong><small>나 ${fmtTime(d.a)} · 상대 ${fmtTime(d.b)}</small></button>`;
       }).join('')+(window.SSAPOHousing?.highlight(a.housing)||'');
       const tabs=[['summary','복기'],['numbers','수치'],['ages','시대업'],['production','생산·연구'],['timeline','경기 흐름']];
-      workspace=header+`<nav class="review-tabs" role="tablist" aria-label="경기 분석 항목">${tabs.map(([id,title],i)=>`<button role="tab" id="tab-${id}" aria-controls="panel-${id}" aria-selected="${i===0}" tabindex="${i===0?0:-1}" data-panel="${id}">${title}</button>`).join('')}</nav><div class="review-body"><section id="panel-summary" role="tabpanel" aria-labelledby="tab-summary" tabindex="0">${window.SSAPOHousing?.warning(a.housing)||''}<div class="highlights">${highlights||'<p class="compact-note">비교할 시대 전환 기록 없음</p>'}</div>${window.SSAPORankedBenchmarks?.render(ranked,true)||''}${renderReview(m)}${renderBasics(mine,theirs,other)}</section><section id="panel-numbers" role="tabpanel" aria-labelledby="tab-numbers" tabindex="0" hidden>${window.SSAPORankedBenchmarks?.render(ranked)||''}${window.SSAPOStateCurve?.render(a.state_curve,mine,theirs)||''}${window.SSAPOEngineIncome?.render(a.engine_income)||''}${missingNotes(a)}${renderNumbersPanel(a.review,mine,theirs,other)}</section><section id="panel-ages" role="tabpanel" aria-labelledby="tab-ages" tabindex="0" hidden>${renderAgePanel(mine,theirs,other,ranked,a.housing)}</section><section id="panel-production" role="tabpanel" aria-labelledby="tab-production" tabindex="0" hidden>${renderProductionPanel()}</section><section id="panel-timeline" role="tabpanel" aria-labelledby="tab-timeline" tabindex="0" hidden>${renderTimelinePanel(a)}</section></div>`+links;
+      workspace=header+`<nav class="review-tabs" role="tablist" aria-label="경기 분석 항목">${tabs.map(([id,title],i)=>`<button role="tab" id="tab-${id}" aria-controls="panel-${id}" aria-selected="${i===0}" tabindex="${i===0?0:-1}" data-panel="${id}">${title}</button>`).join('')}</nav><div class="review-body"><section id="panel-summary" role="tabpanel" aria-labelledby="tab-summary" tabindex="0">${window.SSAPOHousing?.warning(a.housing)||''}<div class="highlights">${highlights||'<p class="compact-note">비교할 시대 전환 기록 없음</p>'}</div>${window.SSAPORankedBenchmarks?.render(ranked,true)||''}${renderReview(m)}${renderBasics(mine,theirs,other)}</section><section id="panel-numbers" role="tabpanel" aria-labelledby="tab-numbers" tabindex="0" hidden>${window.SSAPORankedBenchmarks?.render(ranked)||''}${window.SSAPOStateCurve?.render(a.state_curve,mine,theirs)||''}${window.SSAPOEngineIncome?.render(a.engine_income,[a.metrics?.full_timeline,a.opponents?.[0]?.metrics?.full_timeline])||''}${missingNotes(a)}${renderNumbersPanel(a.review,mine,theirs,other)}</section><section id="panel-ages" role="tabpanel" aria-labelledby="tab-ages" tabindex="0" hidden>${renderAgePanel(mine,theirs,other,ranked,a.housing)}</section><section id="panel-production" role="tabpanel" aria-labelledby="tab-production" tabindex="0" hidden>${renderProductionPanel()}</section><section id="panel-timeline" role="tabpanel" aria-labelledby="tab-timeline" tabindex="0" hidden>${renderTimelinePanel(a)}</section></div>`+links;
     }
     $('#match-detail').innerHTML=`<div class="review-workspace">${workspace}</div>`;
     if(a)bindWorkspace($('#match-detail .review-workspace'),mine,theirs,other,a.review,a.map_view,m);

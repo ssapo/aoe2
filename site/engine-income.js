@@ -36,7 +36,19 @@
   /* By source: one stored row is [seconds, 9 of mine, 9 of the opponent's]; 7 food sources, then gold from mines and other gold. */
   const FOOD=['양','멧돼지','사슴','열매','농장','물고기','기타'];
   const GOLD=['금광','기타'];
-  function sources(d){
+  /* A source someone has set up by the counted time is listed even while both sides are at zero:
+     a Mill (or Folwark) request stands for berries, a Farm request for farms. The rest only when used. */
+  const SETUP={Mill:3,Folwark:3,Farm:4};
+  function started(timelines,until){
+    const found=new Set();
+    for(const timeline of Array.isArray(timelines)?timelines:[]){
+      for(const e of Array.isArray(timeline)?timeline:[]){
+        if(e&&e.kind==='BUILD'&&Number.isFinite(e.seconds)&&e.seconds<=until&&Object.prototype.hasOwnProperty.call(SETUP,e.label))found.add(SETUP[e.label]);
+      }
+    }
+    return found;
+  }
+  function sources(d,timelines){
     const part=d&&d.by_source;
     if(!part||!Array.isArray(part.points)||!part.points.length)return null;
     const last=part.points[part.points.length-1];
@@ -45,8 +57,9 @@
     const own=side(1),opponent=side(10);
     const sum=list=>list.reduce((a,b)=>a+b,0);
     if(sum(own.food)+sum(opponent.food)<=0)return null;
+    const setUp=started(timelines,last[0]);
     return {seconds:last[0],own,opponent,
-      foodShown:FOOD.map((name,i)=>[name,i]).filter(([,i])=>own.food[i]>0||opponent.food[i]>0),
+      foodShown:FOOD.map((name,i)=>[name,i]).filter(([,i])=>own.food[i]>0||opponent.food[i]>0||setUp.has(i)),
       goldSplit:own.gold[1]>0||opponent.gold[1]>0};
   }
   function sourceRows(names,values,side){
@@ -56,19 +69,19 @@
       return `<li><span class="source-name">${esc(name)}</span><span class="source-bar ${side}" aria-hidden="true"><i style="width:${share}%"></i></span><span class="source-amount">${esc(num(values[i]))}</span><span class="source-share">${share}%</span></li>`;
     }).join('')}</ul>`;
   }
-  function renderSources(d){
-    const s=sources(d);
+  function renderSources(d,timelines){
+    const s=sources(d,timelines);
     if(!s)return '';
     const sum=list=>list.reduce((a,b)=>a+b,0);
     const block=(title,names,pick)=>`<div class="source-block"><h4>${esc(title)} <small>${clock(s.seconds)}까지 일꾼이 가져온 양</small></h4><div class="source-sides">${[['mine','나',s.own],['theirs','상대',s.opponent]].map(([side,who,data])=>`<div class="source-side"><strong class="${side}">${esc(who)} · ${esc(num(sum(pick(data))))}</strong>${sourceRows(names,pick(data),side)}</div>`).join('')}</div></div>`;
     return `<div class="income-sources">${block('식량 출처',s.foodShown,x=>x.food)}${s.goldSplit?block('금 출처',GOLD.map((name,i)=>[name,i]),x=>x.gold):''}<p class="source-note">생산을 취소해 돌려받은 자원은 여기에 넣지 않았어요. 그래서 위 그래프의 숫자보다 적을 수 있어요.</p></div>`;
   }
-  function render(d){
+  function render(d,timelines){
     const s=summary(d);
     if(!s||!s.shown.length)return '';
     const lines=[`${clock(s.at)}까지 모은 자원: 나 ${num(s.own)} · 상대 ${num(s.opponent)}`];
     if(s.widest&&s.widest.gap!==0)lines.push(`가장 크게 벌어진 때: ${clock(s.widest.seconds)}, ${s.widest.gap>0?'내가':'상대가'} ${num(Math.abs(s.widest.gap))} 더 모음`);
-    return `<section class="state-curve engine-income"><h3 class="detail-heading">자원별 누적 수입 <small>경기 재현 · ${clock(s.until)}까지 확인됨</small></h3><ul class="state-lines">${lines.map(l=>`<li>${esc(l)}</li>`).join('')}</ul><div class="state-charts">${s.shown.map(([name,a,b])=>chart(d.points,a,b,name)).join('')}</div>${renderSources(d)}</section>`;
+    return `<section class="state-curve engine-income"><h3 class="detail-heading">자원별 누적 수입 <small>경기 재현 · ${clock(s.until)}까지 확인됨</small></h3><ul class="state-lines">${lines.map(l=>`<li>${esc(l)}</li>`).join('')}</ul><div class="state-charts">${s.shown.map(([name,a,b])=>chart(d.points,a,b,name)).join('')}</div>${renderSources(d,timelines)}</section>`;
   }
-  const api={summary,render,valid,sources,renderSources};if(typeof module==='object'&&module.exports)module.exports=api;else global.SSAPOEngineIncome=api;
+  const api={summary,render,valid,sources,renderSources,started};if(typeof module==='object'&&module.exports)module.exports=api;else global.SSAPOEngineIncome=api;
 })(typeof window==='undefined'?globalThis:window);

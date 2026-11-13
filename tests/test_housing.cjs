@@ -35,4 +35,24 @@ test('feudal rows list intervals and missing sides',()=>{
  assert.deepEqual(H.rows({own:null,opponent:h.opponent}),[['봉건 전 인구 막힘 · 추정','—','없음']]);
  assert.deepEqual(H.rows({}),[]);
  assert.match(H.note(h),/10초보다 짧은/);
+ assert.match(H.note(h),/<summary>인구 막힘은<\/summary><p>리플의/);
+});
+test('villagers out by the Feudal click: counted, a range at the click, or an estimate',()=>{
+ const withV=(row,villagers,extra={})=>({...row,feudal_clicked:true,villagers,...extra});
+ const label='누르기 전까지 나온 주민 · 시작 포함';
+ const counted={start:3,trained:16,at_click:0,other_units:0,counted:true};
+ const both={min_block_seconds:10,own:withV(none.own,{...counted,at_click:1}),opponent:withV(none.opponent,{...counted,trained:14})};
+ assert.deepEqual(H.rows(both),[[label,'19~20명','17명'],['봉건 전 인구 막힘 · 추정','없음','없음']]);
+ const guess=H.rows({own:withV(none.own,{...counted,counted:false,at_click:1}),opponent:withV(none.opponent,{start:6,trained:14})});
+ assert.deepEqual(guess[0],[label,'19명 · 추정','20명 · 추정']);
+ // an older analysis, a side left out (Huns), a player who never clicked, and broken values
+ assert.deepEqual(H.rows({own:withV(none.own,counted),opponent:none.opponent})[0],[label,'19명','—']);
+ assert.deepEqual(H.rows({own:withV(none.own,counted),opponent:null})[0],[label,'19명','—']);
+ assert.deepEqual(H.rows({own:withV(none.own,counted,{feudal_clicked:false}),opponent:withV(none.opponent,counted)})[0],[label,'—','19명']);
+ for(const bad of [null,{},{start:3},{start:'3',trained:16},{start:3,trained:-1},{start:3,trained:1.5}])
+  assert.deepEqual(H.rows({own:withV(none.own,bad),opponent:none.opponent}),[['봉건 전 인구 막힘 · 추정','없음','없음']]);
+ assert.match(H.note(both),/<summary>나온 주민·인구 막힘은<\/summary><p>‘나온 주민’은 요청 횟수가 아니라/);
+ assert.match(H.note(both),/죽은 주민은 빼지 못해요/);
+ assert.match(H.note(both),/<p>인구 막힘은 리플의/);
+ assert.doesNotMatch(H.rows(both).flat().join(' ')+H.note(both),/살아|생존/);
 });

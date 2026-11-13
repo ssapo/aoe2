@@ -184,6 +184,70 @@ class HousingTests(TestCase):
         r = H.player_housing(orders, player(), 'Franks', 200, counted=counted)
         self.assertEqual([(b['from_seconds'], b['counted']) for b in r['blocks']], [(25.0, False)])
 
+    def test_villagers_out_by_the_click_are_the_counted_units(self):
+        # 2 villagers and the scout at the start; two more trained: out at 25 and 50
+        p, orders = player(villagers=2), [queue(0, 2)]
+        seen = lambda born, end=70: [(t, t + 10.0, born.count(t), born.count(t)) for t in range(0, end, 10)]
+        r = H.player_housing(orders, p, 'Franks', 70, counted=seen([20, 50]))
+        self.assertEqual(r['villagers'], {'start': 2, 'trained': 2, 'at_click': 0, 'other_units': 0, 'counted': True})
+        # the lists show a unit in the interval that holds the click: before or after it is not told
+        r = H.player_housing(orders, p, 'Franks', 55, counted=seen([20, 50]))
+        self.assertEqual(r['villagers'], {'start': 2, 'trained': 1, 'at_click': 1, 'other_units': 0, 'counted': True})
+        # the same for one the replay is still making when the click comes (due at 50)
+        r = H.player_housing(orders, p, 'Franks', 45, counted=seen([20, 40]))
+        self.assertEqual(r['villagers'], {'start': 2, 'trained': 1, 'at_click': 1, 'other_units': 0, 'counted': True})
+        r = H.player_housing(orders, p, 'Franks', 45, counted=seen([20, 50]))
+        self.assertEqual(r['villagers'], {'start': 2, 'trained': 1, 'at_click': 0, 'other_units': 0, 'counted': True})
+        # no checkpoints: the replay's units, an estimate
+        r = H.player_housing(orders, p, 'Franks', 70)
+        self.assertEqual(r['villagers'], {'start': 2, 'trained': 2, 'at_click': 0, 'other_units': 0, 'counted': False})
+
+    def test_villagers_are_an_estimate_where_the_lists_and_the_replay_differ(self):
+        p, orders = player(villagers=2), [queue(0, 2)]
+        seen = lambda born: [(t, t + 10.0, born.count(t), born.count(t)) for t in range(0, 70, 10)]
+        guess = {'start': 2, 'trained': 2, 'at_click': 0, 'other_units': 0, 'counted': False}
+        counted = seen([20, 50])
+        counted[2] = (20.0, 30.0, None, None)             # not counted: the replay's unit stands there
+        self.assertEqual(H.player_housing(orders, p, 'Franks', 70, counted=counted)['villagers'], guess)
+        counted[2] = (20.0, 30.0, 1, 3)                   # a wall line: one to three units
+        self.assertEqual(H.player_housing(orders, p, 'Franks', 70, counted=counted)['villagers'], guess)
+        # a unit the lists show and no order explains: the lists' number, as an estimate
+        r = H.player_housing(orders, p, 'Franks', 70, counted=seen([20, 30, 50]))
+        self.assertEqual(r['villagers'], dict(guess, trained=3))
+        # a unit the estimate accepted and the lists do not show: the order is set to refused
+        r = H.player_housing(orders, p, 'Franks', 70, counted=seen([20]))
+        self.assertEqual((r['villagers']['trained'], r['villagers']['counted'], r['refused_queue']), (1, True, 1))
+        # a replay that still makes it (no order to set right): the lists' number, as an estimate
+        made = O(births=[25.0, 50.0], kinds=[83, 83], held=set(), due=lambda: [])
+        self.assertEqual(H._villagers(p, made, seen([20]), 70), dict(guess, trained=1))
+        # the click interval was not counted
+        counted = seen([20])
+        counted[5] = (50.0, 60.0, None, None)
+        r = H.player_housing(orders, p, 'Franks', 55, counted=counted)
+        self.assertEqual(r['villagers'], guess)
+
+    def test_nothing_is_trained_before_the_first_order_could_finish(self):
+        # the lists show an object in the first seconds: no queue can have made it
+        counted = [(t, t + 10.0, int(t in (0, 20, 50)), int(t in (0, 20, 50))) for t in range(0, 70, 10)]
+        r = H.player_housing([queue(0, 2)], player(villagers=2), 'Franks', 70, counted=counted)
+        self.assertEqual(r['villagers'], {'start': 2, 'trained': 2, 'at_click': 0, 'other_units': 0, 'counted': True})
+        # a restored game starts with units in the making: nothing is left out there
+        counted = [(a + 100.0, b + 100.0, fewest, most) for a, b, fewest, most in counted]
+        late = [queue(100, 2)]
+        r = H.player_housing(late, player(villagers=2), 'Franks', 170, counted=counted)
+        self.assertEqual((r['villagers']['trained'], r['villagers']['counted']), (3, False))
+
+    def test_other_units_are_told_from_villagers_by_their_orders(self):
+        # a militia from the barracks (21 s) and a villager (25 s) in one interval
+        orders = [queue(0, 1), queue(0, 1, unit=74, building=40)]
+        seen = lambda end: [(t, t + 10.0, 2 * (t == 20), 2 * (t == 20)) for t in range(0, end, 10)]
+        r = H.player_housing(orders, player(villagers=2), 'Franks', 40, counted=seen(60))
+        self.assertEqual(r['villagers'], {'start': 2, 'trained': 1, 'at_click': 0, 'other_units': 1, 'counted': True})
+        # around the click the kinds are not told apart
+        r = H.player_housing(orders, player(villagers=2), 'Franks', 27, counted=seen(60))
+        self.assertEqual(r['villagers']['counted'], False)
+        self.assertEqual((r['villagers']['trained'], r['villagers']['other_units']), (1, 1))
+
     def test_gathering_is_split_by_villager_tasks(self):
         p = player()
         objects = {o.instance_id: (o.name, o.position.x, o.position.y) for o in p.objects}

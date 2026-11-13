@@ -99,7 +99,14 @@ jobs:
           git add site/data/
           if ! git diff --cached --quiet; then
             git commit -m 'Update public match report'
-            git push
+            # main can move while this job runs (a docs or code push): put the report commit on top of it and try again.
+            pushed=false
+            for attempt in 1 2 3; do
+              if git pull --rebase --autostash origin main && git push origin HEAD:main; then pushed=true; break; fi
+              git rebase --abort 2>/dev/null || true
+              sleep 5
+            done
+            if [ "$pushed" != true ]; then echo 'Could not push the report after 3 tries.'; exit 1; fi
           fi
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

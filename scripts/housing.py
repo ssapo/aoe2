@@ -21,6 +21,11 @@ estimate only makes the first guess of which queue orders were accepted: the uni
 checkpoints show appearing (births.py) set it right, wherever they can be counted. Each block
 is still an estimate, and short ones are not reported. A player who starts without a Town
 Center (Steppe, nomad) is left out: the map sets that start's population cap.
+
+The replay's end also gives the villagers that had come out by the Feudal click (`villagers`):
+those the game started with plus those trained since. How many units appeared is the
+checkpoints' count; that a unit is a villager is the replay's (the queue order that made it).
+Villagers that died are not taken off.
 """
 import io
 import math
@@ -46,6 +51,7 @@ BUILD_TIME = {562: 35.0, 68: 35.0, 584: 35.0, 50: 15.0, 12: 50.0, 45: 35.0, 598:
 GATE_BUILD = 30.0
 OTHER_BUILD = 35.0
 LOOM, FEUDAL = 22, 101
+VILLAGERS = (83, 293)      # male, female
 TRAIN = {83: 25.0, 293: 25.0, 74: 21.0, 13: 40.0, 545: 45.0}  # dark-age units
 RESEARCH = {LOOM: 25.0, FEUDAL: 130.0}
 LIVESTOCK = {'Sheep', 'Pig', 'Goose', 'Turkey', 'Goat', 'Llama', 'Cow A', 'Cow B', 'Cow C', 'Cow D',
@@ -450,6 +456,7 @@ class Production:
         self.state, self.t, self.in_training = {}, 0.0, 0
         self.timeline, self.blocks, self.on_birth = [(0.0, pop, self.cap_at(0.0))], [], None
         self.births, self.held = [], set()     # birth times; those of units that had waited at the cap
+        self.kinds = []                        # the unit id of each birth, in the order of `births`
 
     def cap_at(self, t):
         return sum(c for when, c in self.caps if when <= t)
@@ -534,6 +541,7 @@ class Production:
                         self.in_training -= 1
                         self.pop += 1
                         self.births.append(self.t)
+                        self.kinds.append(s['unit'])
                         if s.get('waited'):
                             self.held.add(self.t)
                         if self.on_birth:
@@ -549,6 +557,11 @@ class Production:
         for s in self.state.values():
             if s['wait_from'] is not None:
                 self.blocks.append((s['wait_from'], until))
+
+    def due(self):
+        """[(seconds, waited at the cap)] of the units being made: when each will appear."""
+        return [(s['busy_until'], bool(s.get('waited'))) for s in self.state.values()
+                if s['busy_until'] is not None and s['unit'] is not None]
 
 
 def player_housing(orders, player, civ, until, checkpoints=(), objects=None, counted=None, lists=None):
@@ -609,6 +622,12 @@ def player_housing(orders, player, civ, until, checkpoints=(), objects=None, cou
                   'counted_until_seconds': round(min(known_until, until), 1),
                   'estimated': [round(t, 1) for t, seen in done if not seen]}
     caps = sorted([(0.0, tc_pop * len(tcs))] + builders.caps(tc_pop, house_pop))
+    queued = [(at, payload.get('unit_id')) for at, _, kind, payload, _ in own
+              if kind == 'DE_QUEUE' and at < until and (payload.get('amount') or 0) > 0]
+    mixed = any(unit not in VILLAGERS for _, unit in queued)
+    # no unit comes out before the first order's training time (a Town Center works at most 1.05 times as fast)
+    first = 0.0 if any(unit not in TRAIN for _, unit in queued) else min(
+        (at + TRAIN[unit] / max(TC_WORK.values()) for at, unit in queued), default=math.inf)
 
     run = lambda forced: _replay(own, player, civ, until, caps, tcs, home, checkpoints, objects, pop, forced)
     if counted:
@@ -644,8 +663,90 @@ def player_housing(orders, player, civ, until, checkpoints=(), objects=None, cou
                   'counted_seconds': round(max(0.0, until - start - sum(b - a for a, b in spans)), 1),
                   'estimated': [[round(a, 1), round(b, 1)] for a, b in spans]}
     return {'until_seconds': round(until, 1), 'blocks': shown, 'refused_queue': refused, 'births': born,
+            'villagers': _villagers(player, production, counted, until, first, mixed),
             'houses': houses,
             'blocked_seconds': round(sum(x['seconds'] for x in shown), 1), 'timeline': timeline}
+
+
+def _villagers(player, production, counted, until, first=0.0, mixed=False):
+    """Villagers that had come out by `until`: `start` (in the recording's header) and `trained`
+    (out of a building since; the start's are not in it). `other_units` are the other units
+    trained in that time (militia, ships).
+
+    `counted` says the number is the checkpoints': every interval up to `until` was counted
+    with one answer, and the replay made the same units in the same intervals. `trained` is
+    then what had come out by the last checkpoint before `until`, and `at_click` what the lists
+    show in the interval that holds `until`: before it or after it, they do not tell. So the
+    number at `until` is `trained` to `trained + at_click`.
+
+    Otherwise `trained` is an estimate, and `at_click` 0: the units the checkpoints counted, or
+    the replay's if it made more (in the intervals that were not counted).
+
+    Nothing can have been trained before `first`, so what the lists show before it is left
+    out. The checkpoints do not tell a unit's kind: that is the replay's, from the queue order
+    that made it (`mixed`: units other than villagers were ordered, or units the replay does
+    not know). Villagers that died are not taken off."""
+    row = {'start': sum(1 for o in player.objects if o.class_id == 70 and o.name == 'Villager')}
+    born = list(zip(production.births, production.kinds))
+    if not counted:
+        others = sum(1 for _, kind in born if kind not in VILLAGERS)
+        return dict(row, trained=len(born) - others, at_click=0, other_units=others, counted=False)
+    if counted[0][0] > 0:
+        first = 0.0                   # a restored game: units may be in the making at its start
+    sure = counted[-1][1] >= until
+    slots, loose, around = [], [], None
+    for a, b, fewest, most in counted:
+        if a >= until:
+            break
+        if b <= first:
+            continue
+        if fewest is None:
+            loose.append((a, b))
+            sure = False
+        elif b > until:
+            around = (a, b, most)
+            sure = sure and fewest == most and not (most and mixed)
+        else:
+            slots += [(a - TOLERANCE, b + TOLERANCE)] * fewest
+            if most > fewest:         # a wall line: its foundations, and so the units, are a range
+                loose.append((a, b))
+                sure = False
+    k, missed, extra, last, others = 0, 0, 0, 0, 0
+    for at, kind in born:
+        slack = HELD_TOLERANCE if at in production.held else 0.0
+        while k < len(slots) and slots[k][1] + slack < at:
+            k += 1                    # a unit the lists show and the replay does not make
+            missed += 1
+        if k < len(slots) and slots[k][0] - slack <= at:
+            k += 1
+        elif around and at >= around[0] - TOLERANCE - slack:
+            if last == around[2]:
+                sure = False          # more than the lists show there
+                continue
+            last += 1
+        elif any(a - TOLERANCE - slack <= at <= b + TOLERANCE + slack for a, b in loose):
+            extra += 1
+        else:
+            sure = False              # a unit the replay makes and the lists do not show
+            continue
+        others += kind not in VILLAGERS
+    missed += len(slots) - k
+    if missed:
+        sure = False
+    if around and sure:
+        # the units the lists show around `until`: those the replay made there before it and
+        # those it was still making
+        due = [(at, HELD_TOLERANCE if held else TOLERANCE) for at, held in production.due()]
+        fewest = last + sum(1 for at, slack in due if at <= around[1] - slack)
+        most = last + sum(1 for at, slack in due if at <= around[1] + slack)
+        sure = fewest <= around[2] <= most
+    if sure:
+        return dict(row, trained=len(slots) - others, at_click=around[2] if around else 0,
+                    other_units=others, counted=True)
+    # a unit the replay makes where nothing was counted may be one it missed where it was
+    units = len(slots) + max(0, extra - missed) + last
+    others = min(others, units)
+    return dict(row, trained=units - others, at_click=0, other_units=others, counted=False)
 
 
 def _deadlines(counted, own, civ, pop, cap, house_pop):

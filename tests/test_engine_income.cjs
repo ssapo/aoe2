@@ -30,6 +30,18 @@ test('food sources: amounts, shares and only the sources someone used',()=>{
   assert.ok(!html.includes('물고기'));
   assert.ok(html.includes('금 출처'));assert.ok(html.includes('금광'));
 });
+test('a source set up by the counted time is listed at zero on both sides; later or unrelated requests are not',()=>{
+  const early=[20,100,50,0,0,0,0,0,0,0,60,40,0,0,0,0,0,0,0];
+  const d={...curve,by_source:{points:[early]}};
+  const shown=timelines=>income.sources(d,timelines).foodShown.map(r=>r[0]);
+  assert.deepStrictEqual(shown(),['양','멧돼지']);
+  assert.deepStrictEqual(shown([[{seconds:12,kind:'BUILD',label:'Farm'}],[]]),['양','멧돼지','농장']);
+  assert.deepStrictEqual(shown([[],[{seconds:20,kind:'BUILD',label:'Mill'}]]),['양','멧돼지','열매']);
+  assert.deepStrictEqual(shown([[{seconds:5,kind:'BUILD',label:'Folwark'},{seconds:6,kind:'BUILD',label:'Farm'}],undefined]),['양','멧돼지','열매','농장']);
+  assert.deepStrictEqual(shown([[{seconds:21,kind:'BUILD',label:'Farm'},{seconds:3,kind:'QUEUE',label:'Farm'},{seconds:3,kind:'BUILD',label:'House'},{kind:'BUILD',label:'Mill'},null]]),['양','멧돼지']);
+  const html=income.render(d,[[{seconds:12,kind:'BUILD',label:'Farm'}]]);
+  assert.ok(html.includes('농장'));assert.ok(!html.includes('열매'));
+});
 test('gold split is hidden when no other gold, and nothing is drawn without the by-source part',()=>{
   const plain=row.slice();plain[9]=0;plain[18]=0;
   const html=income.render({...curve,by_source:{points:[plain]}});
