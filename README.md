@@ -1,5 +1,7 @@
 # SSAPO AoE2 리플 분석
 
+> **작업 시작 전 필독:** 현재 브랜치와 관계없이 [최신 공유 인계서 `research/genie/CONTINUE.md`](https://github.com/ssapo/aoe2/blob/research/genie-188329/research/genie/CONTINUE.md)를 먼저 읽는다. 연구 브랜치의 원격 최신본이 기준이다. 맨 위 **공유 작업 상태**에서 다른 세션의 담당 범위·진행 상황을 확인하고, 겹치는 작업은 중복으로 시작하지 않는다. 새 작업은 담당·범위·시각과 `진행 중` 상태를 공유 인계서에 기록·게시한 뒤 시작하며, 종료 시 `완료` 또는 구체적인 `자료 대기`로 갱신한다.
+
 > **다음 AI 작업자 (2026-11-05):** 사용자가 원본 `AoE2DE_s.exe`를 제공했다. 다음 단계는 실제 로컬 Windows 연결 확인 → 설치된 게임에서 1v1 리플 재생 확인 → 원본 상태 수집 경로 검증이다. **[로컬 Windows 인계 문서](research/genie/local-windows-handoff.md)를 먼저 읽는다.** 데스크톱 앱을 열었다는 사실만으로 로컬 실행이 연결된 것은 아니며, 원본 게임 실행·자동 수집은 아직 검증하지 않았다. 연구는 `research/genie-188329`, 분석기 예외 처리 수정은 별도 `fix/analysis-evidence-accuracy` 브랜치. main 반영·배포는 사용자 요청 전 금지.
 
 ssapo의 **AoE2: DE 1v1 경기 복기 웹앱**. 기본 계정 외에 이름 검색·프로필 전환도 지원한다. 공개 경기와 리플을 GitHub Actions에서 분석하고, GitHub Pages에서 결과를 보여준다. 방문자는 게임·Python·별도 앱을 설치할 필요가 없다.
@@ -13,7 +15,7 @@ ssapo의 **AoE2: DE 1v1 경기 복기 웹앱**. 기본 계정 외에 이름 검�
 
 ## Claude 및 다음 작업자를 위한 시작 순서
 
-1. 이 README의 **분석 기준**, **데이터 구조**, **작업·배포 원칙**, **현재 제한**을 먼저 읽는다.
+1. 위 **최신 공유 인계서**와 작업 상태를 확인한 다음, 이 README의 **분석 기준**, **데이터 구조**, **작업·배포 원칙**, **현재 제한**을 읽는다.
 2. `config.json`, `requirements.txt`, `.github/workflows/update.yml`로 계정·파서·배포 조건을 확인한다.
 3. 변경할 영역의 진입점만 읽는다. 수집은 `scripts/collect.py`, 명령 집계는 `scripts/details.py`, 피드백은 `scripts/review.py`, 화면은 `site/app.js`, 맵은 `scripts/mapview.py`와 `site/building-map.js`다.
 4. `site/data/report.json`은 큰 생성 파일이다. 전체를 대화에 출력하지 말고 Python 등으로 대상 경기·필드만 읽는다. 파일 끝의 과거 작업 이력보다 현재 코드와 이 README 앞부분을 우선한다.

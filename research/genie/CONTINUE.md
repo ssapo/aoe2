@@ -7,6 +7,7 @@
 | 작업 ID / 담당 | 상태 | 맡은 범위 | 마지막 갱신 (한국 시간) |
 |---|---|---|---|
 | `codex-cloud-20261113-engine` / Codex + 조사 A·B | 자료 대기: 정적 조사·진단 도구 완료 | A: 사슴 FOLLOW와 Ctrl MOVE 구분·그룹 경로 근사 확인. B: 내려놓기와 주둔 진입 기록 공백 확인. 비교 도구 합성 테스트 11개 통과. 엔진 행동 수정·빌드·리플 실행 없음. | 2026-11-13 09:51 KST |
+| `codex-cloud-20261113-readme` / Codex | 진행 중 | main·연구 브랜치 README에 최신 공유 인계서 필독 링크와 작업 전·후 상태 갱신 안내 연결. 문서만 변경. | 2026-11-13 09:54 KST |
 
 현재 이 작업의 실행 제약: 클라우드에 PC 연결 도구·리플·DAT·원본 truth 기록이 없고 `ssapo/aoe2-data` 읽기 요청은 HTTP 403이다. 정적 조사는 완료했으므로 [결과·재개 절차](sessions/codex-20261113/SESSION-HANDOFF.md), [조사 A](sessions/codex-20261113/deer-movement-investigation.md), [조사 B](sessions/codex-20261113/economy-return-investigation.md)를 먼저 읽는다. PC에서 원본 추적을 이어받는 세션은 이 표의 담당 범위·시각을 갱신하고 고유 실행 이름을 사용한다. **자료 대기는 실행 중이나 독점 예약을 의미하지 않는다.** 현재 이 작업이 돌려 둔 엔진 실행은 없다.
 
