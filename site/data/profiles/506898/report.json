@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-12T20:06:45.130793+00:00",
-  "last_checked_at": "2026-11-12T20:05:26.101534+00:00",
+  "updated_at": "2026-11-13T00:35:16.702983+00:00",
+  "last_checked_at": "2026-11-13T00:34:37.169082+00:00",
   "sync_error": null,
   "profile": {
     "id": 506898,
@@ -37,7 +37,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 17,
+        "analysis_revision": 19,
         "duration_game_seconds": 1952.94,
         "civilization": "Maya",
         "random_civ": true,
@@ -49071,20 +49071,12 @@
           "min_block_seconds": 10.0,
           "own": {
             "until_seconds": 377.5,
-            "blocks": [
-              {
-                "from_seconds": 275.7,
-                "to_seconds": 377.4,
-                "seconds": 101.8,
-                "population": "15/15",
-                "counted": false
-              }
-            ],
+            "blocks": [],
             "refused_queue": 2,
             "births": {
               "source": "recording_checkpoints",
               "corrected_queue": 0,
-              "counted_seconds": 338.5,
+              "counted_seconds": 358.0,
               "estimated": [
                 [
                   8.7,
@@ -49093,22 +49085,16 @@
                 [
                   73.7,
                   80.2
-                ],
-                [
-                  294.7,
-                  301.2
-                ],
-                [
-                  320.7,
-                  327.2
-                ],
-                [
-                  346.7,
-                  353.2
                 ]
               ]
             },
-            "blocked_seconds": 101.8,
+            "houses": {
+              "source": "recording_checkpoints",
+              "counted": 3,
+              "counted_until_seconds": 377.5,
+              "estimated": []
+            },
+            "blocked_seconds": 0,
             "feudal_clicked": true
           },
           "opponent": {
@@ -49119,6 +49105,12 @@
               "source": "recording_checkpoints",
               "corrected_queue": 3,
               "counted_seconds": 412.6,
+              "estimated": []
+            },
+            "houses": {
+              "source": "recording_checkpoints",
+              "counted": 4,
+              "counted_until_seconds": 412.6,
               "estimated": []
             },
             "blocked_seconds": 0,
@@ -49503,7 +49495,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 17,
+        "analysis_revision": 19,
         "duration_game_seconds": 659.63,
         "civilization": "Danes",
         "random_civ": true,
@@ -80158,6 +80150,12 @@
               "counted_seconds": 396.4,
               "estimated": []
             },
+            "houses": {
+              "source": "recording_checkpoints",
+              "counted": 3,
+              "counted_until_seconds": 396.4,
+              "estimated": []
+            },
             "blocked_seconds": 0,
             "feudal_clicked": true
           },
@@ -80175,6 +80173,12 @@
                   268.7
                 ]
               ]
+            },
+            "houses": {
+              "source": "recording_checkpoints",
+              "counted": 4,
+              "counted_until_seconds": 421.0,
+              "estimated": []
             },
             "blocked_seconds": 0,
             "feudal_clicked": true

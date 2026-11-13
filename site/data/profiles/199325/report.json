@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-12T20:05:23.520984+00:00",
-  "last_checked_at": "2026-11-12T20:03:57.858165+00:00",
+  "updated_at": "2026-11-13T00:34:35.578184+00:00",
+  "last_checked_at": "2026-11-13T00:34:04.483744+00:00",
   "sync_error": null,
   "profile": {
     "id": 199325,
@@ -37,7 +37,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 17,
+        "analysis_revision": 19,
         "duration_game_seconds": 1368.5,
         "civilization": "Franks",
         "random_civ": true,
@@ -38205,6 +38205,12 @@
               "counted_seconds": 424.5,
               "estimated": []
             },
+            "houses": {
+              "source": "recording_checkpoints",
+              "counted": 3,
+              "counted_until_seconds": 424.5,
+              "estimated": []
+            },
             "blocked_seconds": 0,
             "feudal_clicked": true
           },
@@ -38242,6 +38248,12 @@
                   383.4
                 ]
               ]
+            },
+            "houses": {
+              "source": "recording_checkpoints",
+              "counted": 2,
+              "counted_until_seconds": 399.7,
+              "estimated": []
             },
             "blocked_seconds": 119.2,
             "feudal_clicked": true
@@ -38590,7 +38602,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 17,
+        "analysis_revision": 19,
         "duration_game_seconds": 1213.08,
         "civilization": "Jurchens",
         "random_civ": true,
@@ -78649,108 +78661,37 @@
               "counted_seconds": 376.2,
               "estimated": []
             },
+            "houses": {
+              "source": "recording_checkpoints",
+              "counted": 3,
+              "counted_until_seconds": 376.2,
+              "estimated": []
+            },
             "blocked_seconds": 0,
             "feudal_clicked": true
           },
           "opponent": {
             "until_seconds": 411.6,
-            "blocks": [
-              {
-                "from_seconds": 25.7,
-                "to_seconds": 212.6,
-                "seconds": 187.0,
-                "population": "5/5",
-                "counted": false
-              },
-              {
-                "from_seconds": 337.6,
-                "to_seconds": 411.5,
-                "seconds": 73.9,
-                "population": "10/10",
-                "counted": false
-              }
-            ],
-            "refused_queue": 8,
+            "blocks": [],
+            "refused_queue": 7,
             "births": {
               "source": "recording_checkpoints",
-              "corrected_queue": 0,
-              "counted_seconds": 242.6,
+              "corrected_queue": 4,
+              "counted_seconds": 398.6,
               "estimated": [
-                [
-                  0.0,
-                  52.0
-                ],
-                [
-                  70.8,
-                  77.3
-                ],
-                [
-                  96.8,
-                  103.3
-                ],
-                [
-                  122.8,
-                  129.3
-                ],
-                [
-                  148.8,
-                  155.3
-                ],
                 [
                   168.3,
                   181.3
-                ],
-                [
-                  194.3,
-                  200.8
-                ],
-                [
-                  246.3,
-                  252.8
-                ],
-                [
-                  259.3,
-                  265.8
-                ],
-                [
-                  272.3,
-                  278.8
-                ],
-                [
-                  285.3,
-                  291.8
-                ],
-                [
-                  298.3,
-                  304.8
-                ],
-                [
-                  311.3,
-                  317.8
-                ],
-                [
-                  324.3,
-                  330.8
-                ],
-                [
-                  337.3,
-                  343.8
-                ],
-                [
-                  350.3,
-                  356.8
-                ],
-                [
-                  369.8,
-                  376.3
-                ],
-                [
-                  395.8,
-                  402.3
                 ]
               ]
             },
-            "blocked_seconds": 260.9,
+            "houses": {
+              "source": "recording_checkpoints",
+              "counted": 3,
+              "counted_until_seconds": 411.6,
+              "estimated": []
+            },
+            "blocked_seconds": 0,
             "feudal_clicked": true
           }
         },
