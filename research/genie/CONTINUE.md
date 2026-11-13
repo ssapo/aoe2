@@ -439,7 +439,7 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 13.4 지금 하던 일 (멈출 때마다 이 절을 덮어쓴다)
 
-**2026-11-13, Claude (세션 M7). 결론: 반쯤 하던 일 없음. 엔진 쪽은 55번까지 넣고 푸시했고, 사이트 쪽은 `houses` 브랜치에 커밋 2개가 사용자의 "배포" 한마디를 기다린다.**
+**2026-11-13, Claude (세션 M7). 결론: 반쯤 하던 일 없음. 엔진 쪽은 55번까지 넣고 푸시했고, 사이트 쪽도 개정 19까지 main에 푸시했다(`8f5d112`, 2026-11-13 사용자 요청으로 배포 시작; 배포 실행과 engine-check 결과, 식량 출처 블록이 화면에 실제로 뜨는지는 아직 확인 전 — 새 세션은 이것부터 확인).**
 
 끝난 것 (엔진, 전부 기본으로 켬; 스위치는 `GENIE_EXPERIMENT_<이름>_188329=1`):
 - 49 `GATHER_SNAP`: 채집 자리 맞추기. 517426097 P2 첫 어긋남 535.9 → 711.4초.
@@ -451,15 +451,15 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 - 55 `HORDE`: commandHorde. "a horde's command" 멈춤 둘이 없어짐. 숫자는 그대로.
 - `GENIE_TRACE_GAIN=1`(진단 출력, 동작 변화 없음): 10초마다 선수별 출처별 누적 채집량 `GAIN {...}`. 확인(518239882, 실행 `M6g2_239`, 1,060초, `tools/M7_gaincheck.py`): 나무·금·돌은 보유 자원 증가분 합과 같고(P1 나무만 +10: 같은 갱신에서 쓴 것), 식량은 P1 −700, P2 −100 = 전부 생산 취소 환불(50·80 단위). "other"는 0. 체크포인트 출력은 `M6_p_239`와 같다(55/54).
 
-끝난 것 (사이트 `ssapo/aoe2` main, 배포됨): 대표 선수를 `config.json`에서 읽기, 유닛 탄생을 체크포인트로 세기(개정 16), 게임 빌드 확인(188329만 엔진 실행), 엔진 갱신(개정 17). **아직 배포 안 됨(`houses`)**: 집 완성 시각을 체크포인트에서 읽기(개정 18, `b845437`), 식량 출처 표시(개정 19, `8f5d112`: `analysis.engine_income.by_source`, 화면 "식량 출처", `engine/switches.env`에 54·55번 스위치 추가; engine-check 기대값 55/54 그대로).
+끝난 것 (사이트 `ssapo/aoe2` main, 배포됨): 대표 선수를 `config.json`에서 읽기, 유닛 탄생을 체크포인트로 세기(개정 16), 게임 빌드 확인(188329만 엔진 실행), 엔진 갱신(개정 17). **2026-11-13 main에 푸시(`8f5d112`, 배포 결과 확인 전)**: 집 완성 시각을 체크포인트에서 읽기(개정 18, `b845437`), 식량 출처 표시(개정 19, `8f5d112`: `analysis.engine_income.by_source`, 화면 "식량 출처", `engine/switches.env`에 54·55번 스위치 추가; engine-check 기대값 55/54 그대로).
 
 지금 숫자: 2.1 맨 위 표(열한 리플). 연구 리플 셋은 11~13분, 나머지는 10초~11분에서 처음 어긋난다.
 
 각 작업 폴더 상태 (PC `C:\Users\ssapo\genie-replays`):
 - `aoe2-push`: 브랜치 `research/genie-188329`, 패치 커밋 `7a9ec3e` + 이 기록을 넣은 커밋(바로 다음), 푸시함.
 - `genie`(엔진 소스): 빌드됨, 커밋된 패치와 같음(sha256 LF `82bbf6cf…2ece67`, PC 사본 `patch-2026-11-13-M7.patch`). 돌고 있는 실행 없음.
-- `aoe2-main`: 브랜치 `houses`, `origin/main` 위에 미푸시 커밋 2개(`b845437`, `8f5d112`). 검사 통과(python 107개, node 55개).
-- 배포하는 법(**사용자가 "배포"라고 할 때만**): ① `Invoke-RestMethod https://api.github.com/repos/ssapo/aoe2/actions/runs`로 진행 중인 실행이 없는지 확인 ② `git fetch origin main` ③ `git rebase FETCH_HEAD` ④ `git push origin houses:main` ⑤ 같은 API로 배포 실행과 engine-check 결과(55/54) 확인.
+- `aoe2-main`: 브랜치 `houses` = `origin/main`(`8f5d112`까지 푸시함, 미푸시 커밋 없음). 검사 통과(python 107개, node 55개). 새 작업은 `git fetch origin main` 뒤 `FETCH_HEAD`에서 새 브랜치를 딴다.
+- 배포하는 법(**사용자가 "배포"라고 할 때만**): ① `Invoke-RestMethod https://api.github.com/repos/ssapo/aoe2/actions/runs`로 진행 중인 실행이 없는지 확인 ② `git fetch origin main` ③ `git rebase FETCH_HEAD` ④ `git push origin <브랜치>:main` ⑤ 같은 API로 배포 실행과 engine-check 결과(55/54) 확인.
 
 열린 사례 (이 순서로; 각 첫 동작):
 1. 사슴 밀기(FOLLOW; 520596921 P1 10.1초, 520394236 P1 86.9초, 520397411 119.4초): 게임에서 520394236의 update 6,000~6,500 메모리 기록을 뜨거나(8절·12.6), 엔진에서 모든 유닛 추적(`GENIE_TRACE_OBJECTS_RANGE=6000-6500`)으로 사슴 위치를 본다. `runs/Q_out/triage2.md` G1.
@@ -472,7 +472,9 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 8. 읽었지만 안 넣은 것: 12.5 5번 목록(사례가 나오면 넣는다).
 9. 사이트: 동물 한 마리마다 먹은 양, 출처별 값을 원본 메모리 기록과 직접 대조(`truth-economy-518239882.md`).
 
-사용자 결정 대기: (가) 사이트 직접 수집과 예약 수집 합치기 — Render에 GitHub 토큰을 넣어야 함. (나) GoatCounter 가입(방문 수 세기). (다) 워크플로가 푸시 전에 pull --rebase 하게 고칠지. (라) `houses` 배포.
+원본 디컴파일 환경 메모: 이번 세션의 새 디컴파일(`re/out_F` 뱀, `out_C` 무리 명령, `out_S` 이동 끝 등)은 클라우드에만 있어 세션이 끝나면 사라진다(주소와 읽은 내용은 각 사례 문서에 있음). 게임 설치 폴더는 필요 없고 PC `re-kit`으로 10분에 다시 차린다; 예외는 게임 스크립트(`Effects.xs`)와 새 게임 빌드.
+
+사용자 결정 대기: (가) 사이트 직접 수집과 예약 수집 합치기 — Render에 GitHub 토큰을 넣어야 함. (나) GoatCounter 가입(방문 수 세기). (다) 워크플로가 푸시 전에 pull --rebase 하게 고칠지.
 
 배경 (아직 맞는 것):
 - 사이트는 GitHub Actions에서 엔진을 빌드해 돌린다. 게임 데이터는 비공개 저장소 `ssapo/aoe2-data`에만 둔다(비밀 `AOE2_DATA_TOKEN`). 엔진 스위치를 더하면 main의 `engine/switches.env`도, 패치가 바뀌어 확인 체크포인트 수가 바뀌면 `engine-check.yml` 기대값도 고친다.
