@@ -838,7 +838,7 @@ index a7e36539..da49f055 100644
          if gather.target.is_none() {
              return self.gather_after_drop(actions, c, roles);
 diff --git a/crates/engine/genie-core/src/gathering/gather/work.rs b/crates/engine/genie-core/src/gathering/gather/work.rs
-index b1ab9a1e..a8d510ea 100644
+index b1ab9a1e..079720c9 100644
 --- a/crates/engine/genie-core/src/gathering/gather/work.rs
 +++ b/crates/engine/genie-core/src/gathering/gather/work.rs
 @@ -64,6 +64,13 @@ impl GatherAction {
@@ -870,13 +870,13 @@ index b1ab9a1e..a8d510ea 100644
          *held += gain;
 +        // 188329: each gain earns the master's additional resources (`0xb81877`, `0xb8190b`)
 +        (r.extras).gain(&mut unit.extra, gain, target.master_id, target.class);
-+        crate::gain_trace::grew(unit.id.get(), i16::from(target.master_id), target.class.get(), gain.get(), held.get());
++        crate::gain_trace::grew(unit.id.get(), target.id.get(), i16::from(target.master_id), target.class.get(), gain.get(), held.get());
          let over = (*held - capacity).abs();
          if *held < capacity && over < REMAINDER && over <= target.amount {
              target.amount += -over;
              *held += over;
 +            (r.extras).gain(&mut unit.extra, over, target.master_id, target.class);
-+            crate::gain_trace::grew(unit.id.get(), i16::from(target.master_id), target.class.get(), over.get(), held.get());
++            crate::gain_trace::grew(unit.id.get(), target.id.get(), i16::from(target.master_id), target.class.get(), over.get(), held.get());
          }
          // a farm's food sold at once (attribute 96): the load goes to the player as food (slot
          // 0xf8 with 1), the unit holds none, and the gathering goes on
@@ -1289,7 +1289,7 @@ index c6c883ca..371bd1e3 100644
          if c.w.model.tuning.hunt.drop_reach < site.gap_squared.get() {
              self.timer = DROP_WAIT;
 diff --git a/crates/engine/genie-core/src/gathering/hunt/gathering.rs b/crates/engine/genie-core/src/gathering/hunt/gathering.rs
-index 2df7dd4b..87a58d1f 100644
+index 2df7dd4b..3ee84752 100644
 --- a/crates/engine/genie-core/src/gathering/hunt/gathering.rs
 +++ b/crates/engine/genie-core/src/gathering/hunt/gathering.rs
 @@ -175,6 +175,14 @@ impl HuntAction {
@@ -1322,13 +1322,13 @@ index 2df7dd4b..87a58d1f 100644
          *held += gain;
 +        // 188329: each gain earns the master's additional resources (`0xbb75a1`, `0xbb762a`)
 +        (r.extras).gain(&mut unit.extra, gain, victim.master_id, victim.class);
-+        crate::gain_trace::grew(unit.id.get(), i16::from(victim.master_id), victim.class.get(), gain.get(), held.get());
++        crate::gain_trace::grew(unit.id.get(), victim.id.get(), i16::from(victim.master_id), victim.class.get(), gain.get(), held.get());
          let over = (*held - capacity).abs();
          if *held < capacity && over < REMAINDER && over <= victim.amount {
              victim.amount -= over;
              *held += over;
 +            (r.extras).gain(&mut unit.extra, over, victim.master_id, victim.class);
-+            crate::gain_trace::grew(unit.id.get(), i16::from(victim.master_id), victim.class.get(), over.get(), held.get());
++            crate::gain_trace::grew(unit.id.get(), victim.id.get(), i16::from(victim.master_id), victim.class.get(), over.get(), held.get());
          }
          if roles
              .of_class(victim.class)
@@ -1945,7 +1945,7 @@ index 398a973c..bcfaaae0 100644
              flags.set(MoveFlags::DIRECT, order.direct);
              moved = self.command_move_to(
 diff --git a/crates/engine/genie-core/src/groups/place.rs b/crates/engine/genie-core/src/groups/place.rs
-index 51f6a791..f1506038 100644
+index 51f6a791..2b31aea6 100644
 --- a/crates/engine/genie-core/src/groups/place.rs
 +++ b/crates/engine/genie-core/src/groups/place.rs
 @@ -386,15 +386,20 @@ impl World {
@@ -1972,7 +1972,7 @@ index 51f6a791..f1506038 100644
          let g = self.groups.held_mut(group)?;
          g.stored_positions.clear_points();
          g.motion.new_position[0] = at;
-@@ -402,6 +407,162 @@ impl World {
+@@ -402,6 +407,185 @@ impl World {
          Ok(())
      }
  
@@ -2044,7 +2044,30 @@ index 51f6a791..f1506038 100644
 +            return Ok(at);
 +        };
 +        let c = g.centroid;
-+        let path = [w, c];
++        // EXPERIMENT (GENIE_EXPERIMENT_FRONTPATH_188329, findings 63): the path is the lead
++        // unit's long pather from W to the centroid (0x10532b0 -> 0x10533b0, limit 1000), not
++        // the straight line. Its range (group target range + master +0x78) and the pass
++        // 0x1059760 over the path are not read.
++        let mut path: Vec<BVector> = vec![w, c];
++        if std::env::var_os("GENIE_EXPERIMENT_FRONTPATH_188329").is_some()
++            && let Ok((found, p)) = self.round_long(lead_id, w.ground(), c)
++        {
++            if crate::groups::trace_forming() {
++                eprintln!("FORMING_FRONTPATH found={found} points={:?}", p.points);
++            }
++            if 2 <= p.points.len() {
++                path = p.points;
++                // 0x10533b0: the path's first point is the start itself (W), the last the goal
++                // itself when the search reached it (else the tile centre it ended on)
++                if std::env::var_os("GENIE_EXPERIMENT_FRONTPATH_TILE").is_none() {
++                    path[0] = w;
++                    if found && let Some(l) = path.last_mut() {
++                        *l = c;
++                    }
++                }
++            }
++        }
++        let path = &path[..];
 +        // 0x10d1b10: the distance along the path of a point's projection
 +        let along = |p: BVector| -> f32 {
 +            let mut best = f32::MAX;
@@ -2213,6 +2236,19 @@ index e101e2d0..f7de2eaa 100644
      /// [`World::statistics_only`]'s member loop: each member's view in the members' order with the
      /// index it has then, and the objects of their searches.
      fn member_views(
+diff --git a/crates/engine/genie-core/src/groups/steer/detour.rs b/crates/engine/genie-core/src/groups/steer/detour.rs
+index 22a83675..ae3e4f80 100644
+--- a/crates/engine/genie-core/src/groups/steer/detour.rs
++++ b/crates/engine/genie-core/src/groups/steer/detour.rs
+@@ -411,7 +411,7 @@ impl World {
+     /// The way round's long pather (`FUN_140f9eb70` with the record) for member `id` from the
+     /// tile of `from` to the tile of `to`, range 0, no target: whether it reached the goal, and
+     /// the path.
+-    pub(super) fn round_long(
++    pub(crate) fn round_long(
+         &self,
+         id: ObjectId,
+         from: Point,
 diff --git a/crates/engine/genie-core/src/groups/steer/slot_steps.rs b/crates/engine/genie-core/src/groups/steer/slot_steps.rs
 index d9156f6d..fd81e8ea 100644
 --- a/crates/engine/genie-core/src/groups/steer/slot_steps.rs
@@ -10994,7 +11030,7 @@ index 90a8616f..77c5309d 100644
      let masters = install_read(dat.as_ref())?;
      let run = census_run(&recording, Some(&masters), limit)?;
 diff --git a/crates/tools/genie-oracle/src/census.rs b/crates/tools/genie-oracle/src/census.rs
-index 99849470..911f99a1 100644
+index 99849470..a17a0ad5 100644
 --- a/crates/tools/genie-oracle/src/census.rs
 +++ b/crates/tools/genie-oracle/src/census.rs
 @@ -112,7 +112,20 @@ pub fn census_run(
@@ -11019,7 +11055,7 @@ index 99849470..911f99a1 100644
      let sections = header.players();
      let (syncs, checkpoints) = recorded_checkpoints(&chapter)?;
      let total = limit.map_or(syncs, |l| l.min(syncs));
-@@ -124,10 +137,146 @@ pub fn census_run(
+@@ -124,10 +137,152 @@ pub fn census_run(
      } else {
          CensusEnd::Recording
      };
@@ -11099,6 +11135,12 @@ index 99849470..911f99a1 100644
 +                        food[0], food[1], food[2], food[3], food[4], food[5], food_other,
 +                        t[1].iter().sum::<f64>(), gold[7], gold_other, t[2].iter().sum::<f64>());
 +                }
++                // GENIE_TRACE_GAIN_ANIMALS=1: one more line with every animal food was taken from
++                // (id, master, class, gathered, given per player); the GAIN lines stay as they are
++                if std::env::var_os("GENIE_TRACE_GAIN_ANIMALS").is_some() {
++                    let rows: Vec<serde_json::Value> = genie_core::gain_trace::animals().iter().map(|(id, a)| serde_json::json!({"id": id, "master": a.master, "class": a.class, "gathered": (a.gathered * 100.0).round() / 100.0, "given": a.given.iter().map(|g| (g * 100.0).round() / 100.0).collect::<Vec<f64>>()})).collect();
++                    eprintln!("GAINA {}", serde_json::json!({"ms": ms, "animals": rows}));
++                }
 +            }
 +            gain_prev = ms;
 +        }
@@ -11168,7 +11210,7 @@ index 99849470..911f99a1 100644
              end = CensusEnd::AllDone;
              break;
          }
-@@ -221,6 +370,15 @@ impl Census {
+@@ -221,6 +376,15 @@ impl Census {
              ) else {
                  continue;
              };
@@ -11590,10 +11632,10 @@ index 00000000..235e801f
 +}
 diff --git a/crates/engine/genie-core/src/gain_trace.rs b/crates/engine/genie-core/src/gain_trace.rs
 new file mode 100644
-index 00000000..86fd85c4
+index 00000000..a91c3ec6
 --- /dev/null
 +++ b/crates/engine/genie-core/src/gain_trace.rs
-@@ -0,0 +1,129 @@
+@@ -0,0 +1,186 @@
 +//! DIAGNOSTIC (`GENIE_TRACE_GAIN`): what each player's units gave their player at drop-offs,
 +//! split by where the load came from, for the census tool's `GAIN` lines. The simulation never
 +//! reads it: the hooks only write here, and only when the switch is set.
@@ -11620,6 +11662,26 @@ index 00000000..86fd85c4
 +    loads: HashMap<i32, Vec<(usize, f32)>>,
 +    last: HashMap<i32, usize>,
 +    totals: Vec<Totals>,
++    /// The animal pieces of a unit's load: (target id, amount), beside `loads` (which stays as
++    /// it was, so the totals do not change by a bit).
++    animal_loads: HashMap<i32, Vec<(i32, f32)>>,
++    animals: std::collections::BTreeMap<i32, Animal>,
++}
++
++/// An animal (sources 0 to 2: herdable, boar, deer) units took food from: its master and class,
++/// the update time of the first gain, what was taken from it (`gathered`, at the gain) and what
++/// each player was given of it at drop-offs (`given`, index = player number; without the
++/// additional resources of a load).
++#[derive(Clone, Debug, Default)]
++pub struct Animal {
++    /// The target's master.
++    pub master: i16,
++    /// The target's class.
++    pub class: i16,
++    /// The sum of the gains from it.
++    pub gathered: f64,
++    /// What each player was given of it.
++    pub given: Vec<f64>,
 +}
 +
 +fn enabled() -> bool {
@@ -11652,14 +11714,32 @@ index 00000000..86fd85c4
 +    }
 +}
 +
-+/// Unit `unit`'s load grew by `gain` from a target of `master` and `class`; `held` is its load
++/// Unit `unit`'s load grew by `gain` from target `target` of `master` and `class`; `held` is its load
 +/// after it (a load that is all this gain starts anew).
-+pub fn grew(unit: i32, master: i16, class: i16, gain: f32, held: f32) {
++pub fn grew(unit: i32, target: i32, master: i16, class: i16, gain: f32, held: f32) {
 +    if !enabled() {
 +        return;
 +    }
 +    let Ok(mut s) = state().lock() else { return };
 +    let from = source(class, master);
++    {
++        let pieces = s.animal_loads.entry(unit).or_default();
++        if held <= gain + 1e-4 {
++            pieces.clear();
++        }
++        if from <= 2 {
++            match pieces.iter_mut().find(|p| p.0 == target) {
++                Some(p) => p.1 += gain,
++                None => pieces.push((target, gain)),
++            }
++        }
++    }
++    if from <= 2 {
++        let a = s.animals.entry(target).or_default();
++        a.master = master;
++        a.class = class;
++        a.gathered += f64::from(gain);
++    }
 +    let _ = s.last.insert(unit, from);
 +    let load = s.loads.entry(unit).or_default();
 +    if held <= gain + 1e-4 {
@@ -11689,6 +11769,16 @@ index 00000000..86fd85c4
 +    }
 +    let load = s.loads.remove(&unit).unwrap_or_default();
 +    let whole: f32 = load.iter().map(|p| p.1).sum();
++    let pieces = s.animal_loads.remove(&unit).unwrap_or_default();
++    if 0.0 < whole {
++        for &(target, part) in &pieces {
++            let a = s.animals.entry(target).or_default();
++            if a.given.len() <= player {
++                a.given.resize(player + 1, 0.0);
++            }
++            a.given[player] += f64::from(amount) * f64::from(part) / f64::from(whole);
++        }
++    }
 +    if whole <= 0.0 {
 +        let from = s.last.get(&unit).copied().unwrap_or(SOURCES - 1);
 +        s.totals[player][resource][from] += f64::from(amount);
@@ -11722,6 +11812,15 @@ index 00000000..86fd85c4
 +#[must_use]
 +pub fn totals() -> Vec<Totals> {
 +    state().lock().map(|s| s.totals.clone()).unwrap_or_default()
++}
++
++/// Every animal food was taken from so far, by its object id.
++#[must_use]
++pub fn animals() -> Vec<(i32, Animal)> {
++    state()
++        .lock()
++        .map(|s| s.animals.iter().map(|(k, v)| (*k, v.clone())).collect())
++        .unwrap_or_default()
 +}
 diff --git a/crates/engine/genie-core/src/gathering/extra.rs b/crates/engine/genie-core/src/gathering/extra.rs
 new file mode 100644
