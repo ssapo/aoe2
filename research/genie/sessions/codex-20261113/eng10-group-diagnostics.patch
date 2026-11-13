@@ -1,0 +1,230 @@
+diff --git a/crates/engine/genie-core/src/groups/steer/to_slots.rs b/crates/engine/genie-core/src/groups/steer/to_slots.rs
+--- a/crates/engine/genie-core/src/groups/steer/to_slots.rs
++++ b/crates/engine/genie-core/src/groups/steer/to_slots.rs
+@@ -222,8 +222,19 @@
+             }
+         }
+         if crate::groups::trace_forming() {
++            let member_ids: Vec<_> = g.members.iter().map(|member| member.id.get()).collect();
++            let member_tops: Vec<_> = g.members.iter().map(|member| {
++                self.parts.mover_of(member.id).map(|mover| mover.stats.speed.get())
++            }).collect();
++            let member_positions: Vec<_> = g.members.iter().map(|member| {
++                self.object(member.id).map(|(_, unit)| unit.position().get())
++            }).collect();
++            let slot_positions: Vec<_> = g.members.iter().map(|member| {
++                f.slots.iter().find(|slot| slot.unit_id == Some(member.id))
++                    .map(|slot| slot.transform_position.position().get())
++            }).collect();
+             eprintln!(
+-                "FORMING_PASS ms={} group={:?} pos=({}, {}) top={} slowest={} formed={} budget={} first={} gaps={:?} speeds={:?}",
++                "FORMING_PASS ms={} group={:?} pos=({}, {}) top={} slowest={} formed={} budget={} first={} gaps={:?} speeds={:?} member_ids={:?} budget_before={} wanted={} dt={} firstgap={} member_tops={:?} member_positions={:?} slot_positions={:?}",
+                 self.world_time.millis(),
+                 group,
+                 self.groups.held(group)?.motion.position[0].x(),
+@@ -234,7 +245,15 @@
+                 budget,
+                 first,
+                 gaps,
+-                speeds
++                speeds,
++                member_ids,
++                g.speed_budget,
++                wanted,
++                dt,
++                firstgap,
++                member_tops,
++                member_positions,
++                slot_positions
+             );
+         }
+         let g = self.groups.held_mut(group)?;
+diff --git a/crates/tools/genie-oracle/src/census.rs b/crates/tools/genie-oracle/src/census.rs
+--- a/crates/tools/genie-oracle/src/census.rs
++++ b/crates/tools/genie-oracle/src/census.rs
+@@ -13,6 +13,8 @@
+ 
+ use crate::{Decoder, Error, MasterTable, frames, header_slice, lane_block, run};
+ use std::slice::from_ref;
++
++mod movement_trace;
+ 
+ /// Why a census run ended.
+ #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+@@ -260,7 +262,9 @@
+                     let ai_trace = turns.parts.unit_ai.get(u.id).map(|ai| format!("{:?} idle={}/{} action={:?} target={:?}", ai.ai_kind, ai.idle_timer.get(), ai.adjusted_idle_timeout.get(), ai.current_action, ai.current_target));
+                     let kind = a.and_then(|a| a.kind).map(|k| k.get());
+                     let action_state = a.map(|a| a.state.get()).unwrap_or(0);
+-                    eprintln!("OBJECT {}", serde_json::json!({"ms":turns.world_time.millis(),"tick":census.updates,"player":p,"id":u.id.get(),"held":u.life.amount.get(),"state":u.life.state as u8,"master":u.life.master_id.get(),"position":u.position().get(),"action_kind":kind,"action_state":action_state,"retarget_ms":timer,"look":look,"limit":limit,"ai":ai_trace}));
++                    let motion = genie_core::players::PlayerId::try_from(p).ok()
++                        .map(|player| movement_trace::snapshot(&turns, u, player));
++                    eprintln!("OBJECT {}", serde_json::json!({"ms":turns.world_time.millis(),"tick":census.updates,"player":p,"id":u.id.get(),"held":u.life.amount.get(),"state":u.life.state as u8,"master":u.life.master_id.get(),"position":u.position().get(),"action_kind":kind,"action_state":action_state,"retarget_ms":timer,"look":look,"limit":limit,"ai":ai_trace,"motion":motion}));
+                 }
+             }
+         }
+diff --git a/crates/tools/genie-oracle/src/census/movement_trace.rs b/crates/tools/genie-oracle/src/census/movement_trace.rs
+new file mode 100644
+--- /dev/null
++++ b/crates/tools/genie-oracle/src/census/movement_trace.rs
+@@ -0,0 +1,161 @@
++//! Read-only movement snapshots for the opt-in OBJECT trace, after a world update.
++
++use genie_core::groups::UnitGroup;
++use genie_core::objects::{ObjectId, unit::Unit};
++use genie_core::players::PlayerId;
++use genie_core::world::World;
++use serde_json::{Value, json};
++
++/// Keep the unit's link even when its group is absent from the world's group list.
++pub(super) fn snapshot(world: &World, unit: &Unit, player: PlayerId) -> Value {
++    let master_base = unit
++        .master(world.master_tables(), player)
++        .ok()
++        .and_then(|master| master.move_stats.as_ref())
++        .map(|stats| stats.base.get());
++    let movement = world.parts.mover_of(unit.id).map(|mover| {
++        json!({
++            "base_speed": mover.stats.base.get(),
++            "speed": mover.stats.speed.get(),
++            "master_base_speed": master_base,
++            "velocity_local_xhy": mover.velocity.map(|v| v.velocity.get()),
++            "forward_xhy": mover.forward.get(),
++            "path_count": mover.paths.len(),
++            "waiting": mover.waiting,
++            "last_move_ms": mover.last_move.millis(),
++        })
++    });
++    json!({
++        "phase": "post_update",
++        "movement": movement,
++        "group": {
++            "id": unit.group.id.map(|id| id.get()),
++            "flag": unit.group.flag,
++            "snapshot": unit.group.id.and_then(|id| world.groups.get(id))
++                .map(|group| group_snapshot(group, unit.id)),
++        },
++    })
++}
++
++/// Look up the speed by member ID; formation slot order can differ from member order.
++fn group_snapshot(group: &UnitGroup, id: ObjectId) -> Value {
++    let member_index = group.members.iter().position(|member| member.id == id);
++    let member = member_index.and_then(|index| group.members.get(index));
++    let speed = member_index
++        .and_then(|index| group.forming_speeds.get(index))
++        .copied()
++        .flatten();
++    let slot = group.current_formation.as_ref().and_then(|formation| {
++        formation
++            .slots
++            .iter()
++            .enumerate()
++            .find(|(_, slot)| slot.unit_id == Some(id))
++            .map(|(index, slot)| {
++                json!({
++                    "index": index,
++                    "position": slot.transform_position.position().get(),
++                    "desired_position": slot.desired_transform_position.position().get(),
++                    "state": slot.state.get(),
++                    "active": slot.active,
++                    "depth": slot.depth,
++                })
++            })
++    });
++    json!({
++        "member_ids": group.members.iter().map(|member| member.id.get()).collect::<Vec<_>>(),
++        "member_index": member_index,
++        "forming_speed": speed,
++        "specific_move_active": member.map(|member| member.specific_move.active),
++        "formed": group.formed,
++        "first_pass": group.first_pass,
++        "speed_budget": group.speed_budget,
++        "slowest_speed": group.slowest_speed,
++        "maximum_velocity_forward": group.motion.maximum_velocity_forward.get(),
++        "position": group.motion.position[0].position().get(),
++        "velocity_local_xhy": group.motion.velocity.get(),
++        "slot": slot,
++    })
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use genie_core::groups::{Formation, Member, Slot};
++    use genie_core::math::fmath::BVector;
++
++    fn id(value: i32) -> ObjectId {
++        ObjectId::try_from(value).unwrap()
++    }
++
++    #[test]
++    fn member_order_and_slot_order_are_independent_and_positions_use_xyz() {
++        let group = UnitGroup {
++            members: vec![
++                Member {
++                    id: id(41),
++                    ..Member::default()
++                },
++                Member {
++                    id: id(17),
++                    ..Member::default()
++                },
++            ],
++            forming_speeds: vec![Some(0.9), Some(1.2)],
++            current_formation: Some(Formation {
++                slots: vec![
++                    Slot {
++                        unit_id: Some(id(17)),
++                        transform_position: BVector::new(10.0, 2.0, 30.0),
++                        ..Slot::default()
++                    },
++                    Slot {
++                        unit_id: Some(id(41)),
++                        ..Slot::default()
++                    },
++                ],
++                ..Formation::default()
++            }),
++            ..UnitGroup::default()
++        };
++        let row = group_snapshot(&group, id(17));
++        assert_eq!(row["member_index"], 1);
++        assert_eq!(row["forming_speed"], json!(1.2_f32));
++        assert_eq!(row["slot"]["index"], 0);
++        assert_eq!(row["slot"]["position"], json!([10.0, 30.0, 2.0]));
++    }
++
++    #[test]
++    fn missing_member_or_speed_is_null_instead_of_borrowing_another_members_speed() {
++        let mut group = UnitGroup {
++            members: vec![Member {
++                id: id(17),
++                ..Member::default()
++            }],
++            ..UnitGroup::default()
++        };
++        let row = group_snapshot(&group, id(17));
++        assert!(row["forming_speed"].is_null());
++        assert!(row["slot"].is_null());
++        group.forming_speeds = vec![Some(1.2)];
++        let absent = group_snapshot(&group, id(99));
++        assert!(absent["member_index"].is_null());
++        assert!(absent["forming_speed"].is_null());
++        assert!(absent["specific_move_active"].is_null());
++    }
++
++    #[test]
++    fn a_missing_group_keeps_the_units_link_for_diagnosis() {
++        use crate::fixtures::{combat_object, gaia, header, human};
++        use genie_core::groups::GroupId;
++
++        let save = header(vec![gaia(Vec::new()), human(vec![combat_object(17, 83)])]);
++        let mut world = crate::header_slice(&save, None).unwrap();
++        world.players[1].objects.iter_mut().next().unwrap().group.id = GroupId::of_field(999);
++        let unit = world.players[1].objects.iter().next().unwrap();
++        let row = snapshot(&world, unit, PlayerId::new(1));
++        assert_eq!(row["group"]["id"], 999);
++        assert!(row["group"]["snapshot"].is_null());
++        assert_eq!(row["phase"], "post_update");
++    }
++}
