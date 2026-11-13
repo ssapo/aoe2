@@ -83,7 +83,57 @@ class CollectorTests(unittest.TestCase):
             saved=json.loads(path.read_text(encoding='utf-8'))
             self.assertEqual([m['id'] for m in saved['matches']],[99])
             self.assertEqual(saved['profile']['id'],222)
-            self.assertEqual(saved['matches'][0]['civilization'],'문명 ID 0')
+            self.assertEqual(saved['matches'][0]['civilization'],'Armenians')
+
+    def test_api_civilization_numbers_are_not_replay_ids(self):
+        # The match-history API numbers civilizations its own way (15 = Franks; in replays 15 = Aztecs).
+        self.assertEqual([collect.civilization_name(i) for i in (5,6,15,21,22,30,63)],
+                         ['Britons','Bulgarians','Franks','Hindustanis','Italians','Maya','Danes'])
+        self.assertEqual(collect.civilization_name(53),'문명 ID 53')
+        self.assertEqual(collect.civilization_name(None),'문명 확인 전')
+        import aocref
+        data=json.loads((Path(aocref.__file__).parent/'data/datasets/100.json').read_text(encoding='utf-8'))
+        replay_names={v['name'] for v in data['civilizations'].values()}
+        self.assertEqual(set(collect.API_CIVILIZATIONS.values()),replay_names)
+        self.assertEqual(len(set(collect.API_CIVILIZATIONS.values())),len(collect.API_CIVILIZATIONS))
+
+    def test_member_civilization_wins_over_a_zero_in_results(self):
+        # 520386901: results said 0 for a Britons player, the member entry said 5.
+        match={'id':7,'startgametime':10,'completiontime':20,
+               'matchhistoryreportresults':[{'profile_id':333,'resulttype':1,'civilization_id':21},{'profile_id':222,'resulttype':0,'civilization_id':0}],
+               'matchhistorymember':[{'profile_id':333,'civilization_id':21},{'profile_id':222,'civilization_id':5,'oldrating':1000,'newrating':990}]}
+        row=collect.metadata(match,222,{})
+        self.assertEqual(row['civilization'],'Britons')
+        self.assertEqual([(p['is_self'],p['civilization']) for p in row['players']],[(False,'Hindustanis'),(True,'Britons')])
+        del match['matchhistorymember']
+        self.assertEqual(collect.metadata(match,222,{})['civilization'],'Armenians')
+
+    def test_replay_decides_civilizations_of_analysed_rows(self):
+        row={'civilization':'Aztecs','players':[{'is_self':False,'civilization':'Chinese'},{'is_self':True,'civilization':'Aztecs'}],
+             'analysis':{'civilization':'Franks','opponents':[{'civilization':'Bulgarians'}]}}
+        collect.replay_civilizations(row)
+        self.assertEqual(row['civilization'],'Franks')
+        self.assertEqual([p['civilization'] for p in row['players']],['Bulgarians','Franks'])
+        pending={'civilization':'Franks','players':[{'is_self':True,'civilization':'Franks'},{'is_self':False,'civilization':'Danes'}],'analysis':None}
+        collect.replay_civilizations(pending)
+        self.assertEqual([p['civilization'] for p in pending['players']],['Franks','Danes'])
+        team={'civilization':'x','players':[{'is_self':True,'civilization':'a'},{'is_self':False,'civilization':'b'},{'is_self':False,'civilization':'c'}],
+              'analysis':{'civilization':'Franks','opponents':[{'civilization':'Huns'},{'civilization':'Goths'}]}}
+        collect.replay_civilizations(team)
+        self.assertEqual((team['civilization'],[p['civilization'] for p in team['players']]),('Franks',['a','b','c']))
+
+    def test_kept_rows_outside_the_api_window_are_repaired(self):
+        payload={'result':{'code':0},'profiles':[],'matchHistoryStats':[]}
+        kept={'id':5,'started_at':1,'players_count':2,'analysis_status':'complete','civilization':'Franks',
+              'players':[{'profile_id':1234,'is_self':True,'civilization':'Aztecs'},{'profile_id':9,'is_self':False,'civilization':'문명 ID 63'}],
+              'analysis':{'civilization':'Franks','map':'Arabia','opponents':[{'name':'x','civilization':'Danes'}]}}
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/'report.json'
+            collect.write_json(path,{'schema_version':1,'profile':{'id':1234},'matches':[kept]})
+            with patch.object(sys,'argv',['collect','--profile-id','1234','--limit','0','--output',str(path)]),patch.object(collect,'fetch',return_value=json.dumps(payload).encode()),patch('review.enrich_report'):
+                collect.main()
+            saved=json.loads(path.read_text(encoding='utf-8'))['matches'][0]
+            self.assertEqual([p['civilization'] for p in saved['players']],['Franks','Danes'])
 
     def test_first_run_accepts_null_profile(self):
         with tempfile.TemporaryDirectory() as folder:

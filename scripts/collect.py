@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-from functools import lru_cache
 from collections import Counter
 from datetime import datetime, timezone
 import gzip
@@ -320,16 +319,51 @@ def analyze_replay(raw, own_id):
     }
 
 
-@lru_cache(maxsize=1)
-def civilization_names():
-    import aocref
-    data=Path(aocref.__file__).parent/'data/datasets/100.json'
-    return {int(k):v['name'] for k,v in json.loads(data.read_text(encoding='utf-8'))['civilizations'].items()}
+# 경기 기록 API의 문명 번호(`getAvailableLeaderboards`의 `races`, 2026-11-13 확인). 리플·게임 데이터의
+# 번호(aocref 데이터셋 100)와 다른 표다: 0~44는 영어 이름순, 그 뒤는 추가된 순서이고 53·54는 비어 있다.
+# 이름은 리플 파서가 쓰는 표기에 맞춘다(API의 Indians → Hindustanis, Mayans → Maya).
+API_CIVILIZATIONS = dict(enumerate(
+    'Armenians Aztecs Bengalis Berbers Bohemians Britons Bulgarians Burgundians Burmese Byzantines Celts Chinese '
+    'Cumans Dravidians Ethiopians Franks Georgians Goths Gurjaras Huns Incas Hindustanis Italians Japanese Khmer '
+    'Koreans Lithuanians Magyars Malay Malians Maya Mongols Persians Poles Portuguese Romans Saracens Sicilians '
+    'Slavs Spanish Tatars Teutons Turks Vietnamese Vikings Achaemenids Athenians Spartans Shu Wu Wei Jurchens '
+    'Khitans'.split()))
+API_CIVILIZATIONS.update({55: 'Macedonians', 56: 'Thracians', 57: 'Puru', 58: 'Muisca', 59: 'Mapuche', 60: 'Tupi',
+                          61: 'Saxons', 62: 'Varangians', 63: 'Danes'})
 
 
 def civilization_name(value):
-    try:return civilization_names().get(int(value), f'문명 ID {value}')
+    """Name for a match-history API civilization number. Not for replay civilization ids."""
+    try:return API_CIVILIZATIONS.get(int(value), f'문명 ID {value}')
     except (TypeError,ValueError):return '문명 확인 전'
+
+
+def api_civilizations(match):
+    """profile_id -> API civilization number of one match-history entry.
+
+    `matchhistorymember` wins: `matchhistoryreportresults` sometimes carries 0 for a player
+    whose member entry has the real number (520386901, 519693265)."""
+    found = {}
+    for key in ('matchhistoryreportresults', 'matchhistorymember'):
+        for p in match.get(key) or []:
+            if p.get('civilization_id') is not None:
+                found[int(p['profile_id'])] = p['civilization_id']
+    return found
+
+
+def replay_civilizations(row):
+    """The parsed replay decides the civilizations of an analysed 1v1 row."""
+    analysis, players = row.get('analysis'), row.get('players') or []
+    if not analysis or not analysis.get('civilization'):
+        return
+    row['civilization'] = analysis['civilization']
+    opponents = analysis.get('opponents') or []
+    if len(players) != 2 or len(opponents) != 1 or sum(bool(p.get('is_self')) for p in players) != 1:
+        return
+    for p in players:
+        name = analysis['civilization'] if p.get('is_self') else opponents[0].get('civilization')
+        if name:
+            p['civilization'] = name
 
 
 def metadata(match, own_id, aliases):
@@ -340,15 +374,16 @@ def metadata(match, own_id, aliases):
     members = match.get('matchhistorymember', [])
     rating = next((p for p in members if int(p['profile_id']) == own_id), {})
     result = {1: 'win', 0: 'loss'}.get(own.get('resulttype'), 'unknown')
+    civs = api_civilizations(match)
     return {
         'id': int(match['id']), 'started_at': match.get('startgametime'),
         'finished_at': match.get('completiontime'),
         'map': str(match.get('mapname', 'Unknown')).removesuffix('.rms'),
-        'civilization': civilization_name(own.get("civilization_id")),
+        'civilization': civilization_name(civs.get(own_id)),
         'result': result, 'rating_before': rating.get('oldrating'), 'rating_after': rating.get('newrating'),
         'match_type_id': match.get('matchtype_id'), 'players_count': len(results),
         'players': [{'profile_id': p['profile_id'], 'name': aliases.get(p['profile_id'], str(p['profile_id'])),
-                     'is_self': int(p['profile_id']) == own_id, 'civilization': civilization_name(p.get('civilization_id'))} for p in results],
+                     'is_self': int(p['profile_id']) == own_id, 'civilization': civilization_name(civs.get(int(p['profile_id'])))} for p in results],
         'analysis_status': 'pending', 'analysis': None, 'attempts': 0,
         'source_url': f'https://www.aoe2insights.com/match/{int(match["id"])}/',
     }
@@ -442,9 +477,11 @@ def main():
         else:
             row.update({k: existing[k] for k in ('analysis_status', 'attempts', 'analysis_note') if k in existing})
         if row.get('analysis'):
-            row['civilization'] = row['analysis']['civilization']
             row['map'] = row['analysis']['map']
         old[row['id']] = row
+    for row in old.values():
+        # Also repairs kept rows that the API no longer lists.
+        replay_civilizations(row)
     output = {
         'schema_version': 1, 'updated_at': now(), 'last_checked_at': checked_at, 'sync_error': None,
         'profile': {'id': own_id, 'insights_user_id': config.get('insights_user_id') if own_id == config.get('profile_id') else None, 'name': aliases.get(own_id, str(own_id))},

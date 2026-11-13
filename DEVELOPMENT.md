@@ -290,7 +290,7 @@ node --check site/building-map.js
 node --check site/collection-watch.js
 ```
 
-2026-11-03 맵 기능 추가 시 **Python 32개 + Node 12개 = 44개** 통과. 2026-11-13 기준 **Python 111개 + Node 64개**이며 Windows(cp949)에서도 `-X utf8` 없이 통과한다(파일 읽기·쓰기에 `encoding='utf-8'`을 명시한다. 빠뜨리면 Windows에서만 깨진다). 테스트가 늘면 총개수도 갱신한다. Python 검사 전에 고정 의존성과 호환 패치를 준비한다. UI 문구 변경마다 불필요한 새 검사를 만들 필요는 없지만, 좌표·시간·수량 의미가 바뀌면 관련 검사를 추가한다.
+2026-11-03 맵 기능 추가 시 **Python 32개 + Node 12개 = 44개** 통과. 2026-11-13 기준 **Python 115개 + Node 64개**이며 Windows(cp949)에서도 `-X utf8` 없이 통과한다(파일 읽기·쓰기에 `encoding='utf-8'`을 명시한다. 빠뜨리면 Windows에서만 깨진다). 테스트가 늘면 총개수도 갱신한다. Python 검사 전에 고정 의존성과 호환 패치를 준비한다. UI 문구 변경마다 불필요한 새 검사를 만들 필요는 없지만, 좌표·시간·수량 의미가 바뀌면 관련 검사를 추가한다.
 
 ### 수집 및 특정 리플 분석
 
@@ -322,6 +322,9 @@ python scripts/build_preview.py /tmp/SSAPO_AoE2_preview.html
 1. `config.json` 또는 `--profile-id`에서 서버 프로필 ID를 읽는다. 현재 코드에서 `AOE2_PROFILE_ID` 환경변수는 읽지 않는다.
 2. `https://aoe-api.worldsedgelink.com/community/leaderboard/getRecentMatchHistory`에 `title=age2`, `profile_ids=[26260702]`로 요청한다. 이 엔드포인트는 변경·중단될 수 있다.
 3. 완료된 1v1만 선별하고, 게임 API의 결과와 `oldrating` / `newrating`을 반영한다. 레이팅을 한쪽 값에서 역산하지 않는다.
+   - **경기 API의 문명 번호는 리플·게임 데이터의 번호와 다른 표다**(API 15 = 프랑크, 리플 15 = 아즈텍). `collect.py`의 `API_CIVILIZATIONS`(같은 API `getAvailableLeaderboards`의 `races`를 2026-11-13에 옮긴 것, 이름은 리플 파서 표기)로 바꾼다. aocref 데이터셋 100의 문명 표를 API 번호에 쓰지 않는다. 표에 없는 번호는 `문명 ID n`으로 남으니 새 문명이 나오면 표에 더한다(`tests/test_collector.py`가 표의 이름이 리플 파서 이름과 같은 집합인지 본다).
+   - 번호는 `matchhistorymember`를 먼저 읽는다. `matchhistoryreportresults`는 같은 선수에게 0을 줄 때가 있다(520386901·519693265의 본인: 결과 0, member 5·44).
+   - 리플을 분석한 1v1 경기는 `players[].civilization`과 `civilization`을 리플 값(`analysis`)으로 맞춘다(`replay_civilizations`). API 목록에서 빠진 예전 경기도 수집할 때마다 같이 맞춰진다.
 4. 우선 `https://aoe.ms/replay/?gameId=MATCH_ID&profileId=26260702`, 이어 API 응답의 허용된 HTTPS blob URL을 시도한다. 리플 응답은 gzip/zip 등일 수 있어 `decode_replay()`를 거친다.
 5. mgz로 분석하고 세부 명령·열매 전환·맵을 추출한다. `write_report()`에서 복기 파생값을 붙이고 보고서와 상태 파일을 저장한다.
 6. 최근 최대 200경기를 유지한다. 새 분석/실패 재시도/구버전 재분석은 실행 예산 안에서 처리한다.
@@ -344,7 +347,7 @@ python scripts/build_preview.py /tmp/SSAPO_AoE2_preview.html
 | --- | --- |
 | `schema_version`, `updated_at`, `last_checked_at`, `sync_error` | 보고서 형식·생성/확인 시각·수집 오류 |
 | `profile` | 서버 ID, Insights ID, 표시 이름 |
-| `matches[]` | `id`, 날짜, 맵, 결과, `rating_before`, `rating_after`, `players`, `analysis_status`, 재시도 상태 |
+| `matches[]` | `id`, 날짜, 맵, 결과, `rating_before`, `rating_after`, `players`, `analysis_status`, 재시도 상태. `civilization`과 `players[].civilization`은 분석 전에는 경기 API 값, 분석 뒤에는 리플 값 |
 | `matches[].analysis` | 단일 리플 분석. `parser`, `analysis_revision`, `duration_game_seconds`, 내 `civilization`, `map`, `metrics`, `opponents`, `map_view`, `review` |
 | `analysis.opponents[]` | 상대 `name`, **상대 `civilization`**, 상대 `metrics`. 문명을 내 문명에서 복사하지 않는다 |
 | `metrics.full_timeline[]` | 게임 초 `seconds`, `kind`, `label`, 생산/시장 `amount`, 판독된 BUILD에만 `x`, `y` |
