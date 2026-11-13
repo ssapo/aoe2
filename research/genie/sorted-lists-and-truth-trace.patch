@@ -201,6 +201,18 @@ index 6e4842c4..aa3ad013 100644
  
  [lints]
  workspace = true
+diff --git a/crates/engine/genie-core/src/combat/abilities/generation.rs b/crates/engine/genie-core/src/combat/abilities/generation.rs
+index d89aa138..6f4c2f59 100644
+--- a/crates/engine/genie-core/src/combat/abilities/generation.rs
++++ b/crates/engine/genie-core/src/combat/abilities/generation.rs
+@@ -199,6 +199,7 @@ impl World {
+             &self.model.roles,
+             self.model.slots,
+         )?;
++        crate::gain_trace::generated(owner.index(), i16::from(out), give.get());
+         for (kind, amount) in adds {
+             self.players
+                 .player_mut(owner)?
 diff --git a/crates/engine/genie-core/src/combat/attack/tests.rs b/crates/engine/genie-core/src/combat/attack/tests.rs
 index c9d08c60..9019a5a1 100644
 --- a/crates/engine/genie-core/src/combat/attack/tests.rs
@@ -302,11 +314,14 @@ index 12e38a35..73eb2561 100644
              my_pasture: None,
              group: GroupLink::default(),
 diff --git a/crates/engine/genie-core/src/construction/build/states.rs b/crates/engine/genie-core/src/construction/build/states.rs
-index 76304cf8..0b379550 100644
+index 76304cf8..e8c11eda 100644
 --- a/crates/engine/genie-core/src/construction/build/states.rs
 +++ b/crates/engine/genie-core/src/construction/build/states.rs
-@@ -127,6 +127,14 @@ impl BuildAction {
+@@ -125,8 +125,18 @@ impl BuildAction {
+         amount: Amount,
+     ) -> Result<(), GenieError> {
          c.give_load(kind, amount)?;
++        crate::gain_trace::dropped(c.player.index(), builder.id.get(), i16::from(kind), amount.get(), false);
          builder.life.attribute_kind = None;
          builder.life.amount = Amount::ZERO;
 +        // 188329: then each additional resource of the load (`0xb9f496` to `0xb9f4d7`,
@@ -316,6 +331,7 @@ index 76304cf8..0b379550 100644
 +                eprintln!("EXTRA build id={} resource={extra} amount={}", builder.id, more.get());
 +            }
 +            c.give_load(extra, more)?;
++            crate::gain_trace::dropped(c.player.index(), builder.id.get(), i16::from(extra), more.get(), true);
 +        }
          Ok(())
      }
@@ -443,11 +459,14 @@ index cdd56c6d..98b73d04 100644
      /// found (its `+0x48`): the top action's slot 0x48 ([`TransportAction::work`] at the work's
      /// point, from the unit itself when the target is the unit), then the unit AI's notify as
 diff --git a/crates/engine/genie-core/src/garrison/unit.rs b/crates/engine/genie-core/src/garrison/unit.rs
-index d8742d52..912ec5db 100644
+index d8742d52..2d7472fd 100644
 --- a/crates/engine/genie-core/src/garrison/unit.rs
 +++ b/crates/engine/genie-core/src/garrison/unit.rs
-@@ -353,6 +353,14 @@ impl Unit {
+@@ -351,8 +351,18 @@ impl Unit {
+                     c.w.model.slots,
+                 )?;
                  c.w.players.player_mut(c.player)?.add_attributes(adds)?;
++                crate::gain_trace::dropped(c.player.index(), self.id.get(), i16::from(resource), self.life.amount.get(), false);
                  self.life.attribute_kind = None;
                  self.life.amount = Amount::ZERO;
 +                // 188329: then each additional resource of the load (`0xb77b6c` to `0xb77bb7`,
@@ -457,11 +476,12 @@ index d8742d52..912ec5db 100644
 +                        eprintln!("EXTRA enter id={} resource={extra} amount={}", self.id, more.get());
 +                    }
 +                    c.give_load(extra, more)?;
++                    crate::gain_trace::dropped(c.player.index(), self.id.get(), i16::from(extra), more.get(), true);
 +                }
              }
          }
          if bm.kind == MasterKind::BUILDING
-@@ -466,7 +474,18 @@ impl Unit {
+@@ -466,7 +476,18 @@ impl Unit {
          self.enter_sight(c, target, at, building_radius, placed, bm)?;
          let mut bell = c.w.parts.town_bell_of(id);
          let ai = c.w.parts.unit_ai.get(id);
@@ -11197,10 +11217,10 @@ index 00000000..235e801f
 +}
 diff --git a/crates/engine/genie-core/src/gain_trace.rs b/crates/engine/genie-core/src/gain_trace.rs
 new file mode 100644
-index 00000000..1c1a1828
+index 00000000..86fd85c4
 --- /dev/null
 +++ b/crates/engine/genie-core/src/gain_trace.rs
-@@ -0,0 +1,116 @@
+@@ -0,0 +1,129 @@
 +//! DIAGNOSTIC (`GENIE_TRACE_GAIN`): what each player's units gave their player at drop-offs,
 +//! split by where the load came from, for the census tool's `GAIN` lines. The simulation never
 +//! reads it: the hooks only write here, and only when the switch is set.
@@ -11309,6 +11329,19 @@ index 00000000..1c1a1828
 +        }
 +    }
 +    let _ = s.last.insert(unit, most.0);
++}
++
++/// Player `player` got `amount` of attribute `kind` from a generating task (a relic's gold, a
++/// trickle): source "other".
++pub fn generated(player: usize, kind: i16, amount: f32) {
++    if !enabled() || !(0..4).contains(&kind) {
++        return;
++    }
++    let Ok(mut s) = state().lock() else { return };
++    if s.totals.len() <= player {
++        s.totals.resize(player + 1, [[0.0; SOURCES]; 4]);
++    }
++    s.totals[player][kind as usize][SOURCES - 1] += f64::from(amount);
 +}
 +
 +/// Every player's totals so far (index = player number; players that gave nothing may be
