@@ -9,7 +9,7 @@ TC_RESEARCH = {'Loom', 'Wheelbarrow', 'Hand Cart', 'Town Watch', 'Town Patrol', 
 FIRST_UNIT_FAMILIES = {
     'Scout Cavalry': ('scouts', '정찰 기병'), 'Camel Scout': ('scouts', '정찰 기병'),
     'Archer': ('archers', '궁사'), 'Skirmisher': ('skirmishers', '척후병'),
-    'Militia': ('militia', '민병대'), 'Man-at-Arms': ('militia', '보병'),
+    'Militia': ('militia', '시민군'), 'Man-at-Arms': ('militia', '보병'),
     'Spearman': ('spears', '창병'), 'Knight': ('knights', '기사'),
     'Eagle Scout': ('eagles', '독수리 정찰병'), 'Eagle Warrior': ('eagles', '독수리 전사'),
 }

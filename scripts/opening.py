@@ -12,7 +12,7 @@ FAMILIES = {
     'Spearman': 'spears', 'Skirmisher': 'skirmishers',
     'Knight': 'knights', 'Camel Rider': 'camels', 'Cavalry Archer': 'cavalry_archers',
 }
-LABELS = {'scouts': '스카웃', 'archers': '궁사', 'militia': '민병대', 'eagles': '독수리 전사',
+LABELS = {'scouts': '스카웃', 'archers': '궁사', 'militia': '시민군', 'eagles': '독수리 전사',
           'spears': '창병', 'skirmishers': '척후병', 'knights': '기사', 'camels': '낙타', 'cavalry_archers': '궁기병'}
 BUILDINGS = {'scouts': 'Stable', 'archers': 'Archery Range', 'eagles': 'Barracks', 'militia': 'Barracks'}
 
@@ -68,7 +68,7 @@ def classify(metrics, duration):
             name = LABELS[family]
             if family == 'militia':
                 maa = any(e.get('kind') == 'RESEARCH' and e.get('label') == 'Man-at-Arms' and e['seconds'] <= end for e in timeline)
-                name = '무장병사' if maa else '드러시' if finite(feudal) and at < feudal else '민병대'
+                name = '무장 병사' if maa else '드러시' if finite(feudal) and at < feudal else '시민군'
                 family = 'maa' if maa else 'drush' if name == '드러시' else family
             add(family, name)
     elif finite(castle) and castle <= duration:

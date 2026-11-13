@@ -2,7 +2,7 @@
   'use strict';
   // Keep in parity with scripts/opening.py; labels describe development, not tactical intent.
   const families={'Scout Cavalry':'scouts','Camel Scout':'scouts',Archer:'archers',Militia:'militia','Man-at-Arms':'militia','Eagle Scout':'eagles','Eagle Warrior':'eagles',Spearman:'spears',Skirmisher:'skirmishers',Knight:'knights','Camel Rider':'camels','Cavalry Archer':'cavalry_archers'};
-  const labels={scouts:'스카웃',archers:'궁사',militia:'민병대',eagles:'독수리 전사',spears:'창병',skirmishers:'척후병',knights:'기사',camels:'낙타',cavalry_archers:'궁기병'};
+  const labels={scouts:'스카웃',archers:'궁사',militia:'시민군',eagles:'독수리 전사',spears:'창병',skirmishers:'척후병',knights:'기사',camels:'낙타',cavalry_archers:'궁기병'};
   const buildings={scouts:'Stable',archers:'Archery Range',eagles:'Barracks',militia:'Barracks'};
   const finite=v=>Number.isFinite(v)&&v>=0;
   function classify(metrics={},duration=0){
@@ -34,7 +34,7 @@
         let name=labels[family];
         if(family==='militia'){
           const maa=timeline.some(e=>e.kind==='RESEARCH'&&e.label==='Man-at-Arms'&&e.seconds<=end);
-          name=maa?'무장병사':finite(feudal)&&at<feudal?'드러시':'민병대';
+          name=maa?'무장 병사':finite(feudal)&&at<feudal?'드러시':'시민군';
           family=maa?'maa':name==='드러시'?'drush':family;
         }
         add(family,name);
