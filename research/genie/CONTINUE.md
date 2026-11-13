@@ -56,11 +56,13 @@ Codex의 초기 이동·내려놓기·주둔 복귀 정적 조사는 [결과·�
 | 516956894 | 639.4 (1·4·7·9) / 684.9 (7) | 97 / 104 | 없음 |
 | 519686090 | 379.4 (1·2·4·7·9) / 411.9 (7) | 57 / 62 | 없음 |
 | 519700670 | 340.4 (7) / 21.9 (7) | 51 / 2 | 없음(전 P2 54,997 "a horde's command") |
-| 520397411 | 171.4 (7) / 119.4 (7) | 25 / 17 | P2 37,997 "a drop site that does not take the load (set_state 2)" |
+| 520397411 | 171.4 (7) / 119.4 (7) | 25 / 17 | 없음(전 P2 37,997 "a drop site that does not take the load (set_state 2)", 59번) |
 | 520394236 | 86.9 (7) / 164.9 (10) | 12 / 24 | 없음(전 P2 48,747 "a horde's command") |
-| 520386901 | 333.7 (7) / 405.2 (9) | 50 / 61 | P1 64,083 "the enabling of master 0x26d (the game's mode)" |
-| 520596921 | 10.1 (7) / 431.6 (7·9) | 0 / 34 | P2 17,092 "a walk's unit in the way (notify 0x215) the action does not pass on" |
-| 520592057 | 639.2 (9) / 580.7 (7) | 97 / 88 | P2 51,417 "a builder with no task for its foundation" |
+| 520386901 | 333.7 (7) / 405.2 (9) | 50 / 61 | 없음(전 P1 64,083 "the enabling of master 0x26d (the game's mode)", 58번) |
+| 520596921 | 10.1 (7) / 431.6 (7; 전 7·9) | 0 / 34 | P1 39,653 "two town centres (the order of the player's index)" (전 P2 17,092 "a walk's unit in the way (notify 0x215) the action does not pass on", 57번) |
+| 520592057 | 639.2 (9) / 580.7 (7) | 97 / 88 | P2 51,417 "a builder with no task for its foundation" (56번: 빠진 분기가 아니라 645.7초부터 개체 번호가 1 밀린 결과) |
+
+**2026-11-13 세션 E5 (`M6f_*` → `E5c_*`, 같은 스위치 29개 + 스위치 없는 57·58·59번; 비교 `tools/E5_cmp.py M6f E5c`, 원문 `runs\E5c_cmp.txt`)**: 위 표의 "엔진 멈춤" 칸만 바뀌었다. 열한 리플 모든 선수의 첫 어긋남과 확인 체크포인트 수는 그대로다(518239882 55 / 54 → main의 `engine-check.yml` 기대값 그대로). 사이트 규칙(두 선수 모두 단어 1이 맞는 마지막 체크포인트, `tools/E5_site_until.py`)으로 본 확인 구간도 전부 그대로다: 518239882 11:50.6, 518470161 12:56.5, 517426097 13:28.9, 516956894 10:32.9, 519686090 6:12.9, 519700670 6:06.4, 520397411 2:57.9, 520394236 3:10.9, 520386901 6:38.7, 520596921 6:58.3, 520592057 10:39.2. **멈춤은 확인 구간을 막고 있던 것이 아니다**: 520596921은 P1의 단어 1이 431.6초에(기록 816 / 엔진 825; 단어 4·7·9는 405.4초 체크포인트에 이미 다름), 520592057은 P1의 단어 1이 645.7초에(56번), 520386901은 P1의 단어 1이 405.2초에 어긋난다. 520596921 P2의 단어 1만 7:11.6 → 7:49.8로 늘었다.
 
 아래 표와 문단은 그 전 세션들의 기록이다(자원 첫 차이 등 자세한 값은 아래).
 
@@ -295,6 +297,9 @@ Codex의 초기 이동·내려놓기·주둔 복귀 정적 조사는 [결과·�
 | MOVEEND_188329 (2026-11-13부터 기본) | 그룹 이동 갱신(0x110d3a0~0x110d5d9)의 끝: 188329에는 AutomaticMoveUnitsToDesiredPositions가 없다. 서 있는 그룹은 자리에 못 간 칸(상태 3 아님)마다 그 멤버의 실패 수가 3 이상이고, 어느 멤버도 유닛 AI의 현재 명령이 없을 때만 끝난다(명령 = −1). 따라가는 그룹의 거리 기준은 (0.5 × 선두의 시야)²보다 클 때(초과) | `groups/update/moves.rs` `move_update_188329`, `groups/mod.rs` `moveend_188329` | group-move-end (findings 53) | 516956894·519686090이 그 멈춤 없이 75,000까지. 여섯 리플 첫 어긋남 그대로. 원본 기록과 값 비교는 못 함(첫 어긋남 뒤의 일) |
 | BACKWORK_ORDER_188329 (2026-11-13부터 기본) | 종이 풀린 뒤 일터로 돌아가기 0x12bc7e0의 순서: 내보내기(0x12a16e0 / slot 0x370) → AI 대상 잊기(0xd27410) → 액션(0xd40980) → 통지 0x202. 사냥 명령 0xd279c0이 작업을 못 찾으면(0xd27a74) 대상이 사라지고 액션이 멈춘다(0xd004a0 꼬리) | `garrison/unload.rs` `back_to_work`, `unit_ai/update.rs` `hunter_search` | findings 54(사례 문서 없음) | 실행 확인(열한 리플, 앞당김 없음; 520596921 P2 315.2 → 431.6초) |
 | HORDE_188329 (2026-11-13부터 기본) | commandHorde 0x10d86e0: 대형 유닛이 없는 그룹은 대형으로 움직이지 않는다. 대상 자료 초기화, 선두 = (0,0,0)에 가장 가까운 멤버, 선두에서 한 번 계획한 경로를 멤버마다 미래 경로(+0x3f8)로 주고 보통의 작업 명령, 플래그 0x40(다음 갱신에 그룹이 사라짐). MoveTo의 경로 요청 0x120e560은 미래 경로를 그대로 걷는다 | `groups/horde.rs` `command_horde`, `groups/order.rs`, `groups/command.rs`, `movement/mod.rs` `Mover.future`, `movement/path_end.rs` `request_path_asked` | findings 55, `runs\C_out\command-horde.md` | 실행 확인(열한 리플, 앞당김 없음; 멈춤 둘 없어짐). 값 재현은 못 함(원본 기록 구간에 사례 없음) |
+| (스위치 없음) 57 | 걷기가 만난 "길을 막은 유닛" 통지 0x215(0x1214f35~0x121503a: 걷기 코드가 유닛 AI slot 0x38을 직접 부른다)를 유닛 자신의 MoveTo(FOLLOW)도 전달한다 | `movement/unit.rs` `move_to_part` | `original-188329-engine-stops-eng05.md` 2절, findings 57 | 실행 확인(520596921 멈춤 17,092 없어짐; 값은 원본 기록 없음) |
+| (스위치 없음) 58 | 켜기 명령 0x1735840: 마스터 0x26d는 서든 데스 규칙(게임 모드 11 또는 설정 `+0x94` 비트 1)이 아니면 보통 마스터처럼 켠다 | `technology/effect/completion.rs` `enable_master` | 같은 문서 3절, findings 58 | 실행 확인(520386901 멈춤 64,083 없어짐) |
+| (스위치 없음) 59 | 사냥 갱신 0xbb6230 상태 8: 짐을 받지 않는 곳(0x10ba220이 0)에 닿으면 `set_state(2)` | `gathering/hunt/drop_off.rs` `update_drop`, `gathering/hunt/hunter.rs` `hunt_drop_walk` | 같은 문서 4절, findings 59 | 실행 확인(520397411 멈춤 37,997 없어짐; 이미 어긋난 뒤의 상황) |
 
 "근거" 열의 문서는 모두 이 폴더의 `original-188329-*.md`이다. 사례 문서는 주소와 손 계산까지 들어 있다.
 
@@ -353,6 +358,7 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
    - 53번에서 안 본 것: 공격 쪽의 같은 종류 멈춤("AutomaticMoveUnitsToDesiredPositions' attack on the target", `moves.rs` `move_to_desired_positions`를 부르는 공격 갱신 0x110be80)은 원본을 안 읽었다. 선두의 시야(slot 0x228 = 0x1245c70)는 원본에서 마스터 값(+0x70)에 유닛별 보정 목록(종류 1)을 적용한 값인데 엔진은 마스터 값만 쓴다.
    - 해결(findings 41~47, 49, 50, 52, 53): 위 2.1의 변화 문단 참고. 49번에서 읽었지만 안 넣은 것: Gather `set_state(6)`의 광산 대각선 재선정(대상 클래스 8·32이고 두 축 모두 타일이 다르면 직교 이웃 타일에서 일꾼이 가장 많은 자원으로 대상을 바꿈; 0xb7f76f 앞, 0xd28770·0xb7b960·상수 `[0x31fe7cc]`는 안 읽음 — 사례가 나오면 `gather/work.rs` `set_face`의 스냅 앞에 넣는다).
    - 첫 어긋남 뒤에서 앞당겨진 것(13.3 규칙으로 판정을 막지 않지만 자원 정확도에는 중요): ESCAPE로 518239882 P2 자원 50 넘게 767.1 → 691.8초, 900초 P2 식량 −249.7 → −439.7; 517426097 P2 word 10 620.4 → 542.4초(멈춤도 73,336 → 70,196). FORMING 단독으로는 518239882 P2 50 넘게 767.1 → 765.4초(두 실행 RES가 처음 갈리는 곳 716.861초 P1 식량 +10). 다음 첫 동작: D2(무시 도형 접점 유지)만 끈 임시 실행으로 ESCAPE 쪽 원인을 가른 뒤, 517426097 P2 word 10(542.4초) 앞 구간을 `J_f_097` 대 `J_c_097` 개체 추적으로 비교.
+   - 엔진 멈춤(세션 E5, `E5c_*`): 최신 다섯 리플의 멈춤 넷 중 셋을 없앴다(57~59번). 남은 것: **520592057 P2 51,417 "a builder with no task for its foundation"**(56번: 빠진 분기가 아님. 뿌리는 P2 580.7초 — 양 4092가 바닥났을 때 예약된 나무 명령을 가진 양치기 여섯의 걸음. 다음 첫 동작: 사냥 상태 8에서 대상이 바닥난 뒤 예약 명령으로 넘어가는 원본 순서를 읽고 `runs\E5_w2`의 여섯 유닛(3850, 3854, 4722, 4724, 4740, 4753; update 44,474~44,499)과 비교하거나, 575~590초의 원본 기록을 뜬다)와 **새로 보인 520596921 P1 39,653 "two town centres (the order of the player's index)"**(안 봄; 다음 첫 동작: `bash runs/E5_go.sh <이름> 520596921 39700 "GENIE_TRACE_COMMANDS=1"`로 그 갱신의 명령을 보고 문구가 나는 엔진 자리를 찾는다). 520596921 P2의 431.6초(단어 7, 기록이 230 큼)는 57번 뒤의 FOLLOW 계속 따라가기 문제다(13.4 열린 사례 1). 그룹 멤버의 걸음(`groups/update/moves.rs:568`)은 0x215를 만나면 여전히 멈춘다.
    - 엔진 멈춤(`L_p_*`, 지금 기본 24개): **세 리플 모두 돌린 구간에서 멈추지 않는다**(518239882는 리플 끝 41,600까지, 나머지 둘은 75,000까지만 돌림 — 그 뒤는 안 돌려 봄). 없어진 멈춤: 518239882 36,702 순찰 범위(45번), 517426097 61,100 도움 요청(46번), 517426097 73,686 "a pather query meeting a gate"(47번 뒤 그 상황이 안 생김; 구현한 것이 아님). 아직 구현 안 된 멈춤 문구(다른 리플에서 다시 나올 수 있음): "a horde's command (commandHorde)", "a builder with no task for its foundation", "a pather query meeting a gate (slot 0x678)", 공성 AI의 순찰 범위, 손상 그림 단계 변경(40번), 탑 같은 못 움직이는 도우미(46번).
      - 해결(findings 40, `MASTERHP`): 518470161 P1 42,960 "a master change that changes the damage sprites"는 화면용이 아니라 **체력 계산 차이**였다(원본은 마스터가 바뀔 때 체력을 정수로 자르지 않음). 원본 손상 그림 검사 0x12429c0(CheckDamageSprites)은 통째로 건너뛰면 안 된다: 단계가 바뀌면 모드 1 항목은 Object 난수(0x144354d90)를 두 번 뽑고 모드 2는 스프라이트를 바꾸며(스프라이트 난수), 항상 체력을 0~최대로 자르고 비율 바이트(+0xd)를 쓴다. 단계가 그대로면 아무 일도 없다. **남은 일(읽음, 미구현)**: 원본은 이 검사를 상태 2 개체의 매 갱신(0x12488e0, 0x1248b56)에서 부른다. 엔진은 업그레이드 경로(`technology/upgrade.rs` `damage_sprites_at`)에서만 부르므로, 전투로 건물 체력이 단계(25/50/75%)를 넘을 때 모드 1 항목의 Object 난수 두 번을 뽑지 않는다(건물이 맞는 구간에서 난수가 밀릴 수 있음; 사례는 아직 없음). 마스터 변경으로 단계가 실제로 바뀌는 경우는 여전히 멈춘다(같은 오류 문구).
    - 해결되어 지운 것: 518470161 P2 216.7초(word 7·9)와 P2 자원 218.5초, 양치기 9381의 내려놓기 경로(37번 `ESCAPE`, 2026-11-12 기본으로 켬). 517426097 P1 230.4초 정찰병 2976의 그룹 형성 속도(39번 `FORMING`, 2026-11-12 기본으로 켬). 518470161 P1 307.7초 양치기 10406의 시체 대신 산 양(38번). 518470161 215.4초 시작 노드 손 계산(37번). 517426097 230.4초 형성 초기화·+0x178 읽기(39번).
@@ -409,6 +415,10 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 | `re-kit\re-focused-cases-p28-p30-s1-s2.tar.gz` | findings 44~48의 원본 읽기 원문: `out_p28`(Explore 0xb79060~, `sim_p28.py`), `out_p29`(내려놓기 무시 규칙 0x120ee10, q1~q3.c), `out_p30`(타일 플래너 포트 `plan.py`·`grid.py`), `out_s1`(도움 요청 s1~s3.c, `best.txt`), `out_s2`(병사 CanAttack s1·s2.c) |
 | `re-kit\re-focused-cases-p25-p27.tar.gz` | P25~P27 보고서(`case_p25.md`~`case_p27.md`, `crs26.py` = 내려놓는 곳 갈래를 더한 자원 탐색 포트) |
 | `re-kit\re-focused-cases-k-p22-p24.tar.gz` | findings 40~43의 원본 읽기 원문: `out_k`(k1~k7.c: 0x12429c0, 0x1266b90, 0x1226150, 0x12bacf0, 0x12b6910, 0x12bc7e0, 0x12baa00, 0x16ecf20, 0xd004a0), `out_p22`(주둔·대피 명령 0x16f0680, 이동 0x16ebc20), `out_p23`, `out_p24`(자원 탐색 0xd23bf0·0xd19f60 디컴파일 p1~p3.c, 포트 `crs.py`), `realstart.py`(이어진 .pdata 조각의 진짜 시작 찾기) |
+| `re-kit\re-focused-cases-eng05.tar.gz` | findings 56~59의 원본 읽기 원문: `out_E5`(`w1.c` 성벽 명령 0xf63360·0x16e9600·0x1700270·0x16dccb0·0x16d9240·BUILD 0xf63100, `w2.c` 자리 검사 0x12f5200·0x1321db0·0x11e2c80·0x12f74e0, 목록 `l1~l3.txt`), `E5_xr.py`(numpy 없이 호출 색인 읽기: `python E5_xr.py to <rva>` / `from <rva>`) |
+| `runs\E5_*`, `runs\E5a_*`, `runs\E5c_*` | 세션 E5: 추적 `E5_w1`(520592057 update 49,100~49,500 전 개체 + 명령), `E5_w2`(같은 리플 43,990~44,499), `E5_f1`(520596921 17,000~17,099, 고치기 전), `E5_f2`(고친 뒤 17,085~17,499, 유닛 넷), `E5_d1`(520397411 37,990~37,999, 고친 뒤); 전체 `E5a_*`(틀린 자리의 57번만 = `M6f_*`와 같음), `E5c_*`(57·58·59번, `GENIE_TRACE_RES=1`), 비교 원문 `E5c_cmp.txt`. 실행 파일 사본 `runs\census_M7.exe`(고치기 전), `census_E5a.exe`, `census_E5c.exe`(지금 빌드와 같음) |
+| `runs\E5_go.sh`, `E5_launch.sh`, `E5_cmp.py`, `E5_site_until.py` (저장소 `tools/`에도 사본) | Git Bash에서 도는 실행 도구(PowerShell `-ExecutionPolicy Bypass` 없이): `bash runs/E5_go.sh <이름> <리플 번호> <갱신 수> "<추가 환경변수>"`(= `go.ps1`, 빌드 없음; `E5_EXE=<runs 안의 exe 사본>`이면 빌드 중에도 돌릴 수 있다), `E5_launch.sh <접두어> "<추가>"`(열한 리플 동시에, 끝날 때까지 기다림), `python E5_cmp.py <기준 접두어> <새 접두어>`(= `M5_cmp.py`, Windows python), `python E5_site_until.py runs <접두어>...`(사이트 규칙의 확인 구간과 멈춤) |
+| `patch-2026-11-13-E5.patch` | 이번 엔진 패치 사본(저장소 `sorted-lists-and-truth-trace.patch`와 같음, sha256 LF `1d5bccd0…b5bd11`). 깨끗한 `91d81be4`에 `git apply --check` 통과 |
 
 
 ## 13. 일을 끝낼 때 남길 기록 (누가 하든 반드시; 다음 사람이 이것만 보고 바로 시작한다)
@@ -417,7 +427,7 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 13.1 사례 하나를 끝낼 때마다 (고쳤든 못 고쳤든)
 
-`truth-log-findings.md` 맨 끝에 번호를 이어 한 절을 쓴다(지금 마지막은 55번). 형식:
+`truth-log-findings.md` 맨 끝에 번호를 이어 한 절을 쓴다(지금 마지막은 59번). 형식:
 
 ```
 ## <번호>. <한 줄 제목> (스위치 `GENIE_EXPERIMENT_...`에 추가 / 새 스위치 / 스위치 없음)
@@ -455,7 +465,20 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 13.4 지금 하던 일 (멈출 때마다 이 절을 덮어쓴다)
 
-**2026-11-13, Claude (세션 M7). 결론: 반쯤 하던 일 없음. 엔진 쪽은 55번까지 넣고 푸시했고, 사이트 쪽도 개정 19까지 main에 푸시했다(`8f5d112`, 2026-11-13 배포 성공·engine-check 성공 확인; 브라우저에서 #520592057의 식량 출처 블록이 뜨는 것 확인. 배포 직후 검증 구간: 520596921 418초, 520592057 639초, 520386901 399초, 520397411·520394236은 없음).**
+**2026-11-13, Claude (세션 E5 = ONBOARDING 후보 ENG-05). 결론: 반쯤 하던 일 없음. 최신 리플의 엔진 멈춤 넷을 보았다: 셋은 원본을 읽어 없앴고(57·58·59번, 스위치 없음), 하나(520592057)는 빠진 분기가 아니라 개체 번호가 밀린 결과임을 밝혔다(56번, 못 고침). 열한 리플의 첫 어긋남·확인 체크포인트 수·사이트 규칙의 확인 구간은 전부 그대로다 — 멈춤을 없애도 사이트의 "식량 출처" 구간은 늘지 않는다(2.1의 E5 문단). 이 커밋들은 PC `aoe2-push`에 로컬로만 있고 **푸시하지 않았다(사용자 확인 대기)**.**
+
+**주의: 연구 브랜치를 푸시하면 사이트 엔진이 바뀐다.** main의 `update.yml`·`engine-check.yml`은 실행할 때마다 `origin research/genie-188329`의 최신 `sorted-lists-and-truth-trace.patch`를 받아 쓴다. 이번 패치는 스위치를 더하지 않으므로 `engine/switches.env`는 그대로 두고, engine-check 기대값(518239882 "55 checkpoints hold" / "54 checkpoints hold", 둘 다 "no stop")도 그대로다(`E5c_p_239`로 확인). 푸시 뒤 첫 수집 실행에서 엔진을 다시 빌드한다(패치 해시가 캐시 키).
+
+끝난 것 (세션 E5):
+- 56 (못 고침): 520592057 P2 51,417 멈춤의 사슬 — P2 580.7초(양이 바닥난 양치기 여섯의 예약 나무 명령) → 민병대 자리(추정) → 641초 P1의 한 칸 성벽이 기록에서는 거절되고 엔진에서는 놓임 → 번호 1 밀림 → 665초 건설 명령의 일꾼이 다른 유닛.
+- 57: 유닛 자신의 MoveTo(FOLLOW)가 통지 0x215를 전달. 520596921 멈춤 17,092(7:01) 없어지고 39,653(16분대)에 새 멈춤 "two town centres".
+- 58: 마스터 0x26d 켜기(서든 데스 규칙만 막음). 520386901 멈춤 없어짐.
+- 59: 사냥의 내려놓기에서 짐을 안 받는 곳 → `set_state(2)`. 520397411 멈춤 없어짐.
+- 도구: `tools/E5_go.sh`, `E5_launch.sh`, `E5_cmp.py`, `E5_site_until.py`, `E5_xr.py`(12.7). 원본 읽기 환경은 **PC에 그대로 있다**: `re-kit\re`(풀린 상태) + `re-kit\toolchain`(Ghidra 11.3.2, JDK 21). Git Bash에서: `cd re-kit/re; export JAVA_HOME=<toolchain\jdk-21.0.13+9의 Windows 경로>; export JAVA_TOOL_OPTIONS=-Duser.name=root`(프로젝트 소유자가 root라서 필요) 뒤 `cmd //c "..\toolchain\ghidra_11.3.2_PUBLIC\support\analyzeHeadless.bat" <proj2 경로> aoe -process AoE2DE_s_unpacked.exe -noanalysis -scriptPath <gs 경로> -postScript RangeDecomp.java <목록> <출력.c> < /dev/null`. 디스어셈블은 `PYTHONPATH=../python-deps python dz.py <rva> <끝>`. numpy는 없다(`E5_xr.py`가 호출 색인을 대신 읽는다).
+
+알아 둘 것: `cargo test -p genie-core --lib`는 이 패치 상태에서 컴파일되지 않는다(이번 세션 전부터: `groups/layout.rs` 896·910줄 테스트의 `FormationLine` 초기화에 `spacing_half` 누락, 오류는 그 둘뿐). 그래서 58번에서 고친 테스트는 돌리지 못했다. 사이트 워크플로는 `census` 예제만 빌드하므로 영향 없다.
+
+그 전 세션(M7)의 상태: 엔진 55번까지, 사이트 개정 19까지 배포·확인됨(`8f5d112`; 그 뒤 main은 다른 세션이 개정 20 `80fff1c`까지 올렸다).
 
 끝난 것 (엔진, 전부 기본으로 켬; 스위치는 `GENIE_EXPERIMENT_<이름>_188329=1`):
 - 49 `GATHER_SNAP`: 채집 자리 맞추기. 517426097 P2 첫 어긋남 535.9 → 711.4초.
@@ -472,8 +495,8 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 지금 숫자: 2.1 맨 위 표(열한 리플). 연구 리플 셋은 11~13분, 나머지는 10초~11분에서 처음 어긋난다.
 
 각 작업 폴더 상태 (PC `C:\Users\ssapo\genie-replays`):
-- `aoe2-push`: 브랜치 `research/genie-188329`, 패치 커밋 `7a9ec3e` + 이 기록을 넣은 커밋(바로 다음), 푸시함.
-- `genie`(엔진 소스): 빌드됨, 커밋된 패치와 같음(sha256 LF `82bbf6cf…2ece67`, PC 사본 `patch-2026-11-13-M7.patch`). 돌고 있는 실행 없음.
+- `aoe2-push`: 브랜치 `research/genie-188329`. 2026-11-13에 origin(`1d36b5e`, Codex의 문서 커밋 6개)을 받아 그 위에 로컬 커밋을 다시 얹었다(`87dc7be` 배포 확인 기록 + 세션 E5 커밋). **origin보다 앞서 있고 푸시 전이다.**
+- `genie`(엔진 소스): 빌드됨(57·58·59번 포함), 저장소 패치와 같음(sha256 LF `1d5bccd0…b5bd11`, PC 사본 `patch-2026-11-13-E5.patch`). 돌고 있는 실행 없음.
 - `aoe2-main`: 브랜치 `houses` = `origin/main`(`8f5d112`까지 푸시함, 미푸시 커밋 없음). 검사 통과(python 107개, node 55개). 새 작업은 `git fetch origin main` 뒤 `FETCH_HEAD`에서 새 브랜치를 딴다.
 - 배포하는 법(**사용자가 "배포"라고 할 때만**): ① `Invoke-RestMethod https://api.github.com/repos/ssapo/aoe2/actions/runs`로 진행 중인 실행이 없는지 확인 ② `git fetch origin main` ③ `git rebase FETCH_HEAD` ④ `git push origin <브랜치>:main` ⑤ 같은 API로 배포 실행과 engine-check 결과(55/54) 확인.
 
@@ -482,7 +505,7 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 2. Ctrl 누른 이동의 잠깐 어긋남(triage2 G3): 520596921 update 400~1,000, 유닛 9479 하나만 추적.
 3. 519686090 P1 379.4초: 여자 사냥꾼(122) 하나의 내려놓기가 0.5초쯤 늦음(추정). 체크포인트 간격으로 보아 update 28,500~29,000쯤(추정)을 추적.
 4. SeekShelter 뒤 일터 복귀(triage2 G2; 520592057 P1, 520386901 P2는 54번 뒤 늦춰졌지만 520596921 P2의 "주둔했던 사냥꾼이 쉰다"가 54번 뒤에도 남았는지 먼저 추적으로 확인): 남았으면 원본의 주둔 명령 쪽 "이전 작업 기록"을 읽는다.
-5. 남은 엔진 멈춤 넷(2.1 표 오른쪽 칸; `runs/Q_out/triage2.md` 2절): 원본 동작을 읽어 오류를 대체(12.4).
+5. 남은 엔진 멈춤(12.5 맨 위 E5 항목): 520592057 P2 51,417(56번, 뿌리는 580.7초의 양치기 여섯)과 새 520596921 P1 39,653 "two town centres". 사이트의 확인 구간을 늘리려면 멈춤이 아니라 각 리플의 **단어 1 첫 불일치**를 풀어야 한다: 520596921 P1 431.6초(단어 4·7·9는 405.4초 체크포인트에 이미 다름 — 그 앞의 첫 지속 어긋남부터 추적), 520592057 P1 645.7초(= 56번), 520386901 P1 405.2초.
 6. 연구 리플 11~13분(12.5 0번): 518239882 P2 696.6 → 518470161 P2 710.7 → 518239882 P1 710.6 → 517426097 795.9 → 518470161 P1 822.0.
 7. 51번의 다른 7개 문명 확인(그 문명이 나오는 리플을 받아 체크포인트 단어 1로).
 8. 읽었지만 안 넣은 것: 12.5 5번 목록(사례가 나오면 넣는다).
@@ -493,7 +516,7 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 사용자 결정 대기: (가) 사이트 직접 수집과 예약 수집 합치기 — Render에 GitHub 토큰을 넣어야 함. (나) GoatCounter 가입(방문 수 세기). (다) 워크플로가 푸시 전에 pull --rebase 하게 고칠지.
 
 배경 (아직 맞는 것):
-- 사이트는 GitHub Actions에서 엔진을 빌드해 돌린다. 게임 데이터는 비공개 저장소 `ssapo/aoe2-data`에만 둔다(비밀 `AOE2_DATA_TOKEN`). 엔진 스위치를 더하면 main의 `engine/switches.env`도, 패치가 바뀌어 확인 체크포인트 수가 바뀌면 `engine-check.yml` 기대값도 고친다.
+- 사이트는 GitHub Actions에서 엔진을 빌드해 돌린다. 게임 데이터는 비공개 저장소 `ssapo/aoe2-data`에만 둔다(비밀 `AOE2_DATA_TOKEN`). 엔진 스위치를 더하면 main의 `engine/switches.env`도, 패치가 바뀌어 확인 체크포인트 수가 바뀌면 `engine-check.yml` 기대값도 고친다. **워크플로는 연구 브랜치의 최신 패치를 실행 때마다 받으므로, 연구 브랜치 푸시가 곧 사이트 엔진 반영이다(맨 위 주의).**
 - `origin/main`은 `git fetch origin main`으로 따로 받아야 최신이다.
 - 실행: `runs\go.ps1 -Name <이름> -Envs "<M6_envs.txt 한 줄>"`(12.3). 열한 리플은 `tools/M5_launch.ps1`, 비교 `tools/M5_cmp.py`, 패치 `tools/M6_mkpatch.ps1` + `tools/M3_striplf.py`. `GENIE_TRACE_RES=1`을 붙이면 열한 개 동시에 약 20분.
 - 빌드 중에 실행을 띄우면 exe가 잠겨 링크가 실패한다. 빌드 성공은 `build7.err`의 "Finished"와 `census.exe` 시각으로 본다.

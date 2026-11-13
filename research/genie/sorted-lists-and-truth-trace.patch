@@ -1244,6 +1244,32 @@ index 2945a9b1..79aa24d9 100644
      match found.as_slice() {
          [one] => Ok(Some(**one)),
          [] if on_tile.iter().all(open) => Ok(None),
+diff --git a/crates/engine/genie-core/src/gathering/hunt/drop_off.rs b/crates/engine/genie-core/src/gathering/hunt/drop_off.rs
+index c6c883ca..371bd1e3 100644
+--- a/crates/engine/genie-core/src/gathering/hunt/drop_off.rs
++++ b/crates/engine/genie-core/src/gathering/hunt/drop_off.rs
+@@ -93,7 +93,7 @@ impl HuntAction {
+     /// one or one whose target was let go (codes 3 to 5) makes the hunt wait 3 seconds and stops the unit's animation (`FUN_141161850`). Once it
+     /// ended (its update in state 1 returns 1: the list deletes it and its destructor stops the
+     /// unit) the load goes to the player at a drop site that takes it within a tile (`site`; one
+-    /// that does not, `set_state` 2, is not modelled; a farther one makes the hunt wait 3 seconds
++    /// that does not ends the hunt, `set_state` 2, [`Dropped::Idle`]; a farther one makes the hunt wait 3 seconds
+     /// too): the resource of what the unit carries (`FUN_140fdd4f0`: food for 15 to 17, nothing
+     /// outside 0 to 3, 9 and 56, then 0 beyond the player's attributes, `FUN_140efe5b0`), which
+     /// the caller adds; the unit carries nothing after (`FUN_14119d310` with -1). A hunt with a
+@@ -142,9 +142,9 @@ impl HuntAction {
+             "a drop-off whose drop site is gone",
+         ))?;
+         if !site.takes {
+-            return Err(GenieError::unsupported(
+-                "a drop site that does not take the load (set_state 2)",
+-            ));
++            // 188329 0xbb6230 state 8: a site its master does not drop this load at (0x10ba220)
++            // ends the hunt (set_state 2, the caller's)
++            return Ok(Dropped::Idle);
+         }
+         if c.w.model.tuning.hunt.drop_reach < site.gap_squared.get() {
+             self.timer = DROP_WAIT;
 diff --git a/crates/engine/genie-core/src/gathering/hunt/gathering.rs b/crates/engine/genie-core/src/gathering/hunt/gathering.rs
 index 2df7dd4b..87a58d1f 100644
 --- a/crates/engine/genie-core/src/gathering/hunt/gathering.rs
@@ -1289,7 +1315,7 @@ index 2df7dd4b..87a58d1f 100644
          if roles
              .of_class(victim.class)
 diff --git a/crates/engine/genie-core/src/gathering/hunt/hunter.rs b/crates/engine/genie-core/src/gathering/hunt/hunter.rs
-index 3e35c7a5..51dd1cf0 100644
+index 3e35c7a5..c72b54d0 100644
 --- a/crates/engine/genie-core/src/gathering/hunt/hunter.rs
 +++ b/crates/engine/genie-core/src/gathering/hunt/hunter.rs
 @@ -140,6 +140,20 @@ impl Unit {
@@ -1313,6 +1339,17 @@ index 3e35c7a5..51dd1cf0 100644
              Some(HuntState::Drop { .. }) if timer < Seconds::ZERO => {
                  self.hunt_drop_wait(actions, c, roles)?;
              }
+@@ -199,8 +213,8 @@ impl Unit {
+     /// State 8, which has no target: its drop site (the second target) is what it walks to
+     /// ([`crate::gathering::hunt::HuntAction::update_drop`]); a load dropped goes to the player
+     /// at once ([`Step::give_load`]) and the hunt walks back ([`Unit::hunt_after_drop`]); a
+-    /// drop site that does not take it goes and the drop-off searches again. Its idling
+-    /// (`set_state` 2) is not modelled.
++    /// drop site gone makes the drop-off search again; one that does not take the load ends the
++    /// hunt (`set_state` 2: the unit stands, the target and the drop site go).
+     pub(crate) fn hunt_drop_walk(
+         &mut self,
+         actions: &mut Action,
 @@ -271,6 +285,15 @@ impl Unit {
                  // the local player's tracker (FUN_14097daf0) are not held; a sharing player's
                  // allies' share (+0x1426) is not modelled
@@ -1329,6 +1366,23 @@ index 3e35c7a5..51dd1cf0 100644
                  return self.hunt_after_drop(actions, c, roles);
              }
              Dropped::Again => {
+@@ -281,9 +304,13 @@ impl Unit {
+                 self.hunt_drop_off(actions, c, roles)?;
+             }
+             Dropped::Idle => {
+-                return Err(GenieError::unsupported(
+-                    "a hunt's drop-off idling (set_state 2)",
+-                ));
++                // set_state(2): the hunt is done, as after its walk to a point; the unit keeps
++                // its load
++                let hunt = actions.list.hunt_mut().ok_or(NO_HUNT)?;
++                let task = hunt.task;
++                let [target, second] = hunt.set_done();
++                self.hunt_stand(c, &task)?;
++                self.hunt_release(c, [target, second])?;
+             }
+         }
+         Ok(HeadCode::Keeps)
 diff --git a/crates/engine/genie-core/src/gathering/hunt/hunter_strike.rs b/crates/engine/genie-core/src/gathering/hunt/hunter_strike.rs
 index 0b192fdd..43cb344c 100644
 --- a/crates/engine/genie-core/src/gathering/hunt/hunter_strike.rs
@@ -3544,6 +3598,22 @@ index eb4f2f5f..0aa3187d 100644
      }
  }
  
+diff --git a/crates/engine/genie-core/src/movement/unit.rs b/crates/engine/genie-core/src/movement/unit.rs
+index 5f058dd9..b167fc33 100644
+--- a/crates/engine/genie-core/src/movement/unit.rs
++++ b/crates/engine/genie-core/src/movement/unit.rs
+@@ -159,6 +159,11 @@ impl Unit {
+             return Ok(HeadCode::of(code));
+         }
+         let step = self.own_move_step(actions, c, me, roles)?;
++        // The walk's units in the way (0x215): the walk tells the walker's unit AI of them
++        // itself, whatever action owns it (188329 0x1214f35..0x121503a: the unit AI's slot 0x38
++        // with the walker's id twice, 0x215, the hit's id, -1, -1), so before the notifies this
++        // update posts after its step. An own MoveTo to an object (FOLLOW) meets them.
++        self.post_in_the_way(c.w.parts.motion.mover_mut(self.id), &mut c.w.parts.unit_ai)?;
+         if step.gave_up {
+             self.own_move_give_up(actions, c, roles)?;
+         }
 diff --git a/crates/engine/genie-core/src/movement/walk.rs b/crates/engine/genie-core/src/movement/walk.rs
 index ff48ae22..d725068d 100644
 --- a/crates/engine/genie-core/src/movement/walk.rs
@@ -5075,6 +5145,94 @@ index e5f89e13..04e9c49d 100644
  /// Where a run's spots lie and which way each tries its next point: above the building (up),
  /// below it (down), left of it or right of it (out).
  #[derive(Clone, Copy)]
+diff --git a/crates/engine/genie-core/src/technology/effect/completion.rs b/crates/engine/genie-core/src/technology/effect/completion.rs
+index 00dffb2a..e50904d6 100644
+--- a/crates/engine/genie-core/src/technology/effect/completion.rs
++++ b/crates/engine/genie-core/src/technology/effect/completion.rs
+@@ -25,7 +25,6 @@ use crate::technology::TechMode;
+ use crate::technology::effect::ATTRIBUTE_39;
+ use crate::technology::{EffectCommand, ObjectsKind, Party};
+ use crate::technology::{Location, TechDef, TechKind, TechState, factors};
+-use crate::world::GameMode;
+ use crate::world::Seconds;
+ use crate::world::World;
+ use crate::world::layer::AttributeRoles;
+@@ -463,9 +462,9 @@ impl World {
+     /// against `+0x260` is taken to hold). Without `one` building (a third argument of 1) and
+     /// its object, the master's slot 0x58 (`FUN_141126280`) sets `available` unless it is
+     /// `disabled` (the byte, held as its test against 0). The sprites' loading on an enable
+-    /// (slot 0xa8) is not simulation. The enabling of master `0x26d` does nothing in game mode
+-    /// 11; not modelled: its enabling in another mode (it asks a settings flag) and a command for
+-    /// one building (`FUN_1411c69f0`, `FUN_1411c6a50`: the building's list, not held).
++    /// (slot 0xa8) is not simulation. The enabling of master `0x26d` does nothing under the sudden
++    /// death rule (game mode 11 or the sub-mode's bit 1); not modelled: a command for one building
++    /// (`FUN_1411c69f0`, `FUN_1411c6a50`: the building's list, not held).
+     pub(super) fn enable_master(
+         &mut self,
+         p: PlayerId,
+@@ -484,14 +483,12 @@ impl World {
+                 .of_master(master)
+                 .contains(MasterRoles::MODE_TESTED)
+         {
+-            // game mode 11 never enables it; any other asks a settings flag (their `+0x18`'s
+-            // `+0x7c`, bit 1, FUN_141324b60), which is not held
+-            if self.settings.game_mode == GameMode::SuddenDeath {
++            // game mode 11 never enables it, nor does another mode under the sub-mode's sudden
++            // death rule (188329 0x1735917..0x17359ac: the options' `+0x34` is 11, or bit 1 of
++            // their `+0x18`'s `+0x7c`, read by 0x13f6370); any other enables it as any master
++            if self.settings.sudden_death() {
+                 return Ok(());
+             }
+-            return Err(GenieError::unsupported(
+-                "the enabling of master 0x26d (the game's mode)",
+-            ));
+         }
+         if let (true, Some(id)) = (one, object) {
+             let building = match self.object(id) {
+diff --git a/crates/engine/genie-core/src/technology/effect/tests.rs b/crates/engine/genie-core/src/technology/effect/tests.rs
+index c1bcbf84..01e8ae0a 100644
+--- a/crates/engine/genie-core/src/technology/effect/tests.rs
++++ b/crates/engine/genie-core/src/technology/effect/tests.rs
+@@ -95,7 +95,7 @@ use crate::world::Seconds;
+ use crate::world::WholeSeconds;
+ use crate::world::WorldTime;
+ use crate::world::settings::OptionFlags;
+-use crate::world::{FrameSeed, GameMode};
++use crate::world::{FrameSeed, GameMode, SubModeFlags};
+ use std::sync::Arc;
+ 
+ /// A combat unit's charge after its master's maximum charge changes (`FUN_1412163c0`'s
+@@ -1793,7 +1793,7 @@ fn the_object_kinds_without_an_object_do_nothing() {
+ }
+ 
+ /// The enable command (`FUN_1416665b0`, kind 2): `available` takes the byte unless the master
+-/// is disabled; master 0x26d is never enabled in game mode 11.
++/// is disabled; master 0x26d is never enabled in game mode 11 or under the sudden death rule.
+ #[test]
+ fn the_enable_command_sets_available_unless_disabled() {
+     let mut t = World::new(
+@@ -1825,11 +1825,17 @@ fn the_enable_command_sets_available_unless_disabled() {
+     t.do_effect(PlayerId::new(0), &[attribute(2, 0x26d, 1, -1, 0.0)], None)
+         .unwrap();
+     assert!(!(t.model.masters[0].get(master_id(0x26d)).unwrap().available).is_available());
++    // another mode under the sub-mode's sudden death rule (bit 1) does not enable it either
+     t.settings.game_mode = GameMode::of_data(0);
+-    assert!(
+-        t.do_effect(PlayerId::new(0), &[attribute(2, 0x26d, 1, -1, 0.0)], None)
+-            .is_err()
+-    );
++    t.settings.sub_game_mode_flag = SubModeFlags::from_bits_retain(2);
++    t.do_effect(PlayerId::new(0), &[attribute(2, 0x26d, 1, -1, 0.0)], None)
++        .unwrap();
++    assert!(!(t.model.masters[0].get(master_id(0x26d)).unwrap().available).is_available());
++    // without the rule it is enabled as any master
++    t.settings.sub_game_mode_flag = SubModeFlags::from_bits_retain(0);
++    t.do_effect(PlayerId::new(0), &[attribute(2, 0x26d, 1, -1, 0.0)], None)
++        .unwrap();
++    assert!((t.model.masters[0].get(master_id(0x26d)).unwrap().available).is_available());
+     t.do_effect(PlayerId::new(0), &[attribute(2, 4, 0, -1, 0.0)], None)
+         .unwrap();
+     assert!(!(t.model.masters[0].get(master_id(4)).unwrap().available).is_available());
 diff --git a/crates/engine/genie-core/src/testing/build_158041.rs b/crates/engine/genie-core/src/testing/build_158041.rs
 index 1a1bfc98..bdca75be 100644
 --- a/crates/engine/genie-core/src/testing/build_158041.rs
