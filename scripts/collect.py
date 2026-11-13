@@ -442,6 +442,7 @@ def main():
     old = {m['id']: m for m in previous.get('matches', [])} if same_profile else {}
     pending = sorted(payload['matchHistoryStats'], key=lambda m: m.get('startgametime', 0), reverse=True)
     budget = max(0, min(args.limit, 10))
+    listed = set()
     for match in pending:
         if config.get('only_1v1') and len(match.get('matchhistoryreportresults', [])) != 2:
             continue
@@ -479,6 +480,20 @@ def main():
         if row.get('analysis'):
             row['map'] = row['analysis']['map']
         old[row['id']] = row
+        listed.add(row['id'])
+    # Kept rows the API no longer lists: their replay is asked for by match id alone, so an
+    # outdated analysis is brought up to date with what is left of this run's budget, newest first.
+    for row in sorted(old.values(), key=lambda m: m.get('started_at') or 0, reverse=True):
+        if not budget:
+            break
+        if row['id'] in listed or row.get('analysis_status') != 'complete':
+            continue
+        if (row.get('analysis') or {}).get('analysis_revision', 0) >= ANALYSIS_REVISION:
+            continue
+        if upgrade_analysis(row, row, {'id': row['id']}, own_id):
+            budget -= 1
+            if row.get('analysis'):
+                row['map'] = row['analysis'].get('map', row.get('map'))
     for row in old.values():
         # Also repairs kept rows that the API no longer lists.
         replay_civilizations(row)

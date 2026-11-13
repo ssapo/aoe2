@@ -148,6 +148,52 @@ class CollectorTests(unittest.TestCase):
             self.assertEqual(status['schema_version'],1)
             self.assertEqual(status['last_checked_at'],json.loads(path.read_text(encoding='utf-8'))['last_checked_at'])
 
+    def test_kept_rows_outside_the_api_window_are_upgraded_within_the_budget(self):
+        payload={'result':{'code':0},'profiles':[],'matchHistoryStats':[]}
+        def kept(match_id,started,revision):
+            return {'id':match_id,'started_at':started,'players_count':2,'analysis_status':'complete','map':'Old',
+                    'analysis':{'analysis_revision':revision,'map':'Old','opponents':[]}}
+        rows=[kept(1,10,4),kept(2,30,4),kept(3,20,collect.ANALYSIS_REVISION),kept(4,40,4),
+              {'id':5,'started_at':50,'players_count':2,'analysis_status':'unavailable','analysis':None}]
+        newer={'analysis_revision':collect.ANALYSIS_REVISION,'map':'Arabia','opponents':[]}
+        asked=[]
+        def fetch(url,limit=None):
+            if 'getRecentMatchHistory' in url:
+                return json.dumps(payload).encode()
+            asked.append(url)
+            if 'gameId=4&' in url:
+                raise OSError('expired replay')
+            return b'replay'
+        def run(limit):
+            with patch.object(sys,'argv',['collect','--profile-id','1234','--limit',str(limit),'--output',str(path)]),patch.object(collect,'fetch',side_effect=fetch),patch.object(collect,'analyze_replay',return_value=newer),patch('review.enrich_report'):
+                collect.main()
+            return {m['id']:m for m in json.loads(path.read_text(encoding='utf-8'))['matches']}
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/'report.json'
+            collect.write_json(path,{'schema_version':1,'profile':{'id':1234},'matches':rows})
+            saved=run(2)
+            # newest outdated rows first: 4 (its replay is gone) and 2; 1 waits for the next run
+            self.assertEqual([u.split('gameId=')[1].split('&')[0] for u in asked],['4','2'])
+            self.assertEqual(saved[4]['analysis']['analysis_revision'],4)
+            self.assertEqual(saved[4]['analysis_upgrade'],{'revision':collect.ANALYSIS_REVISION,'attempts':1})
+            self.assertEqual(saved[2]['analysis'],newer)
+            self.assertEqual(saved[2]['map'],'Arabia')
+            self.assertNotIn('analysis_upgrade',saved[2])
+            self.assertEqual(saved[1]['analysis']['analysis_revision'],4)
+            self.assertEqual(saved[3]['analysis']['analysis_revision'],collect.ANALYSIS_REVISION)
+            self.assertEqual(saved[5]['analysis_status'],'unavailable')
+            asked.clear()
+            saved=run(0)
+            self.assertEqual(asked,[])
+            saved=run(5)
+            self.assertEqual(saved[1]['analysis'],newer)
+            run(5);run(5)
+            asked.clear()
+            saved=run(5)
+            # three failed tries at this revision: the lost replay is not asked for again
+            self.assertEqual(asked,[])
+            self.assertEqual(saved[4]['analysis']['analysis_revision'],4)
+
     def test_upgrade_failure_keeps_success_and_has_bounded_retries(self):
         old={'analysis':{'analysis_revision':4,'metrics':{'preserved':True}},'analysis_status':'complete'}
         row=dict(old)
