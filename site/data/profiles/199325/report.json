@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-13T02:34:09.032526+00:00",
-  "last_checked_at": "2026-11-13T02:33:27.815258+00:00",
+  "updated_at": "2026-11-13T02:59:01.524606+00:00",
+  "last_checked_at": "2026-11-13T02:58:08.725915+00:00",
   "sync_error": null,
   "profile": {
     "id": 199325,
@@ -79033,7 +79033,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 17,
+        "analysis_revision": 20,
         "duration_game_seconds": 2875.65,
         "civilization": "Varangians",
         "random_civ": false,
@@ -147908,6 +147908,25 @@
                 ]
               ]
             },
+            "villagers": {
+              "start": 3,
+              "trained": 31,
+              "at_click": 0,
+              "other_units": 10,
+              "counted": false
+            },
+            "houses": {
+              "source": "recording_checkpoints",
+              "counted": 5,
+              "counted_until_seconds": 400.5,
+              "estimated": [
+                479.3,
+                581.9,
+                623.2,
+                638.9,
+                657.9
+              ]
+            },
             "blocked_seconds": 55.8,
             "feudal_clicked": true
           },
@@ -147936,6 +147955,23 @@
                   426.5,
                   428.0
                 ]
+              ]
+            },
+            "villagers": {
+              "start": 3,
+              "trained": 16,
+              "at_click": 0,
+              "other_units": 0,
+              "counted": false
+            },
+            "houses": {
+              "source": "recording_checkpoints",
+              "counted": 3,
+              "counted_until_seconds": 251.0,
+              "estimated": [
+                270.8,
+                297.5,
+                386.4
               ]
             },
             "blocked_seconds": 0,
@@ -148371,7 +148407,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 17,
+        "analysis_revision": 20,
         "duration_game_seconds": 2019.21,
         "civilization": "Goths",
         "random_civ": true,
@@ -201188,45 +201224,46 @@
               "counted_seconds": 426.1,
               "estimated": []
             },
+            "villagers": {
+              "start": 3,
+              "trained": 16,
+              "at_click": 1,
+              "other_units": 0,
+              "counted": true
+            },
+            "houses": {
+              "source": "recording_checkpoints",
+              "counted": 4,
+              "counted_until_seconds": 426.1,
+              "estimated": []
+            },
             "blocked_seconds": 0,
             "feudal_clicked": true
           },
           "opponent": {
             "until_seconds": 397.5,
-            "blocks": [
-              {
-                "from_seconds": 276.1,
-                "to_seconds": 392.1,
-                "seconds": 116.0,
-                "population": "15/15",
-                "counted": false
-              }
-            ],
+            "blocks": [],
             "refused_queue": 1,
             "births": {
               "source": "recording_checkpoints",
               "corrected_queue": 0,
-              "counted_seconds": 371.5,
-              "estimated": [
-                [
-                  298.9,
-                  305.4
-                ],
-                [
-                  324.9,
-                  331.4
-                ],
-                [
-                  350.9,
-                  357.4
-                ],
-                [
-                  370.4,
-                  376.9
-                ]
-              ]
+              "counted_seconds": 397.5,
+              "estimated": []
             },
-            "blocked_seconds": 116.0,
+            "villagers": {
+              "start": 3,
+              "trained": 15,
+              "at_click": 0,
+              "other_units": 0,
+              "counted": true
+            },
+            "houses": {
+              "source": "recording_checkpoints",
+              "counted": 4,
+              "counted_until_seconds": 397.5,
+              "estimated": []
+            },
+            "blocked_seconds": 0,
             "feudal_clicked": true
           }
         },
@@ -201266,7 +201303,7 @@
           "own": {
             "available": true,
             "opening": "maa",
-            "opening_label": "무장병사",
+            "opening_label": "무장 병사",
             "opening_revision": 2,
             "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 463.28,
@@ -325484,7 +325521,7 @@
           "own": {
             "available": true,
             "opening": "maa_then_archers",
-            "opening_label": "무장병사 → 궁사",
+            "opening_label": "무장 병사 → 궁사",
             "opening_revision": 2,
             "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 386.02,
@@ -420404,7 +420441,7 @@
           "opponent": {
             "available": true,
             "opening": "maa_then_archers",
-            "opening_label": "무장병사 → 궁사",
+            "opening_label": "무장 병사 → 궁사",
             "opening_revision": 2,
             "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 411.67,
@@ -464583,7 +464620,7 @@
           "own": {
             "available": true,
             "opening": "maa",
-            "opening_label": "무장병사",
+            "opening_label": "무장 병사",
             "opening_revision": 2,
             "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 409.8,
@@ -553819,7 +553856,7 @@
           "opponent": {
             "available": true,
             "opening": "maa",
-            "opening_label": "무장병사",
+            "opening_label": "무장 병사",
             "opening_revision": 2,
             "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 450.63,
@@ -613684,7 +613721,7 @@
           "own": {
             "available": true,
             "opening": "maa_then_archers",
-            "opening_label": "무장병사 → 궁사",
+            "opening_label": "무장 병사 → 궁사",
             "opening_revision": 2,
             "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 466.26,
@@ -688672,7 +688709,7 @@
           "opponent": {
             "available": true,
             "opening": "maa_then_archers",
-            "opening_label": "무장병사 → 궁사",
+            "opening_label": "무장 병사 → 궁사",
             "opening_revision": 2,
             "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 423.01,
@@ -859683,7 +859720,7 @@
           "own": {
             "available": true,
             "opening": "maa",
-            "opening_label": "무장병사",
+            "opening_label": "무장 병사",
             "opening_revision": 2,
             "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 466.87,
@@ -859790,7 +859827,7 @@
           "opponent": {
             "available": true,
             "opening": "maa_then_archers",
-            "opening_label": "무장병사 → 궁사",
+            "opening_label": "무장 병사 → 궁사",
             "opening_revision": 2,
             "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 394.36,
@@ -979829,7 +979866,7 @@
           "opponent": {
             "available": true,
             "opening": "maa_then_archers",
-            "opening_label": "무장병사 → 궁사",
+            "opening_label": "무장 병사 → 궁사",
             "opening_revision": 2,
             "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 411.62,
@@ -1101990,7 +1102027,7 @@
           "opponent": {
             "available": true,
             "opening": "maa_then_archers",
-            "opening_label": "무장병사 → 궁사",
+            "opening_label": "무장 병사 → 궁사",
             "opening_revision": 2,
             "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 410.9,
@@ -1164783,7 +1164820,7 @@
           "opponent": {
             "available": true,
             "opening": "maa",
-            "opening_label": "무장병사",
+            "opening_label": "무장 병사",
             "opening_revision": 2,
             "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 428.49,
@@ -1234498,7 +1234535,7 @@
           "opponent": {
             "available": true,
             "opening": "maa",
-            "opening_label": "무장병사",
+            "opening_label": "무장 병사",
             "opening_revision": 2,
             "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 415.08,
@@ -1275312,7 +1275349,7 @@
           "own": {
             "available": true,
             "opening": "maa_then_eagles",
-            "opening_label": "무장병사 → 독수리 전사",
+            "opening_label": "무장 병사 → 독수리 전사",
             "opening_revision": 2,
             "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 441.69,
@@ -1473808,7 +1473845,7 @@
           "opponent": {
             "available": true,
             "opening": "maa_then_archers",
-            "opening_label": "무장병사 → 궁사",
+            "opening_label": "무장 병사 → 궁사",
             "opening_revision": 2,
             "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 419.34,
@@ -1532927,7 +1532964,7 @@
           "own": {
             "available": true,
             "opening": "maa",
-            "opening_label": "무장병사",
+            "opening_label": "무장 병사",
             "opening_revision": 2,
             "opening_basis": "early_production_sequence_buildings_research",
             "first_military_seconds": 429.3,
