@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-13T02:59:01.524606+00:00",
-  "last_checked_at": "2026-11-13T02:58:08.725915+00:00",
+  "updated_at": "2026-11-13T04:38:42.227086+00:00",
+  "last_checked_at": "2026-11-13T04:37:19.441206+00:00",
   "sync_error": null,
   "profile": {
     "id": 199325,
@@ -201693,7 +201693,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 15,
+        "analysis_revision": 20,
         "duration_game_seconds": 2902.13,
         "civilization": "Turks",
         "random_civ": true,
@@ -269743,19 +269743,84 @@
           "own": {
             "until_seconds": 544.3,
             "blocks": [],
-            "refused_queue": 2,
+            "refused_queue": 1,
+            "births": {
+              "source": "recording_checkpoints",
+              "corrected_queue": 1,
+              "counted_seconds": 531.3,
+              "estimated": [
+                [
+                  210.2,
+                  223.2
+                ]
+              ]
+            },
+            "villagers": {
+              "start": 3,
+              "trained": 21,
+              "at_click": 0,
+              "other_units": 0,
+              "counted": false
+            },
+            "houses": {
+              "source": "recording_checkpoints",
+              "counted": 3,
+              "counted_until_seconds": 320.7,
+              "estimated": [
+                353.4,
+                482.3,
+                509.0
+              ]
+            },
             "blocked_seconds": 0,
             "feudal_clicked": true
           },
           "opponent": {
             "until_seconds": 376.7,
             "blocks": [],
-            "refused_queue": 1,
+            "refused_queue": 0,
+            "births": {
+              "source": "recording_checkpoints",
+              "corrected_queue": 1,
+              "counted_seconds": 350.7,
+              "estimated": [
+                [
+                  106.2,
+                  112.7
+                ],
+                [
+                  197.2,
+                  203.7
+                ],
+                [
+                  229.7,
+                  236.2
+                ],
+                [
+                  301.2,
+                  307.7
+                ]
+              ]
+            },
+            "villagers": {
+              "start": 3,
+              "trained": 13,
+              "at_click": 0,
+              "other_units": 0,
+              "counted": false
+            },
+            "houses": {
+              "source": "recording_checkpoints",
+              "counted": 6,
+              "counted_until_seconds": 376.7,
+              "estimated": []
+            },
             "blocked_seconds": 0,
             "feudal_clicked": true
           }
         },
         "engine_income": null,
+        "game_build": 188329,
         "insights": [
           {
             "kind": "review",
@@ -270281,7 +270346,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 15,
+        "analysis_revision": 20,
         "duration_game_seconds": 1889.56,
         "civilization": "Japanese",
         "random_civ": true,
@@ -325489,6 +325554,25 @@
             "until_seconds": 371.0,
             "blocks": [],
             "refused_queue": 1,
+            "births": {
+              "source": "recording_checkpoints",
+              "corrected_queue": 0,
+              "counted_seconds": 371.0,
+              "estimated": []
+            },
+            "villagers": {
+              "start": 3,
+              "trained": 14,
+              "at_click": 0,
+              "other_units": 0,
+              "counted": true
+            },
+            "houses": {
+              "source": "recording_checkpoints",
+              "counted": 3,
+              "counted_until_seconds": 371.0,
+              "estimated": []
+            },
             "blocked_seconds": 0,
             "feudal_clicked": true
           },
@@ -325496,11 +325580,36 @@
             "until_seconds": 302.5,
             "blocks": [],
             "refused_queue": 0,
+            "births": {
+              "source": "recording_checkpoints",
+              "corrected_queue": 0,
+              "counted_seconds": 289.5,
+              "estimated": [
+                [
+                  229.7,
+                  242.7
+                ]
+              ]
+            },
+            "villagers": {
+              "start": 3,
+              "trained": 11,
+              "at_click": 0,
+              "other_units": 0,
+              "counted": false
+            },
+            "houses": {
+              "source": "recording_checkpoints",
+              "counted": 3,
+              "counted_until_seconds": 302.5,
+              "estimated": []
+            },
             "blocked_seconds": 0,
             "feudal_clicked": true
           }
         },
         "engine_income": null,
+        "game_build": 188329,
         "insights": [
           {
             "kind": "review",
