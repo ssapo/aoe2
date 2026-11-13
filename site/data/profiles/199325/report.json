@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-13T04:38:42.227086+00:00",
-  "last_checked_at": "2026-11-13T04:37:19.441206+00:00",
+  "updated_at": "2026-11-13T05:37:17.952158+00:00",
+  "last_checked_at": "2026-11-13T05:35:47.154432+00:00",
   "sync_error": null,
   "profile": {
     "id": 199325,
@@ -25,13 +25,13 @@
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Aztecs"
+          "civilization": "Franks"
         },
         {
           "profile_id": 1943128,
           "name": "DS_Kvothe",
           "is_self": false,
-          "civilization": "Mapuche"
+          "civilization": "Muisca"
         }
       ],
       "analysis_status": "complete",
@@ -38604,13 +38604,13 @@
           "profile_id": 247224,
           "name": "Survivalist",
           "is_self": false,
-          "civilization": "Shu"
+          "civilization": "Wu"
         },
         {
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Wei"
+          "civilization": "Jurchens"
         }
       ],
       "analysis_status": "complete",
@@ -79021,13 +79021,13 @@
           "profile_id": 5232543,
           "name": "DS_Gali",
           "is_self": false,
-          "civilization": "Danes"
+          "civilization": "Varangians"
         },
         {
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Danes"
+          "civilization": "Varangians"
         }
       ],
       "analysis_status": "complete",
@@ -148395,13 +148395,13 @@
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Huns"
+          "civilization": "Goths"
         },
         {
           "profile_id": 5232543,
           "name": "DS_Gali",
           "is_self": false,
-          "civilization": "Romans"
+          "civilization": "Vietnamese"
         }
       ],
       "analysis_status": "complete",
@@ -201681,13 +201681,13 @@
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Gurjaras"
+          "civilization": "Turks"
         },
         {
           "profile_id": 15752697,
           "name": "j1nkerS",
           "is_self": false,
-          "civilization": "Vietnamese"
+          "civilization": "Mongols"
         }
       ],
       "analysis_status": "complete",
@@ -270334,13 +270334,13 @@
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": false,
-          "civilization": "Portuguese"
+          "civilization": "Khmer"
         },
         {
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Slavs"
+          "civilization": "Japanese"
         }
       ],
       "analysis_status": "complete",
@@ -325981,19 +325981,19 @@
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Burgundians"
+          "civilization": "Saracens"
         },
         {
           "profile_id": 1970693,
           "name": "christar123 ten",
           "is_self": false,
-          "civilization": "문명 ID 63"
+          "civilization": "Danes"
         }
       ],
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 15,
+        "analysis_revision": 20,
         "duration_game_seconds": 2159.21,
         "civilization": "Saracens",
         "random_civ": true,
@@ -387945,19 +387945,67 @@
           "own": {
             "until_seconds": 374.3,
             "blocks": [],
-            "refused_queue": 5,
+            "refused_queue": 1,
+            "births": {
+              "source": "recording_checkpoints",
+              "corrected_queue": 4,
+              "counted_seconds": 361.3,
+              "estimated": [
+                [
+                  97.5,
+                  104.0
+                ],
+                [
+                  344.5,
+                  351.0
+                ]
+              ]
+            },
+            "villagers": {
+              "start": 3,
+              "trained": 13,
+              "at_click": 0,
+              "other_units": 0,
+              "counted": false
+            },
+            "houses": {
+              "source": "recording_checkpoints",
+              "counted": 3,
+              "counted_until_seconds": 374.3,
+              "estimated": []
+            },
             "blocked_seconds": 0,
             "feudal_clicked": true
           },
           "opponent": {
             "until_seconds": 393.8,
             "blocks": [],
-            "refused_queue": 5,
+            "refused_queue": 3,
+            "births": {
+              "source": "recording_checkpoints",
+              "corrected_queue": 2,
+              "counted_seconds": 393.8,
+              "estimated": []
+            },
+            "villagers": {
+              "start": 3,
+              "trained": 15,
+              "at_click": 0,
+              "other_units": 0,
+              "counted": true
+            },
+            "houses": {
+              "source": "recording_checkpoints",
+              "counted": 3,
+              "counted_until_seconds": 393.8,
+              "estimated": []
+            },
             "blocked_seconds": 0,
             "feudal_clicked": true
           }
         },
         "engine_income": null,
+        "game_build": 188329,
         "insights": [
           {
             "kind": "strength",
@@ -388331,19 +388379,19 @@
           "profile_id": 22210642,
           "name": "if i lose it all",
           "is_self": false,
-          "civilization": "Poles"
+          "civilization": "Slavs"
         },
         {
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Wei"
+          "civilization": "Jurchens"
         }
       ],
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 15,
+        "analysis_revision": 20,
         "duration_game_seconds": 951.57,
         "civilization": "Jurchens",
         "random_civ": true,
@@ -420434,19 +420482,63 @@
           "own": {
             "until_seconds": 397.4,
             "blocks": [],
-            "refused_queue": 11,
+            "refused_queue": 7,
+            "births": {
+              "source": "recording_checkpoints",
+              "corrected_queue": 5,
+              "counted_seconds": 397.4,
+              "estimated": []
+            },
+            "villagers": {
+              "start": 3,
+              "trained": 15,
+              "at_click": 0,
+              "other_units": 0,
+              "counted": true
+            },
+            "houses": {
+              "source": "recording_checkpoints",
+              "counted": 3,
+              "counted_until_seconds": 397.4,
+              "estimated": []
+            },
             "blocked_seconds": 0,
             "feudal_clicked": true
           },
           "opponent": {
             "until_seconds": 401.1,
             "blocks": [],
-            "refused_queue": 1,
+            "refused_queue": 0,
+            "births": {
+              "source": "recording_checkpoints",
+              "corrected_queue": 1,
+              "counted_seconds": 394.6,
+              "estimated": [
+                [
+                  166.0,
+                  172.5
+                ]
+              ]
+            },
+            "villagers": {
+              "start": 3,
+              "trained": 15,
+              "at_click": 0,
+              "other_units": 0,
+              "counted": false
+            },
+            "houses": {
+              "source": "recording_checkpoints",
+              "counted": 4,
+              "counted_until_seconds": 401.1,
+              "estimated": []
+            },
             "blocked_seconds": 0,
             "feudal_clicked": true
           }
         },
         "engine_income": null,
+        "game_build": 188329,
         "insights": [
           {
             "kind": "review",
@@ -420664,13 +420756,13 @@
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Incas"
+          "civilization": "Hindustanis"
         },
         {
           "profile_id": 5188554,
           "name": "Lamo",
           "is_self": false,
-          "civilization": "Berbers"
+          "civilization": "Magyars"
         }
       ],
       "analysis_status": "complete",
@@ -465001,13 +465093,13 @@
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": false,
-          "civilization": "Spanish"
+          "civilization": "Ethiopians"
         },
         {
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Mapuche"
+          "civilization": "Muisca"
         }
       ],
       "analysis_status": "complete",
@@ -498075,13 +498167,13 @@
           "profile_id": 198035,
           "name": "Oni.DauT",
           "is_self": false,
-          "civilization": "Spanish"
+          "civilization": "Ethiopians"
         },
         {
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Berbers"
+          "civilization": "Magyars"
         }
       ],
       "analysis_status": "complete",
@@ -554196,13 +554288,13 @@
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Huns"
+          "civilization": "Goths"
         },
         {
           "profile_id": 22889810,
           "name": "nW | Manuel",
           "is_self": false,
-          "civilization": "Danes"
+          "civilization": "Varangians"
         }
       ],
       "analysis_status": "complete",
@@ -614176,13 +614268,13 @@
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Portuguese"
+          "civilization": "Khmer"
         },
         {
           "profile_id": 238641,
           "name": "AnTiDeMoN",
           "is_self": false,
-          "civilization": "Bulgarians"
+          "civilization": "Persians"
         }
       ],
       "analysis_status": "complete",
@@ -689065,13 +689157,13 @@
           "profile_id": 403270,
           "name": "TomS",
           "is_self": false,
-          "civilization": "Vietnamese"
+          "civilization": "Mongols"
         },
         {
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Tupi"
+          "civilization": "Mapuche"
         }
       ],
       "analysis_status": "complete",
@@ -752008,13 +752100,13 @@
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Britons"
+          "civilization": "Aztecs"
         },
         {
           "profile_id": 301918,
           "name": "OS+ | Scotty",
           "is_self": false,
-          "civilization": "Romans"
+          "civilization": "Vietnamese"
         }
       ],
       "analysis_status": "complete",
@@ -799898,13 +799990,13 @@
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Saracens"
+          "civilization": "Byzantines"
         },
         {
           "profile_id": 3444509,
           "name": "Mununez",
           "is_self": false,
-          "civilization": "Malay"
+          "civilization": "Malians"
         }
       ],
       "analysis_status": "complete",
@@ -860317,13 +860409,13 @@
           "profile_id": 339835,
           "name": "DS_StonePleaseAoE",
           "is_self": false,
-          "civilization": "Spartans"
+          "civilization": "Shu"
         },
         {
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Byzantines"
+          "civilization": "Burgundians"
         }
       ],
       "analysis_status": "complete",
@@ -928993,13 +929085,13 @@
           "profile_id": 265517,
           "name": "CNZS_Daniel",
           "is_self": false,
-          "civilization": "Poles"
+          "civilization": "Slavs"
         },
         {
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Wu"
+          "civilization": "Wei"
         }
       ],
       "analysis_status": "complete",
@@ -980265,13 +980357,13 @@
           "profile_id": 3747802,
           "name": "SalzZ_wide",
           "is_self": false,
-          "civilization": "Malay"
+          "civilization": "Malians"
         },
         {
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Vikings"
+          "civilization": "Chinese"
         }
       ],
       "analysis_status": "complete",
@@ -1026620,13 +1026712,13 @@
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Burmese"
+          "civilization": "Maya"
         },
         {
           "profile_id": 5232543,
           "name": "DS_Gali",
           "is_self": false,
-          "civilization": "Romans"
+          "civilization": "Vietnamese"
         }
       ],
       "analysis_status": "complete",
@@ -1102391,13 +1102483,13 @@
           "profile_id": 5232543,
           "name": "DS_Gali",
           "is_self": false,
-          "civilization": "Turks"
+          "civilization": "Celts"
         },
         {
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Celts"
+          "civilization": "Dravidians"
         }
       ],
       "analysis_status": "complete",
@@ -1165151,13 +1165243,13 @@
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Incas"
+          "civilization": "Hindustanis"
         },
         {
           "profile_id": 5232543,
           "name": "DS_Gali",
           "is_self": false,
-          "civilization": "Armenians"
+          "civilization": "Vikings"
         }
       ],
       "analysis_status": "complete",
@@ -1234922,13 +1235014,13 @@
           "profile_id": 5232543,
           "name": "DS_Gali",
           "is_self": false,
-          "civilization": "Franks"
+          "civilization": "Bengalis"
         },
         {
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Britons"
+          "civilization": "Aztecs"
         }
       ],
       "analysis_status": "complete",
@@ -1275657,13 +1275749,13 @@
           "profile_id": 17331610,
           "name": "Ilum | Gordin Hood",
           "is_self": false,
-          "civilization": "Khmer"
+          "civilization": "Malay"
         },
         {
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Mapuche"
+          "civilization": "Muisca"
         }
       ],
       "analysis_status": "complete",
@@ -1301313,7 +1301405,7 @@
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Mongols"
+          "civilization": "Cumans"
         }
       ],
       "analysis_status": "complete",
@@ -1334264,13 +1334356,13 @@
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "문명 ID 0"
+          "civilization": "Armenians"
         },
         {
           "profile_id": 198035,
           "name": "Oni.DauT",
           "is_self": false,
-          "civilization": "Byzantines"
+          "civilization": "Burgundians"
         }
       ],
       "analysis_status": "complete",
@@ -1402414,13 +1402506,13 @@
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Franks"
+          "civilization": "Bengalis"
         },
         {
           "profile_id": 611972,
           "name": "Dark | Adam",
           "is_self": false,
-          "civilization": "Armenians"
+          "civilization": "Vikings"
         }
       ],
       "analysis_status": "complete",
@@ -1474238,13 +1474330,13 @@
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Turks"
+          "civilization": "Celts"
         },
         {
           "profile_id": 22210642,
           "name": "if i lose it all",
           "is_self": false,
-          "civilization": "Malians"
+          "civilization": "Lithuanians"
         }
       ],
       "analysis_status": "complete",
@@ -1533457,13 +1533549,13 @@
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Wei"
+          "civilization": "Jurchens"
         },
         {
           "profile_id": 22210642,
           "name": "if i lose it all",
           "is_self": false,
-          "civilization": "Aztecs"
+          "civilization": "Franks"
         }
       ],
       "analysis_status": "complete",
@@ -1549594,7 +1549686,7 @@
       "started_at": 1768704399,
       "finished_at": 1768705912,
       "map": "Vulpine",
-      "civilization": "문명 ID 0",
+      "civilization": "Koreans",
       "result": "win",
       "rating_before": 1950,
       "rating_after": 1958,
@@ -1549605,13 +1549697,13 @@
           "profile_id": 197964,
           "name": "_LY_Yo",
           "is_self": false,
-          "civilization": "Ethiopians"
+          "civilization": "Koreans"
         },
         {
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "문명 ID 0"
+          "civilization": "Koreans"
         }
       ],
       "analysis_status": "unavailable",
@@ -1549625,7 +1549717,7 @@
       "started_at": 1768701154,
       "finished_at": 1768702555,
       "map": "Glacis",
-      "civilization": "Ethiopians",
+      "civilization": "Koreans",
       "result": "loss",
       "rating_before": 1974,
       "rating_after": 1950,
@@ -1549636,13 +1549728,13 @@
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Ethiopians"
+          "civilization": "Koreans"
         },
         {
           "profile_id": 197388,
           "name": "Oni.TaToH",
           "is_self": false,
-          "civilization": "Ethiopians"
+          "civilization": "Koreans"
         }
       ],
       "analysis_status": "unavailable",
@@ -1549656,7 +1549748,7 @@
       "started_at": 1768699525,
       "finished_at": 1768700434,
       "map": "Glacis",
-      "civilization": "Byzantines",
+      "civilization": "Burgundians",
       "result": "win",
       "rating_before": 1970,
       "rating_after": 1974,
@@ -1549667,13 +1549759,13 @@
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Byzantines"
+          "civilization": "Burgundians"
         },
         {
           "profile_id": 199170,
           "name": "Oni.dogao",
           "is_self": false,
-          "civilization": "Byzantines"
+          "civilization": "Burgundians"
         }
       ],
       "analysis_status": "unavailable",
@@ -1549687,7 +1549779,7 @@
       "started_at": 1768697889,
       "finished_at": 1768699094,
       "map": "Vulpine",
-      "civilization": "Byzantines",
+      "civilization": "Burgundians",
       "result": "win",
       "rating_before": 1961,
       "rating_after": 1970,
@@ -1549698,13 +1549790,13 @@
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Byzantines"
+          "civilization": "Burgundians"
         },
         {
           "profile_id": 197388,
           "name": "Oni.TaToH",
           "is_self": false,
-          "civilization": "Ethiopians"
+          "civilization": "Koreans"
         }
       ],
       "analysis_status": "unavailable",
@@ -1549718,7 +1549810,7 @@
       "started_at": 1768623954,
       "finished_at": 1768625125,
       "map": "Loch Ness",
-      "civilization": "Byzantines",
+      "civilization": "Burgundians",
       "result": "loss",
       "rating_before": 1981,
       "rating_after": 1961,
@@ -1549729,13 +1549821,13 @@
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Byzantines"
+          "civilization": "Burgundians"
         },
         {
           "profile_id": 271202,
           "name": "Oni.Vinchester",
           "is_self": false,
-          "civilization": "Cumans"
+          "civilization": "Portuguese"
         }
       ],
       "analysis_status": "unavailable",
@@ -1549749,7 +1549841,7 @@
       "started_at": 1768598181,
       "finished_at": 1768599553,
       "map": "Karsts",
-      "civilization": "Chinese",
+      "civilization": "Bulgarians",
       "result": "win",
       "rating_before": 1975,
       "rating_after": 1981,
@@ -1549760,13 +1549852,13 @@
           "profile_id": 251265,
           "name": "TAG_MbL_",
           "is_self": false,
-          "civilization": "Chinese"
+          "civilization": "Bulgarians"
         },
         {
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Chinese"
+          "civilization": "Bulgarians"
         }
       ],
       "analysis_status": "unavailable",
@@ -1549780,7 +1549872,7 @@
       "started_at": 1768575828,
       "finished_at": 1768577393,
       "map": "Acclivity",
-      "civilization": "Saracens",
+      "civilization": "Byzantines",
       "result": "loss",
       "rating_before": 1997,
       "rating_after": 1975,
@@ -1549791,13 +1549883,13 @@
           "profile_id": 271202,
           "name": "Oni.Vinchester",
           "is_self": false,
-          "civilization": "Portuguese"
+          "civilization": "Khmer"
         },
         {
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Saracens"
+          "civilization": "Byzantines"
         }
       ],
       "analysis_status": "unavailable",
@@ -1549811,7 +1549903,7 @@
       "started_at": 1768544145,
       "finished_at": 1768545038,
       "map": "Acclivity",
-      "civilization": "Romans",
+      "civilization": "Vietnamese",
       "result": "win",
       "rating_before": 1996,
       "rating_after": 1997,
@@ -1549822,13 +1549914,13 @@
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Romans"
+          "civilization": "Vietnamese"
         },
         {
           "profile_id": 2821779,
           "name": "DS_Pela",
           "is_self": false,
-          "civilization": "Bengalis"
+          "civilization": "Teutons"
         }
       ],
       "analysis_status": "unavailable",
@@ -1549842,7 +1549934,7 @@
       "started_at": 1768541170,
       "finished_at": 1768542252,
       "map": "Acclivity",
-      "civilization": "Chinese",
+      "civilization": "Bulgarians",
       "result": "win",
       "rating_before": 1992,
       "rating_after": 1996,
@@ -1549853,13 +1549945,13 @@
           "profile_id": 3176045,
           "name": "wR.Prisma",
           "is_self": false,
-          "civilization": "Jurchens"
+          "civilization": "Khitans"
         },
         {
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Chinese"
+          "civilization": "Bulgarians"
         }
       ],
       "analysis_status": "unavailable",
@@ -1549873,7 +1549965,7 @@
       "started_at": 1768539500,
       "finished_at": 1768540740,
       "map": "Acclivity",
-      "civilization": "Byzantines",
+      "civilization": "Burgundians",
       "result": "win",
       "rating_before": 1987,
       "rating_after": 1992,
@@ -1549884,13 +1549976,13 @@
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Byzantines"
+          "civilization": "Burgundians"
         },
         {
           "profile_id": 197964,
           "name": "_LY_Yo",
           "is_self": false,
-          "civilization": "Britons"
+          "civilization": "Aztecs"
         }
       ],
       "analysis_status": "unavailable",
@@ -1549904,7 +1549996,7 @@
       "started_at": 1723566822,
       "finished_at": 1723567253,
       "map": "Isthmus",
-      "civilization": "Chinese",
+      "civilization": "Bulgarians",
       "result": "loss",
       "rating_before": 2090,
       "rating_after": 2069,
@@ -1549915,13 +1550007,13 @@
           "profile_id": 197964,
           "name": "_LY_Yo",
           "is_self": false,
-          "civilization": "Burgundians"
+          "civilization": "Saracens"
         },
         {
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Chinese"
+          "civilization": "Bulgarians"
         }
       ],
       "analysis_status": "unavailable",
@@ -1549935,7 +1550027,7 @@
       "started_at": 1723565386,
       "finished_at": 1723566496,
       "map": "Isthmus",
-      "civilization": "Koreans",
+      "civilization": "Gurjaras",
       "result": "win",
       "rating_before": 2078,
       "rating_after": 2090,
@@ -1549946,13 +1550038,13 @@
           "profile_id": 197964,
           "name": "_LY_Yo",
           "is_self": false,
-          "civilization": "Khmer"
+          "civilization": "Malay"
         },
         {
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Koreans"
+          "civilization": "Gurjaras"
         }
       ],
       "analysis_status": "unavailable",
@@ -1549966,7 +1550058,7 @@
       "started_at": 1723564110,
       "finished_at": 1723565156,
       "map": "Sandrift",
-      "civilization": "Incas",
+      "civilization": "Hindustanis",
       "result": "win",
       "rating_before": 2065,
       "rating_after": 2078,
@@ -1549977,13 +1550069,13 @@
           "profile_id": 197964,
           "name": "_LY_Yo",
           "is_self": false,
-          "civilization": "Magyars"
+          "civilization": "Italians"
         },
         {
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Incas"
+          "civilization": "Hindustanis"
         }
       ],
       "analysis_status": "unavailable",
@@ -1549997,7 +1550089,7 @@
       "started_at": 1722144042,
       "finished_at": 1722144451,
       "map": "Cliffbound",
-      "civilization": "Burgundians",
+      "civilization": "Saracens",
       "result": "win",
       "rating_before": 2083,
       "rating_after": 2094,
@@ -1550008,13 +1550100,13 @@
           "profile_id": 582058,
           "name": "VIT | Hearttt",
           "is_self": false,
-          "civilization": "Burgundians"
+          "civilization": "Saracens"
         },
         {
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Burgundians"
+          "civilization": "Saracens"
         }
       ],
       "analysis_status": "unavailable",
@@ -1550028,7 +1550120,7 @@
       "started_at": 1722143192,
       "finished_at": 1722143697,
       "map": "Hollow_Woodlands",
-      "civilization": "Burgundians",
+      "civilization": "Saracens",
       "result": "win",
       "rating_before": 2071,
       "rating_after": 2083,
@@ -1550039,13 +1550131,13 @@
           "profile_id": 582058,
           "name": "VIT | Hearttt",
           "is_self": false,
-          "civilization": "Burgundians"
+          "civilization": "Saracens"
         },
         {
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Burgundians"
+          "civilization": "Saracens"
         }
       ],
       "analysis_status": "unavailable",
@@ -1550059,7 +1550151,7 @@
       "started_at": 1722135784,
       "finished_at": 1722137511,
       "map": "Hollow_Woodlands",
-      "civilization": "Hindustanis",
+      "civilization": "Incas",
       "result": "loss",
       "rating_before": 2091,
       "rating_after": 2071,
@@ -1550070,13 +1550162,13 @@
           "profile_id": 197964,
           "name": "_LY_Yo",
           "is_self": false,
-          "civilization": "Hindustanis"
+          "civilization": "Incas"
         },
         {
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Hindustanis"
+          "civilization": "Incas"
         }
       ],
       "analysis_status": "unavailable",
@@ -1550090,7 +1550182,7 @@
       "started_at": 1722128212,
       "finished_at": 1722130617,
       "map": "River_Divide",
-      "civilization": "Burgundians",
+      "civilization": "Saracens",
       "result": "loss",
       "rating_before": 2112,
       "rating_after": 2091,
@@ -1550101,13 +1550193,13 @@
           "profile_id": 197964,
           "name": "_LY_Yo",
           "is_self": false,
-          "civilization": "Bohemians"
+          "civilization": "Spanish"
         },
         {
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Burgundians"
+          "civilization": "Saracens"
         }
       ],
       "analysis_status": "unavailable",
@@ -1550121,7 +1550213,7 @@
       "started_at": 1722123664,
       "finished_at": 1722124578,
       "map": "Cliffbound",
-      "civilization": "Poles",
+      "civilization": "Slavs",
       "result": "win",
       "rating_before": 2105,
       "rating_after": 2112,
@@ -1550132,13 +1550224,13 @@
           "profile_id": 212721,
           "name": "TAG_Sitaux",
           "is_self": false,
-          "civilization": "Poles"
+          "civilization": "Slavs"
         },
         {
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Poles"
+          "civilization": "Slavs"
         }
       ],
       "analysis_status": "unavailable",
@@ -1550152,7 +1550244,7 @@
       "started_at": 1722109453,
       "finished_at": 1722110693,
       "map": "Isthmus",
-      "civilization": "Saracens",
+      "civilization": "Byzantines",
       "result": "win",
       "rating_before": 2089,
       "rating_after": 2105,
@@ -1550163,13 +1550255,13 @@
           "profile_id": 2783660,
           "name": "wR.Sebastian",
           "is_self": false,
-          "civilization": "Saracens"
+          "civilization": "Byzantines"
         },
         {
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Saracens"
+          "civilization": "Byzantines"
         }
       ],
       "analysis_status": "unavailable",
@@ -1550183,7 +1550275,7 @@
       "started_at": 1722097225,
       "finished_at": 1722098771,
       "map": "Karsts",
-      "civilization": "Burgundians",
+      "civilization": "Saracens",
       "result": "win",
       "rating_before": 2075,
       "rating_after": 2089,
@@ -1550194,13 +1550286,13 @@
           "profile_id": 2783660,
           "name": "wR.Sebastian",
           "is_self": false,
-          "civilization": "Burgundians"
+          "civilization": "Saracens"
         },
         {
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Burgundians"
+          "civilization": "Saracens"
         }
       ],
       "analysis_status": "unavailable",
@@ -1550225,7 +1550317,7 @@
           "profile_id": 254645,
           "name": "avlid",
           "is_self": false,
-          "civilization": "Khmer"
+          "civilization": "Malay"
         },
         {
           "profile_id": 199325,
@@ -1550245,7 +1550337,7 @@
       "started_at": 1714491365,
       "finished_at": 1714491980,
       "map": "Enclosed",
-      "civilization": "Magyars",
+      "civilization": "Italians",
       "result": "win",
       "rating_before": 1993,
       "rating_after": 2004,
@@ -1550262,7 +1550354,7 @@
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Magyars"
+          "civilization": "Italians"
         }
       ],
       "analysis_status": "unavailable",
@@ -1550276,7 +1550368,7 @@
       "started_at": 1714423238,
       "finished_at": 1714423704,
       "map": "Atacama",
-      "civilization": "Cumans",
+      "civilization": "Portuguese",
       "result": "win",
       "rating_before": 1992,
       "rating_after": 1993,
@@ -1550287,13 +1550379,13 @@
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Cumans"
+          "civilization": "Portuguese"
         },
         {
           "profile_id": 19407236,
           "name": "Mistico",
           "is_self": false,
-          "civilization": "Bohemians"
+          "civilization": "Spanish"
         }
       ],
       "analysis_status": "unavailable",
@@ -1550307,7 +1550399,7 @@
       "started_at": 1714421422,
       "finished_at": 1714422512,
       "map": "Acclivity",
-      "civilization": "Ethiopians",
+      "civilization": "Koreans",
       "result": "win",
       "rating_before": 1988,
       "rating_after": 1992,
@@ -1550318,13 +1550410,13 @@
           "profile_id": 2295504,
           "name": "Eren",
           "is_self": false,
-          "civilization": "Chinese"
+          "civilization": "Bulgarians"
         },
         {
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Ethiopians"
+          "civilization": "Koreans"
         }
       ],
       "analysis_status": "unavailable",
@@ -1550338,7 +1550430,7 @@
       "started_at": 1714419279,
       "finished_at": 1714420832,
       "map": "FrigidLake",
-      "civilization": "Maya",
+      "civilization": "Georgians",
       "result": "win",
       "rating_before": 1979,
       "rating_after": 1988,
@@ -1550349,13 +1550441,13 @@
           "profile_id": 409748,
           "name": "wR.Capoch",
           "is_self": false,
-          "civilization": "Dravidians"
+          "civilization": "Tatars"
         },
         {
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Maya"
+          "civilization": "Georgians"
         }
       ],
       "analysis_status": "pending",
@@ -1550368,7 +1550460,7 @@
       "started_at": 1714418066,
       "finished_at": 1714418840,
       "map": "Kawasan",
-      "civilization": "Maya",
+      "civilization": "Georgians",
       "result": "win",
       "rating_before": 1969,
       "rating_after": 1979,
@@ -1550379,13 +1550471,13 @@
           "profile_id": 409748,
           "name": "wR.Capoch",
           "is_self": false,
-          "civilization": "Italians"
+          "civilization": "Huns"
         },
         {
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Maya"
+          "civilization": "Georgians"
         }
       ],
       "analysis_status": "pending",
@@ -1550398,7 +1550490,7 @@
       "started_at": 1714417295,
       "finished_at": 1714417772,
       "map": "NorthernIsles",
-      "civilization": "Magyars",
+      "civilization": "Italians",
       "result": "win",
       "rating_before": 1958,
       "rating_after": 1969,
@@ -1550409,13 +1550501,13 @@
           "profile_id": 409748,
           "name": "wR.Capoch",
           "is_self": false,
-          "civilization": "문명 ID 0"
+          "civilization": "Armenians"
         },
         {
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Magyars"
+          "civilization": "Italians"
         }
       ],
       "analysis_status": "pending",
@@ -1550428,7 +1550520,7 @@
       "started_at": 1714416134,
       "finished_at": 1714416925,
       "map": "Morass",
-      "civilization": "Magyars",
+      "civilization": "Italians",
       "result": "win",
       "rating_before": 1946,
       "rating_after": 1958,
@@ -1550439,13 +1550531,13 @@
           "profile_id": 3446882,
           "name": "Dr.Kozmonot",
           "is_self": false,
-          "civilization": "Byzantines"
+          "civilization": "Burgundians"
         },
         {
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Magyars"
+          "civilization": "Italians"
         }
       ],
       "analysis_status": "pending",
@@ -1550458,7 +1550550,7 @@
       "started_at": 1714415298,
       "finished_at": 1714415847,
       "map": "Morass",
-      "civilization": "Armenians",
+      "civilization": "Vikings",
       "result": "win",
       "rating_before": 1940,
       "rating_after": 1946,
@@ -1550469,13 +1550561,13 @@
           "profile_id": 254645,
           "name": "avlid",
           "is_self": false,
-          "civilization": "Ethiopians"
+          "civilization": "Koreans"
         },
         {
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Armenians"
+          "civilization": "Vikings"
         }
       ],
       "analysis_status": "pending",
@@ -1550488,7 +1550580,7 @@
       "started_at": 1714413986,
       "finished_at": 1714414758,
       "map": "Atacama",
-      "civilization": "Gurjaras",
+      "civilization": "Turks",
       "result": "win",
       "rating_before": 1933,
       "rating_after": 1940,
@@ -1550499,13 +1550591,13 @@
           "profile_id": 254645,
           "name": "avlid",
           "is_self": false,
-          "civilization": "Mongols"
+          "civilization": "Cumans"
         },
         {
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Gurjaras"
+          "civilization": "Turks"
         }
       ],
       "analysis_status": "pending",
@@ -1550518,7 +1550610,7 @@
       "started_at": 1618068879,
       "finished_at": 1618070120,
       "map": "goldenpit.rms2",
-      "civilization": "Franks",
+      "civilization": "Bengalis",
       "result": "win",
       "rating_before": 2026,
       "rating_after": 2052,
@@ -1550529,13 +1550621,13 @@
           "profile_id": 214031,
           "name": "HAMZA",
           "is_self": false,
-          "civilization": "Franks"
+          "civilization": "Bengalis"
         },
         {
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Franks"
+          "civilization": "Bengalis"
         }
       ],
       "analysis_status": "pending",
@@ -1550548,7 +1550640,7 @@
       "started_at": 1614652178,
       "finished_at": 1614653045,
       "map": "Fortress",
-      "civilization": "Vikings",
+      "civilization": "Chinese",
       "result": "win",
       "rating_before": 1000,
       "rating_after": 1048,
@@ -1550559,13 +1550651,13 @@
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Vikings"
+          "civilization": "Chinese"
         },
         {
           "profile_id": 3309375,
           "name": "Glorious",
           "is_self": false,
-          "civilization": "Spanish"
+          "civilization": "Ethiopians"
         }
       ],
       "analysis_status": "pending",
@@ -1550578,7 +1550670,7 @@
       "started_at": 1607455246,
       "finished_at": 1607456129,
       "map": "Arabia",
-      "civilization": "Chinese",
+      "civilization": "Bulgarians",
       "result": "loss",
       "rating_before": 2062,
       "rating_after": 2026,
@@ -1550589,13 +1550681,13 @@
           "profile_id": 199325,
           "name": "VIT | Hera",
           "is_self": true,
-          "civilization": "Chinese"
+          "civilization": "Bulgarians"
         },
         {
           "profile_id": 2653793,
           "name": "Frost_9",
           "is_self": false,
-          "civilization": "Chinese"
+          "civilization": "Bulgarians"
         }
       ],
       "analysis_status": "pending",
