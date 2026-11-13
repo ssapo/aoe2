@@ -28,6 +28,6 @@
 
 ## 개발·연구에 참여하려면
 
-**작업자는 [ONBOARDING.md](ONBOARDING.md)를 가장 먼저 읽어 주세요.** 공통 작업 상태와 기본 절차를 확인한 뒤, 맡은 영역의 개발·연구 문서로 안내합니다.
+**작업자는 [ONBOARDING.md](ONBOARDING.md)를 가장 먼저 읽어 주세요.** 이전 대화가 없어도 [기존 작업 목록 전체](ONBOARDING.md#task-index)에서 하나를 고르고, 담당 상태를 기록한 뒤 지정된 필수 문서를 읽어 시작할 수 있습니다.
 
 문명 아이콘 출처는 [AoE2 Tech Tree](https://github.com/SiegeEngineers/aoe2techtree)이며, 관련 출처와 고지는 [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt)에 있습니다. Age of Empires II는 Microsoft의 게임이며, 이 사이트는 비공식 개인 프로젝트입니다.
