@@ -8,7 +8,10 @@
 
 | 작업 ID / 담당 | 상태 | 범위·결과·다음 동작 | 마지막 갱신 (한국 시간) |
 |---|---|---|---|
-| `codex-cloud-20261113-engine` / Codex + 조사 A·B | 자료 대기 | 엔진 초기 이동 오차·채집물 내려놓기·주둔 복귀 정적 조사 완료. 비교 도구 합성 테스트 11개 통과. 실제 엔진 수정·실행 검증에는 PC 연결 또는 리플·DAT·원본 기록이 필요함. 상세 결과는 엔진 연구를 이어받을 때 확인. 실행 중인 엔진 작업 없음. | 2026-11-13 09:51 KST |
+| `codex-cloud-20261113-engine` / Codex 통합 | 정적 조사 완료 / 실행 검증 자료 대기 | **하위 조사 A·B 모두 종료 확인.** ENG-01~04의 코드 조사와 비교 도구 작성은 아래 기록대로 완료. 실제 원인 확정·엔진 행동 수정·일치 구간 연장은 미완료이며 PC 연결 또는 리플·DAT·원본 기록 필요. 이 세션이 남긴 엔진 실행·백그라운드 조사 없음. | 2026-11-13 10:30 KST |
+| `codex-cloud-20261113-engine/A` / `deer_movement` | 정적 조사 완료 | ENG-01·02: FOLLOW/Ctrl 사례 혼동, 위치 체크섬 해석, 그룹 직선 경로 근사와 미구현 분기를 조사. [완료 보고서](https://github.com/ssapo/aoe2/blob/research/genie-188329/research/genie/sessions/codex-20261113/deer-movement-investigation.md). 실제 리플 추적·엔진 수정 검증은 하지 않음. | 2026-11-13 10:30 KST |
+| `codex-cloud-20261113-engine/B` / `economy_return` | 정적 조사 완료 | ENG-03·04: 내려놓기 경로·주둔 진입 작업 기록의 공백과 기각 조건 조사. [완료 보고서](https://github.com/ssapo/aoe2/blob/research/genie-188329/research/genie/sessions/codex-20261113/economy-return-investigation.md). 실제 리플 추적·엔진 수정 검증은 하지 않음. | 2026-11-13 10:30 KST |
+| `codex-cloud-20261113-engine/tool` / Codex | 진단 도구 작성 완료 | [개체 비교 도구·실행 및 검증 기록](https://github.com/ssapo/aoe2/blob/research/genie-188329/research/genie/sessions/codex-20261113/SESSION-HANDOFF.md). 동일 ms·선수·개체 ID와 3연속 표본 비교, 합성 테스트 11개 통과. 실제 게임/엔진 정확도 검증 결과는 아님. | 2026-11-13 10:30 KST |
 | `codex-cloud-20261113-readme` / Codex | 완료 | 방문자 README와 작업자 문서 분리. 후속 구조 정리는 아래 작업이 담당. | 2026-11-13 09:58 KST |
 | `codex-cloud-20261113-common-onboarding` / Codex | 완료 | 공통 시작 절차·작업 상태를 main의 이 문서로 통합. 분석기 참고는 DEVELOPMENT.md로 보존하고 엔진 상세는 연구 선택 시에만 연결. 연구 브랜치의 공통 표 제거·안내 수정(`7635da0`). 문서 링크·차이·기존 기술 이력 보존 확인. 실행 중인 작업 없음. | 2026-11-13 10:08 KST |
 | `codex-cloud-20261113-required-docs` / Codex | 완료 | 작업별 필수 문서·지정 절과 구현 전 실제 열람 의무를 명시. DEVELOPMENT를 개발 지침으로 정리. 문서 링크·해당 절·차이 확인. 실행 중인 작업 없음. | 2026-11-13 10:13 KST |
