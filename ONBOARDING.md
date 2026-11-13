@@ -8,7 +8,7 @@
 
 ## 1. 공통 작업 상태
 
-엔진 후보 1 / Codex: **진행 중**. GitHub 연구 패치 기준 `FormationLine.spacing_half` 테스트 초기화 누락 2곳을 복구하고 genie-core 단위검사를 실행한다. 다른 엔진 행동 수정은 이 작업 범위에 포함하지 않는다.
+엔진 후보 1 / Codex: **완료 — 검토 브랜치에 푸시, 운영 연구 브랜치에는 미반영**. `FormationLine.spacing_half` 초기화 누락 2곳과 기존 AI 변경을 반영하지 못한 테스트 2건을 보완했다. 엔진 실행 규칙 변경 없이 **genie-core 단위테스트 2,061개 통과·실패/무시 0개**. GitHub 연구 패치만 적용한 별도 소스에서도 재확인했다. [수정 근거·검증·통합/증분 패치](https://github.com/ssapo/aoe2/blob/codex/engine-test-build-repair-20261113/research/genie/sessions/codex-20261113/ENGINE-TEST-BUILD-REPAIR.md), 커밋 `9c0ffd1`. 기존 '단위테스트 컴파일 불가' 기록은 수정 전 상태이며, 이번 결과는 위 검토 브랜치의 패치 기준이다. 실제 리플 정확도는 이번 검증 대상이 아니다. 남겨 둔 실행 없음.
 
 | 작업 ID / 담당 | 상태 | 범위·결과·다음 동작 | 마지막 갱신 (한국 시간) |
 |---|---|---|---|
