@@ -3,11 +3,18 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'scripts'))
-from engine_income import income, parse_output, run_engine  # noqa: E402
+from engine_income import by_source, income, parse_gains, parse_output, run_engine  # noqa: E402
 
 
 def res(ms, player, values):
     return 'RES {"ms":%d,"player":%d,"res":%s}' % (ms, player, list(values))
+
+
+def gain(ms, player, food, gold=(0, 0)):
+    names = ('sheep', 'boar', 'deer', 'berries', 'farm', 'fish', 'other')
+    return 'GAIN ' + __import__('json').dumps({
+        'ms': ms, 'p': player, 'food': dict(zip(names, food)), 'wood': 0.0,
+        'gold': {'mine': gold[0], 'other': gold[1]}, 'stone': 0.0})
 
 
 def cp(ms, player, rec, eng):
@@ -44,6 +51,36 @@ class EngineIncomeTest(unittest.TestCase):
         self.assertIsNone(income(short, 1, 2))
         self.assertIsNone(income(self.lines(), 1, 3))
         self.assertEqual(parse_output(['noise', 'RES {bad'])[0], {})
+
+    def gain_lines(self):
+        out = []
+        for ms in range(10010, 400011, 10000):                                  # printed just after each 10-s mark
+            s = ms / 1000
+            out.append(gain(ms, 1, [s, 0, 0, 2 * s, 0, 0, 0.4], (3, 0)))
+            out.append(gain(ms, 2, [0, s, s, 0, 0, 0, 0], (0, 7.6)))
+        return out
+
+    def test_by_source_follows_the_marks_and_stops_at_the_verified_time(self):
+        r = income(self.lines(last_ok=False) + self.gain_lines(), 1, 2)
+        part = r['by_source']
+        self.assertEqual(len(part['columns']), 19)
+        self.assertEqual(part['columns'][1], 'own_sheep')
+        self.assertEqual(part['columns'][18], 'opponent_gold_other')
+        self.assertEqual(part['points'][0], [10.0, 10, 0, 0, 20, 0, 0, 0, 3, 0, 0, 10, 10, 0, 0, 0, 0, 0, 8])
+        self.assertEqual(part['points'][-1][0], 290.0)                          # the line of mark 300 comes 10 ms past the cut
+        self.assertEqual(part['points'][-1][1:5], [290, 0, 0, 580])
+        self.assertEqual(r['points'][-1][0], 300.0)                             # the old fields are as before
+
+    def test_without_gain_lines_the_by_source_part_is_absent(self):
+        r = income(self.lines(), 1, 2)
+        self.assertNotIn('by_source', r)
+        self.assertEqual(sorted(r), ['columns', 'opponent_total', 'own_total', 'points', 'source', 'verified_until_seconds'])
+        self.assertIsNone(by_source(self.gain_lines()[::2], 1, 2, 400000))      # one player only
+        self.assertEqual(parse_gains(['GAIN {bad', 'GAIN {"ms":1,"p":1,"food":{}}', 'noise']), {})
+
+    def test_by_source_applies_the_offset(self):
+        part = by_source(self.gain_lines(), 1, 2, 25000, offset=1.5)
+        self.assertEqual([p[0] for p in part['points']], [11.5, 21.5])
 
     def test_another_game_build_is_not_run(self):
         from types import SimpleNamespace as N

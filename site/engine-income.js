@@ -1,4 +1,4 @@
-/* Cumulative income per resource from the re-simulation engine, shown only over the span its stockpile matched the recording's checkpoints. */
+/* Cumulative income per resource from the re-simulation engine, shown only over the span its stockpile matched the recording's checkpoints; below it, where the food (and gold) came from. */
 (function(global){
   'use strict';
   const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -33,12 +33,42 @@
     const last=points[points.length-1];
     return `<figure class="state-chart"><figcaption><strong>${esc(title)}</strong><span><b class="mine">━ 나 ${num(last[mineIndex])}</b> <b class="theirs">━ 상대 ${num(last[theirsIndex])}</b> <small>${clock(end)}까지</small></span></figcaption><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(title)} 누적 수입">${[0,top/2,top].map(v=>`<line x1="${left}" x2="${right}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" class="state-grid"/><text x="${left-5}" y="${(y(v)+3.5).toFixed(1)}" text-anchor="end" class="state-axis">${num(v)}</text>`).join('')}${minutes.map(t=>`<text x="${x(t).toFixed(1)}" y="${base+15}" text-anchor="middle" class="state-axis">${clock(t)}</text>`).join('')}<path d="${path(theirsIndex)}" class="state-line theirs"/><path d="${path(mineIndex)}" class="state-line mine"/></svg></figure>`;
   }
+  /* By source: one stored row is [seconds, 9 of mine, 9 of the opponent's]; 7 food sources, then gold from mines and other gold. */
+  const FOOD=['양','멧돼지','사슴','열매','농장','물고기','기타'];
+  const GOLD=['금광','기타'];
+  function sources(d){
+    const part=d&&d.by_source;
+    if(!part||!Array.isArray(part.points)||!part.points.length)return null;
+    const last=part.points[part.points.length-1];
+    if(!Array.isArray(last)||last.length!==19||!last.every(v=>Number.isFinite(v)&&v>=0))return null;
+    const side=from=>({food:last.slice(from,from+7),gold:last.slice(from+7,from+9)});
+    const own=side(1),opponent=side(10);
+    const sum=list=>list.reduce((a,b)=>a+b,0);
+    if(sum(own.food)+sum(opponent.food)<=0)return null;
+    return {seconds:last[0],own,opponent,
+      foodShown:FOOD.map((name,i)=>[name,i]).filter(([,i])=>own.food[i]>0||opponent.food[i]>0),
+      goldSplit:own.gold[1]>0||opponent.gold[1]>0};
+  }
+  function sourceRows(names,values,side){
+    const total=values.reduce((a,b)=>a+b,0);
+    return `<ul class="source-rows">${names.map(([name,i])=>{
+      const share=total>0?Math.round(values[i]/total*100):0;
+      return `<li><span class="source-name">${esc(name)}</span><span class="source-bar ${side}" aria-hidden="true"><i style="width:${share}%"></i></span><span class="source-amount">${esc(num(values[i]))}</span><span class="source-share">${share}%</span></li>`;
+    }).join('')}</ul>`;
+  }
+  function renderSources(d){
+    const s=sources(d);
+    if(!s)return '';
+    const sum=list=>list.reduce((a,b)=>a+b,0);
+    const block=(title,names,pick)=>`<div class="source-block"><h4>${esc(title)} <small>${clock(s.seconds)}까지 일꾼이 가져온 양</small></h4><div class="source-sides">${[['mine','나',s.own],['theirs','상대',s.opponent]].map(([side,who,data])=>`<div class="source-side"><strong class="${side}">${esc(who)} · ${esc(num(sum(pick(data))))}</strong>${sourceRows(names,pick(data),side)}</div>`).join('')}</div></div>`;
+    return `<div class="income-sources">${block('식량 출처',s.foodShown,x=>x.food)}${s.goldSplit?block('금 출처',GOLD.map((name,i)=>[name,i]),x=>x.gold):''}<p class="source-note">생산을 취소해 돌려받은 자원은 여기에 넣지 않았어요. 그래서 위 그래프의 숫자보다 적을 수 있어요.</p></div>`;
+  }
   function render(d){
     const s=summary(d);
     if(!s||!s.shown.length)return '';
     const lines=[`${clock(s.at)}까지 모은 자원: 나 ${num(s.own)} · 상대 ${num(s.opponent)}`];
     if(s.widest&&s.widest.gap!==0)lines.push(`가장 크게 벌어진 때: ${clock(s.widest.seconds)}, ${s.widest.gap>0?'내가':'상대가'} ${num(Math.abs(s.widest.gap))} 더 모음`);
-    return `<section class="state-curve engine-income"><h3 class="detail-heading">자원별 누적 수입 <small>경기 재현 · ${clock(s.until)}까지 확인됨</small></h3><ul class="state-lines">${lines.map(l=>`<li>${esc(l)}</li>`).join('')}</ul><div class="state-charts">${s.shown.map(([name,a,b])=>chart(d.points,a,b,name)).join('')}</div></section>`;
+    return `<section class="state-curve engine-income"><h3 class="detail-heading">자원별 누적 수입 <small>경기 재현 · ${clock(s.until)}까지 확인됨</small></h3><ul class="state-lines">${lines.map(l=>`<li>${esc(l)}</li>`).join('')}</ul><div class="state-charts">${s.shown.map(([name,a,b])=>chart(d.points,a,b,name)).join('')}</div>${renderSources(d)}</section>`;
   }
-  const api={summary,render,valid};if(typeof module==='object'&&module.exports)module.exports=api;else global.SSAPOEngineIncome=api;
+  const api={summary,render,valid,sources,renderSources};if(typeof module==='object'&&module.exports)module.exports=api;else global.SSAPOEngineIncome=api;
 })(typeof window==='undefined'?globalThis:window);
