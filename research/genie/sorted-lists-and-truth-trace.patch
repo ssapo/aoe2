@@ -6406,7 +6406,7 @@ index 28ca0268..32b392f0 100644
          }
      }
 diff --git a/crates/engine/genie-core/src/unit_ai/idle_animals.rs b/crates/engine/genie-core/src/unit_ai/idle_animals.rs
-index bf5761c6..06742498 100644
+index bf5761c6..83c758c1 100644
 --- a/crates/engine/genie-core/src/unit_ai/idle_animals.rs
 +++ b/crates/engine/genie-core/src/unit_ai/idle_animals.rs
 @@ -29,6 +29,38 @@ use crate::world::layer::ClassRoles;
@@ -6448,7 +6448,7 @@ index bf5761c6..06742498 100644
  impl UnitAi {
      /// The boar's idle check (slot 72, `FUN_140c1e630`): `FUN_140c41e50` first
      /// ([`UnitAi::cap_human_order`]). A furious boar, or any in mode 1, stays. Then one draw of
-@@ -153,8 +185,42 @@ impl UnitAi {
+@@ -153,11 +185,145 @@ impl UnitAi {
          let reach = (at.speed * unit_ai_tuning.evade_reach).get();
          let (dx, dy) = (other.x() - x, other.y() - y);
          let d = sqrt(dy * dy + dx * dx);
@@ -6460,7 +6460,7 @@ index bf5761c6..06742498 100644
 +        // more than one point and is longer than 0.3. PARTIAL: the clamp to the map, the second
 +        // target and the four directions (steps 4, 7 and 8) are not modelled; without a planner
 +        // the straight path stands in.
-+        if std::env::var_os("GENIE_EXPERIMENT_EVADE_188329").is_some() {
++        if std::env::var_os("GENIE_EXPERIMENT_EVADE_188329").is_some() && !animalreact_188329() {
 +            let radii = Distance::new(at.size.x());
 +            let points: Vec<(f32, f32)> = match side.tile_path(Point::new(point.x(), point.y()), radii)? {
 +                Some(path) if 1 < path.points.len() && 0.3 < path.length.get() => {
@@ -6486,6 +6486,9 @@ index bf5761c6..06742498 100644
 +                point = Position::new(out.0, out.1, z);
 +            }
 +        }
++        if animalreact_188329() {
++            point = self.evade_from_188329(at, other, ai, side)?;
++        }
 +        let moved = self.evasive_move(point, (OrderForce::Forced, BadPoint::Kept), at, ai, side)?;
 +        if std::env::var_os("GENIE_TRACE_ANIMAL").is_some() {
 +            eprintln!("ANIMAL_EVADE from={:?} other={:?} point={:?} moved={:?}", at.position, other, point, moved);
@@ -6493,7 +6496,107 @@ index bf5761c6..06742498 100644
          Ok(())
      }
  
-@@ -189,24 +255,35 @@ impl UnitAi {
++    /// 188329 `evasiveMoveFrom` (0xd26200, its only caller the hunted idle 0xcfd1d3), whole
++    /// (switch `GENIE_EXPERIMENT_ANIMALREACT_188329`; read in `out_r11/a3.c` and `evade.asm`):
++    /// reach = speed * 3 (mode 1's extra tile never reaches here: the idle stops before). An
++    /// object exactly on the unit draws one of four axis directions (`below(4)`, line 0x1853,
++    /// table 0x324c280: (0,1), (0,-1), (1,0), (-1,0)). The point away by `reach` is held to
++    /// [radius, map - radius] on each axis (0xd26475..0xd26491: `rad > t ? rad : min(max, t)`).
++    /// A: the tile path there; usable with more than one point and longer than 0.3 -> the point
++    /// at the walked distance `reach` along it (0x106e0b0). B: else the point past the other
++    /// object at `2 * reach`, the same way with `2 * reach`. C: else one draw `below(4)` (line
++    /// 0x1889) and the four table directions from it, each divided by the distance to the other
++    /// object and times `2 * reach`; the first usable path. All failing: the last held target.
++    /// Without a planner (no movement state) the first held target. The move (slot 0x370) is the
++    /// caller's.
++    fn evade_from_188329(
++        &self,
++        at: &Surroundings,
++        other: Position,
++        ai: &mut Well512,
++        side: &mut dyn UnitSide,
++    ) -> Result<Position, GenieError> {
++        const AXES: [(f32, f32); 4] = [(0.0, 1.0), (0.0, -1.0), (1.0, 0.0), (-1.0, 0.0)];
++        let (x, y, z) = (at.position.x(), at.position.y(), at.position.z());
++        let reach = (at.speed * at.unit_ai_tuning.evade_reach).get();
++        let (mut dx, mut dy) = (other.x() - x, other.y() - y);
++        if dx == 0.0 && dy == 0.0 {
++            let k = ai.below(4) as usize;
++            (dx, dy) = AXES[k & 3];
++        }
++        let len = sqrt(dy * dy + dx * dx);
++        let (ux, uy) = (dx / len, dy / len);
++        let rad = at.size.x();
++        let (maxx, maxy) = (at.map.width() as f32 - rad, at.map.height() as f32 - rad);
++        let hold = |t: f32, max: f32| if t < rad { rad } else { max.min(t) };
++        let held = |tx: f32, ty: f32| (hold(tx, maxx), hold(ty, maxy));
++        // the point at the walked distance `along` on the path to `goal`, when the path is usable
++        let mut walk = |goal: (f32, f32), along: f32| -> Result<Option<Option<(f32, f32)>>, GenieError> {
++            let Some(path) = side.tile_path(Point::new(goal.0, goal.1), Distance::new(rad))? else {
++                return Ok(None);
++            };
++            if !(1 < path.points.len() && 0.3 < path.length.get()) {
++                return Ok(Some(None));
++            }
++            let points: Vec<(f32, f32)> = path.points.iter().map(|p| (p.x(), p.y())).collect();
++            let mut out = *points.last().unwrap_or(&goal);
++            let mut walked = 0.0_f32;
++            for w in points.windows(2) {
++                let [a, b] = w else { continue };
++                let (sx, sy) = (b.0 - a.0, b.1 - a.1);
++                let seg = sqrt((sx * sx + 0.0) + sy * sy);
++                if along <= seg + walked {
++                    let k = (along - walked) / seg;
++                    out = (k * sx + a.0, k * sy + a.1);
++                    break;
++                }
++                walked += seg;
++            }
++            Ok(Some(Some(out)))
++        };
++        let first = held(x - ux * reach, y - uy * reach);
++        let found = match walk(first, reach)? {
++            None => return Ok(Position::new(first.0, first.1, z)),
++            Some(Some(p)) => Some(p),
++            Some(None) => None,
++        };
++        let reach2 = reach + reach;
++        let mut last = first;
++        let found = match found {
++            Some(p) => Some(p),
++            None => {
++                let second = held(x + ux * reach2, y + uy * reach2);
++                last = second;
++                match walk(second, reach2)? {
++                    Some(Some(p)) => Some(p),
++                    _ => {
++                        let k = ai.below(4) as usize;
++                        let mut hit = None;
++                        for i in 0..4 {
++                            let (tx, ty) = AXES[(i + k) & 3];
++                            let t = held(x + (tx / len) * reach2, y + (ty / len) * reach2);
++                            last = t;
++                            if let Some(Some(p)) = walk(t, reach2)? {
++                                hit = Some(p);
++                                break;
++                            }
++                        }
++                        hit
++                    }
++                }
++            }
++        };
++        let p = found.unwrap_or(last);
++        if std::env::var_os("GENIE_TRACE_ANIMAL").is_some() {
++            eprintln!("ANIMAL_EVADE188329 from={:?} other={:?} first={:?} point={:?}", at.position, other, first, p);
++        }
++        Ok(Position::new(p.0, p.1, z))
++    }
++
+     pub(super) fn hunted_idle(
+         &mut self,
+         at: &Surroundings,
+@@ -189,24 +355,35 @@ impl UnitAi {
          ai: &mut Well512,
          side: &mut dyn UnitSide,
      ) -> Result<IdleOutcome, GenieError> {
@@ -6534,7 +6637,7 @@ index bf5761c6..06742498 100644
              }
          }
          if at.flags.contains(SurroundingFlags::MODE_1) {
-@@ -236,6 +313,9 @@ impl UnitAi {
+@@ -236,6 +413,9 @@ impl UnitAi {
              },
              memory: Memory::default(),
          })?;
@@ -6544,7 +6647,7 @@ index bf5761c6..06742498 100644
          self.alert(found, at.dt_seconds);
          if found.id.is_some() {
              let other = found
-@@ -249,6 +329,10 @@ impl UnitAi {
+@@ -249,6 +429,10 @@ impl UnitAi {
              let dx = x - h.origin.x();
              let dy = y - h.origin.y();
              if HUNTED_HOME < dy * dy + dx * dx {
@@ -6555,7 +6658,7 @@ index bf5761c6..06742498 100644
                  if let Some(m) = self.move_to(go_home) {
                      side.effect_now(Effect::Move(m), self, ai)?;
                  }
-@@ -264,6 +348,9 @@ impl UnitAi {
+@@ -264,6 +448,9 @@ impl UnitAi {
              };
              let sx = step(ai) as f32;
              let sy = step(ai) as f32;
@@ -6565,6 +6668,15 @@ index bf5761c6..06742498 100644
              let wander = self.move_to(AiMove {
                  point: Position::new(x + sx, sy + y, z),
                  ..go_home
+@@ -353,3 +540,8 @@ impl UnitAi {
+         Ok(IdleOutcome::Acted)
+     }
+ }
++
++/// `GENIE_EXPERIMENT_ANIMALREACT_188329`: the hunted animal's whole `evasiveMoveFrom` (0xd26200).
++fn animalreact_188329() -> bool {
++    std::env::var_os("GENIE_EXPERIMENT_ANIMALREACT_188329").is_some()
++}
 diff --git a/crates/engine/genie-core/src/unit_ai/ids.rs b/crates/engine/genie-core/src/unit_ai/ids.rs
 index d0cbfb72..5adf364c 100644
 --- a/crates/engine/genie-core/src/unit_ai/ids.rs
@@ -6580,6 +6692,20 @@ index d0cbfb72..5adf364c 100644
      Some({
          let held = roles.of_class(class);
          if held.intersects(
+diff --git a/crates/engine/genie-core/src/unit_ai/retarget.rs b/crates/engine/genie-core/src/unit_ai/retarget.rs
+index 516e920b..02ac9264 100644
+--- a/crates/engine/genie-core/src/unit_ai/retarget.rs
++++ b/crates/engine/genie-core/src/unit_ai/retarget.rs
+@@ -521,6 +521,9 @@ impl UnitAi {
+             || unit_ai_tuning.follow_slack_high < dx
+             || dy < unit_ai_tuning.follow_slack_low
+             || unit_ai_tuning.follow_slack_high < dy;
++        if std::env::var_os("GENIE_TRACE_ANIMAL").is_some() {
++            eprintln!("FOLLOW_CHECK at={:?} size={:?} target={:?} at={:?} radius={:?} point={:?} moved={} gap={:?} range={:?}", at.position, at.size, id, target.position, target.radius, self.target_point, moved, footprint_gap_squared(at.position, at.size, target.position, target.radius), self.desired_distance);
++        }
+         if !moved {
+             return Ok(MiscEnd::GoesOn);
+         }
 diff --git a/crates/engine/genie-core/src/unit_ai/side.rs b/crates/engine/genie-core/src/unit_ai/side.rs
 index 7fd24514..b0ef18a3 100644
 --- a/crates/engine/genie-core/src/unit_ai/side.rs
