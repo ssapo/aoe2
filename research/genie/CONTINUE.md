@@ -484,6 +484,8 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 13.4 지금 하던 일 (멈출 때마다 이 절을 덮어쓴다)
 
+**2026-11-15, 사용자 결정 둘**: ① `GENIE_EXPERIMENT_ANIMALREACT_188329`(74번, 동물 도망 지점)를 **기본으로 켠다** — `runs\M6_envs.txt`와 main `engine/switches.env`에 더함, engine-check 기대값 57 / 54 그대로, main 분석 개정 23. 아래 ENG-01 기록의 "기본 끔"은 이 결정 전의 말이다. ② **연구 브랜치는 이제 매번 묻지 않고 커밋 뒤 바로 푸시한다**(사용자: "연구브랜치는 항상 푸시하는 게 좋겠다, 확인은 내가 한다"). 충돌·강제 푸시가 필요할 때만 멈추고 묻는다. 푸시한 뒤 사용자에게 무엇을 올렸는지 알린다.
+
 **2026-11-15 새벽, Claude (세션 A = ONBOARDING `ENG-06` 계속: 518239882 정찰병 묶음 형성). 결론: 반쯤 하던 일 없음. 73번의 다음 첫 동작대로 원본에서 0x10ef890을 부르는 곳(그룹 갱신 0x1109d70의 0x110b825)을 읽었다(findings 75): 자기 이동을 끝내는 선 검사는 엔진 `line_clear`와 같은 함수(0x1217630, 여유 0.5)지만 **선을 유닛의 현재 자리(+0x3bc)에서 긋고**(엔진은 마지막으로 움직인 자리), **칸이 지도 끝 가까이면 막힌 것**으로 본다. 둘 다 `FRONTPATH` 아래에 넣었다. 그러나 이 사례에서는 결과가 안 바뀐다: 세 정찰병의 비트 일치 구간 그대로, 열한 리플과 동물 판 셋의 출력이 `A1off_*`와 바이트까지 같다(518239882 P1 57 / P2 54 그대로). 새로 안 것: 두 유닛의 꺾임점은 나무 1372·1330의 상자 모서리이고, 4472는 속도(예산)만 다르다. 로컬 커밋만, 푸시 안 함.**
 
 - 엔진 소스 `genie`: 빌드됨, 저장소 패치와 같음(PC 사본 `runs\A6.patch`, 만들기 `runs\M6_mkpatch.ps1 -Name runs\A6` 뒤 `python3 runs/M3_striplf.py runs/A6`). `runs\census_base.exe` = `runs\census_A6e.exe`. 추적 줄 셋 추가(`GENIE_TRACE_FORMING=1`: `FORMING_OWNEND`, `FORMING_LINEHITS`, `FORMING_LINEBOXES`). 실행은 Git Bash(`D:\Program Files\Git\bin\bash.exe`)로 `E5_EXE=census_A6e.exe bash runs/E5_go.sh ...`(약 30초, 27,500 update까지). 원본 디컴파일: 그룹 갱신 0x1109d70은 클라우드 `re/out/d15.c`, 0x1217630은 `re/out_A6/a.c`.
