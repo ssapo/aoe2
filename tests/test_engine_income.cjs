@@ -22,8 +22,8 @@ const withSources={...curve,by_source:{columns:[],points:[[10,1,1,0,1,1,0,0,0,0,
 test('food sources: amounts, shares and only the sources someone used',()=>{
   const s=income.sources(withSources);
   assert.strictEqual(s.seconds,20);
-  assert.deepStrictEqual(s.own.food,[100,50,0,30,20,0,0]);
-  assert.deepStrictEqual(s.foodShown.map(r=>r[0]),['가축','사냥(멧돼지)','사냥(사슴)','열매','농장']);
+  assert.deepStrictEqual(s.own.food,[100,50,30,20,0,0]);
+  assert.deepStrictEqual(s.foodShown.map(r=>r[0]),['가축','사냥','열매','농장']);
   const html=income.render(withSources);
   assert.ok(html.includes('식량 출처'));assert.ok(html.includes('나 · 200'));assert.ok(html.includes('상대 · 100'));
   assert.ok(html.includes('width:50%'));assert.ok(html.includes('0:20까지'));
@@ -34,11 +34,11 @@ test('a source set up by the counted time is listed at zero on both sides; later
   const early=[20,100,50,0,0,0,0,0,0,0,60,40,0,0,0,0,0,0,0];
   const d={...curve,by_source:{points:[early]}};
   const shown=timelines=>income.sources(d,timelines).foodShown.map(r=>r[0]);
-  assert.deepStrictEqual(shown(),['가축','사냥(멧돼지)']);
-  assert.deepStrictEqual(shown([[{seconds:12,kind:'BUILD',label:'Farm'}],[]]),['가축','사냥(멧돼지)','농장']);
-  assert.deepStrictEqual(shown([[],[{seconds:20,kind:'BUILD',label:'Mill'}]]),['가축','사냥(멧돼지)','열매']);
-  assert.deepStrictEqual(shown([[{seconds:5,kind:'BUILD',label:'Folwark'},{seconds:6,kind:'BUILD',label:'Farm'}],undefined]),['가축','사냥(멧돼지)','열매','농장']);
-  assert.deepStrictEqual(shown([[{seconds:21,kind:'BUILD',label:'Farm'},{seconds:3,kind:'QUEUE',label:'Farm'},{seconds:3,kind:'BUILD',label:'House'},{kind:'BUILD',label:'Mill'},null]]),['가축','사냥(멧돼지)']);
+  assert.deepStrictEqual(shown(),['가축','사냥']);
+  assert.deepStrictEqual(shown([[{seconds:12,kind:'BUILD',label:'Farm'}],[]]),['가축','사냥','농장']);
+  assert.deepStrictEqual(shown([[],[{seconds:20,kind:'BUILD',label:'Mill'}]]),['가축','사냥','열매']);
+  assert.deepStrictEqual(shown([[{seconds:5,kind:'BUILD',label:'Folwark'},{seconds:6,kind:'BUILD',label:'Farm'}],undefined]),['가축','사냥','열매','농장']);
+  assert.deepStrictEqual(shown([[{seconds:21,kind:'BUILD',label:'Farm'},{seconds:3,kind:'QUEUE',label:'Farm'},{seconds:3,kind:'BUILD',label:'House'},{kind:'BUILD',label:'Mill'},null]]),['가축','사냥']);
   const html=income.render(d,[[{seconds:12,kind:'BUILD',label:'Farm'}]]);
   assert.ok(html.includes('농장'));assert.ok(!html.includes('열매'));
 });
@@ -56,10 +56,10 @@ const animalRows={until_seconds:20,own:[{id:1,kind:'sheep',eaten:86.2,first_seco
 test('animals: grouped by kind, one chip per animal, per-kind count and sum; no remainder without the full amount',()=>{
   const s=income.animals({...withSources,animals:animalRows});
   assert.strictEqual(s.seconds,20);
-  assert.deepStrictEqual(s.own.map(k=>[k.kind,k.rows.length,Math.round(k.eaten),k.full]),[['sheep',2,126,null],['boar',2,572,null],['other',1,12,null]]);
-  assert.deepStrictEqual(s.opponent.map(k=>[k.kind,k.rows.length]),[['deer',1]]);
+  assert.deepStrictEqual(s.own.map(k=>[k.kind,k.rows.length,Math.round(k.eaten),k.full]),[['sheep',2,126,null],['hunt',2,572,null],['other',1,12,null]]);
+  assert.deepStrictEqual(s.opponent.map(k=>[k.kind,k.rows.length]),[['hunt',1]]);
   const html=income.render({...withSources,animals:animalRows});
-  assert.ok(html.includes('동물별 먹은 양'));assert.ok(html.includes('사냥(멧돼지) 2마리</b> · 572'));assert.ok(html.includes('나 · 5마리'));assert.ok(html.includes('상대 · 1마리'));
+  assert.ok(html.includes('동물별 먹은 양'));assert.ok(html.includes('사냥 2마리</b> · 572'));assert.ok(html.includes('나 · 5마리'));assert.ok(html.includes('상대 · 1마리'));
   assert.strictEqual((html.match(/<li>/g)||[]).length-(income.render(withSources).match(/<li>/g)||[]).length,6);
   assert.ok(html.includes('0:20까지'));assert.ok(html.includes('확인된 시각까지만'));
   assert.ok(!html.includes('남김'));assert.ok(!html.includes(' / '));assert.ok(!html.includes('<b>'+'</b>'));assert.ok(!/<b>[^<]*<b>|NaN|undefined/.test(html));
@@ -67,7 +67,7 @@ test('animals: grouped by kind, one chip per animal, per-kind count and sum; no 
 test('animals: the uneaten part shows only when the full amount is known and at least a fifth was left',()=>{
   const d={...withSources,animals:{until_seconds:20,own:[{id:5,kind:'boar',eaten:286,full:340},{id:6,kind:'boar',eaten:200,full:340}],opponent:[]}};
   const html=income.renderAnimals(d);
-  assert.ok(html.includes('사냥(멧돼지) 2마리</b> · 486 / 680'));
+  assert.ok(html.includes('사냥 2마리</b> · 486 / 680'));
   assert.strictEqual((html.match(/class="left"/g)||[]).length,1);assert.ok(html.includes('남김 140'));assert.ok(!html.includes('남김 54'));
   assert.ok(html.includes('먹은 동물 없음'));
 });

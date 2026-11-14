@@ -34,11 +34,11 @@
     return `<figure class="state-chart"><figcaption><strong>${esc(title)}</strong><span><b class="mine">━ 나 ${num(last[mineIndex])}</b> <b class="theirs">━ 상대 ${num(last[theirsIndex])}</b> <small>${clock(end)}까지</small></span></figcaption><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(title)} 누적 수입">${[0,top/2,top].map(v=>`<line x1="${left}" x2="${right}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" class="state-grid"/><text x="${left-5}" y="${(y(v)+3.5).toFixed(1)}" text-anchor="end" class="state-axis">${num(v)}</text>`).join('')}${minutes.map(t=>`<text x="${x(t).toFixed(1)}" y="${base+15}" text-anchor="middle" class="state-axis">${clock(t)}</text>`).join('')}<path d="${path(theirsIndex)}" class="state-line theirs"/><path d="${path(mineIndex)}" class="state-line mine"/></svg></figure>`;
   }
   /* By source: one stored row is [seconds, 9 of mine, 9 of the opponent's]; 7 food sources, then gold from mines and other gold. */
-  const FOOD=['가축','사냥(멧돼지)','사냥(사슴)','열매','농장','물고기','기타'];
+  const FOOD=['가축','사냥','열매','농장','물고기','기타']; // shown rows; boar and deer are one row (사냥)
   const GOLD=['금광','기타'];
   /* A source someone has set up by the counted time is listed even while both sides are at zero:
      a Mill (or Folwark) request stands for berries, a Farm request for farms. The rest only when used. */
-  const SETUP={Mill:3,Folwark:3,Farm:4};
+  const SETUP={Mill:2,Folwark:2,Farm:3};
   function started(timelines,until){
     const found=new Set();
     for(const timeline of Array.isArray(timelines)?timelines:[]){
@@ -53,7 +53,7 @@
     if(!part||!Array.isArray(part.points)||!part.points.length)return null;
     const last=part.points[part.points.length-1];
     if(!Array.isArray(last)||last.length!==19||!last.every(v=>Number.isFinite(v)&&v>=0))return null;
-    const side=from=>({food:last.slice(from,from+7),gold:last.slice(from+7,from+9)});
+    const side=from=>{const f=last.slice(from,from+7);return {food:[f[0],f[1]+f[2],f[3],f[4],f[5],f[6]],gold:last.slice(from+7,from+9)};};
     const own=side(1),opponent=side(10);
     const sum=list=>list.reduce((a,b)=>a+b,0);
     if(sum(own.food)+sum(opponent.food)<=0)return null;
@@ -71,14 +71,14 @@
   }
   /* By animal: what each side's gatherers brought in from every single sheep, boar and deer by the counted time.
      `full` (an animal's whole food) is not in today's data; when a row carries it, what was left is shown too. */
-  const KINDS=[['sheep','가축'],['boar','사냥(멧돼지)'],['deer','사냥(사슴)'],['other','기타 동물']];
+  const KINDS=[['sheep','가축',['sheep']],['hunt','사냥',['boar','deer']],['other','기타 동물',[]]];
   const LEFT_SHARE=.2;
   function animals(d){
     const part=d&&d.animals;
     if(!part||!Number.isFinite(part.until_seconds))return null;
-    const known=new Set(KINDS.map(k=>k[0]));
-    const side=list=>KINDS.map(([kind,name])=>{
-      const rows=(Array.isArray(list)?list:[]).filter(a=>a&&Number.isFinite(a.eaten)&&a.eaten>0&&(a.kind===kind||(kind==='other'&&!known.has(a.kind)))).map(a=>{
+    const known=new Set(KINDS.flatMap(k=>k[2]));
+    const side=list=>KINDS.map(([kind,name,members])=>{
+      const rows=(Array.isArray(list)?list:[]).filter(a=>a&&Number.isFinite(a.eaten)&&a.eaten>0&&(members.includes(a.kind)||(kind==='other'&&!known.has(a.kind)))).map(a=>{
         const full=Number.isFinite(a.full)&&a.full>=a.eaten?a.full:null,left=full===null?null:full-a.eaten;
         return {eaten:a.eaten,full,left,wasted:full!==null&&full>0&&left/full>=LEFT_SHARE};
       });
