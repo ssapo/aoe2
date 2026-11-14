@@ -69,12 +69,39 @@
       return `<li><span class="source-name">${esc(name)}</span><span class="source-bar ${side}" aria-hidden="true"><i style="width:${share}%"></i></span><span class="source-amount">${esc(num(values[i]))}</span><span class="source-share">${share}%</span></li>`;
     }).join('')}</ul>`;
   }
+  /* By animal: what each side's gatherers brought in from every single sheep, boar and deer by the counted time.
+     `full` (an animal's whole food) is not in today's data; when a row carries it, what was left is shown too. */
+  const KINDS=[['sheep','양'],['boar','멧돼지'],['deer','사슴'],['other','기타 동물']];
+  const LEFT_SHARE=.2;
+  function animals(d){
+    const part=d&&d.animals;
+    if(!part||!Number.isFinite(part.until_seconds))return null;
+    const known=new Set(KINDS.map(k=>k[0]));
+    const side=list=>KINDS.map(([kind,name])=>{
+      const rows=(Array.isArray(list)?list:[]).filter(a=>a&&Number.isFinite(a.eaten)&&a.eaten>0&&(a.kind===kind||(kind==='other'&&!known.has(a.kind)))).map(a=>{
+        const full=Number.isFinite(a.full)&&a.full>=a.eaten?a.full:null,left=full===null?null:full-a.eaten;
+        return {eaten:a.eaten,full,left,wasted:full!==null&&full>0&&left/full>=LEFT_SHARE};
+      });
+      const allFull=rows.length>0&&rows.every(r=>r.full!==null);
+      return {kind,name,rows,eaten:rows.reduce((a,r)=>a+r.eaten,0),full:allFull?rows.reduce((a,r)=>a+r.full,0):null};
+    }).filter(k=>k.rows.length);
+    const own=side(part.own),opponent=side(part.opponent);
+    if(!own.length&&!opponent.length)return null;
+    return {seconds:part.until_seconds,own,opponent};
+  }
+  function renderAnimals(d){
+    const s=animals(d);
+    if(!s)return '';
+    const kinds=list=>list.length?list.map(k=>`<p class="animal-kind"><b>${esc(k.name)} ${k.rows.length}마리</b> · ${esc(num(k.eaten))}${k.full!==null?` / ${esc(num(k.full))}`:''}</p><ul class="animal-chips">${k.rows.map(r=>`<li${r.wasted?' class="left"':''}>${esc(num(r.eaten))}${r.wasted?`<small>남김 ${esc(num(r.left))}</small>`:''}</li>`).join('')}</ul>`).join(''):'<p class="animal-kind">먹은 동물 없음</p>';
+    const count=list=>list.reduce((a,k)=>a+k.rows.length,0);
+    return `<div class="source-block animal-block"><h4>동물별 먹은 양 <small>${clock(s.seconds)}까지 · 한 마리마다 일꾼이 가져온 식량</small></h4><div class="source-sides">${[['mine','나',s.own],['theirs','상대',s.opponent]].map(([side,who,list])=>`<div class="source-side"><strong class="${side}">${esc(who)} · ${count(list)}마리</strong>${kinds(list)}</div>`).join('')}</div><p class="source-note">확인된 시각까지만 센 값이에요. 그때 먹고 있던 동물은 적게 나와요.</p></div>`;
+  }
   function renderSources(d,timelines){
     const s=sources(d,timelines);
     if(!s)return '';
     const sum=list=>list.reduce((a,b)=>a+b,0);
     const block=(title,names,pick)=>`<div class="source-block"><h4>${esc(title)} <small>${clock(s.seconds)}까지 일꾼이 가져온 양</small></h4><div class="source-sides">${[['mine','나',s.own],['theirs','상대',s.opponent]].map(([side,who,data])=>`<div class="source-side"><strong class="${side}">${esc(who)} · ${esc(num(sum(pick(data))))}</strong>${sourceRows(names,pick(data),side)}</div>`).join('')}</div></div>`;
-    return `<div class="income-sources">${block('식량 출처',s.foodShown,x=>x.food)}${s.goldSplit?block('금 출처',GOLD.map((name,i)=>[name,i]),x=>x.gold):''}<p class="source-note">생산을 취소해 돌려받은 자원은 여기에 넣지 않았어요. 그래서 위 그래프의 숫자보다 적을 수 있어요.</p></div>`;
+    return `<div class="income-sources">${block('식량 출처',s.foodShown,x=>x.food)}${renderAnimals(d)}${s.goldSplit?block('금 출처',GOLD.map((name,i)=>[name,i]),x=>x.gold):''}<p class="source-note">생산을 취소해 돌려받은 자원은 여기에 넣지 않았어요. 그래서 위 그래프의 숫자보다 적을 수 있어요.</p></div>`;
   }
   function render(d,timelines){
     const s=summary(d);
@@ -83,5 +110,5 @@
     if(s.widest&&s.widest.gap!==0)lines.push(`가장 크게 벌어진 때: ${clock(s.widest.seconds)}, ${s.widest.gap>0?'내가':'상대가'} ${num(Math.abs(s.widest.gap))} 더 모음`);
     return `<section class="state-curve engine-income"><h3 class="detail-heading">자원별 누적 수입 <small>경기 재현 · ${clock(s.until)}까지 확인됨</small></h3><ul class="state-lines">${lines.map(l=>`<li>${esc(l)}</li>`).join('')}</ul><div class="state-charts">${s.shown.map(([name,a,b])=>chart(d.points,a,b,name)).join('')}</div>${renderSources(d,timelines)}</section>`;
   }
-  const api={summary,render,valid,sources,renderSources,started};if(typeof module==='object'&&module.exports)module.exports=api;else global.SSAPOEngineIncome=api;
+  const api={summary,render,valid,sources,renderSources,started,animals,renderAnimals};if(typeof module==='object'&&module.exports)module.exports=api;else global.SSAPOEngineIncome=api;
 })(typeof window==='undefined'?globalThis:window);

@@ -378,3 +378,7 @@ body.review-open{overflow:hidden}
 .source-bar{display:block;height:7px;border-radius:4px;background:#eef1e8;overflow:hidden}.source-bar i{display:block;height:100%;border-radius:4px;background:var(--green)}.source-bar.theirs i{background:#b0624f}
 .source-amount,.source-share{text-align:right;font-variant-numeric:tabular-nums}.source-share{color:var(--muted);font-size:10px}
 .source-note{margin:8px 0 0;font-size:10px;color:var(--muted);line-height:1.5}
+.animal-kind{margin:6px 0 3px;font-size:11px;color:var(--ink);font-variant-numeric:tabular-nums}.animal-kind b{font-weight:600}
+.animal-chips{list-style:none;display:flex;flex-wrap:wrap;gap:4px;margin:0;padding:0}.animal-chips li{padding:0 7px;border-radius:9px;background:#eef1e8;font-size:11px;line-height:1.7;font-variant-numeric:tabular-nums}
+.animal-chips li.left{background:#f6e7e2;color:#8a4634}.animal-chips small{margin-left:4px;font-size:10px}
+.ranked-basis{margin:6px 0 0;font-size:10px;line-height:1.5;color:var(--muted);overflow-wrap:anywhere}.ranked-basis span{display:block}

@@ -7,9 +7,10 @@ const source={schema_version:1,min_rating:2000,samples:[...Array.from({length:8}
 test('reference balances players, excludes own and current match, and keeps map strict without filtering by opening',()=>{
  const r=b.select(source,context,s=>s.ages.봉건);
  assert.equal(r.median,550);assert.equal(r.players,2);assert.equal(r.matches,9);assert.equal(r.sameCiv,true);
+ assert.equal(r.tier,'map');assert.deepEqual(r.maps,['Arabia']);assert.equal(b.basis(r),'같은 맵 9경기');
  assert.equal(b.select(source,{...context,profileId:1},s=>s.ages.봉건),null);
  assert.equal(b.select(source,{...context,matchId:9},s=>s.ages.봉건),null);
- assert.equal(b.select(source,{...context,map:'Arabian Desert'},s=>s.ages.봉건),null);
+ assert.equal(b.select(source,{...context,map:'Socotra'},s=>s.ages.봉건),null);
  assert.equal(b.select(source,{...context,opening:'archers'},s=>s.ages.봉건).median,550);
  assert.equal(b.select(source,{...context,opening:null},s=>s.ages.봉건).median,550);
  const mixed=b.select(source,{...context,civilization:'Mayans'},s=>s.ages.봉건);
@@ -62,4 +63,44 @@ test('own resource card survives missing or mismatched reference data without in
 test('opening describes early investment sequence independently of the first unit',()=>{
  const opening=require('../site/opening.js'),cases=require('./fixtures/openings.json');
  for(const c of cases)assert.equal(opening.classify(c.metrics,c.duration).opening,c.opening,c.name);
+});
+
+test('a map with too few games falls back to its map group and says which maps; the same map is kept when it is enough',()=>{
+ const on=(map,id,player,value,civilization='Franks')=>({...sample(id,player,value),map,civilization});
+ const src={schema_version:1,min_rating:2000,samples:[on('Arabia',1,1,100),on('Arabia',2,2,300),...Array.from({length:6},(_,i)=>on('Arabian Desert',i+3,i%2+1,200,'Mayans')),on('Atacama',9,3,200),on('Arena',10,4,900),on('MegaRandom',11,5,900)]};
+ const r=b.select(src,context,s=>s.ages.봉건);
+ assert.equal(r.tier,'group');assert.equal(r.group,'open');assert.equal(r.matches,9);assert.equal(r.players,3);assert.equal(r.sameCiv,false);
+ assert.deepEqual(r.maps,['Arabian Desert','Arabia','Atacama']);assert.equal(r.median,200);
+ assert.equal(b.basis(r),'비슷한 맵(Arabian Desert·Arabia·Atacama) 9경기');
+ // the same civilization is preferred inside the group tier too
+ const civ=b.select(src,{...context,civilization:'Mayans'},s=>s.ages.봉건);
+ assert.equal(civ.tier,'group');assert.equal(civ.sameCiv,true);assert.equal(civ.matches,6);assert.deepEqual(civ.maps,['Arabian Desert']);
+ // enough games on the map itself: the group is not used
+ const desert=b.select(src,{...context,map:'Arabian Desert'},s=>s.ages.봉건);
+ assert.equal(desert.tier,'map');assert.equal(desert.matches,6);assert.deepEqual(desert.maps,['Arabian Desert']);
+ // closed maps do not borrow from open ones, and a map in no group borrows from nobody
+ assert.deepEqual(b.choose(src,{...context,map:'Arena'},s=>s.ages.봉건),{reference:null,shortage:{same:1,group:1}});
+ assert.deepEqual(b.choose(src,{...context,map:'Socotra'},s=>s.ages.봉건),{reference:null,shortage:{same:0,group:null}});
+ assert.equal(b.groupOf('Hideout').id,'closed');assert.equal(b.groupOf('MegaRandom'),null);
+});
+
+test('compare and render name the basis, or give one short reason when no tier has enough games',()=>{
+ const on=(map,id,player)=>({...sample(id,player,500),map});
+ const src={schema_version:1,min_rating:2000,samples:[...Array.from({length:6},(_,i)=>on('Arabian Desert',i+1,i%2+1)),on('Arena',7,3),on('Hideout',8,4)]};
+ const match=map=>({id:999,map,analysis:{civilization:'Franks',duration_game_seconds:900,metrics:{full_timeline:[],age_checkpoints:{봉건:{command_seconds:400,reached_seconds:530}}},review:{own:{available:true,opening:'scouts',checkpoints:[]}}}});
+ const arabia=b.compare(match('Arabia'),99,src,state);
+ assert.equal(arabia.ages[0].reference.tier,'group');assert.equal(arabia.shortage,undefined);
+ const html=b.render(arabia),quick=b.render(arabia,true);
+ assert.match(html,/기준: 2000점 이상 · 비슷한 맵\(Arabian Desert\) 6경기/);assert.match(html,/같은 맵 기준 경기가 부족해서/);
+ assert.match(quick,/비슷한 맵\(Arabian Desert\) 6경기/);assert.doesNotMatch(html+quick,/부족해요|undefined|NaN/);
+ const desert=b.render(b.compare(match('Arabian Desert'),99,src,state));
+ assert.match(desert,/기준: 2000점 이상 · 같은 맵 6경기/);assert.doesNotMatch(desert,/비슷한 맵/);
+ const arena=b.compare(match('Arena'),99,src,state);
+ assert.deepEqual(arena.ages,[]);assert.deepEqual(arena.shortage,{same:1,group:2});
+ assert.equal(b.shortageText(arena),'이 맵은 2000점 이상 기준 경기가 부족해요(같은 맵 1경기, 비슷한 맵 2경기; 5경기·2명 이상 필요)');
+ assert.match(b.render(arena,true),/ranked-shortage/);
+ assert.equal(b.shortageText(b.compare(match('Socotra'),99,src,state)),'이 맵은 2000점 이상 기준 경기가 부족해요(같은 맵 0경기, 비슷한 맵 묶음 없음; 5경기·2명 이상 필요)');
+ assert.equal(b.shortageText(arabia),'');assert.equal(b.render(b.compare(match('Arena'),99,null,state)),'');
+ const evil=b.compare({...match('<img>'),map:'<img>'},99,src,state);
+ assert.doesNotMatch(b.render(evil),/<img>/);
 });

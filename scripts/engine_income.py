@@ -20,6 +20,14 @@ mine, other). Those are what gatherers dropped off (plus generated trickles as "
 refunds, market and tribute are not in them, so their food sum can be below the income
 curve's. They are cut at the same verified time. An older engine prints no such lines
 and the by-source part is then absent.
+
+By animal: with GENIE_TRACE_GAIN_ANIMALS the engine adds, after those lines, one GAINA
+line with every sheep, boar or deer food was taken from: its id, class and how much of
+it each player's gatherers have dropped off so far. The last such line at or before the
+verified time gives the animals each player has eaten; the marks at which an animal's
+amount first rose and last rose give when (10 second steps). The line does not carry an
+animal's full food, so what was left to rot is not known and is not stored. An engine
+without GAINA lines leaves the animals part absent.
 """
 import json
 import os
@@ -35,6 +43,7 @@ UPDATES = '90000'         # about 20 game minutes: longer than any span verified
 ORDER = (0, 1, 3, 2)      # engine: food, wood, stone, gold -> stored: food, wood, gold, stone
 FOOD_SOURCES = ('sheep', 'boar', 'deer', 'berries', 'farm', 'fish', 'other')
 GOLD_SOURCES = ('mine', 'other')
+ANIMAL_KINDS = {58: 'sheep', 10: 'boar', 9: 'deer'}   # the engine's class of the animal; anything else is 'other'
 SOURCE_NAMES = ['sheep', 'boar', 'deer', 'berries', 'farm', 'fish', 'food_other', 'gold_mine', 'gold_other']
 _CP = re.compile(r'CPWORDS syncs=\d+ world_ms=(\d+) player=(\d+) rec=\[(.*?)\] eng=\[(.*?)\]')
 
@@ -106,6 +115,58 @@ def by_source(lines, own_number, opponent_number, until_ms, offset=0.0):
     }
 
 
+def parse_animals(lines):
+    """[(ms, {id: (class, [dropped off per player number])})] from GAINA lines, in order."""
+    out = []
+    for line in lines:
+        if not line.startswith('GAINA '):
+            continue
+        try:
+            row = json.loads(line[6:])
+            found = {}
+            for animal in row['animals']:
+                found[int(animal['id'])] = (int(animal['class']), [float(v) for v in animal.get('given') or []])
+            out.append((int(row['ms']), found))
+        except (ValueError, KeyError, TypeError):
+            continue
+    return out
+
+
+def animals(lines, own_number, opponent_number, until_ms, offset=0.0):
+    """The stored per-animal part, or None when the engine printed no usable GAINA line by until_ms."""
+    rows = [(ms, found) for ms, found in parse_animals(lines) if ms <= until_ms]
+    if not rows:
+        return None
+
+    def amount(found, key, number):
+        given = found[key][1] if key in found else []
+        return given[number] if 0 <= number < len(given) else 0.0
+
+    def side(number):
+        out = []
+        for key, (kind, _) in rows[-1][1].items():
+            eaten = round(amount(rows[-1][1], key, number), 1)
+            if eaten < 0.5:
+                continue
+            first = last = None
+            before = 0.0
+            for ms, found in rows:
+                now = amount(found, key, number)
+                if now > before + 0.005:
+                    mark = round(ms // (STEP * 1000) * STEP + offset, 1)
+                    first = mark if first is None else first
+                    last = mark
+                    before = now
+            out.append({'id': key, 'kind': ANIMAL_KINDS.get(kind, 'other'), 'eaten': eaten,
+                        'first_seconds': first, 'last_seconds': last})
+        return sorted(out, key=lambda a: (a['first_seconds'], a['id']))
+
+    own, opponent = side(own_number), side(opponent_number)
+    if not own and not opponent:
+        return None
+    return {'until_seconds': round(rows[-1][0] // (STEP * 1000) * STEP + offset, 1), 'own': own, 'opponent': opponent}
+
+
 def _cumulative(rows, until_ms):
     """[(seconds, [food, wood, gold, stone])] every STEP seconds up to until_ms."""
     out, total, prev, mark = [], [0.0] * 4, None, 0
@@ -147,6 +208,9 @@ def income(lines, own_number, opponent_number, offset=0.0):
     sources = by_source(lines, own_number, opponent_number, until, offset)
     if sources:
         result['by_source'] = sources
+    eaten = animals(lines, own_number, opponent_number, until, offset)
+    if eaten:
+        result['animals'] = eaten
     return result
 
 
@@ -166,7 +230,7 @@ def run_engine(recording):
     if not binary or not data or not Path(binary).is_file() or not Path(data).is_file():
         return None
     switches = Path(__file__).resolve().parent.parent / 'engine' / 'switches.env'
-    env = dict(os.environ, **_switches(switches), GENIE_TRACE_RES='1', GENIE_TRACE_GAIN='1',
+    env = dict(os.environ, **_switches(switches), GENIE_TRACE_RES='1', GENIE_TRACE_GAIN='1', GENIE_TRACE_GAIN_ANIMALS='1',
                GENIE_PRINT_CHECKPOINTS='1')
     with tempfile.TemporaryDirectory() as folder:
         rec, err = Path(folder) / 'replay.aoe2record', Path(folder) / 'engine.err'

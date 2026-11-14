@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'scripts'))
-from engine_income import by_source, income, parse_gains, parse_output, run_engine  # noqa: E402
+from engine_income import animals, by_source, income, parse_animals, parse_gains, parse_output, run_engine  # noqa: E402
 
 
 def res(ms, player, values):
@@ -15,6 +15,12 @@ def gain(ms, player, food, gold=(0, 0)):
     return 'GAIN ' + __import__('json').dumps({
         'ms': ms, 'p': player, 'food': dict(zip(names, food)), 'wood': 0.0,
         'gold': {'mine': gold[0], 'other': gold[1]}, 'stone': 0.0})
+
+
+def gaina(ms, rows):
+    """rows: (id, class, gathered, given per player number)."""
+    return 'GAINA ' + __import__('json').dumps({'ms': ms, 'animals': [
+        {'id': i, 'master': 0, 'class': c, 'gathered': g, 'given': list(given)} for i, c, g, given in rows]})
 
 
 def cp(ms, player, rec, eng):
@@ -81,6 +87,47 @@ class EngineIncomeTest(unittest.TestCase):
     def test_by_source_applies_the_offset(self):
         part = by_source(self.gain_lines(), 1, 2, 25000, offset=1.5)
         self.assertEqual([p[0] for p in part['points']], [11.5, 21.5])
+
+    def animal_lines(self):
+        return [
+            gaina(10010, []),
+            gaina(20007, [(3661, 58, 7.5, [])]),                                   # carried, nothing dropped off yet
+            gaina(30004, [(3661, 58, 40.0, [0.0, 30.0]), (4016, 10, 20.0, [0.0, 0.0, 20.0])]),
+            gaina(40011, [(3661, 58, 86.2, [0.0, 86.21]), (4016, 10, 150.0, [0.0, 0.0, 150.0])]),
+            gaina(50002, [(3661, 58, 86.2, [0.0, 86.21]), (4016, 10, 270.1, [0.0, 0.3, 269.8]),
+                          (3828, 9, 115.9, [0.0, 0.0, 115.94]), (77, 61, 9.0, [0.0, 9.0])]),
+            gaina(60003, [(3661, 58, 99.0, [0.0, 99.0])]),                         # past the verified time
+            'GAINA {broken',
+        ]
+
+    def test_animals_are_each_players_dropped_off_amounts_at_the_last_line_in_the_verified_span(self):
+        self.assertEqual(len(parse_animals(self.animal_lines())), 6)
+        got = animals(self.animal_lines(), 1, 2, 55000)
+        self.assertEqual(got['until_seconds'], 50)
+        self.assertEqual(got['own'], [
+            {'id': 3661, 'kind': 'sheep', 'eaten': 86.2, 'first_seconds': 30, 'last_seconds': 40},
+            {'id': 77, 'kind': 'other', 'eaten': 9.0, 'first_seconds': 50, 'last_seconds': 50}])     # 0.3 of the boar is too little to list
+        self.assertEqual(got['opponent'], [
+            {'id': 4016, 'kind': 'boar', 'eaten': 269.8, 'first_seconds': 30, 'last_seconds': 50},
+            {'id': 3828, 'kind': 'deer', 'eaten': 115.9, 'first_seconds': 50, 'last_seconds': 50}])
+        self.assertNotIn('full', got['own'][0])                                   # the engine line has no full amount
+        self.assertEqual(animals(self.animal_lines(), 1, 2, 35000, offset=2.5)['own'][0],
+                         {'id': 3661, 'kind': 'sheep', 'eaten': 30.0, 'first_seconds': 32.5, 'last_seconds': 32.5})
+
+    def test_without_gaina_lines_or_eaten_animals_the_animals_part_is_absent(self):
+        self.assertIsNone(animals(self.lines(), 1, 2, 400000))
+        self.assertIsNone(animals(self.animal_lines(), 1, 2, 25000))              # only carried food so far
+        self.assertIsNone(animals(self.animal_lines(), 1, 2, 5000))
+        self.assertNotIn('animals', income(self.lines(), 1, 2))
+
+    def test_income_carries_animals_beside_the_unchanged_fields(self):
+        plain = income(self.lines(), 1, 2)
+        extra = [gaina(300004, [(3661, 58, 86.2, [0.0, 86.2])]), gaina(410000, [(3661, 58, 99.0, [0.0, 99.0])])]
+        got = income(self.lines() + extra, 1, 2)
+        self.assertEqual(got['animals'], {'until_seconds': 300, 'opponent': [], 'own': [
+            {'id': 3661, 'kind': 'sheep', 'eaten': 86.2, 'first_seconds': 300, 'last_seconds': 300}]})
+        got.pop('animals')
+        self.assertEqual(got, plain)
 
     def test_another_game_build_is_not_run(self):
         from types import SimpleNamespace as N

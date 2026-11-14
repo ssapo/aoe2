@@ -51,3 +51,29 @@ test('gold split is hidden when no other gold, and nothing is drawn without the 
   assert.strictEqual(income.renderSources({...curve,by_source:{points:[row.map((v,i)=>i===3?'<b>':v)]}}),'');
   assert.strictEqual(income.renderSources({...curve,by_source:{points:[row.map((v,i)=>i?0:v)]}}),'');
 });
+
+const animalRows={until_seconds:20,own:[{id:1,kind:'sheep',eaten:86.2,first_seconds:10,last_seconds:20},{id:2,kind:'sheep',eaten:40},{id:5,kind:'boar',eaten:290.4},{id:6,kind:'boar',eaten:281.6},{id:9,kind:'<b>',eaten:12}],opponent:[{id:7,kind:'deer',eaten:103.3},{id:8,kind:'deer',eaten:0},{id:10,kind:'boar',eaten:'x'}]};
+test('animals: grouped by kind, one chip per animal, per-kind count and sum; no remainder without the full amount',()=>{
+  const s=income.animals({...withSources,animals:animalRows});
+  assert.strictEqual(s.seconds,20);
+  assert.deepStrictEqual(s.own.map(k=>[k.kind,k.rows.length,Math.round(k.eaten),k.full]),[['sheep',2,126,null],['boar',2,572,null],['other',1,12,null]]);
+  assert.deepStrictEqual(s.opponent.map(k=>[k.kind,k.rows.length]),[['deer',1]]);
+  const html=income.render({...withSources,animals:animalRows});
+  assert.ok(html.includes('동물별 먹은 양'));assert.ok(html.includes('멧돼지 2마리</b> · 572'));assert.ok(html.includes('나 · 5마리'));assert.ok(html.includes('상대 · 1마리'));
+  assert.strictEqual((html.match(/<li>/g)||[]).length-(income.render(withSources).match(/<li>/g)||[]).length,6);
+  assert.ok(html.includes('0:20까지'));assert.ok(html.includes('확인된 시각까지만'));
+  assert.ok(!html.includes('남김'));assert.ok(!html.includes(' / '));assert.ok(!html.includes('<b>'+'</b>'));assert.ok(!/<b>[^<]*<b>|NaN|undefined/.test(html));
+});
+test('animals: the uneaten part shows only when the full amount is known and at least a fifth was left',()=>{
+  const d={...withSources,animals:{until_seconds:20,own:[{id:5,kind:'boar',eaten:286,full:340},{id:6,kind:'boar',eaten:200,full:340}],opponent:[]}};
+  const html=income.renderAnimals(d);
+  assert.ok(html.includes('멧돼지 2마리</b> · 486 / 680'));
+  assert.strictEqual((html.match(/class="left"/g)||[]).length,1);assert.ok(html.includes('남김 140'));assert.ok(!html.includes('남김 54'));
+  assert.ok(html.includes('먹은 동물 없음'));
+});
+test('animals: absent or empty data draws nothing and leaves the rest as it was',()=>{
+  assert.strictEqual(income.renderAnimals(withSources),'');
+  assert.strictEqual(income.renderAnimals({animals:{until_seconds:20,own:[],opponent:[]}}),'');
+  assert.strictEqual(income.renderAnimals({animals:{own:[{kind:'sheep',eaten:5}]}}),'');
+  assert.ok(!income.render(withSources).includes('동물별'));
+});

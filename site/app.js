@@ -89,7 +89,7 @@
     return `<div class="panel-toolbar"><div class="segments" role="group" aria-label="비교할 시대">${available.map((age,i)=>`<button data-age="${age}" aria-pressed="${i===0}">${age}</button>`).join('')}</div><span class="toolbar-note">나 / 상대 비교</span></div>`+available.map((age,i)=>{
       const left=checkpoint(mine,age),right=checkpoint(theirs,age),diff=ageDifference(mine,theirs,age);
       const reference=ranked?.ages?.find(r=>r.age===age);
-      const rankedLine=reference?`<p class="ranked-age-reference">${ranked.minRating}+ 기준 ${fmtTime(reference.reference.median)} · ${Math.round(Math.abs(reference.delta))}초 ${reference.delta>0?'늦음':reference.delta<0?'빠름':'차이 없음'}</p>`:'';
+      const rankedLine=reference?`<p class="ranked-age-reference">${ranked.minRating}+ 기준 ${fmtTime(reference.reference.median)} · ${Math.round(Math.abs(reference.delta))}초 ${reference.delta>0?'늦음':reference.delta<0?'빠름':'차이 없음'}${window.SSAPORankedBenchmarks?.basis(reference.reference)?` · ${esc(window.SSAPORankedBenchmarks.basis(reference.reference))}`:''}</p>`:(window.SSAPORankedBenchmarks?.shortageText(ranked)?`<p class="ranked-age-reference">${esc(window.SSAPORankedBenchmarks.shortageText(ranked))}</p>`:'');
       const requests=p=>Number.isFinite(p.command_seconds)&&p.unit_requests_before_click&&!p.unknown_unit_request_amounts?.includes('Villager')?number(p.unit_requests_before_click.Villager??0):'—';
       const recent=p=>p.unit_requests_previous_120s?quantities(p.unit_requests_previous_120s):'—';
       const prior=p=>p.unit_requests_before_click?quantities(Object.fromEntries(Object.entries(p.unit_requests_before_click).filter(([k])=>k!=='Villager'))):'—';
