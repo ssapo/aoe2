@@ -2082,10 +2082,19 @@ index 398a973c..bcfaaae0 100644
              flags.set(MoveFlags::DIRECT, order.direct);
              moved = self.command_move_to(
 diff --git a/crates/engine/genie-core/src/groups/place.rs b/crates/engine/genie-core/src/groups/place.rs
-index 51f6a791..2b31aea6 100644
+index 51f6a791..560b2370 100644
 --- a/crates/engine/genie-core/src/groups/place.rs
 +++ b/crates/engine/genie-core/src/groups/place.rs
-@@ -386,15 +386,20 @@ impl World {
+@@ -16,6 +16,8 @@ use crate::map::DistanceSquared;
+ use crate::map::TerrainMask;
+ use crate::map::spatial::Movers;
+ use crate::map::spatial::RecordId;
++use crate::map::spatial::SmoothingWalls;
++use crate::pathing::tile_path::{Found, Path, Request, smooth};
+ use crate::map::{GroundOffset, Point};
+ use crate::math::fmath::BVector;
+ use crate::math::fmath::{cross, normalize};
+@@ -386,15 +388,20 @@ impl World {
                          beside <= (r + r) * (r + r)
                      } =>
              {
@@ -2109,7 +2118,7 @@ index 51f6a791..2b31aea6 100644
          let g = self.groups.held_mut(group)?;
          g.stored_positions.clear_points();
          g.motion.new_position[0] = at;
-@@ -402,6 +407,185 @@ impl World {
+@@ -402,6 +409,226 @@ impl World {
          Ok(())
      }
  
@@ -2125,12 +2134,17 @@ index 51f6a791..2b31aea6 100644
 +    /// lead, at least 0 (at least 0.5 on a patrol); the place at `d` along the path
 +    /// (`0x106e0b0`). `at` (the member's place) without a path.
 +    fn front_lead_188329(
-+        &self,
++        &mut self,
 +        group: GroupId,
 +        lead_id: ObjectId,
 +        at: BVector,
 +        held: &[(ObjectId, BVector)],
 +    ) -> Result<BVector, GenieError> {
++        let searched = if std::env::var_os("GENIE_EXPERIMENT_FRONTPATH_188329").is_some() {
++            self.front_path_188329(group, lead_id, at)?
++        } else {
++            None
++        };
 +        let g = self.groups.held(group)?;
 +        let mut lead = 0.5_f32;
 +        if let Some(f) = g.current_formation.as_ref()
@@ -2160,49 +2174,21 @@ index 51f6a791..2b31aea6 100644
 +        if g.formed && !(lead <= 0.1) {
 +            lead = 0.1;
 +        }
-+        // W: the walked level's last point (its level byte not 0), else the parent's waypoint
-+        // at least 10 beyond its current one
-+        let w = match g.motion.paths.first() {
-+            Some(l) if l.level.get() != 0 => l.points.last().copied(),
-+            Some(_) => g.motion.paths.get(1).and_then(|p| {
-+                let mut i = usize::try_from(p.waypoint.get()).ok()?;
-+                let mut acc = 0.0_f32;
-+                while acc < 10.0 && i + 1 < p.points.len() {
-+                    let (a, b) = (p.points.get(i)?, p.points.get(i + 1)?);
-+                    let (dx, dy) = (b.x() - a.x(), b.y() - a.y());
-+                    acc += sqrt(dx * dx + dy * dy);
-+                    i += 1;
-+                }
-+                p.points.get(i).copied()
-+            }),
-+            None => None,
-+        };
++        // EXPERIMENT (FRONTPATH): the 10 is counted from the member's place (`0x10ef53c`)
++        let w = front_goal_188329(g, searched.as_ref().map(|_| at));
 +        let Some(w) = w else {
 +            return Ok(at);
 +        };
 +        let c = g.centroid;
-+        // EXPERIMENT (GENIE_EXPERIMENT_FRONTPATH_188329, findings 63): the path is the lead
-+        // unit's long pather from W to the centroid (0x10532b0 -> 0x10533b0, limit 1000), not
-+        // the straight line. Its range (group target range + master +0x78) and the pass
-+        // 0x1059760 over the path are not read.
++        // EXPERIMENT (GENIE_EXPERIMENT_FRONTPATH_188329, findings 63 and 73): the path is the
++        // lead unit's tile search from W to the centroid, smoothed (`0x10532b0`), not the
++        // straight line; without a path (results 4 and 5) the group stands on the member's place.
 +        let mut path: Vec<BVector> = vec![w, c];
-+        if std::env::var_os("GENIE_EXPERIMENT_FRONTPATH_188329").is_some()
-+            && let Ok((found, p)) = self.round_long(lead_id, w.ground(), c)
-+        {
-+            if crate::groups::trace_forming() {
-+                eprintln!("FORMING_FRONTPATH found={found} points={:?}", p.points);
++        if let Some((found, p)) = searched {
++            if matches!(found, Found::Nothing | Found::OffMap) {
++                return Ok(at);
 +            }
-+            if 2 <= p.points.len() {
-+                path = p.points;
-+                // 0x10533b0: the path's first point is the start itself (W), the last the goal
-+                // itself when the search reached it (else the tile centre it ended on)
-+                if std::env::var_os("GENIE_EXPERIMENT_FRONTPATH_TILE").is_none() {
-+                    path[0] = w;
-+                    if found && let Some(l) = path.last_mut() {
-+                        *l = c;
-+                    }
-+                }
-+            }
++            path = p;
 +        }
 +        let path = &path[..];
 +        // 0x10d1b10: the distance along the path of a point's projection
@@ -2292,9 +2278,103 @@ index 51f6a791..2b31aea6 100644
 +        Ok(point)
 +    }
 +
++    /// 188329 `0x10532b0` as movePositionToFront calls it (`0x10ef69f`): the tile search of the
++    /// lead unit's restriction (`0x10533b0` = [`Planner::search_on_tiles`], goal tiles within the
++    /// group target's range `+0x3e0` + the lead's master radius `+0x78`, range 0, node limit
++    /// 1000) from W to the group's centroid, then, for a result other than 0, 4 and 5, the
++    /// smoothing for the lead unit (`0x1059760` = [`smooth`], more than two points). None
++    /// without W, the lead or a planner.
++    ///
++    /// [`Planner::search_on_tiles`]: crate::pathing::tile_path::Planner::search_on_tiles
++    fn front_path_188329(
++        &mut self,
++        group: GroupId,
++        lead_id: ObjectId,
++        at: BVector,
++    ) -> Result<Option<(Found, Vec<BVector>)>, GenieError> {
++        let g = self.groups.held(group)?;
++        let Some(w) = front_goal_188329(g, Some(at)) else {
++            return Ok(None);
++        };
++        let (c, range) = (g.centroid, g.current_target.range);
++        let Some((p, u)) = self.object(lead_id) else {
++            return Ok(None);
++        };
++        let radius = u.master(self.master_tables(), p)?.radius.x();
++        let Some(mover) = self.parts.mover_of(u.id) else {
++            return Ok(None);
++        };
++        let walker = mover.walker(lead_id);
++        let req = Request {
++            from: w.ground(),
++            to: c.ground(),
++            radii: Distance::new(range.get() + radius),
++            range: Distance::ZERO,
++            closed: Vec::new(),
++            full: false,
++        };
++        let tuning = &self.model.tuning.tile_path;
++        let (slots, ignore) = self.pathing.smoothing_ignore(lead_id, None);
++        let tiles = self.spatial.tiles();
++        let Some(planner) = self.pathing.planner(walker.restriction, tiles) else {
++            return Ok(None);
++        };
++        let mut out = Path::default();
++        let found = planner.search_on_tiles(&req, &mut out, tuning)?;
++        let raw = out.points.clone();
++        if !matches!(found, Found::Nothing | Found::OffMap) {
++            let ignore: Vec<RecordId> = ignore.into_iter().map(RecordId::from).collect();
++            let mut walls =
++                SmoothingWalls::new(&mut self.spatial, walker.radius, walker.mask, &ignore);
++            smooth::<GenieError>(&mut out, &mut walls, tuning)?;
++            if walls.ran {
++                self.pathing.smoothing_ran(slots);
++                self.spatial.set_manager_ignore(&ignore);
++            }
++        }
++        if crate::groups::trace_forming() {
++            eprintln!(
++                "FORMING_FRONTPATH found={found:?} radii={} raw={raw:?} points={:?}",
++                req.radii.get(),
++                out.points
++            );
++        }
++        Ok(Some((found, out.points)))
++    }
++
      /// The terrain classes master `master` of player `p` lets its objects stand on: its
      /// restriction (`+0x606`) in the map's table (`FUN_141054630`).
      ///
+@@ -870,3 +1097,29 @@ mod tests {
+         );
+     }
+ }
++
++/// 188329 movePositionToFront's W (`0x10ef4d4`..): the walked level's last point (its level
++/// byte not 0), else the parent's waypoint at least 10 beyond its current one; with `at` (the
++/// chosen member's place) the 10 is counted from there: the sum starts with the ground distance
++/// from `at` to the current waypoint (`0x10ef53c`..`0x10ef5d0`, constant `0x31fd87c`).
++fn front_goal_188329(g: &crate::groups::UnitGroup, at: Option<BVector>) -> Option<BVector> {
++    match g.motion.paths.first() {
++        Some(l) if l.level.get() != 0 => l.points.last().copied(),
++        Some(_) => g.motion.paths.get(1).and_then(|p| {
++            let mut i = usize::try_from(p.waypoint.get()).ok()?;
++            let mut acc = 0.0_f32;
++            if let (Some(at), Some(a)) = (at, p.points.get(i)) {
++                let (dx, dy) = (a.x() - at.x(), a.y() - at.y());
++                acc = sqrt(dx * dx + dy * dy);
++            }
++            while acc < 10.0 && i + 1 < p.points.len() {
++                let (a, b) = (p.points.get(i)?, p.points.get(i + 1)?);
++                let (dx, dy) = (b.x() - a.x(), b.y() - a.y());
++                acc += sqrt(dx * dx + dy * dy);
++                i += 1;
++            }
++            p.points.get(i).copied()
++        }),
++        None => None,
++    }
++}
 diff --git a/crates/engine/genie-core/src/groups/stats.rs b/crates/engine/genie-core/src/groups/stats.rs
 index e101e2d0..f7de2eaa 100644
 --- a/crates/engine/genie-core/src/groups/stats.rs
@@ -2374,10 +2454,60 @@ index e101e2d0..f7de2eaa 100644
      /// index it has then, and the objects of their searches.
      fn member_views(
 diff --git a/crates/engine/genie-core/src/groups/steer/detour.rs b/crates/engine/genie-core/src/groups/steer/detour.rs
-index 22a83675..ae3e4f80 100644
+index 22a83675..a27f9a7f 100644
 --- a/crates/engine/genie-core/src/groups/steer/detour.rs
 +++ b/crates/engine/genie-core/src/groups/steer/detour.rs
-@@ -411,7 +411,7 @@ impl World {
+@@ -93,9 +93,28 @@ impl World {
+             .transform_position;
+         let [place, forward, _, _] = g.motion.position;
+         let (moving, waits) = (g.motion.moving(), g.motion.waits_to_move());
++        // EXPERIMENT (GENIE_EXPERIMENT_FRONTPATH_188329, findings 63; 188329 `0x10ef890`): the
++        // first try (the short path to the slot) and the "ends farther than the gap" stop are
++        // made only once the group is formed (`+0x5cc`).
++        let unformed = !g.formed && std::env::var_os("GENIE_EXPERIMENT_FRONTPATH_188329").is_some();
+         let r = self.rounder(id, differentiators)?;
+-        let (way, serves) = self.find_way(&r, (to, forward, place))?;
+-        if serves && !moving && !waits && ends_farther(&way.record, to, gap) {
++        let (way, serves) = self.find_way(&r, (to, forward, place), unformed)?;
++        if crate::groups::trace_forming() {
++            eprintln!(
++                "FORMING_WAY ms={} id={} unformed={unformed} to=({}, {}) gap={} result={:?} serves={serves} planned={} goal=({}, {}) points={:?}",
++                self.world_time.millis(),
++                id.get(),
++                to.x(),
++                to.y(),
++                gap.get(),
++                way.result,
++                way.planned,
++                way.goal.x(),
++                way.goal.y(),
++                way.record.points
++            );
++        }
++        if serves && !unformed && !moving && !waits && ends_farther(&way.record, to, gap) {
+             self.stop_member(id)?;
+             self.show_standing(id)?;
+             self.move_record(group, index)?.consecutive_move_failures = 0;
+@@ -140,6 +159,7 @@ impl World {
+         &mut self,
+         r: &Rounder<'_>,
+         (to, forward, place): (BVector, BVector, BVector),
++        unformed: bool,
+     ) -> Result<(Way, bool), GenieError> {
+         let mut way = Way {
+             record: Path::default(),
+@@ -147,7 +167,9 @@ impl World {
+             planned: false,
+             goal: to,
+         };
+-        self.round_to_slot(r, to, &mut way)?;
++        if !unformed {
++            self.round_to_slot(r, to, &mut way)?;
++        }
+         if way.result != ShortFound::Reached {
+             self.round_one_step(r, to, forward, &mut way)?;
+             if !way.result.leads() {
+@@ -411,7 +433,7 @@ impl World {
      /// The way round's long pather (`FUN_140f9eb70` with the record) for member `id` from the
      /// tile of `from` to the tile of `to`, range 0, no target: whether it reached the goal, and
      /// the path.

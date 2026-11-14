@@ -306,6 +306,7 @@ Codex의 초기 이동·내려놓기·주둔 복귀 정적 조사는 [결과·�
 | (스위치 없음) 68 | Repair 명령 0x6e(디스패치 0xf60e04, 처리기 0xf653d0, 직접 수리 0x12c66c0): 일꾼 검사 → 분배기 → 낱개마다 바로 수리(수리공 마스터 156·222로 바꾸고 유형 0x6a 작업을 골라 Repair 액션) 또는 AI 대기열에 명령 0x2ce | `commands/repair.rs`, `orders/repair_command.rs`, 코덱 `decode.rs`·`encode.rs` | `original-188329-repair-command.md` 1~6절, findings 68 | 실행 확인(프로 경기 넷의 Repair 멈춤 없어짐; 값 대조는 못 함) |
 | (스위치 없음) 69 | 리플 머리말의 작업 클래스가 −1보다 작으면(유형 154의 −1288) 값 그대로 둔다(DAT 쪽 `special_group`과 같게) | `genie-import/src/save.rs` `saved_group` | 같은 문서 7절, findings 69 | 실행 확인(520219269가 update 0 → 1,758까지; 원본의 유형 154는 안 읽음) |
 | (스위치 없음) 70 | 선수 속성 204(마푸체: 82 = 성): 건축가가 건물을 완공할 때와 외교 변경 때, 다른 선수의 그 종류 완공 건물마다 신호 개체(마스터 697)를 만들고 표시한다 | `players/diplomacy.rs` `reveal_units`, `construction/build/world_side.rs`, `World::reveal_marks` | `original-188329-reveal-attribute-204.md`, findings 70 | 실행 확인(520219269가 1,758 → 63,232까지; 신호가 실제로 만들어지는 경우는 못 봄) |
+| `GENIE_EXPERIMENT_FRONTPATH_188329` (**기본 끔**, 실험) | 앞점 경로 = 선두 유닛의 타일 탐색 + 다듬기(0x10532b0), W는 유닛 자리부터 10을 셈, 형성 전에는 칸으로 가는 첫 시도·"멀리 끝나면 세움" 없음 | `groups/place.rs`, `groups/steer/detour.rs` | findings 63·63 추가·73 | 세 정찰병 0.9~1.15초 비트 일치, 그 뒤 다름; 열한 리플에서 앞당겨진 선수 없음(518239882 P1 55 → 57, 519700670 P2 2 → 72) |
 
 "근거" 열의 문서는 모두 이 폴더의 `original-188329-*.md`이다. 사례 문서는 주소와 손 계산까지 들어 있다.
 
@@ -352,6 +353,7 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 12.5 미해결 (이른 순)
 
+- (2026-11-14 세션 E13 = ENG-06 이어받음; 실행 `E13_t3`, `E13f_*`) **518239882 P2 696.6초(정찰병 셋의 묶음, findings 63·73)**: 실험 스위치 `GENIE_EXPERIMENT_FRONTPATH_188329`를 켜면 세 정찰병이 0.9~1.15초 동안 기록과 비트까지 같고 체크포인트 27,499의 단어 7 차이가 382 → 2로 준다. 남은 것은 "자기 이동이 끝나는 update"(기록이 한 update 이르다, 추정). 첫 동작: 원본에서 0x10ef890을 부르는 쪽의 선 검사(엔진 `to_slots.rs` `steer_all`의 `line_clear`)와 순서를 읽는다 — 명령은 findings 73 끝. 스위치는 13.3 규칙으로는 기본에 넣을 수 있는 상태다(사용자 결정 대기: 넣으면 518239882 P1 55 → 57, 519700670 P2 2 → 72).
 - (2026-11-14 세션 E12; 실행 `E12a_V_520219269`) 520219269(촉 대 마푸체)는 속성 204를 넣은 뒤(findings 70) update 63,232(P2) / 64,160(P1)까지 돈다. **새 문명 둘의 첫 어긋남**: 마푸체 P2 60.7초 단어 7(엔진 −9), 67.2초 단어 9; 촉 P1 119.2초 단어 7·9. 단어 1은 P2 145.2초, P1 210.2초까지 같다. 첫 동작: `E5_go.sh <이름> 520219269 4700 "GENIE_TRACE_OBJECTS_RANGE=4000-4700"`으로 P2의 54~61초를 추적한다(원본 기록이 없으니 체크포인트 단어 7의 차이 9가 어느 개체인지는 `checkpoint_words.py`로). 남은 멈춤: P2 63,232 "a player's attribute 204" — 건물이 스스로 완공되는 길(`building_update.rs`)에 남겨 둔 멈춤으로 추정(안 봄; 그 길의 원본을 읽고 `reveal_units`를 부르면 된다). 포르투갈의 단어 1 −1은 금 할인이 아니다(findings 71). 뒤쪽 멈춤 셋은 안 넣었다(findings 72: 농장 보너스는 0x128b590 타일 번지기 탐색을 끝까지 읽어야 한다).
 - (2026-11-14 세션 E11, 확인 V의 프로 경기 일곱; 실행 `E11c_V_<id>`; 전부 첫 어긋남 뒤의 엔진 멈춤이라 사이트 확인 구간과는 무관) Repair 멈춤 넷과 520219269의 update 0 멈춤은 없앴다(findings 68·69). 그 뒤의 멈춤, 이른 순: 520219269 P2 1,758 / P1 1,836 "a player's attribute 204 (FUN_14152bcb0)"(촉 또는 마푸체의 선수 속성 204 — 이 판은 그때까지 체크포인트 3개가 다 맞으므로 **여기를 풀면 새 문명 둘의 검증이 시작된다**; 첫 동작: `players`에서 이 멈춤 자리를 찾아 속성 204를 쓰는 효과를 `e6_tech`로 뽑고 원본의 해당 함수를 읽는다(188329 주소는 아직 모른다; 엔진 주석의 옛 주소는 `FUN_14152bcb0`)), 519002991 P1 38,158 "a missed missile meeting another object than its target", 520282194 P1 42,058 "a builder with no task for its foundation"(56번과 같은 종류일 수 있음, 안 봄), 520352957 가이아 48,495 "an attacker whose hits apply effects (FUN_14107bdf0)", 518801961 P1 56,792 "a gather command without a task", 520162577 P1 57,289 "a farm's bonus near a master (FUN_1411d3cd0)"·P2 57,401 "a class 42 or livestock unit leaving a building". 520169985는 멈춤 없음. Repair에서 안 넣은 것: 분배기가 묶음을 만드는 경우(그룹 명령 0x10d8230, 엔진은 "a unit group the order splitter forms"로 멈춤), 액션의 대상 바꾸기가 0을 돌려주는 갈래.
 
@@ -439,7 +441,7 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 13.1 사례 하나를 끝낼 때마다 (고쳤든 못 고쳤든)
 
-`truth-log-findings.md` 맨 끝에 번호를 이어 한 절을 쓴다(지금 마지막은 72번; 63번에는 뒤에 "63 추가" 절이 있다). 형식:
+`truth-log-findings.md` 맨 끝에 번호를 이어 한 절을 쓴다(지금 마지막은 73번; 63번에는 뒤에 "63 추가" 절이 있고 73번이 그 다음 이어지는 기록이다). 형식:
 
 ```
 ## <번호>. <한 줄 제목> (스위치 `GENIE_EXPERIMENT_...`에 추가 / 새 스위치 / 스위치 없음)
@@ -476,6 +478,15 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 - **기본 묶음에 넣는 판정 규칙(2026-11-12 바뀜)**: 리플·선수마다 "첫 어긋남" = (모든 체크포인트 단어 중 가장 이른 불일치, 자원 첫 차이 > 0.01) 중 이른 시각. 스위치를 켠 실행에서 세 리플 모든 선수의 첫 어긋남이 앞당겨지지 않으면 기본에 넣는다. 같은 실행에서 그 선수의 첫 어긋남 뒤에 생긴 불일치·앞당김은 뒤따른 것으로 보고 판정을 막지 않는다(대신 12.5에 열린 문제로 적는다). 예전 규칙(어느 단어든 첫 불일치가 하나라도 앞당겨지면 안 넣음)은 너무 엄격해서 바꿨다. 숫자는 `summ2.sh`의 "first word mismatch"와 "first difference > 0.01"에서 뽑는다.
 
 ### 13.4 지금 하던 일 (멈출 때마다 이 절을 덮어쓴다)
+
+**2026-11-14 저녁, Claude (세션 E13 = ONBOARDING `ENG-06` 이어받음: 63번 정찰병 묶음 형성). 결론: 반쯤 하던 일 없음. 실험 스위치 `GENIE_EXPERIMENT_FRONTPATH_188329`(여전히 **기본 끔**)에 원본에서 읽은 셋을 더했다(findings 73): ① 앞점 경로 = 선두 유닛의 타일 탐색(0x10533b0 = 엔진 `search_on_tiles`, 반경 합 = 목표 범위 + 마스터 반지름) + 다듬기(0x1059760 = 엔진 `smooth`), ② W를 고를 때 10을 유닛 자리부터 센다, ③ 형성 전에는 칸으로 가는 첫 시도와 "멀리 끝나면 세움"을 안 한다. 스위치를 켜면 518239882의 정찰병 3430은 여섯 표본(694.349~695.497초), 4464·4472는 다섯 표본이 기록과 비트까지 같고(전에는 4464만), 체크포인트 27,499의 단어 7 차이가 382 → 2다. 그 뒤(자기 이동이 끝나는 때)부터 아직 다르므로 기본에 넣지 않았다. 스위치를 끈 열한 리플(`E13a_*`)의 `.out`은 `E12a_*`와 바이트까지 같다 → 2.1 표·engine-check 기대값(55 / 54) 그대로. 로컬 커밋만 했고 푸시하지 않았다(사용자 확인 대기).**
+
+- 스위치를 켠 열한 리플(`E13f_*`, 비교 `python3 E5_cmp.py E13a E13f`): 앞당겨진 선수 없음, 518239882 P1 710.6 → 738.5초(55 → 57개), P2 그대로(696.6초, 54개), 519700670 P2 21.9 → 476.9초(2 → 72개), 나머지 그대로. **13.3 규칙으로는 기본에 넣을 수 있다** — 넣기로 하면: `runs\M6_envs.txt`와 main `engine/switches.env`에 `GENIE_EXPERIMENT_FRONTPATH_188329=1`, engine-check 기대값 57 / 54, 2.1 표 갱신. 이번에는 "세 정찰병이 끝까지 비트로 맞을 때만 기본"이라는 맡은 조건에 따라 꺼 두었다.
+- 엔진 소스 `genie`: 빌드됨(73 포함), 저장소 패치와 같음(sha256 LF `12a3ef24b5cc95784a7da40cf0fcc9ec39c112ef0cdbc8bc46c060a1c6289c10`, 594162바이트, PC 사본 `runs\E13.patch`; 만들기 `runs\M6_mkpatch.ps1 -Name runs\E13` 뒤 `python3 runs/M3_striplf.py runs/E13`). `runs\census_base.exe` = 이 빌드(`runs\census_E13c.exe`). 빌드 `runs\E13_build.ps1 -Tag <이름>`(cmd로 cargo를 불러 `.done`이 제대로 써진다; 로그 `runs\E13_build.log`). 실행·비교는 E12와 같다(`E5_go.sh`, `E5_launch.sh`, `E5_EXE=census_E13c.exe`).
+- 다음 첫 동작(63·73번): 원본에서 0x10ef890(= 엔진 `steer_to_slot`)을 부르는 쪽 — 멤버의 자기 이동이 켜져 있을 때 칸까지의 선을 검사해 끝내는 곳 — 을 읽어 엔진 `groups/steer/to_slots.rs` `steer_all`(87~116줄, `line_clear`, 여유 `tuning.group.clearance`)과 ① 검사 반지름·여유·무시 목록 ② 자기 이동 한 걸음과의 순서 ③ 속도 계산(`speed_pass_188329`)에 그 update에 끝난 멤버가 드는지를 맞춘다. 기록은 4464의 자기 이동이 꺾임점 (46.875, 75.125)에 닿은 update(695.357초 → 엔진은 695.385초)에 끝난 것으로 보인다(추정). 실행: `bash runs/E5_go.sh <이름> 518239882 27500 "GENIE_EXPERIMENT_FRONTPATH_188329=1;GENIE_TRACE_OBJECT_IDS=3430,4464,4472;GENIE_TRACE_OBJECTS_RANGE=27405-27500;GENIE_TRACE_FORMING=1"` 뒤 runs 폴더에서 `python3 E13_tr.py <이름>.err ../truth/truth4.jsonl 3430,4464,4472`(표본마다 기록·엔진 좌표와 `==`/`!=`).
+- 원본 읽기: 0x1059760의 디컴파일은 클라우드 컨테이너 `re-env/re/out_E13/a.c`에만 있다(PC `re-kit`에는 없음; 다시 뜨려면 목록 `1059760 1059c08 1`). 나머지는 PC `re-kit\re\out_p20\d5.c`·`d8.c`, `out\d5.c`(0x10533b0, 0x1055040), `out_p15\steer2.c`.
+
+아래는 같은 날 앞선 기록이다.
 
 **2026-11-14 저녁, Claude (세션 E12 = ONBOARDING `ENG-12`, ENG-11 뒤에 드러난 멈춤과 포르투갈 −1). 결론: 반쯤 하던 일 없음. ① 520219269의 "선수 속성 204" 멈춤을 원본대로 넣어 없앴다(findings 70, 문서 `original-188329-reveal-attribute-204.md`, 스위치 없음): update 1,758 → 63,232까지 돌고 체크포인트가 P1 17개, P2 8개 맞는다. ② 포르투갈의 단어 1 −1은 금 할인이 아니었다(findings 71: 그 앞에 금을 쓴 적이 없다; 덜 찬 짐 내려놓기의 크기 차이, 추정) — 고친 것 없음. ③ 뒤쪽 멈춤 셋은 안 넣었다(findings 72). 기본 열한 리플의 체크포인트 줄과 `.out` 끝 줄은 `E11c_*`와 바이트까지 같다(`E12a_*`; 518239882 55 / 54, 멈춤 없음) → 2.1 표 그대로. 로컬 커밋만 했고 푸시하지 않았다(사용자 확인 대기).**
 
