@@ -6887,6 +6887,36 @@ index 7fd24514..b0ef18a3 100644
      /// The object `id` as the unit AI reads it ([`UnitSeen`]): None when the world does not
      /// hold it (`FUN_1415417a0`).
      ///
+diff --git a/crates/engine/genie-core/src/unit_ai/surroundings.rs b/crates/engine/genie-core/src/unit_ai/surroundings.rs
+index 7cc2f5c9..f3765381 100644
+--- a/crates/engine/genie-core/src/unit_ai/surroundings.rs
++++ b/crates/engine/genie-core/src/unit_ai/surroundings.rs
+@@ -299,6 +299,11 @@ pub(super) struct LiveTop {
+ /// The idle part's group test (`0x140c67e8f`): no group, or one that is idle (`FUN_141017ad0`) of
+ /// a unit that does not move (slot 0x5c8).
+ pub(super) fn group_lets_idle(group: Option<GroupState>) -> bool {
++    // 188329 0xd42a00 (0xd42ed6..): a member runs slot 0x240 only when `0x10dd760(group, id)`
++    // is false ([`GroupState::IDLE_FREE_188329`]); the member's own mover is not read
++    if std::env::var_os("GENIE_EXPERIMENT_IDLEGROUP_188329").is_some() {
++        return group.is_none_or(|g| g.contains(GroupState::IDLE_FREE_188329));
++    }
+     group.is_none_or(|g| g.contains(GroupState::IDLE) && !g.contains(GroupState::MEMBER_MOVING))
+ }
+ 
+@@ -317,6 +322,13 @@ bitflags::bitflags! {
+         const MOVING = 1 << 3;
+         /// The unit itself moves (its slot 0x5c8), which the idle part reads with the group.
+         const MEMBER_MOVING = 1 << 4;
++        /// 188329 `0x10dd760(group, id)` is false: the group is idle (`0x10dd870`) on no command
++        /// or a move (`+0x3b0` -1 or 1) and patrols (`0x110ffd0`, bit 11 of `+0x140`), or the
++        /// unit holds a slot of its formation (`+0x128`, `0x10dd1e0`) and either the group has
++        /// no wait delays and its walked level wants no path (`0x1110070`) and the member has
++        /// at least 3 failures (`+0xf8[i].+0x1c`), or the slot is in place (state `+0x20` 3).
++        /// The test of `+0x460` is not modelled (read as 0).
++        const IDLE_FREE_188329 = 1 << 5;
+     }
+ }
+ 
 diff --git a/crates/engine/genie-core/src/unit_ai/tests.rs b/crates/engine/genie-core/src/unit_ai/tests.rs
 index 4cc9cc71..b603cd5e 100644
 --- a/crates/engine/genie-core/src/unit_ai/tests.rs
@@ -6925,7 +6955,7 @@ index 4cc9cc71..b603cd5e 100644
      let (r, w) = hear(PlayerKind::Human, Vec::new());
      assert_eq!(r, Ok(GO_ON));
 diff --git a/crates/engine/genie-core/src/unit_ai/unit.rs b/crates/engine/genie-core/src/unit_ai/unit.rs
-index dc286d39..4ddecf51 100644
+index dc286d39..3934ba44 100644
 --- a/crates/engine/genie-core/src/unit_ai/unit.rs
 +++ b/crates/engine/genie-core/src/unit_ai/unit.rs
 @@ -89,9 +89,13 @@ impl Unit {
@@ -6944,7 +6974,15 @@ index dc286d39..4ddecf51 100644
          }
          if let Some((new, main)) = c.taken_over.take() {
              captured = Some(Captured {
-@@ -471,6 +475,7 @@ impl Unit {
+@@ -257,6 +261,7 @@ impl Unit {
+                     GroupState::MEMBER_MOVING,
+                     c.w.parts.mover_of(self.id).is_some_and(Mover::is_moving),
+                 );
++                flags.set(GroupState::IDLE_FREE_188329, idle_free_188329(g, self.id));
+                 flags
+             }),
+             top_target: actions
+@@ -471,6 +476,7 @@ impl Unit {
          c: &mut Step<'_>,
          captured: Option<&Captured>,
          after: Option<AfterOrder>,
@@ -6952,7 +6990,7 @@ index dc286d39..4ddecf51 100644
      ) -> Result<Option<AfterOrder>, GenieError> {
          let busy = actions.top_action_kind().is_some() || c.w.parts.unread.contains(self.id);
          // the unit's master: its own (a captured unit's copy), else its owner's
-@@ -483,7 +488,7 @@ impl Unit {
+@@ -483,7 +489,7 @@ impl Unit {
          let class = master.map(|ms| ms.class);
          // a captured unit's unit AI runs as its new owner's (RGE_Combat_Object::update reads the
          // owner then): on that player's turn, with its time as it stands
@@ -6961,7 +6999,7 @@ index dc286d39..4ddecf51 100644
              Some(k) if k.main => (
                  (k.new == c.w.player_turn)
                      .then(|| c.w.player_time.get(k.new.index()).copied())
-@@ -495,13 +500,31 @@ impl Unit {
+@@ -495,13 +501,31 @@ impl Unit {
              ),
              _ => (c.turn, c.player, c.w.players.player(c.player)?.kind),
          };
@@ -6994,7 +7032,7 @@ index dc286d39..4ddecf51 100644
          }
          if turn.is_some()
              && after.is_none()
-@@ -549,6 +572,7 @@ impl Unit {
+@@ -549,6 +573,7 @@ impl Unit {
                      .map_or(Speed::ZERO, |m| m.stats.speed),
              ),
          );
@@ -7002,7 +7040,7 @@ index dc286d39..4ddecf51 100644
          self.with_side(
              actions,
              c,
-@@ -562,6 +586,10 @@ impl Unit {
+@@ -562,6 +587,10 @@ impl Unit {
                          .after_order(after, world_time, player_kind, &at, ai_stream, side)
                          .map(|()| None),
                      (Some(dt), None) => {
@@ -7013,6 +7051,39 @@ index dc286d39..4ddecf51 100644
                          ai.update(dt, world_time, player_kind, &at, ai_stream, side)
                      }
                      (None, _) => ai
+@@ -691,3 +720,32 @@ impl Unit {
+         Ok(())
+     }
+ }
++
++/// 188329 `0x10dd760(group, id)` (0x10dd760..0x10dd865) is false: see
++/// [`GroupState::IDLE_FREE_188329`].
++fn idle_free_188329(g: &crate::groups::UnitGroup, id: ObjectId) -> bool {
++    if !g.is_idle()
++        || !(g.current_command == GroupCommandKind::NONE
++            || g.current_command == GroupCommandKind::MOVE)
++    {
++        return false;
++    }
++    if g.patrols() {
++        return true;
++    }
++    let Some(slot) = g
++        .current_formation
++        .as_ref()
++        .and_then(|f| f.slots.iter().find(|s| s.unit_id == Some(id)))
++    else {
++        return false;
++    };
++    let failed = g.motion.number_wait_delays.get() == 0
++        && !g.motion.waits_to_move()
++        && g
++            .members
++            .iter()
++            .find(|m| m.id == id)
++            .is_some_and(|m| 3 <= m.specific_move.consecutive_move_failures);
++    failed || slot.state == crate::groups::SlotState::InPlace
++}
 diff --git a/crates/engine/genie-core/src/unit_ai/update.rs b/crates/engine/genie-core/src/unit_ai/update.rs
 index 1ecba910..2359a475 100644
 --- a/crates/engine/genie-core/src/unit_ai/update.rs
