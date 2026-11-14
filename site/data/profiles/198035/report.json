@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-14T09:48:17.490984+00:00",
-  "last_checked_at": "2026-11-14T09:47:44.270848+00:00",
+  "updated_at": "2026-11-14T17:13:20.140978+00:00",
+  "last_checked_at": "2026-11-14T17:13:19.136059+00:00",
   "sync_error": null,
   "profile": {
     "id": 198035,
@@ -9,6 +9,67 @@
     "name": "Oni.DauT"
   },
   "matches": [
+    {
+      "id": 521114550,
+      "started_at": 1794673318,
+      "finished_at": 1794675236,
+      "map": "my map",
+      "civilization": "Danes",
+      "result": "loss",
+      "rating_before": 1577,
+      "rating_after": 1559,
+      "match_type_id": 0,
+      "players_count": 2,
+      "players": [
+        {
+          "profile_id": 197388,
+          "name": "Oni.TaToH",
+          "is_self": false,
+          "civilization": "Khmer"
+        },
+        {
+          "profile_id": 198035,
+          "name": "Oni.DauT",
+          "is_self": true,
+          "civilization": "Danes"
+        }
+      ],
+      "analysis_status": "parser_error",
+      "analysis": null,
+      "attempts": 1,
+      "source_url": "https://www.aoe2insights.com/match/521114550/",
+      "analysis_note": "리플 형식이 현재 파서와 호환되지 않거나 분석에 실패했습니다."
+    },
+    {
+      "id": 521113794,
+      "started_at": 1794673249,
+      "finished_at": 1794673259,
+      "map": "my map",
+      "civilization": "Danes",
+      "result": "win",
+      "rating_before": 1561,
+      "rating_after": 1577,
+      "match_type_id": 0,
+      "players_count": 2,
+      "players": [
+        {
+          "profile_id": 197388,
+          "name": "Oni.TaToH",
+          "is_self": false,
+          "civilization": "Saracens"
+        },
+        {
+          "profile_id": 198035,
+          "name": "Oni.DauT",
+          "is_self": true,
+          "civilization": "Danes"
+        }
+      ],
+      "analysis_status": "pending",
+      "analysis": null,
+      "attempts": 0,
+      "source_url": "https://www.aoe2insights.com/match/521113794/"
+    },
     {
       "id": 520792597,
       "started_at": 1794566803,
@@ -106197,8 +106258,7 @@
         }
       },
       "attempts": 1,
-      "source_url": "https://www.aoe2insights.com/match/520789671/",
-      "analysis_note": "명령 기록 분석 완료"
+      "source_url": "https://www.aoe2insights.com/match/520789671/"
     },
     {
       "id": 520787482,
