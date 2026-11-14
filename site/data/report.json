@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-14T08:46:47.135458+00:00",
-  "last_checked_at": "2026-11-14T08:44:37.557590+00:00",
+  "updated_at": "2026-11-14T09:36:17.407102+00:00",
+  "last_checked_at": "2026-11-14T09:32:36.494805+00:00",
   "sync_error": null,
   "profile": {
     "id": 26260702,
@@ -37,7 +37,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 21,
+        "analysis_revision": 22,
         "duration_game_seconds": 2511.57,
         "civilization": "Chinese",
         "random_civ": true,
@@ -41980,7 +41980,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 21,
+        "analysis_revision": 22,
         "duration_game_seconds": 2463.58,
         "civilization": "Britons",
         "random_civ": false,
@@ -78982,7 +78982,7 @@
             ],
             [
               410.0,
-              1048,
+              978,
               240,
               0,
               0,
@@ -78990,18 +78990,73 @@
               250,
               0,
               0
+            ],
+            [
+              420.0,
+              1068,
+              250,
+              0,
+              0,
+              887,
+              250,
+              0,
+              0
+            ],
+            [
+              430.0,
+              1090,
+              270,
+              0,
+              0,
+              937,
+              260,
+              0,
+              0
+            ],
+            [
+              440.0,
+              1177,
+              270,
+              0,
+              0,
+              947,
+              280,
+              0,
+              0
+            ],
+            [
+              450.0,
+              1239,
+              280,
+              0,
+              0,
+              1026,
+              280,
+              0,
+              0
+            ],
+            [
+              460.0,
+              1239,
+              300,
+              0,
+              0,
+              1036,
+              300,
+              0,
+              0
             ]
           ],
-          "verified_until_seconds": 418.3,
+          "verified_until_seconds": 469.8,
           "own_total": [
-            1068,
-            240,
+            1369,
+            300,
             0,
             0
           ],
           "opponent_total": [
-            887,
-            250,
+            1036,
+            310,
             0,
             0
           ],
@@ -79870,9 +79925,9 @@
               ],
               [
                 410.0,
-                607,
+                605,
                 252,
-                189,
+                121,
                 0,
                 0,
                 0,
@@ -79888,11 +79943,116 @@
                 0,
                 0,
                 0
+              ],
+              [
+                420.0,
+                627,
+                252,
+                189,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                357,
+                531,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                430.0,
+                647,
+                252,
+                191,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                407,
+                531,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                440.0,
+                689,
+                252,
+                236,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                417,
+                531,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                450.0,
+                701,
+                252,
+                236,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                476,
+                531,
+                0,
+                20,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                460.0,
+                701,
+                252,
+                236,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                476,
+                531,
+                0,
+                30,
+                0,
+                0,
+                0,
+                0,
+                0
               ]
             ]
           },
           "animals": {
-            "until_seconds": 410.0,
+            "until_seconds": 460.0,
             "own": [
               {
                 "id": 9759,
@@ -79946,9 +80106,9 @@
               {
                 "id": 9761,
                 "kind": "sheep",
-                "eaten": 71.8,
+                "eaten": 83.9,
                 "first_seconds": 350.0,
-                "last_seconds": 410.0
+                "last_seconds": 440.0
               },
               {
                 "id": 9988,
@@ -79958,11 +80118,18 @@
                 "last_seconds": 400.0
               },
               {
+                "id": 9768,
+                "kind": "sheep",
+                "eaten": 82.1,
+                "first_seconds": 420.0,
+                "last_seconds": 450.0
+              },
+              {
                 "id": 9908,
                 "kind": "deer",
-                "eaten": 67.6,
-                "first_seconds": 410.0,
-                "last_seconds": 410.0
+                "eaten": 114.2,
+                "first_seconds": 420.0,
+                "last_seconds": 440.0
               }
             ],
             "opponent": [
@@ -80011,9 +80178,16 @@
               {
                 "id": 9773,
                 "kind": "sheep",
-                "eaten": 20.0,
+                "eaten": 81.7,
                 "first_seconds": 400.0,
-                "last_seconds": 400.0
+                "last_seconds": 450.0
+              },
+              {
+                "id": 9766,
+                "kind": "sheep",
+                "eaten": 87.3,
+                "first_seconds": 420.0,
+                "last_seconds": 450.0
               }
             ]
           }
@@ -80466,7 +80640,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 21,
+        "analysis_revision": 22,
         "duration_game_seconds": 2518.89,
         "civilization": "Franks",
         "random_civ": false,
@@ -128104,7 +128278,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 21,
+        "analysis_revision": 22,
         "duration_game_seconds": 1201.99,
         "civilization": "Britons",
         "random_civ": false,
@@ -154894,7 +155068,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 21,
+        "analysis_revision": 22,
         "duration_game_seconds": 1471.54,
         "civilization": "Franks",
         "random_civ": false,
