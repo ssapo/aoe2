@@ -2555,7 +2555,7 @@ index d9156f6d..fd81e8ea 100644
          let near =
              !within && !below_or_unordered(radius * self.model.tuning.group.slot_reach, gap.get());
 diff --git a/crates/engine/genie-core/src/groups/steer/to_slots.rs b/crates/engine/genie-core/src/groups/steer/to_slots.rs
-index 999d44b5..e3c81c3b 100644
+index 999d44b5..1edf79c0 100644
 --- a/crates/engine/genie-core/src/groups/steer/to_slots.rs
 +++ b/crates/engine/genie-core/src/groups/steer/to_slots.rs
 @@ -61,6 +61,9 @@ impl World {
@@ -2568,7 +2568,63 @@ index 999d44b5..e3c81c3b 100644
          let mut i = 0;
          loop {
              let g = self.groups.held(group)?;
-@@ -131,6 +134,146 @@ impl World {
+@@ -90,14 +93,47 @@ impl World {
+                     .checked(slot)?
+                     .transform_position;
+                 let members: Vec<ObjectId> = g.members.iter().map(|m| m.id).collect();
+-                let from = u.moved_vector(self.parts.mover_of(u.id));
+-                let clear = self.line_clear(
+-                    m.id,
+-                    from,
+-                    to,
+-                    Distance::new(self.model.tuning.group.clearance),
+-                    &members,
+-                )?;
++                // EXPERIMENT (GENIE_EXPERIMENT_FRONTPATH_188329, findings 75; 188329
++                // `0x110b51b`..`0x110b6e6` in `0x1109d70`): the line starts at the unit's place
++                // (vtable slot 0x568 = `+0x3bc`, `0x113c480`), not where it last moved to, and a
++                // slot within the master's radius + 0.01 (`[0x32063d4]`) of a map edge counts as
++                // blocked (strict `<` on each side and axis).
++                let frontpath = std::env::var_os("GENIE_EXPERIMENT_FRONTPATH_188329").is_some();
++                let from = if frontpath {
++                    u.position().vector()
++                } else {
++                    u.moved_vector(self.parts.mover_of(u.id))
++                };
++                let edge = frontpath
++                    && self.parts.mover_of(u.id).is_some_and(|mv| {
++                        let map = self.spatial.map;
++                        let (rx, ry) = (mv.stats.radius.x() + 0.01, mv.stats.radius.y() + 0.01);
++                        to.x() < rx
++                            || map.width() as f32 - rx < to.x()
++                            || to.y() < ry
++                            || map.height() as f32 - ry < to.y()
++                    });
++                let clear = !edge
++                    && self.line_clear(
++                        m.id,
++                        from,
++                        to,
++                        Distance::new(self.model.tuning.group.clearance),
++                        &members,
++                    )?;
++                if crate::groups::trace_forming() {
++                    eprintln!(
++                        "FORMING_OWNEND ms={} id={} from=({}, {}) to=({}, {}) edge={} clear={}",
++                        self.world_time.millis(),
++                        m.id.get(),
++                        from.x(),
++                        from.y(),
++                        to.x(),
++                        to.y(),
++                        edge,
++                        clear
++                    );
++                }
+                 let dt = self.dt_seconds;
+                 let g = self.groups.held_mut(group)?;
+                 let own = &mut g.members.checked_mut(index)?.specific_move;
+@@ -131,6 +167,146 @@ impl World {
          Ok(())
      }
  
@@ -2715,6 +2771,29 @@ index 999d44b5..e3c81c3b 100644
      /// A member in no slot (`0x14103ef2e`): it stops (slot 0x5d0) when its action list holds no
      /// `MoveTo` (slot 0x538 with 1), its top action is not in state 4, 5 or 11 (slot 0x2b0) and
      /// it moves (slot 0x5c8).
+@@ -213,6 +389,22 @@ impl World {
+             Some(mask),
+             &ignore,
+         )?;
++        if crate::groups::trace_forming() && !hits.is_empty() {
++            eprintln!(
++                "FORMING_LINEHITS ms={} id={} grow={} hits={:?}",
++                self.world_time.millis(),
++                id.get(),
++                (grow * radius).get(),
++                hits
++            );
++            let boxes: Vec<String> = self
++                .spatial
++                .records()
++                .filter(|(i, _, _)| hits.iter().any(|h| format!("{h:?}").contains(&format!("({})", i.get()))))
++                .map(|(i, k, r)| format!("{}:{k:?}:{r:?}", i.get()))
++                .collect();
++            eprintln!("FORMING_LINEBOXES {boxes:?}");
++        }
+         Ok(hits.is_empty())
+     }
+ 
 diff --git a/crates/engine/genie-core/src/groups/update/awake.rs b/crates/engine/genie-core/src/groups/update/awake.rs
 index 4ce9b2f7..c0872e13 100644
 --- a/crates/engine/genie-core/src/groups/update/awake.rs
