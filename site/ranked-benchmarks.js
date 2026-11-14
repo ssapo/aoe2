@@ -39,9 +39,11 @@
   /* Maps that play alike. Used only when the same map has too few reference games; a map in no group gets no fallback.
      Arabia and Arabian Desert stay separate names (no evidence they are one map) but are both open land maps. */
   const MAP_GROUPS=[
-    {id:'open',maps:['Arabia','Arabian Desert','Atacama']},
-    {id:'closed',maps:['Arena','Hideout','Enclosed','Fortress']},
+    // 열린 맵: 벽 없이 시작하는 육지 맵. 닫힌 맵: 벽이나 숲으로 막혀 시작하는 맵. 물·유목·무작위·대회용 맵은 넣지 않는다.
+    {id:'open',label:'열린 맵',maps:['Arabia','Arabian Desert','Atacama','Socotra','Steppe','Serengeti','Valley','valley.rms2','Acropolis','acropolis.rms2','Kilimanjaro','Runestones','Ghost Lake','Ghost_Lake','Golden Pit','goldenpit.rms2','Gold Rush','Land Madness','Lombardia','Mongolia']},
+    {id:'closed',label:'닫힌 맵',maps:['Arena','Hideout','Enclosed','Fortress','Black Forest','Amazon Tunnel','Fortified Clearing','Michi']},
   ];
+  const kindLabel=maps=>(MAP_GROUPS.find(g=>(maps||[]).some(m=>g.maps.includes(m)))||{label:'비슷한 맵'}).label;
   const MIN_MATCHES=5,MIN_PLAYERS=2;
   const groupOf=map=>MAP_GROUPS.find(g=>g.maps.includes(map))||null;
   /* {reference, shortage}: the same map first (same civilization, then mixed), then the map's group the same way.
@@ -81,13 +83,13 @@
   function basis(reference){
     if(!reference||!finite(reference.matches))return '';
     if(reference.tier==='map')return `같은 맵 ${reference.matches}경기`;
-    if(reference.tier==='group')return `비슷한 맵(${(reference.maps||[]).join('·')}) ${reference.matches}경기`;
+    if(reference.tier==='group')return `${kindLabel(reference.maps)}(${(reference.maps||[]).join('·')}) ${reference.matches}경기`;
     return '';
   }
   function shortageText(result){
     const s=result?.shortage;
     if(!s||['resources','ages','villagers'].some(k=>result[k]?.length))return '';
-    return `이 맵은 ${result.minRating||2000}점 이상 기준 경기가 부족해요(같은 맵 ${s.same}경기, ${s.group===null?'비슷한 맵 묶음 없음':`비슷한 맵 ${s.group}경기`}; ${MIN_MATCHES}경기·${MIN_PLAYERS}명 이상 필요)`;
+    return `이 맵은 ${result.minRating||2000}점 이상 기준 경기가 부족해요(같은 맵 ${s.same}경기, ${s.group===null?'열린 맵·닫힌 맵 어느 쪽에도 안 넣은 맵':`같은 종류 맵 ${s.group}경기`}; ${MIN_MATCHES}경기·${MIN_PLAYERS}명 이상 필요)`;
   }
   function compare(match,profileId,source,state){
     const a=match?.analysis,m=a?.metrics,own=a?.review?.own;
@@ -137,10 +139,10 @@
     const basisNote=rows=>{
       const used=rows.filter(r=>basis(r.reference));
       if(!used.length)return '';
-      const where=r=>r.reference.tier==='group'?`비슷한 맵(${(r.reference.maps||[]).join('·')})`:'같은 맵';
+      const where=r=>r.reference.tier==='group'?`${kindLabel(r.reference.maps)}(${(r.reference.maps||[]).join('·')})`:'같은 맵';
       const places=[...new Set(used.map(where))],counts=used.map(r=>r.reference.matches),low=Math.min(...counts),high=Math.max(...counts);
       const text=places.length===1?`기준: ${result.minRating}점 이상 · ${places[0]} ${low===high?low:`${low}~${high}`}경기`:`기준(${result.minRating}점 이상) — ${used.map(r=>`${r.label}: ${basis(r.reference)}`).join(' / ')}`;
-      return `<p class="ranked-basis">${esc(text)}${used.some(r=>r.reference.tier==='group')?' <span>같은 맵 기준 경기가 부족해서 비슷한 맵으로 비교했어요.</span>':''}</p>`;
+      return `<p class="ranked-basis">${esc(text)}${used.some(r=>r.reference.tier==='group')?' <span>같은 맵 기준 경기가 부족해서 같은 종류(열린 맵/닫힌 맵)끼리 비교했어요.</span>':''}</p>`;
     };
     const table=(rows,time)=>`<div class="table-scroll"><table class="timeline comparison ranked-table"><thead><tr><th>항목</th><th>나</th><th>${result.minRating}+</th><th>차이</th></tr></thead><tbody>${rows.map(r=>row(r,time)).join('')}</tbody></table></div>${basisNote(rows)}`;
     const age=result.ages.find(r=>r.age==='성주')||result.ages[0],villager=result.villagers.find(r=>r.at===900)||result.villagers[0];
@@ -151,6 +153,6 @@
     const details=compact?(quick?`<div class="ranked-quick">${quick}</div>`:''):[['ages','시대업',true],['villagers','시간대별 주민',false],['resources','시간대별 자원',false]].filter(([key])=>result[key].length).map(([key,title,time])=>`<details class="ranked-details"><summary>${title} 비교</summary>${table(result[key],time)}</details>`).join('');
     return `<section class="ranked-benchmarks"><div class="panel-toolbar"><h3 class="detail-heading">내 자원 흐름</h3>${compact?'<button class="subtle" data-open-panel="numbers">자세히 →</button>':''}</div>${heroHtml}${details}${short?`<p class="ranked-basis ranked-shortage">${esc(short)}</p>`:''}</section>`;
   }
-  const api={select,choose,compare,render,stageAt,tcBand,basis,shortageText,groupOf,MAP_GROUPS};
+  const api={select,choose,compare,render,stageAt,tcBand,basis,shortageText,groupOf,kindLabel,MAP_GROUPS};
   if(typeof module==='object'&&module.exports)module.exports=api;else global.SSAPORankedBenchmarks=api;
 })(typeof window==='undefined'?globalThis:window);
