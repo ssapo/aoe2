@@ -403,6 +403,28 @@ index 12e38a35..73eb2561 100644
              pasture: None,
              my_pasture: None,
              group: GroupLink::default(),
+diff --git a/crates/engine/genie-core/src/construction/build/completion.rs b/crates/engine/genie-core/src/construction/build/completion.rs
+index f58c1e4d..9b6c51f9 100644
+--- a/crates/engine/genie-core/src/construction/build/completion.rs
++++ b/crates/engine/genie-core/src/construction/build/completion.rs
+@@ -16,7 +16,6 @@ use crate::objects::masters::ObjectFlags;
+ use crate::objects::masters::{BuildingMaster, Master};
+ use crate::objects::unit::UnitFlags;
+ use crate::players::PlayerId;
+-use crate::players::diplomacy::REVEAL_UNITS;
+ use crate::world::Seconds;
+ use crate::world::World;
+ use crate::world::layer::ClassRoles;
+@@ -51,9 +50,6 @@ impl World {
+     ///
+     /// What the completion does not model, and a building without its master or place.
+     pub(crate) fn complete_building(&mut self, id: ObjectId) -> Result<(), GenieError> {
+-        if self.attribute_204() {
+-            return Err(REVEAL_UNITS);
+-        }
+         let (p, u) = self.object(id).ok_or(NOT_HELD)?;
+         let master = u.master(self.master_tables(), p)?.clone();
+         let building = master.building.ok_or(GenieError::unsupported(
 diff --git a/crates/engine/genie-core/src/construction/build/states.rs b/crates/engine/genie-core/src/construction/build/states.rs
 index 76304cf8..e8c11eda 100644
 --- a/crates/engine/genie-core/src/construction/build/states.rs
@@ -426,8 +448,22 @@ index 76304cf8..e8c11eda 100644
          Ok(())
      }
  
+diff --git a/crates/engine/genie-core/src/construction/build/world_side.rs b/crates/engine/genie-core/src/construction/build/world_side.rs
+index e59bc443..40306643 100644
+--- a/crates/engine/genie-core/src/construction/build/world_side.rs
++++ b/crates/engine/genie-core/src/construction/build/world_side.rs
+@@ -258,6 +258,9 @@ impl World {
+             return Ok(BuildProgress::Ongoing);
+         }
+         self.set_state(q, at, ObjectState::Alive)?;
++        // 188329 0x1284670's end: after the set_state(2) the world's pass over the kinds the
++        // players' attribute 204 names (0x15fec80)
++        self.reveal_units()?;
+         Ok(BuildProgress::Ended)
+     }
+ 
 diff --git a/crates/engine/genie-core/src/construction/building_update.rs b/crates/engine/genie-core/src/construction/building_update.rs
-index d42efbec..87c7f139 100644
+index d42efbec..8ffe2a8c 100644
 --- a/crates/engine/genie-core/src/construction/building_update.rs
 +++ b/crates/engine/genie-core/src/construction/building_update.rs
 @@ -32,6 +32,7 @@ use crate::objects::sprite::new_sprite;
@@ -438,7 +474,18 @@ index d42efbec..87c7f139 100644
  use crate::unit_ai::HUMAN_ORDER_CAP;
  use crate::world::Millis;
  use crate::world::Seconds;
-@@ -307,7 +308,7 @@ impl Unit {
+@@ -298,6 +299,10 @@ impl Unit {
+         }
+         let (p, id) = (c.player, self.id);
+         c.lend((&mut *self, &mut *actions), |w| {
++            // 188329: this completion's pass over the revealed kinds (0x15fec80) was not read
++            if w.attribute_204() {
++                return Err(crate::players::diplomacy::REVEAL_UNITS);
++            }
+             w.set_state(p, id, ObjectState::Alive)
+         })
+     }
+@@ -307,7 +312,7 @@ impl Unit {
      /// none): `FUN_1411c39b0` (attribute 255 naming its master: a terrain
      /// effect around it, not modelled); then for each whole second since `last_garrison_time`
      /// (`+0xbe0`, which moves on by them): a monastery's (master 104) relics give their goods
@@ -447,7 +494,7 @@ index d42efbec..87c7f139 100644
      /// `raider_build_countdown` (`+0x9a0`) runs would be let out at its end (not modelled); the
      /// units inside (from the first) heal by the master's `garrison_heal_rate` below their
      /// master's hit points (slot 0x110, [`Unit::heal`]); with villagers inside, a damaged
-@@ -374,12 +375,19 @@ impl Unit {
+@@ -374,12 +379,19 @@ impl Unit {
          if self.damaged_lately.running() {
              self.damaged_lately = self.damaged_lately.tick();
          }
@@ -4832,6 +4879,147 @@ index 7277973c..778db9c6 100644
          out.append(chosen);
          Ok(result)
      }
+diff --git a/crates/engine/genie-core/src/players/diplomacy.rs b/crates/engine/genie-core/src/players/diplomacy.rs
+index 79d51f79..14281911 100644
+--- a/crates/engine/genie-core/src/players/diplomacy.rs
++++ b/crates/engine/genie-core/src/players/diplomacy.rs
+@@ -21,6 +21,7 @@ use crate::math::conversions::cvttss2si;
+ use crate::math::image::diplomacy::NO_POINT as DIPLOMACY_NO_POINT;
+ use crate::objects::ListIndex;
+ use crate::objects::ObjectId;
++use crate::objects::ObjectState;
+ use crate::objects::masters::MasterKind;
+ use crate::players::AllyTest;
+ use crate::players::PlayerId;
+@@ -43,6 +44,10 @@ pub(crate) const REVEAL_UNITS: GenieError =
+ /// The attribute naming the units a player reveals to the others (204, `+0x660`).
+ const REVEAL_UNIT: usize = 204;
+ 
++/// 188329: the master of the flare a player makes at a revealed object (697, `0x15fec80`).
++const REVEAL_FLARE: crate::objects::masters::MasterId =
++    crate::objects::masters::MasterId::named(697);
++
+ /// `FUN_141676b80`'s kind of player `q`'s objects for player `p` of relation `relation` toward
+ /// it: Gaia's 0, its own 1, relations 0 and 4 an ally's (2), 1 a neutral's (3), any other an
+ /// enemy's (4).
+@@ -374,14 +379,110 @@ impl World {
+     /// `FUN_14152bcb0`: outside the editor's screen (mode 4, which a playback is not) each
+     /// player with attribute 204 (`+0x660`, truncated, `CVTTSS2SI`) not 0 reveals its units of
+     /// that kind to the others: not modelled ([`REVEAL_UNITS`]); without one nothing happens.
+-    pub(crate) fn reveal_units(&self) -> Result<(), GenieError> {
+-        let reveals = self.players.iter().any(|q| {
+-            q.attributes
++    ///
++    /// 188329 (`0x15fec80`, read in ENG-12; the world's load, a diplomacy change and a builder's
++    /// completed building `0x1284670` call it): for each player `a` (Gaia too) whose attribute
++    /// 204 truncates to a kind `k` not 0, with `n = |k|` (`0xa82800`) and its sort
++    /// (`0x10baf30`: below 900 a master's id, 900 to 999 the class `n − 900`, 1000 and up a
++    /// master's id again), each other player `b` in the players' order: when both relation
++    /// bytes (`+0x180`) are 0 the marks of `b`'s objects for `a` go (`0x1247170`, `0x1247190`);
++    /// else each object of `b`'s list (`+0x30`) of that master id (`+0x18`) or class (`+0x38`)
++    /// which is no building or a building in state 2 with build points (`+0x900`) not 0, and
++    /// without `a`'s mark (`+0x2d8`, `0x12473d0`): with `k` above 0 player `a` makes an object
++    /// of master 697 at its place (slot 0x1c8 `0x16fd190`, as a hit's flare:
++    /// [`World::remains`], [`World::made_new_object`]); then the mark is set (`0x12476b0`).
++    /// Not modelled: `k` below 0 (the object's `+0x2dc` mark and its slot 0x1e8, and
++    /// `0x12420b0`), and a kind that names objects that are no buildings (the pass an object's
++    /// creation runs, `0x1247920`, which for a building starts as a foundation and so does
++    /// nothing).
++    pub(crate) fn reveal_units(&mut self) -> Result<(), GenieError> {
++        for a in 0..self.players.len() {
++            let k = self.players[a]
++                .attributes
+                 .get(REVEAL_UNIT)
+-                .is_some_and(|&v| cvttss2si(v.get()) != 0)
+-        });
+-        if reveals {
+-            return Err(REVEAL_UNITS);
++                .map_or(0, |&v| cvttss2si(v.get()));
++            if k == 0 {
++                continue;
++            }
++            if k < 0 {
++                return Err(REVEAL_UNITS);
++            }
++            let n = k;
++            let (by_class, wanted) = if (900..1000).contains(&n) {
++                (true, n - 900)
++            } else {
++                (false, n)
++            };
++            let Ok(a_id) = u8::try_from(a) else {
++                return Err(REVEAL_UNITS);
++            };
++            let a_id = PlayerId::new(a_id);
++            let bit = 1u32 << (a & 31);
++            for b in 0..self.players.len() {
++                if a == b {
++                    continue;
++                }
++                let Ok(b_id) = u8::try_from(b) else {
++                    return Err(REVEAL_UNITS);
++                };
++                let b_id = PlayerId::new(b_id);
++                let ab = self.players[a].relations.get(b_id).map_or(0, |r| r.get());
++                let ba = self.players[b].relations.get(a_id).map_or(0, |r| r.get());
++                if ab == 0 && ba == 0 {
++                    let ids: Vec<ObjectId> = self.players[b].objects.iter().map(|u| u.id).collect();
++                    for id in ids {
++                        if let Some(m) = self.reveal_marks.get_mut(&id) {
++                            *m &= !bit;
++                            if *m == 0 {
++                                let _ = self.reveal_marks.remove(&id);
++                            }
++                        }
++                    }
++                    continue;
++                }
++                let mut found = Vec::new();
++                for u in self.players[b].objects.iter() {
++                    let m = u.master(self.master_tables(), b_id)?;
++                    let named = if by_class {
++                        i32::from(m.class.get()) == wanted
++                    } else {
++                        m.id.index() == usize::try_from(wanted).unwrap_or(usize::MAX)
++                    };
++                    if !named {
++                        continue;
++                    }
++                    if m.kind != MasterKind::BUILDING {
++                        return Err(GenieError::unsupported(
++                            "a player's attribute 204 naming objects that are no buildings (0x1247920)",
++                        ));
++                    }
++                    let built = self
++                        .parts
++                        .building_of(u.id)
++                        .construction
++                        .as_ref()
++                        .is_none_or(|c| c.progress.get() != 0.0);
++                    if !built || u.life.state != ObjectState::Alive {
++                        continue;
++                    }
++                    if self.reveal_marks.get(&u.id).is_some_and(|m| m & bit != 0) {
++                        continue;
++                    }
++                    found.push(u.id);
++                }
++                for id in found {
++                    let at = self
++                        .spatial
++                        .get(id)
++                        .map(|p| p.position)
++                        .ok_or(GenieError::unsupported(
++                            "a revealed object without a place (attribute 204)",
++                        ))?;
++                    self.remains(a_id, REVEAL_FLARE, at, None)?;
++                    self.made_new_object(a_id)?;
++                    *self.reveal_marks.entry(id).or_insert(0) |= bit;
++                }
++            }
+         }
+         Ok(())
+     }
 diff --git a/crates/engine/genie-core/src/players/game_status/stops.rs b/crates/engine/genie-core/src/players/game_status/stops.rs
 index f0e3108e..d471880a 100644
 --- a/crates/engine/genie-core/src/players/game_status/stops.rs
@@ -7080,6 +7268,32 @@ index 8c22fa57..15f31bd7 100644
          let i = place.slot();
          let out = list.out_at(i);
          let gone = list.swap_remove(i)?;
+diff --git a/crates/engine/genie-core/src/world/mod.rs b/crates/engine/genie-core/src/world/mod.rs
+index be560628..1917696a 100644
+--- a/crates/engine/genie-core/src/world/mod.rs
++++ b/crates/engine/genie-core/src/world/mod.rs
+@@ -305,6 +305,9 @@ pub struct World {
+     /// cheat (GAME 4), 0 without; while it is not 0 every work is done at once, which the work
+     /// actions do not model (they take it as 0).
+     pub instant_work: i32,
++    /// 188329: each object's marks of the players that made their flare at it (`+0x2d8`, a bit
++    /// per player, `0x15fec80`; [`World::reveal_units`]). An object without marks has no entry.
++    pub reveal_marks: std::collections::BTreeMap<ObjectId, u32>,
+ }
+ 
+ /// The objects of recyclable masters (`+0x680`, the `.dat`'s `recyclable`): a new one takes the
+diff --git a/crates/engine/genie-core/src/world/setup.rs b/crates/engine/genie-core/src/world/setup.rs
+index 9912d9e7..a645c607 100644
+--- a/crates/engine/genie-core/src/world/setup.rs
++++ b/crates/engine/genie-core/src/world/setup.rs
+@@ -87,6 +87,7 @@ impl World {
+             alliance_locked: 0,
+             teams: [Team::ALONE; 8],
+             instant_work: 0,
++            reveal_marks: std::collections::BTreeMap::new(),
+         }
+     }
+ }
 diff --git a/crates/engine/genie-core/src/world/world_update.rs b/crates/engine/genie-core/src/world/world_update.rs
 index f127e410..c81b0510 100644
 --- a/crates/engine/genie-core/src/world/world_update.rs
