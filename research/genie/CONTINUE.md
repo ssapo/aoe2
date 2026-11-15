@@ -487,6 +487,8 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 13.4 지금 하던 일 (멈출 때마다 이 절을 덮어쓴다)
 
+**2026-11-15, 사용자 결정: `GENIE_EXPERIMENT_IDLEGROUP_188329`(76번, 묶음 이동을 마친 멤버의 대기 검사)를 기본으로 켠다.** 원본과 맞는 수정이라 다음 어긋남을 바르게 쫓으려고 넣는다; 517426097 사이트 구간 13:28.9 → 13:22.4로 짧아지는 것은 감수(808.857초 P1 단어 1). `runs\M6_envs.txt`와 main `engine/switches.env`에 더함, engine-check 57 / 54 그대로, main 분석 개정 24. 아래 ENG-14 기록의 "기본 끔"은 이 결정 전의 말이다.
+
 **2026-11-15 새벽, Claude (세션 S14 = ONBOARDING `ENG-14`, 517426097 795.9초 정찰병 자동 공격 시작). 결론: 반쯤 하던 일 없음. 공격 시점은 거리 경계(6.25)가 아니라 "할 일 없음" 검사의 박자에서 정해졌다. 원본(0xd42a00 → 0x10dd760)은 묶음 이동을 마친 멤버가 자기 진형 칸에 "도착(상태 3)"한 뒤에야 대기 검사를 시작하고, 엔진은 유닛이 안 움직이면 바로 시작한다(findings 76). 새 스위치 `GENIE_EXPERIMENT_IDLEGROUP_188329`(**기본 끔**)에 넣었다: 켜면 4007의 공격이 60,647에 시작하고(기록과 같음) 4007 위치가 794.570초까지 비트 일치, 리플의 가장 이른 위치 차이 791.554 → 793.777초(P1 3997·4022). 다른 열 리플과 동물 판 셋은 바이트 그대로, 13.3 규칙으로 앞당겨진 선수 없음(518239882 57 / 54). 그러나 517426097의 사이트 확인 구간이 13:28.9 → 13:22.4로 짧아져 기본에 넣지 않았다(사용자 결정 거리: 넣으면 `M6_envs.txt`와 main `engine/switches.env`에 한 줄, engine-check 57 / 54 그대로). 연구 브랜치에 푸시함(새 규칙).**
 
 - 엔진 소스 `genie`: 빌드됨, 저장소 패치와 같음(PC 사본 `runs\S14.patch`, 만들기 `runs\M6_mkpatch.ps1 -Name runs\S14` 뒤 `python3 runs/M3_striplf.py runs/S14`). `runs\census_base.exe` = `runs\census_S14b.exe`(스위치를 끈 출력은 `A1off_*`/기본과 같다; 열한 리플 `S14off_*`). 원본 디컴파일: 병사 대기 검사 0xcfea00·공격 slot 0xcf5300은 클라우드 `re/out_S14/a.c`, 찾기 slot 0x50 0xd3fdd0은 `re/out_S14/b.c`, 0xd1ec40은 `re/out_s1/s3.c`, 0x10dd760은 디스어셈블(`dz.py 10dd760 10dd865`).
