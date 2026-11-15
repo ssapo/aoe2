@@ -45,6 +45,7 @@ ssapo의 **AoE2: DE 1v1 경기 복기 웹앱**. 기본 계정 외에 이름 검�
 - 이미 수집된 프로필은 바로 표시. 자료가 없으면 빈 프로필과 수집 안내 표시. 저장소 실행 권한이 있는 사용자가 Actions → Run workflow → `profile_id`에 **게임 서버 ID**를 입력하면 목록·리플 분석을 생성한다. 공개 방문자에게 Actions 실행 권한이 생기는 것은 아니다.
 - **바로가기 선수 명단**: `config.json`의 `featured_profiles`(`{"id": 서버 프로필 ID, "name": 버튼 이름}` 목록)에서 읽는다. 현재 Hera 199325, Liereyy 506898. 여기에 줄을 더하거나 빼면 자동 수집 대상과 사이트 바로가기 버튼이 함께 바뀐다. 수집기가 `site/data/featured.json`을 쓰고 사이트가 그 파일로 버튼을 만든다(버튼 툴팁은 최근 수집된 닉네임). ID는 닉네임이 바뀌어도 그대로다.
 - `scripts/collect_profiles.py`: 예약·일반 push에서는 ssapo 최대 5개 + Hera 최대 2개 분석 시도. 수동 `REQUESTED_PROFILE_ID`가 있으면 별도 프로필 최대 5개 추가. 잘못된 입력은 subprocess를 시작하기 전에 거절한다. 입력을 shell 코드에 삽입하지 않는다.
+- **2026-11-15 갱신(사용자 요청: 랭킹 1~14위 전부)**: `featured_profiles`를 14명으로 늘렸다(Lucho 9423131, ACCM 347269, Liereyy 506898, Lewis 8793414, MbL 251265, Sitaux 212721, Hera 199325, Sebastian 2783660, Blve 16847348, Nicov 208393, Yo 197964, dogao 199170, Sora Kuma 209118, Ciskhan 1136191; ID는 `site/data/players.json`의 이름·레이팅·순위로 확인). 실행 시간이 30분 한도를 넘지 않도록 **경기 목록은 매번 14명 모두 새로 받고, 리플 분석(엔진 포함)은 30분 슬롯마다 4명씩 돌아가며 최대 2경기씩** 한다(`collect_profiles.analysed_now`, 나머지는 `--limit 0`). 순환 벤치마크 선수가 이번 차례가 아니면 그 선수만 1경기 분석한다.
 - 수동 추가 프로필은 현재 실행에서 갱신되며 지속 자동 수집 대상으로 등록되지는 않는다. 계속 갱신하려면 다시 수동 실행하거나 명시적인 수집 정책을 구현해야 한다.
 - `.github/workflows/update.yml`은 `site/data/` 전체를 커밋한다. 검색 명단 단계는 실패해도 기존 자료를 유지하고 배포를 계속한다.
 - 새 파일: `scripts/player_index.py`, `scripts/collect_profiles.py`, `site/player-search.js`, `tests/test_profiles.py`, `tests/test_player_search.cjs`.

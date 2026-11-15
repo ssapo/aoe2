@@ -15,7 +15,7 @@ class ProfileTests(unittest.TestCase):
         self.assertEqual(len(targets('26260702')),1+len(FEATURED))
 
     def test_featured_list_comes_from_config_and_follows_nickname(self):
-        self.assertEqual(FEATURED[:2],(199325,506898))
+        self.assertTrue({199325,506898} <= set(FEATURED))
         with tempfile.TemporaryDirectory() as d:
             d=Path(d);cfg=d/'config.json'
             cfg.write_text(json.dumps({'featured_profiles':[{'id':7,'name':'A'},8,{'id':26260702},{'id':'x'},{'id':7,'name':'dup'}]}),encoding='utf-8')
@@ -25,6 +25,21 @@ class ProfileTests(unittest.TestCase):
             self.assertEqual(rows,[{'id':7,'name':'A','nickname':''},{'id':8,'name':'New Nick','nickname':'New Nick'}])
             self.assertEqual(json.loads((d/'featured.json').read_text(encoding='utf-8'))['profiles'],rows)
             self.assertEqual(featured_profiles(d/'missing.json'),{})
+
+    def test_featured_players_take_turns_for_analysis_but_all_are_listed(self):
+        from collect_profiles import analysed_now
+        from datetime import datetime,timezone
+        ids=list(range(1,15))
+        seen=set()
+        for k in range(4):
+            now=datetime.fromtimestamp(1800*k,timezone.utc);turn=analysed_now(ids,now,4)
+            self.assertEqual(len(turn),4);seen|=turn
+        self.assertEqual(seen,set(ids))
+        self.assertEqual(analysed_now([1,2],None,4),{1,2})
+        jobs=targets('',now=datetime.fromtimestamp(0,timezone.utc))
+        self.assertEqual(len(jobs),1+len(FEATURED))
+        self.assertEqual(sum(1 for _,_,l in jobs[1:] if l==2),min(4,len(FEATURED)))
+        self.assertTrue(all(l in (0,2) for _,_,l in jobs[1:]))
 
     def test_invalid_request_does_not_start_collection(self):
         with self.assertRaises(ValueError):targets('123; echo unsafe')

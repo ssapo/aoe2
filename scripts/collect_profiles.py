@@ -38,15 +38,32 @@ def benchmark_target(now=None):
     pid=BENCHMARK_PROFILES[int(now.timestamp()//1800)%len(BENCHMARK_PROFILES)]
     return pid,ROOT/f'site/data/profiles/{pid}/report.json',1
 
-def targets(request=''):
+ANALYSED_PER_RUN=4  # featured players whose replays are analysed in one run; the others are only listed
+
+def analysed_now(featured=FEATURED,now=None,per_run=ANALYSED_PER_RUN):
+    """Featured players that get replay analysis in this run, in turn by 30-minute slot.
+
+    Every featured player's match list is refreshed each run; analysis (the slow part, engine included)
+    goes to `per_run` of them at a time so a run stays well inside the workflow time limit."""
+    featured=list(featured)
+    if len(featured)<=per_run:return set(featured)
+    now=now or datetime.now(timezone.utc)
+    start=(int(now.timestamp()//1800)*per_run)%len(featured)
+    return {featured[(start+i)%len(featured)] for i in range(per_run)}
+
+def targets(request='',now=None):
     requested=profile_id(request) if request.strip() else None
-    return [(DEFAULT_PROFILE,ROOT/'site/data/report.json',5)]+[(pid,ROOT/f'site/data/profiles/{pid}/report.json',5 if pid==requested else 2) for pid in dict.fromkeys([*FEATURED,*([requested] if requested and requested!=DEFAULT_PROFILE else [])])]
+    turn=analysed_now(now=now)
+    def limit(pid):return 5 if pid==requested else 2 if pid in turn else 0
+    return [(DEFAULT_PROFILE,ROOT/'site/data/report.json',5)]+[(pid,ROOT/f'site/data/profiles/{pid}/report.json',limit(pid)) for pid in dict.fromkeys([*FEATURED,*([requested] if requested and requested!=DEFAULT_PROFILE else [])])]
 
 def main():
     jobs=targets(os.environ.get('REQUESTED_PROFILE_ID',''));failed=[]
     required={job[0] for job in jobs}
     extra=benchmark_target()
-    if extra[0] not in {job[0] for job in jobs}:jobs.append(extra)
+    listed={job[0]:i for i,job in enumerate(jobs)}
+    if extra[0] not in listed:jobs.append(extra)
+    elif jobs[listed[extra[0]]][2]==0:jobs[listed[extra[0]]]=(extra[0],jobs[listed[extra[0]]][1],1)
     for pid,path,limit in jobs:
         result=subprocess.run([sys.executable,str(ROOT/'scripts/collect.py'),'--profile-id',str(pid),'--output',str(path),'--limit',str(limit)])
         if result.returncode:
