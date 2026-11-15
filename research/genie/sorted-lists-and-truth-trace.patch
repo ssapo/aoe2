@@ -5214,6 +5214,36 @@ index 72090fb3..3f1a775d 100644
                      filter: None,
                      source: OrderSource::Queued,
                  },
+diff --git a/crates/engine/genie-core/src/orders/work.rs b/crates/engine/genie-core/src/orders/work.rs
+index 9e2d36cf..4879a68c 100644
+--- a/crates/engine/genie-core/src/orders/work.rs
++++ b/crates/engine/genie-core/src/orders/work.rs
+@@ -500,7 +500,11 @@ impl World {
+                 let target = target.ok_or(TERRAIN_TASK)?;
+                 self.start_object_task(player, idx, (target, point), task, notifies)
+             }
+-            _ => Err(UNMODELLED_FACTORY),
++            kind => {
++                // diagnostic: the task the factory does not model (findings 97)
++                eprintln!("UNMODELLED_TASK kind={:#x} task={:?}", kind.get(), task.id);
++                Err(UNMODELLED_FACTORY)
++            }
+         }
+     }
+ 
+@@ -537,7 +541,11 @@ impl World {
+             ActionKind::BUILD => self.start_build(player, idx, target, task, point, notifies),
+             REPAIR => self.start_repair(player, idx, target, task, point, notifies),
+             GATHER => self.start_gather(player, idx, target, task, Some((point, notifies))),
+-            _ => Err(UNMODELLED_FACTORY),
++            kind => {
++                // diagnostic: the task the factory does not model (findings 97)
++                eprintln!("UNMODELLED_TASK kind={:#x} task={:?}", kind.get(), task.id);
++                Err(UNMODELLED_FACTORY)
++            }
+         }
+     }
+ 
 diff --git a/crates/engine/genie-core/src/pathing/long_path/cost.rs b/crates/engine/genie-core/src/pathing/long_path/cost.rs
 index bce9f3c0..9b7ea512 100644
 --- a/crates/engine/genie-core/src/pathing/long_path/cost.rs
