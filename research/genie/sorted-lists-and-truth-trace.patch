@@ -469,7 +469,7 @@ index e59bc443..40306643 100644
      }
  
 diff --git a/crates/engine/genie-core/src/construction/building_update.rs b/crates/engine/genie-core/src/construction/building_update.rs
-index d42efbec..8ffe2a8c 100644
+index d42efbec..8b973922 100644
 --- a/crates/engine/genie-core/src/construction/building_update.rs
 +++ b/crates/engine/genie-core/src/construction/building_update.rs
 @@ -32,6 +32,7 @@ use crate::objects::sprite::new_sprite;
@@ -484,10 +484,10 @@ index d42efbec..8ffe2a8c 100644
          }
          let (p, id) = (c.player, self.id);
          c.lend((&mut *self, &mut *actions), |w| {
-+            // 188329: this completion's pass over the revealed kinds (0x15fec80) was not read
-+            if w.attribute_204() {
-+                return Err(crate::players::diplomacy::REVEAL_UNITS);
-+            }
++            // 188329 (findings 99): the update's state-0 completion (0x1280d30 -> 0x1282297:
++            // build points +0x900 at least the build time and no annex +0x868) is the building's
++            // slot 0xa8 (0x12940c0) alone; the pass over the revealed kinds (0x15fec80) is the
++            // builder's work's (0x1284670), which this completion does not reach
              w.set_state(p, id, ObjectState::Alive)
          })
      }
@@ -4609,6 +4609,76 @@ index 54c082c7..13031ea9 100644
                  }
              }
              LinkedPathKind::AsksAgain => {
+diff --git a/crates/engine/genie-core/src/objects/actions.rs b/crates/engine/genie-core/src/objects/actions.rs
+index 118ae20f..68e610d5 100644
+--- a/crates/engine/genie-core/src/objects/actions.rs
++++ b/crates/engine/genie-core/src/objects/actions.rs
+@@ -39,6 +39,7 @@ use crate::objects::ActionState;
+ use crate::objects::ObjectId;
+ use crate::objects::RoleId;
+ use crate::objects::masters::ActionKind;
++use crate::objects::relic_pickup::{RELIC_PICKUP, RelicPickupAction};
+ use crate::ownership::artifact::ARTIFACT_KIND;
+ use crate::ownership::artifact::Artifact;
+ use genie_diff::Diff;
+@@ -135,6 +136,9 @@ action_kinds! {
+     /// A villager's wait for a foundation ([`crate::construction::wait_solidify`]).
+     WaitSolidify(WaitSolidify) => wait_solidify, wait_solidify_mut, take_wait_solidify,
+         set_wait_solidify, with_wait_solidify;
++    /// A monk's relic pick-up ([`crate::objects::relic_pickup`]).
++    RelicPickup(RelicPickupAction) => relic_pickup, relic_pickup_mut, take_relic_pickup,
++        set_relic_pickup, with_relic_pickup;
+ }
+ 
+ impl Action {
+@@ -156,6 +160,7 @@ impl Action {
+             Self::Missile(_) => MISSILE,
+             Self::Make(_) => MAKE,
+             Self::WaitSolidify(_) => WAIT_SOLIDIFY,
++            Self::RelicPickup(_) => RELIC_PICKUP,
+         }
+     }
+ 
+@@ -177,6 +182,7 @@ impl Action {
+             Self::Missile(a) => a.state.get(),
+             Self::Make(a) => a.state.get(),
+             Self::WaitSolidify(a) => a.state.get(),
++            Self::RelicPickup(a) => a.state.get(),
+         })
+     }
+ }
+@@ -197,6 +203,7 @@ impl Action {
+             Self::Attack(a) => a.target.map(RoleId::id),
+             Self::Enter(a) => a.target.map(RoleId::id),
+             Self::Missile(a) => a.target.map(RoleId::id),
++            Self::RelicPickup(a) => a.target,
+             Self::Fly(_)
+             | Self::Explore(_)
+             | Self::Transport(_)
+diff --git a/crates/engine/genie-core/src/objects/layers/action.rs b/crates/engine/genie-core/src/objects/layers/action.rs
+index 8555387e..0cffc6a2 100644
+--- a/crates/engine/genie-core/src/objects/layers/action.rs
++++ b/crates/engine/genie-core/src/objects/layers/action.rs
+@@ -125,6 +125,7 @@ impl Action {
+             actions::Action::Explore(e) => walking(e.state.move_to().map(|m| m.state)),
+             actions::Action::Enter(e) => walking(e.state.move_to().map(|m| m.state)),
+             actions::Action::Transport(t) => walking(t.state.move_to().map(|m| m.state)),
++            actions::Action::RelicPickup(r) => walking(r.state.move_to().map(|m| m.state)),
+             actions::Action::MoveTo(_)
+             | actions::Action::Missile(_)
+             | actions::Action::Make(_)
+diff --git a/crates/engine/genie-core/src/objects/mod.rs b/crates/engine/genie-core/src/objects/mod.rs
+index 8e11f247..75a62846 100644
+--- a/crates/engine/genie-core/src/objects/mod.rs
++++ b/crates/engine/genie-core/src/objects/mod.rs
+@@ -22,6 +22,7 @@ pub mod object_list;
+ mod outcomes;
+ use genie_model::objects::regeneration;
+ pub(crate) mod release;
++pub mod relic_pickup;
+ mod relic_count;
+ mod relics;
+ mod role;
 diff --git a/crates/engine/genie-core/src/objects/object_list.rs b/crates/engine/genie-core/src/objects/object_list.rs
 index a4790a15..9dff401e 100644
 --- a/crates/engine/genie-core/src/objects/object_list.rs
@@ -4682,6 +4752,23 @@ index bd8b67b7..b04ae357 100644
          }
      }
  }
+diff --git a/crates/engine/genie-core/src/objects/teardown.rs b/crates/engine/genie-core/src/objects/teardown.rs
+index b22ddd84..4028024a 100644
+--- a/crates/engine/genie-core/src/objects/teardown.rs
++++ b/crates/engine/genie-core/src/objects/teardown.rs
+@@ -97,6 +97,12 @@ impl Action {
+                 torn.release(e.target.map(ContainerId::id));
+             }
+             Self::Transport(t) => stop_if_moving(motion, t.state.move_to().is_some())?,
++            // 0xbc3280: its sub-actions go, the base lets the target go; its notify (0x1fa
++            // with 0x277) the update posts as it deletes it
++            Self::RelicPickup(r) => {
++                stop_if_moving(motion, r.state.move_to().is_some())?;
++                torn.release(r.target);
++            }
+             Self::Build(b) => {
+                 if b.added
+                     && let Some(target) = b.target
 diff --git a/crates/engine/genie-core/src/objects/unit/mod.rs b/crates/engine/genie-core/src/objects/unit/mod.rs
 index e8e94a15..fbfa090c 100644
 --- a/crates/engine/genie-core/src/objects/unit/mod.rs
@@ -4750,10 +4837,18 @@ index cee0a80b..c1040a9b 100644
              path_made: m
                  .paths
 diff --git a/crates/engine/genie-core/src/objects/unit/update.rs b/crates/engine/genie-core/src/objects/unit/update.rs
-index d7751598..0b639f9e 100644
+index d7751598..6ee77878 100644
 --- a/crates/engine/genie-core/src/objects/unit/update.rs
 +++ b/crates/engine/genie-core/src/objects/unit/update.rs
-@@ -310,10 +310,15 @@ impl Unit {
+@@ -149,6 +149,7 @@ impl Unit {
+             Some(Action::Build(_)) => self.build_part(actions, c, me),
+             Some(Action::Repair(_)) => self.repair_part(actions, c, me, roles),
+             Some(Action::Enter(_)) => self.enter_part(actions, c, me, roles),
++            Some(Action::RelicPickup(_)) => self.relic_pickup_part(actions, c, me, roles),
+             Some(Action::Transport(_)) => self.transport_update(actions, c, me, roles),
+             Some(Action::WaitSolidify(_)) => Ok(actions.wait_solidify_part(
+                 OthersRef::of(&c.w.players, &c.w.index, c.player)?,
+@@ -310,10 +311,15 @@ impl Unit {
              if c.w.object(id).is_none() {
                  continue;
              }
@@ -5215,10 +5310,26 @@ index 72090fb3..3f1a775d 100644
                      source: OrderSource::Queued,
                  },
 diff --git a/crates/engine/genie-core/src/orders/work.rs b/crates/engine/genie-core/src/orders/work.rs
-index 9e2d36cf..4879a68c 100644
+index 9e2d36cf..588c47b6 100644
 --- a/crates/engine/genie-core/src/orders/work.rs
 +++ b/crates/engine/genie-core/src/orders/work.rs
-@@ -500,7 +500,11 @@ impl World {
+@@ -33,6 +33,7 @@ use crate::orders::OrderSource;
+ use crate::orders::gather::HuntOrder;
+ use crate::orders::{ATTACK_TASK, Work};
+ use crate::ownership::artifact::ARTIFACT_KIND;
++use crate::objects::relic_pickup::{RELIC_PICKUP, RelicPickupAction};
+ use crate::players::Amount;
+ use crate::players::PlayerId;
+ use crate::unit_ai::AiAction;
+@@ -496,14 +497,51 @@ impl World {
+             // the factory makes no action of a mule cart's task: the move without one
+             CART_TASK => self.work_move(player, idx, target, point, (notifies, source)),
+             TRANSPORT => self.start_transport((player, idx), (target, point), task, notifies),
++            RELIC_PICKUP => {
++                let target = target.ok_or(TERRAIN_TASK)?;
++                self.start_relic_pickup(player, idx, target, task)
++            }
+             ENTER | ATTACK_TASK | HUNT | ActionKind::BUILD | REPAIR | GATHER => {
                  let target = target.ok_or(TERRAIN_TASK)?;
                  self.start_object_task(player, idx, (target, point), task, notifies)
              }
@@ -5231,7 +5342,39 @@ index 9e2d36cf..4879a68c 100644
          }
      }
  
-@@ -537,7 +541,11 @@ impl World {
++    /// The factory's relic pick-up (188329 0xbb8c30 case 0x84, constructor 0xbc2f60): the
++    /// action takes the relic (0xb6ba50, slot 0x178); the unit AI takes the order 0x2db (its
++    /// history recorded) and the action 0x277 (0xd40990, 0xd40980; its `+0x1b0` flag, 0xd1bdb0,
++    /// is not held); the install clears the action list and holds it; its start (slot 0x28,
++    /// 0xbc3310) is `set_state(4)`, the walk to the relic.
++    fn start_relic_pickup(
++        &mut self,
++        player: PlayerId,
++        idx: ListIndex,
++        target: ObjectId,
++        task: &Task,
++    ) -> Result<(), GenieError> {
++        let mut action = RelicPickupAction::new(target, task);
++        let unit = self.players.live(player, idx)?;
++        let id = unit.id;
++        self.take(target, self.releaser(player, idx)?)?;
++        if let Some(ai) = self.parts.unit_ai.get_mut(id) {
++            ai.set_order(Some(OrderKind::OnTarget), self.streams.get(Stream::Ai));
++            ai.set_action(Some(AiAction::OnTarget));
++        }
++        self.clear_actions(player, idx)?;
++        self.relic_pickup_start(player, idx, &mut action)?;
++        self.parts
++            .actions_mut(id)?
++            .list
++            .set_relic_pickup(Some(action));
++        Ok(())
++    }
++
+     /// [`World::start_task`]'s actions on an object: the Enter, Attack, Hunt, Build, Repair or
+     /// Gather on `target` starts.
+     fn start_object_task(
+@@ -537,7 +575,11 @@ impl World {
              ActionKind::BUILD => self.start_build(player, idx, target, task, point, notifies),
              REPAIR => self.start_repair(player, idx, target, task, point, notifies),
              GATHER => self.start_gather(player, idx, target, task, Some((point, notifies))),
@@ -13943,6 +14086,430 @@ index 00000000..f10e049d
 +        g.current_command = command;
 +        g.flags |= GroupFlags::NO_PATH_UNIT;
 +        Ok(GroupMove::Begun)
++    }
++}
+diff --git a/crates/engine/genie-core/src/objects/relic_pickup.rs b/crates/engine/genie-core/src/objects/relic_pickup.rs
+new file mode 100644
+index 00000000..a8069986
+--- /dev/null
++++ b/crates/engine/genie-core/src/objects/relic_pickup.rs
+@@ -0,0 +1,418 @@
++//! A monk's relic pick-up (`TRIBE_Action_Pickup`, type 0x84; 188329: the factory 0xbb8c30 case
++//! 0x84, constructor 0xbc2f60, vtable 0x3227ce8: `set_state` 0xbc3760, update 0xbc38e0).
++
++use crate::GenieError;
++use crate::map::Distance;
++use crate::map::Footprint;
++use crate::map::Position;
++use crate::movement::Me;
++use crate::movement::move_to::Patience;
++use crate::movement::move_to::{GiveUp, ListUpdate, MoveToAction, TargetMoved, update_sub_actions};
++use crate::objects::ObjectId;
++use crate::objects::SpriteId;
++use crate::objects::layers::Action;
++use crate::objects::masters::ActionKind;
++use crate::objects::masters::MasterId;
++use crate::objects::masters::Task;
++use crate::objects::teardown::HeadCode;
++use crate::objects::unit::Unit;
++use crate::unit_ai::AiAction;
++use crate::unit_ai::NotifyKind;
++use crate::unit_ai::UnitStance;
++use crate::world::Seconds;
++use crate::world::layer::ClassRoles;
++use crate::world::layer::Roles;
++use crate::world::lets::release;
++use crate::world::slots::PlayerSlots;
++use crate::world::step::Step;
++use genie_diff::Diff;
++
++/// The relic pick-up's action type (0x84).
++pub const RELIC_PICKUP: ActionKind = ActionKind::named(0x84);
++
++/// The in-reach test of state 6 (0x1251e50 with `[0x320532c]` = 0.25).
++const PICKUP_REACH: f32 = 0.25;
++
++/// The wait after a failed walk (state 4's `+0x44` = -0.5).
++const RETRY_WAIT: f32 = -0.5;
++
++/// The states the update reads (`+0x18`).
++#[derive(Clone, Copy, Debug, PartialEq, Diff)]
++pub enum RelicPickupState {
++    /// 1: done.
++    Done,
++    /// 2: halted (after a failure).
++    Halted,
++    /// 4: walking to the relic, with its quiet `MoveTo` sub-action.
++    Walk {
++        /// The `MoveTo` (0xb92150: range 0, the task's moving sprite, quiet, `+0x6c` 1).
++        move_to: Option<MoveToAction>,
++    },
++    /// 6: at the relic.
++    AtRelic,
++    /// 13: failed.
++    Failed,
++}
++
++impl RelicPickupState {
++    /// The state's number.
++    #[must_use]
++    pub const fn get(&self) -> u8 {
++        match self {
++            Self::Done => 1,
++            Self::Halted => 2,
++            Self::Walk { .. } => 4,
++            Self::AtRelic => 6,
++            Self::Failed => 13,
++        }
++    }
++
++    /// Its `MoveTo`, if it walks with one.
++    #[must_use]
++    pub const fn move_to(&self) -> Option<&MoveToAction> {
++        match self {
++            Self::Walk { move_to } => move_to.as_ref(),
++            _ => None,
++        }
++    }
++}
++
++/// The relic pick-up action.
++#[derive(Clone, Copy, Debug, PartialEq, Diff)]
++pub struct RelicPickupAction {
++    /// The relic (`+0x20`).
++    pub target: Option<ObjectId>,
++    /// `+0x18`, with the `MoveTo` of state 4.
++    pub state: RelicPickupState,
++    /// `+0x44`: state 4's wait after a failed walk (below 0 it counts up by the tick).
++    pub timer: Seconds,
++    /// The task's `+0x28` (`work_val1`) as a master: the unit's master once it holds the relic.
++    pub carrier: MasterId,
++    /// The task's moving sprite (`+0x40`).
++    pub moving: Option<SpriteId>,
++}
++
++impl RelicPickupAction {
++    /// The constructor (0xbc2f60) on `target` with `task`: `+0x38`..`+0x40` -1, the target
++    /// taken (0xb6ba50, the caller's); the walk of the start (slot 0x28 = 0xbc3310,
++    /// `set_state(4)`) is the caller's ([`Unit::relic_pickup_walk`]).
++    #[must_use]
++    pub fn new(target: ObjectId, task: &Task) -> Self {
++        Self {
++            target: Some(target),
++            state: RelicPickupState::Walk { move_to: None },
++            timer: Seconds::ZERO,
++            carrier: MasterId::named(task.work_val1.get() as i32 as i16),
++            moving: task.sprites.moving,
++        }
++    }
++}
++
++/// The footprints' squared gap of 0x1251e50: `(|dx| - ra) - rb` (and so for y) at least 0.
++fn gap_squared(a: Position, ra: Footprint, b: Position, rb: Footprint) -> f32 {
++    let x = (((b.x() - a.x()).abs() - ra.x()) - rb.x()).max(0.0);
++    let y = (((b.y() - a.y()).abs() - ra.y()) - rb.y()).max(0.0);
++    x * x + y * y
++}
++
++/// What the action reads of its relic.
++#[derive(Clone, Copy, Debug)]
++struct Relic {
++    /// The relic is of the relics' class (0x2a).
++    is_relic: bool,
++    /// Its state is above 6.
++    gone: bool,
++    position: Position,
++    radius: Footprint,
++}
++
++impl Unit {
++    /// The relic pick-up's update with the action copied out of the list and put back.
++    ///
++    /// # Errors
++    ///
++    /// What the update does not model.
++    pub(crate) fn relic_pickup_part(
++        &mut self,
++        actions: &mut Action,
++        c: &mut Step<'_>,
++        me: Me,
++        roles: &Roles,
++    ) -> Result<HeadCode, GenieError> {
++        let Some(mut a) = actions.list.relic_pickup().copied() else {
++            return Ok(HeadCode::Keeps);
++        };
++        let code = self.relic_pickup_update(&mut a, actions, c, me, roles);
++        if let Some(x) = actions.list.relic_pickup_mut() {
++            *x = a;
++        }
++        code
++    }
++
++    fn relic_of(&self, c: &Step<'_>, id: Option<ObjectId>, roles: &Roles) -> Result<Option<Relic>, GenieError> {
++        let Some((tp, t)) = c.w.object(id) else {
++            return Ok(None);
++        };
++        let m = t.master(c.w.master_tables(), tp)?;
++        Ok(Some(Relic {
++            is_relic: roles.of_class(m.class).contains(ClassRoles::RELIC),
++            gone: t.life.state > crate::objects::ObjectState::Undead,
++            position: t.position(),
++            radius: m.radius,
++        }))
++    }
++
++    /// `set_state` (0xbc3760): the sub-actions go (a walking `MoveTo`'s teardown stops the
++    /// unit); 4 makes the `MoveTo` to a relic target (class 0x2a), else turns to 13.
++    pub(crate) fn relic_pickup_set_state(
++        &mut self,
++        a: &mut RelicPickupAction,
++        c: &mut Step<'_>,
++        state: RelicPickupState,
++        roles: &Roles,
++    ) -> Result<(), GenieError> {
++        if matches!(a.state, RelicPickupState::Walk { move_to: Some(_) })
++            && let Some(m) = c.w.parts.mover_mut(self.id)
++        {
++            m.stop()?;
++        }
++        a.state = match state {
++            RelicPickupState::Walk { .. } => RelicPickupState::Walk { move_to: None },
++            s => s,
++        };
++        if let RelicPickupState::Walk { .. } = state {
++            let relic = self.relic_of(c, a.target, roles)?;
++            if !relic.is_some_and(|r| r.is_relic) {
++                a.state = RelicPickupState::Failed;
++                return Ok(());
++            }
++            let move_reads = self.move_to_reads(
++                c.w.parts.motion.mover(self.id),
++                c.w.master_tables(),
++                c.player,
++                (
++                    &c.w.model.graphics,
++                    c.w.parts.combat_of(self.id).abilities.look.as_ref(),
++                ),
++                roles,
++            )?;
++            let move_to = match move_reads.walk_to(c.w, a.target)? {
++                Some(to) => move_reads.to_object(
++                    to,
++                    Distance::ZERO,
++                    a.moving,
++                    TargetMoved::Follows,
++                    &c.w.model.tuning.move_to,
++                )?,
++                None => None,
++            };
++            a.state = RelicPickupState::Walk { move_to };
++        }
++        Ok(())
++    }
++
++    /// The update (0xbc38e0).
++    fn relic_pickup_update(
++        &mut self,
++        a: &mut RelicPickupAction,
++        actions: &mut Action,
++        c: &mut Step<'_>,
++        me: Me,
++        roles: &Roles,
++    ) -> Result<HeadCode, GenieError> {
++        let relic = self.relic_of(c, a.target, roles)?;
++        if relic.is_some_and(|r| r.gone) {
++            self.relic_pickup_drop(a, c)?;
++        }
++        match a.state {
++            RelicPickupState::Done => return Ok(HeadCode::Deletes),
++            RelicPickupState::Walk { .. } => {
++                let relic = self.relic_of(c, a.target, roles)?;
++                if relic.is_some_and(|r| r.is_relic) {
++                    if a.timer.get() < 0.0 {
++                        a.timer = a.timer + c.dt.seconds();
++                        if a.timer.get() < 0.0 {
++                            return Ok(HeadCode::Keeps);
++                        }
++                        a.timer = Seconds::ZERO;
++                        let next = RelicPickupState::Walk { move_to: None };
++                        self.relic_pickup_set_state(a, c, next, roles)?;
++                        return Ok(HeadCode::Keeps);
++                    }
++                    let master = self.master(c.w.master_tables(), c.player)?;
++                    let how = ListUpdate {
++                        gives_up: GiveUp {
++                            patience: if roles.of_class(master.class).contains(ClassRoles::VILLAGER)
++                                && !c.w.players.player(c.player)?.kind.is_computer()
++                            {
++                                Patience::WaitsOnce
++                            } else {
++                                Patience::Fails
++                            },
++                            stance: c
++                                .w
++                                .parts
++                                .unit_ai
++                                .get(self.id)
++                                .map_or(UnitStance::Aggressive, |ai| ai.stance),
++                        },
++                        ..ListUpdate::default()
++                    };
++                    let code = match &mut a.state {
++                        RelicPickupState::Walk { move_to } => {
++                            update_sub_actions(move_to, c, self, me, how)?
++                        }
++                        _ => update_sub_actions(&mut None, c, self, me, how)?,
++                    };
++                    match code.get() {
++                        1 | 2 => {
++                            self.relic_pickup_set_state(a, c, RelicPickupState::AtRelic, roles)?;
++                            return Ok(HeadCode::Keeps);
++                        }
++                        3 | 4 => {
++                            a.timer = Seconds::new(RETRY_WAIT);
++                            return Ok(HeadCode::Keeps);
++                        }
++                        5 => self.relic_pickup_drop(a, c)?,
++                        _ => return Ok(HeadCode::Keeps),
++                    }
++                }
++            }
++            RelicPickupState::AtRelic => {
++                let Some(r) = self.relic_of(c, a.target, roles)? else {
++                    return Ok(HeadCode::Keeps);
++                };
++                let own = self.master(c.w.master_tables(), c.player)?;
++                let gap = gap_squared(self.position(), own.radius, r.position, r.radius);
++                if !(PICKUP_REACH * PICKUP_REACH < gap) {
++                    return self.relic_pickup_take(a, actions, c);
++                }
++            }
++            RelicPickupState::Failed => {
++                self.post_own(
++                    &mut c.w.parts.unit_ai,
++                    NotifyKind::ACTION_FAILED,
++                    [AiAction::OnTarget.value(), 0, 0],
++                )?;
++                a.state = RelicPickupState::Halted;
++                self.relic_pickup_done(c)?;
++                return Ok(HeadCode::Deletes);
++            }
++            RelicPickupState::Halted => return Ok(HeadCode::Keeps),
++        }
++        self.relic_pickup_set_state(a, c, RelicPickupState::Failed, roles)?;
++        Ok(HeadCode::Keeps)
++    }
++
++    /// Slot 0x68 with none: the target goes (its slot 0x180).
++    fn relic_pickup_drop(&mut self, a: &mut RelicPickupAction, c: &mut Step<'_>) -> Result<(), GenieError> {
++        if let Some(t) = a.target.take() {
++            let by = self.releaser(c)?;
++            release(c, self, Some(t), by)?;
++        }
++        Ok(())
++    }
++
++    /// The destructor's notify (0xbc3280: slot 0x358 with 0x1fa and action 0x277), posted as
++    /// the update deletes the action.
++    fn relic_pickup_done(&self, c: &mut Step<'_>) -> Result<(), GenieError> {
++        self.post_own(
++            &mut c.w.parts.unit_ai,
++            NotifyKind::ACTION_COMPLETED,
++            [AiAction::OnTarget.value(), 0, 0],
++        )
++    }
++
++    /// State 6 in reach (0xbc3a2f~): the relic's slot 0xd8 (0x113b390: it leaves the world, its
++    /// hit points 0), the target goes; a unit in a group is not modelled (0x10f64b0,
++    /// 0x10d3c50, 0x110d5e0); the master becomes the task's carrier (slot 0x98 with 0) when the
++    /// player has it (0x1728c10). Its 1 deletes the action. Not held: the game's event 0x8c,
++    /// the capture-the-relic mode's (game type 10) parts.
++    fn relic_pickup_take(
++        &mut self,
++        a: &mut RelicPickupAction,
++        actions: &mut Action,
++        c: &mut Step<'_>,
++    ) -> Result<HeadCode, GenieError> {
++        if self.group.id.is_some() {
++            return Err(GenieError::unsupported("a relic pick-up by a group member"));
++        }
++        let relic = a.target;
++        self.relic_pickup_drop(a, c)?;
++        if let Some(r) = relic {
++            c.w.relic_taken(r)?;
++        }
++        self.relic_pickup_done(c)?;
++        a.state = RelicPickupState::Done;
++        let carrier = a.carrier;
++        if c.w.master(c.player, carrier).is_ok() {
++            c.lend_at((&mut *self, &mut *actions), |w, p, i| w.change_master(p, i, carrier))?;
++        }
++        Ok(HeadCode::Deletes)
++    }
++}
++
++impl crate::world::World {
++    /// The start's `set_state(4)` from the work command (0xbc3310 -> 0xbc3760 case 4): a relic
++    /// target (class 0x2a) gets the quiet `MoveTo` within 0 with the task's moving sprite
++    /// (0xb92150 with 0, `+0x40`, 1, 1), else the action turns to 13.
++    ///
++    /// # Errors
++    ///
++    /// A unit or a master the world lacks, a sprite the table lacks.
++    pub(crate) fn relic_pickup_start(
++        &mut self,
++        player: crate::players::PlayerId,
++        idx: crate::objects::ListIndex,
++        a: &mut RelicPickupAction,
++    ) -> Result<(), GenieError> {
++        let is_relic = match self.object(a.target) {
++            Some((tp, t)) => {
++                let m = t.master(self.master_tables(), tp)?;
++                self.model.roles.of_class(m.class).contains(ClassRoles::RELIC)
++            }
++            None => false,
++        };
++        if !is_relic {
++            a.state = RelicPickupState::Failed;
++            return Ok(());
++        }
++        let unit = &self.players.live(player, idx)?;
++        let master = unit.master(self.master_tables(), player)?;
++        let move_reads = crate::movement::move_to::MoveToReads::of(
++            (unit, self.parts.mover_of(unit.id)),
++            master,
++            (
++                &self.model.graphics,
++                self.parts.combat_of(unit.id).abilities.look.as_ref(),
++            ),
++            &self.model.roles,
++        );
++        let move_to = match move_reads.walk_to(self, a.target)? {
++            Some(to) => move_reads.to_object(
++                to,
++                Distance::ZERO,
++                a.moving,
++                TargetMoved::Follows,
++                &self.model.tuning.move_to,
++            )?,
++            None => None,
++        };
++        a.state = RelicPickupState::Walk { move_to };
++        Ok(())
++    }
++
++    /// The relic's slot 0xd8 (0x113b390): it wakes and its hit points go to 0.
++    ///
++    /// # Errors
++    ///
++    /// A relic the world does not hold.
++    pub(crate) fn relic_taken(&mut self, id: ObjectId) -> Result<(), GenieError> {
++        let Some((owner, _)) = self.object(Some(id)) else {
++            return Ok(());
++        };
++        let i = self.wake(id)?;
++        self.players.live_mut(owner, i)?.life.hp = crate::objects::HitPoints::ZERO;
++        Ok(())
 +    }
 +}
 diff --git a/crates/engine/genie-core/src/orders/repair_command.rs b/crates/engine/genie-core/src/orders/repair_command.rs
