@@ -2050,7 +2050,7 @@ index 7787900f..f932e18b 100644
          }
      }
 diff --git a/crates/engine/genie-core/src/groups/order.rs b/crates/engine/genie-core/src/groups/order.rs
-index 398a973c..bcfaaae0 100644
+index 398a973c..8fe3628e 100644
 --- a/crates/engine/genie-core/src/groups/order.rs
 +++ b/crates/engine/genie-core/src/groups/order.rs
 @@ -74,6 +74,18 @@ impl World {
@@ -2081,6 +2081,25 @@ index 398a973c..bcfaaae0 100644
              flags.set(MoveFlags::QUEUED, order.queued);
              flags.set(MoveFlags::DIRECT, order.direct);
              moved = self.command_move_to(
+@@ -110,6 +122,18 @@ impl World {
+                 )?;
+             }
+         }
++        if crate::groups::trace_forming() {
++            let g = self.groups.held(group)?;
++            eprintln!(
++                "GROUPCMD group={:?} members={:?} target={:?} task={:?} moved={:?} queue={}",
++                group,
++                g.members.iter().map(|m| m.id).collect::<Vec<_>>(),
++                target,
++                task.map(|t| t.command),
++                moved,
++                g.command_queue.len()
++            );
++        }
+         if moved == GroupMove::Begun {
+             self.stop_all_units(group, StopScope::Busy)?;
+         }
 diff --git a/crates/engine/genie-core/src/groups/place.rs b/crates/engine/genie-core/src/groups/place.rs
 index 51f6a791..560b2370 100644
 --- a/crates/engine/genie-core/src/groups/place.rs
@@ -11788,7 +11807,7 @@ index 90a8616f..77c5309d 100644
      let masters = install_read(dat.as_ref())?;
      let run = census_run(&recording, Some(&masters), limit)?;
 diff --git a/crates/tools/genie-oracle/src/census.rs b/crates/tools/genie-oracle/src/census.rs
-index 99849470..a17a0ad5 100644
+index 99849470..6315af3a 100644
 --- a/crates/tools/genie-oracle/src/census.rs
 +++ b/crates/tools/genie-oracle/src/census.rs
 @@ -112,7 +112,20 @@ pub fn census_run(
@@ -11950,7 +11969,7 @@ index 99849470..a17a0ad5 100644
 +                    let (look, limit) = turns.parts.unit_ai.get(u.id).map(|ai| (ai.look_around_timer.get(), ai.look_around_timeout.get())).unwrap_or((0, 0));
 +                    let a = crate::header_runs::checkpoint_action(turns.parts.actions_of(u.id), turns.parts.production.get(u.id));
 +                    let timer = turns.parts.unit_ai.get(u.id).map(|ai| ai.retarget_timer.get()).unwrap_or(0);
-+                    let ai_trace = turns.parts.unit_ai.get(u.id).map(|ai| format!("{:?} idle={}/{} action={:?} target={:?}", ai.ai_kind, ai.idle_timer.get(), ai.adjusted_idle_timeout.get(), ai.current_action, ai.current_target));
++                    let ai_trace = turns.parts.unit_ai.get(u.id).map(|ai| format!("{:?} idle={}/{} order={:?} action={:?} target={:?}", ai.ai_kind, ai.idle_timer.get(), ai.adjusted_idle_timeout.get(), ai.current_order, ai.current_action, ai.current_target));
 +                    let kind = a.and_then(|a| a.kind).map(|k| k.get());
 +                    let action_state = a.map(|a| a.state.get()).unwrap_or(0);
 +                    eprintln!("OBJECT {}", serde_json::json!({"ms":turns.world_time.millis(),"tick":census.updates,"player":p,"id":u.id.get(),"held":u.life.amount.get(),"state":u.life.state as u8,"master":u.life.master_id.get(),"position":u.position().get(),"action_kind":kind,"action_state":action_state,"retarget_ms":timer,"look":look,"limit":limit,"ai":ai_trace}));
