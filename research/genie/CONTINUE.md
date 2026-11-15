@@ -46,7 +46,7 @@ Codex의 초기 이동·내려놓기·주둔 복귀 정적 조사는 [결과·�
 
 ### 2.1 리플 3개 (2026-11-13 세션 M4, 지금 기본 = 스위치 27개: 아래 25개 + `FARMSPOT` 52 + `MOVEEND` 53; 25개 = 옛 17개(`J_f_*`) + `MASTERHP` 40 + `GARRISON_RECORD` 41 + `RESSEARCH` 43 + `EXPLORE_WAIT` 44 + `PATROLRANGE` 45 + `HELPCALL` 46 + `PLANCHOICE` 47 + `GATHER_SNAP` 49; HUNT에 42번 포함; `SEARCH_CLEAR=unit`; 스위치 없는 50·51번 포함. 실행 `M4_p_239`, `M4_p_161`, `M4_p_097`; 518470161·517426097은 update 75,000까지; 한 줄 스위치 목록 `runs\M4_envs.txt`)
 
-**2026-11-15 오후, 세션 Y19(ONBOARDING `ENG-19`) 1/3: 진단 출력만(`GAINA`의 `full`, findings 88) → 아래 U15 표의 숫자 그대로.**
+**2026-11-15 오후, 세션 Y19(ONBOARDING `ENG-19`): 기본에 스위치 둘 추가(`PAUSEALL` 89, `NOTILEPLAN` 90; `runs\M6_envs.txt`), Gather 빈 대상 멈춤 없앰(91) — 아래 U15 표의 숫자 그대로**(첫 어긋남·확인 체크포인트·사이트 구간; 518239882 57 / 54). 바뀐 것은 520596921의 멈춤뿐: 29,749 → **39,653 "two town centres"**(실행 `E19d_*` = 지금 기본, exe `runs\census_E19c.exe` = `census_base.exe`).
 
 **2026-11-15 밤 늦게, 세션 X18(ONBOARDING `ENG-18`): 엔진 동작 변경 없음 → 아래 U15 표의 숫자 그대로**(518239882 57 / 54, 사이트 구간 그대로). 두 사례의 원본 함수를 엔진과 한 줄씩 맞춰 "같다"를 확인하고 남은 것을 원본 기록 조건으로 좁혔다(findings 86·87).
 
@@ -67,7 +67,7 @@ Codex의 초기 이동·내려놓기·주둔 복귀 정적 조사는 [결과·�
 | 520397411 | 184.4 / 119.4 | 27 / 17 | 2:57.9 |
 | 520394236 | 86.9 / 164.9 | 12 / 24 | 3:10.9 |
 | 520386901 | 333.7 / 405.2 | 50 / 61 | 6:38.7 |
-| 520596921 | 10.1 / 431.6 | 0 / 34 | 7:49.8 (29,749 멈춤 "a gather's target empty when faced (set_state 3)") |
+| 520596921 | 10.1 / 431.6 | 0 / 34 | 7:49.8 (39,653 멈춤 "two town centres", Y19 뒤) |
 | 520592057 | 639.2 / 619.7 | 97 / 94 | 10:39.2 (51,417 멈춤) |
 | 519925669 / 519930254 / 520848973 | 255.9 / 346.9; 554.9 / 567.9; 210.4 / 275.4 | — | 5:07.9; 9:40.9; 5:46.9 |
 
@@ -337,6 +337,8 @@ Codex의 초기 이동·내려놓기·주둔 복귀 정적 조사는 [결과·�
 | `GENIE_EXPERIMENT_DROPIGNORE_188329` (**기본 켬**) 78 | 내려놓기 무시 규칙(원본 0x120ef00~0x120f344): 질의 범위 반지름×4+0.1, 걷는 유닛과 걸린 유닛 모두 클래스 4·0x15만 | `movement/new_path.rs` `ignore_list` | 원본 디스어셈블 읽음, 518470161 9383 491.7초 비트 일치 확인 |
 | `GENIE_EXPERIMENT_SPLITTARGET_188329` (**기본 켬**) 79 | 대상을 찍은 INTERACT의 나누기(원본 0x10b4480): 남은 유닛의 가운데까지가 대상과의 간격보다 먼 유닛은 따로 명령(그룹 안 만듦). 사거리 검사 둘은 안 넣음 | `orders/split.rs` `split_aimed`·`split_run`, `orders/mod.rs` `Split.aim` | 원본 디컴파일 읽음, 517426097 60,836 3997·4022 공격 유지 확인 |
 | `GENIE_EXPERIMENT_FRONTPATH_188329` (기본 켬, 75번 추가) | 자기 이동을 끝내는 선 검사(0x110b51b~0x110b6e6): 선을 유닛의 현재 자리(+0x3bc)에서 긋고, 칸이 지도 끝에서 (반지름 + 0.01)보다 가까우면 막힘 | `groups/steer/to_slots.rs` `members_to_slots` | findings 75 | 실행: 14리플 바이트까지 그대로, 518239882 세 정찰병도 그대로 |
+| `GENIE_EXPERIMENT_PAUSEALL_188329` (**기본 켬**) 89 | 걷는 유닛이 주는 멈춤(slot 0x640 = 0x12191b0)을 걷는 층이 없는 유닛의 경로 자료에도 남김(`Mover.rest_pause`), 새 경로·그룹 이동 명령(0x1224d00 → 0x1072bb0)에서 지움 | `movement/mod.rs`, `objects/unit/top.rs` `gait`, `objects/unit/update.rs` `after_actions`, `objects/release.rs` `pause`, `movement/walk.rs` `paused`, `groups/command.rs` `command_move_to` | 읽음·열네 판 바이트 같음(`E19pa_*`) |
+| `GENIE_EXPERIMENT_NOTILEPLAN_188329` (**기본 켬**) 90 | 진형 칸 돌아가기 1·3단계에 타일 플래너 없음, 1단계 짧은 경로는 칸까지 거리 × 1.5 이하만 | `groups/steer/detour.rs` `round_to_slot`·`round_to_place` | 읽음·516956894만 860초부터 다름(첫 어긋남 뒤) |
 
 "근거" 열의 문서는 모두 이 폴더의 `original-188329-*.md`이다. 사례 문서는 주소와 손 계산까지 들어 있다.
 
@@ -383,6 +385,7 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 12.5 미해결 (이른 순)
 
+- (2026-11-15 세션 Y19 = ONBOARDING `ENG-19`; 실행 `E19d_*`) **엔진 멈춤(전부 첫 어긋남 뒤라 사이트 구간과 무관)**: 520596921 P1 39,653 "two town centres (the order of the player's index)"(91번으로 29,749에서 넘어옴); 519002991·519700670 "a missed missile meeting another object than its target"(다음 첫 동작: 188329에서 투사체 맞음 판정 고리 찾기 — `ActionMissile.cpp`를 쓰는 0xb8bfe0·0xb8dbd0의 부르는 쪽, 엔진 `combat/missile/unit.rs` `missile_hits`); 520352957 "an attacker whose hits apply effects"(안 읽음); 520219269 63,232 속성 204(건물 자기 완공 갈래에서 0x15fec80을 부르는지 — 부르는 곳 다섯에 건물 갱신이 없다, 91번); 520162577 농장 보너스(0x127e5a0, 0x128b590).
 - (2026-11-15 세션 X18 = ONBOARDING `ENG-18`; 실행 `X18a`) **W17의 두 사례(고친 것 없음, 둘 다 새 원본 기록이 있어야 다음으로 간다)**:
   - 517426097 794.336초 4014(findings 86): 칸 자리 점 질의 0x1218f70 → 0x111c660(종류 0x20) → 0x111ced0은 엔진 `point_clear_among`과 같다(움직이는·다른 선수 유닛도 셈, 넓힘 0.5 × 반지름). 기록의 경로 끝점 (70.584923, 55.901680)은 칸으로 가는 짧은 경로의 끝(엔진 진단: (70.58492, 56.03688))도 그룹 자리 (70.60392, 55.74543)도 아니고, y가 그룹 자리 y + 0.15625다. 다음 첫 동작: 원본 기록 — update 60,815~60,826 매 틱, P2 그룹 2(3999·4014)의 +0x8/+0x10, +0x128 칸 표, +0xf8 자기 이동 표(목표 +0xc~+0x14), 4014 obj+0x3f0. 기록 없이: 0x1058020 → 0x1057a40 끝점 규칙 읽기(엔진 `round_long_way`).
   - 518239882 P2 696.6초(findings 87): 자기 이동 끝 조건 0x110b51b~0x110b6e6은 엔진과 한 줄씩 같고, 엔진의 695.357초 입력으로는 원본도 "막힘"(나무 1372 상자 모서리 0.004 안쪽). 다음 첫 동작: 원본 기록 — update 27,448~27,460 매 틱, 4464·4472·3430의 obj+0x3bc·obj+0x3f0(경로점·번호), 그룹 +0xf8 표(켜짐, +0x18, +0x20), +0x178.
@@ -491,7 +494,7 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 13.1 사례 하나를 끝낼 때마다 (고쳤든 못 고쳤든)
 
-`truth-log-findings.md` 맨 끝에 번호를 이어 한 절을 쓴다(지금 마지막은 88번; 63번에는 뒤에 "63 추가" 절이 있고 73번이 그 다음 이어지는 기록이다). 형식:
+`truth-log-findings.md` 맨 끝에 번호를 이어 한 절을 쓴다(지금 마지막은 91번; 63번에는 뒤에 "63 추가" 절이 있고 73번이 그 다음 이어지는 기록이다). 형식:
 
 ```
 ## <번호>. <한 줄 제목> (스위치 `GENIE_EXPERIMENT_...`에 추가 / 새 스위치 / 스위치 없음)
@@ -529,10 +532,10 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 13.4 지금 하던 일 (멈출 때마다 이 절을 덮어쓴다)
 
-**2026-11-15 오후, Claude (세션 Y19 = ONBOARDING `ENG-19`, 1/3 끝). 결론: `GAINA`에 동물의 원래 식량 `full`을 더했다(findings 88, 동작 변경 없음 — 518239882 체크포인트·`GAIN` 줄 바이트까지 같음). 원본 `truth4`의 죽을 때 식량(양 100, 사슴 140, 멧돼지 340)과 같다. main 수집기가 `full`을 저장한다(개정 26).**
+**2026-11-15 오후, Claude (세션 Y19 = ONBOARDING `ENG-19`). 결론: 반쯤 하던 일 없음. ① `GAINA`에 동물의 원래 식량 `full`(88번, 진단만; 원본 `truth4`의 죽을 때 식량 100 / 140 / 340과 같음) — main 수집기가 다 먹힌 동물만 `full`을 저장(개정 26). ② 확인된 차이 셋: 83번 → `PAUSEALL`(89번, 기본 켬), 81번 → `NOTILEPLAN`(90번, 기본 켬), 77번은 **틀린 기록이었다**(0x10d9321이 stopAllUnits 0x1107880을 부름 = 엔진과 같음; 89번). 두 스위치 다 열네 판에서 앞당겨진 선수·줄어든 사이트 구간 없음(516956894만 860초부터 다름). ③ 엔진 멈춤: 520596921 29,749(Gather 빈 대상)를 원본대로 넣음(91번) → 39,653 "two town centres"까지. 나머지 넷(빗나간 투사체, 타격 효과, 520219269 속성 204, 농장 보너스)은 주소만(91번 끝, 12.5 맨 위). 숫자(2.1 U15 표, 518239882 57 / 54) 그대로.**
 
-- 엔진 소스 `genie`: 빌드됨, 저장소 패치와 같음(PC 사본 `runs\E19a.patch`, sha256 LF `79954960…99a6a6`). exe `runs\census_E19a.exe`(기본 출력은 `census_base.exe`와 같음).
-- 다음 첫 동작: 확인된 차이 셋(findings 83·77·81)을 각각 스위치로(이 세션이 이어서 함).
+- 엔진 소스 `genie`: 빌드됨, 저장소 패치와 같음(PC 사본 `runs\E19c.patch`, sha256 LF `3186b44d…2508`). `runs\census_base.exe` = `runs\census_E19c.exe`. 기본 스위치 `runs\M6_envs.txt`에 `PAUSEALL`·`NOTILEPLAN` 추가. 실행: `E19pa_*`·`E19nt_*`(스위치 하나씩), `E19of_*`(새 스위치 없이), `E19d_*`(새 기본 전체). 디컴파일: 클라우드 `re/out_Y19/a.c`(0xb8bfe0, 0xb8dbd0).
+- 다음 첫 동작: 12.5 맨 위 Y19 항목 — 520596921 "two town centres"(이른 순으로는 이것; `players`의 선수 순서 처리) 또는 투사체 맞음 고리 찾기.
 
 **2026-11-15 밤 늦게, Claude (세션 X18 = ONBOARDING `ENG-18`, 자동 연속 3). 결론: 반쯤 하던 일 없음, 엔진 동작 변경 없음(소스는 저장소 패치와 같음 — 임시 진단 `GENIE_DIAG_SLOTSHORT`는 넣었다가 되돌림; `runs\census_base.exe` = `census_U15b.exe` 그대로). 두 사례 모두 원본 함수가 엔진과 같음을 읽어 확인했고(findings 86·87), 남은 차이는 읽기로는 못 가린다 → 숫자(2.1 U15 표, 518239882 57 / 54, 사이트 구간) 그대로.**
 

@@ -271,11 +271,14 @@ index d89aa138..6f4c2f59 100644
              self.players
                  .player_mut(owner)?
 diff --git a/crates/engine/genie-core/src/combat/attack/tests.rs b/crates/engine/genie-core/src/combat/attack/tests.rs
-index c9d08c60..9019a5a1 100644
+index c9d08c60..a89b2374 100644
 --- a/crates/engine/genie-core/src/combat/attack/tests.rs
 +++ b/crates/engine/genie-core/src/combat/attack/tests.rs
-@@ -600,6 +600,7 @@ fn soldier_mover(speed: f32) -> Mover {
+@@ -598,8 +598,10 @@ fn soldier_mover(speed: f32) -> Mover {
+         angle: Angle::ZERO,
+         animated: Animated::default(),
          pauses: Vec::new(),
++        rest_pause: Seconds::ZERO,
          in_the_way: Vec::new(),
          sprite_facets: None,
 +        future: None,
@@ -283,11 +286,14 @@ index c9d08c60..9019a5a1 100644
  }
  
 diff --git a/crates/engine/genie-core/src/combat/volley/launch.rs b/crates/engine/genie-core/src/combat/volley/launch.rs
-index 9a856bbb..5c7443f1 100644
+index 9a856bbb..26b92bdb 100644
 --- a/crates/engine/genie-core/src/combat/volley/launch.rs
 +++ b/crates/engine/genie-core/src/combat/volley/launch.rs
-@@ -132,6 +132,7 @@ impl Unit {
+@@ -130,8 +130,10 @@ impl Unit {
+             last_turn: Seconds::ZERO,
+             angle,
              pauses: Vec::new(),
++            rest_pause: Seconds::ZERO,
              in_the_way: Vec::new(),
              sprite_facets: facets,
 +            future: None,
@@ -535,11 +541,14 @@ index e526db7f..d4937d04 100644
                  "an unload whose unit finds no spot (its later rings)",
              ));
 diff --git a/crates/engine/genie-core/src/garrison/tests.rs b/crates/engine/genie-core/src/garrison/tests.rs
-index 88cdc0ef..5489276f 100644
+index 88cdc0ef..8f8c7cd7 100644
 --- a/crates/engine/genie-core/src/garrison/tests.rs
 +++ b/crates/engine/genie-core/src/garrison/tests.rs
-@@ -2515,6 +2515,7 @@ pub(crate) fn walker(t: &mut World, p: PlayerId, id: i32, m: MasterId, at: Point
+@@ -2513,8 +2513,10 @@ pub(crate) fn walker(t: &mut World, p: PlayerId, id: i32, m: MasterId, at: Point
+             angle: Angle::ZERO,
+             animated: Animated::default(),
              pauses: Vec::new(),
++            rest_pause: Seconds::ZERO,
              in_the_way: Vec::new(),
              sprite_facets: None,
 +            future: None,
@@ -974,6 +983,34 @@ index a7e36539..da49f055 100644
          let gather = actions.list.gather().ok_or(NO_GATHER)?;
          if gather.target.is_none() {
              return self.gather_after_drop(actions, c, roles);
+diff --git a/crates/engine/genie-core/src/gathering/gather/update.rs b/crates/engine/genie-core/src/gathering/gather/update.rs
+index 3ab90215..b2721a8b 100644
+--- a/crates/engine/genie-core/src/gathering/gather/update.rs
++++ b/crates/engine/genie-core/src/gathering/gather/update.rs
+@@ -240,7 +240,7 @@ impl GatherAction {
+     /// of its animals is not modelled, a farm another farmer works waits for another (0xf3; the
+     /// search's notify is the caller's). Else the unit turns to its target (`FUN_141162db0`;
+     /// turning over time it faces next update) and works (`set_state(7)`, its time at the stop
+-    /// 0) on a target holding something or one regathered; an empty one is not modelled.
++    /// 0) on a target holding something or one regathered; an empty one is let go of.
+     fn update_face(
+         &mut self,
+         c: &mut Step<'_>,
+@@ -279,9 +279,11 @@ impl GatherAction {
+             self.time_at_stop = Seconds::ZERO;
+             return Ok(Next::Stay);
+         }
+-        Err(GenieError::unsupported(
+-            "a gather's target empty when faced (set_state 3)",
+-        ))
++        // 188329 0xb800b0 state 6 (`0x140b81001`..): an empty target not regathered lets go of
++        // it (slot 0x68 with none; the caller lets it go), then as without a target: a load to
++        // its drop site (`set_state(8)`), a farmer's wait (0xf3), else the search (3) — findings 90
++        self.target = None;
++        self.update_without_target(c, unit, r, roles)
+     }
+ 
+     /// Case 6, the work: on a farm's stops (the game's `+0xc14` being 0) the time at the stop
 diff --git a/crates/engine/genie-core/src/gathering/gather/work.rs b/crates/engine/genie-core/src/gathering/gather/work.rs
 index b1ab9a1e..b7c54bbc 100644
 --- a/crates/engine/genie-core/src/gathering/gather/work.rs
@@ -1580,7 +1617,7 @@ index 617e311c..d012669e 100644
      /// (`FUN_140ac44b0`): the player's attribute 292 is 1.
      pub(crate) decay: DecayRule,
 diff --git a/crates/engine/genie-core/src/gathering/hunt/tests.rs b/crates/engine/genie-core/src/gathering/hunt/tests.rs
-index 8ea13ae4..55c60b9e 100644
+index 8ea13ae4..d238531c 100644
 --- a/crates/engine/genie-core/src/gathering/hunt/tests.rs
 +++ b/crates/engine/genie-core/src/gathering/hunt/tests.rs
 @@ -69,6 +69,7 @@ pub(crate) fn hunt_reads() -> HuntReads {
@@ -1591,8 +1628,11 @@ index 8ea13ae4..55c60b9e 100644
          decay: DecayRule::Runs,
          has_ai: true,
          ai_class: None,
-@@ -307,6 +308,7 @@ pub(crate) fn walker() -> Mover {
+@@ -305,8 +306,10 @@ pub(crate) fn walker() -> Mover {
+         angle: Angle::ZERO,
+         animated: Animated::default(),
          pauses: Vec::new(),
++        rest_pause: Seconds::ZERO,
          in_the_way: Vec::new(),
          sprite_facets: None,
 +        future: None,
@@ -1851,7 +1891,7 @@ index c9f58b16..c6df3d71 100644
          self.order_work(p, idx, &work)
      }
 diff --git a/crates/engine/genie-core/src/groups/command.rs b/crates/engine/genie-core/src/groups/command.rs
-index cc0b4325..a2049d93 100644
+index cc0b4325..4fb39fb9 100644
 --- a/crates/engine/genie-core/src/groups/command.rs
 +++ b/crates/engine/genie-core/src/groups/command.rs
 @@ -71,6 +71,11 @@ bitflags::bitflags! {
@@ -1891,7 +1931,21 @@ index cc0b4325..a2049d93 100644
              return Err(GenieError::unsupported(
                  "a horde's move (commandHorde, FUN_141010180)",
              ));
-@@ -499,7 +515,7 @@ impl World {
+@@ -316,6 +332,13 @@ impl World {
+             if let Some(ai) = self.parts.unit_ai.get_mut(id) {
+                 ai.clear_notifies(world_time.since_start())?;
+             }
++            // 188329 0x10d9377: every member's slot 0x5a8 (0x1224d00) clears its path data
++            // (0x1072bb0), the kept pause too (findings 89)
++            if crate::movement::pauseall_188329()
++                && let Some(m) = self.parts.mover_mut(id)
++            {
++                m.rest_pause = Seconds::ZERO;
++            }
+         }
+         let owner = self.groups.held(group)?.owner_player()?;
+         let min_column = self
+@@ -499,7 +522,7 @@ impl World {
                  last.point.ground(),
                  MoveTo {
                      range: last.range,
@@ -2473,7 +2527,7 @@ index e101e2d0..f7de2eaa 100644
      /// index it has then, and the objects of their searches.
      fn member_views(
 diff --git a/crates/engine/genie-core/src/groups/steer/detour.rs b/crates/engine/genie-core/src/groups/steer/detour.rs
-index 22a83675..a27f9a7f 100644
+index 22a83675..e3c9261a 100644
 --- a/crates/engine/genie-core/src/groups/steer/detour.rs
 +++ b/crates/engine/genie-core/src/groups/steer/detour.rs
 @@ -93,9 +93,28 @@ impl World {
@@ -2526,7 +2580,46 @@ index 22a83675..a27f9a7f 100644
          if way.result != ShortFound::Reached {
              self.round_one_step(r, to, forward, &mut way)?;
              if !way.result.leads() {
-@@ -411,7 +433,7 @@ impl World {
+@@ -238,7 +260,15 @@ impl World {
+                 r.differentiators,
+                 &mut way.record,
+             )?;
+-            if way.record.points.len() < 2 || at_most_or_unordered(way.record.length.get(), EPSILON)
++            // 188329 (0x10ef890 step 1): the path also takes no more than the gap to the slot
++            // times 1.5 (`[0x3201490]`), else the try ends (result 4) — findings 81, 89
++            let too_long = notileplan_188329() && {
++                let (dx, dy) = (to.x() - r.at.x(), to.y() - r.at.y());
++                !(way.record.length.get() <= sqrt(dx * dx + dy * dy) * 1.5)
++            };
++            if way.record.points.len() < 2
++                || at_most_or_unordered(way.record.length.get(), EPSILON)
++                || too_long
+             {
+                 way.record.points.clear();
+             } else {
+@@ -246,7 +276,9 @@ impl World {
+                 served = !res.fails();
+             }
+         }
++        // 188329 0x10ef890 steps 1 and 3 have no tile planner branch (findings 81)
+         if !served
++            && !notileplan_188329()
+             && let Some(found) =
+                 self.round_plan(r.restriction, r.at.ground(), to, &mut way.record)?
+         {
+@@ -338,8 +370,9 @@ impl World {
+                 way.result = ShortFound::Blocked;
+                 way.record.points.clear();
+             }
+-        } else if let Some(found) =
+-            self.round_plan(r.restriction, r.at.ground(), place, &mut way.record)?
++        } else if !notileplan_188329()
++            && let Some(found) =
++                self.round_plan(r.restriction, r.at.ground(), place, &mut way.record)?
+         {
+             way.result = planned_as_short(found);
+             way.planned = true;
+@@ -411,7 +444,7 @@ impl World {
      /// The way round's long pather (`FUN_140f9eb70` with the record) for member `id` from the
      /// tile of `from` to the tile of `to`, range 0, no target: whether it reached the goal, and
      /// the path.
@@ -2535,6 +2628,21 @@ index 22a83675..a27f9a7f 100644
          &self,
          id: ObjectId,
          from: Point,
+@@ -529,6 +562,14 @@ pub(super) const fn planned_as_short(found: Found) -> ShortFound {
+ /// The way round found so far: the record's path (a new path record, `FUN_14152eea0`), the
+ /// pather's result (the tile planner's read as the short pather's, [`planned_as_short`]),
+ /// whether the tile planner made it, and where the member goes.
++/// `GENIE_EXPERIMENT_NOTILEPLAN_188329`: the way round's steps 1 and 3 as 188329 0x10ef890 runs
++/// them: no tile planner after the short pather, and step 1's path no longer than the gap times
++/// 1.5 (findings 81, 89).
++fn notileplan_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_NOTILEPLAN_188329").is_some())
++}
++
+ struct Way {
+     record: Path,
+     result: ShortFound,
 diff --git a/crates/engine/genie-core/src/groups/steer/slot_steps.rs b/crates/engine/genie-core/src/groups/steer/slot_steps.rs
 index d9156f6d..fd81e8ea 100644
 --- a/crates/engine/genie-core/src/groups/steer/slot_steps.rs
@@ -3576,10 +3684,29 @@ index f6314358..9d7b8d8a 100644
          let _ = out.push(p);
      }
 diff --git a/crates/engine/genie-core/src/movement/mod.rs b/crates/engine/genie-core/src/movement/mod.rs
-index 21b160d4..fbd30055 100644
+index 21b160d4..3d9af8e0 100644
 --- a/crates/engine/genie-core/src/movement/mod.rs
 +++ b/crates/engine/genie-core/src/movement/mod.rs
-@@ -255,6 +255,18 @@ pub struct Mover {
+@@ -47,6 +47,7 @@ use genie_model::movement::move_algorithm;
+ mod move_start;
+ pub mod move_to;
+ mod new_path;
++pub(crate) use new_path::pauseall_188329;
+ mod path_end;
+ mod path_flags;
+ mod path_points;
+@@ -245,6 +246,10 @@ pub struct Mover {
+     /// The pauses its walk gave units it met (slot 0x5f0 on each: the met unit's walked level's
+     /// `+0x34`), for the caller to hand on.
+     pub pauses: Vec<(ObjectId, Seconds)>,
++    /// 188329 (`GENIE_EXPERIMENT_PAUSEALL_188329`, findings 89): the pause (`obj+0x3f0`'s `+0x34`)
++    /// the game keeps in a unit's path data while it has no walked level here: a walker's slot
++    /// 0x640 (0x12191b0) writes it whether the unit walks or not; a new path clears it (0x1072bb0).
++    pub rest_pause: Seconds,
+     /// The kept hits its walk met of the walked level's target's master, of a player neither
+     /// counts an ally: the motion step tells the unit AI of each (its slot 0x38 with
+     /// [`crate::unit_ai::NotifyKind::IN_THE_WAY`] and the hit's id), which the caller passes on.
+@@ -255,6 +260,18 @@ pub struct Mover {
      /// master's [`MoveStats::facets`] then). Not saved: the update's copy of its sprite's.
      #[diff(unsaved)]
      pub sprite_facets: Option<SpriteFacets>,
@@ -3598,7 +3725,7 @@ index 21b160d4..fbd30055 100644
  }
  
  /// The moving unit, as the motion step needs it besides its [`Mover`], whose place it walks
-@@ -586,3 +598,11 @@ pub(crate) fn stop_mover(mover: Option<&mut Mover>) -> Result<(), GenieError> {
+@@ -586,3 +603,11 @@ pub(crate) fn stop_mover(mover: Option<&mut Mover>) -> Result<(), GenieError> {
  
  #[cfg(test)]
  pub(crate) mod tests;
@@ -3629,7 +3756,7 @@ index 8ae7fee5..35ac2065 100644
              return MoveTo::Failed;
          }
 diff --git a/crates/engine/genie-core/src/movement/new_path.rs b/crates/engine/genie-core/src/movement/new_path.rs
-index 1f873756..713fd7ef 100644
+index 1f873756..19e5c91a 100644
 --- a/crates/engine/genie-core/src/movement/new_path.rs
 +++ b/crates/engine/genie-core/src/movement/new_path.rs
 @@ -65,6 +65,15 @@ impl Mover {
@@ -3648,7 +3775,23 @@ index 1f873756..713fd7ef 100644
              if level.waypoint.at_or_past_last(level.points.len()) {
                  if level.continue_counter.left() {
                      // the unit pauses itself (slot 0x5f0, the walked level's `+0x34`) and stops
-@@ -216,15 +225,33 @@ impl Mover {
+@@ -131,6 +140,7 @@ impl Mover {
+             } else {
+                 LinkedPathKind::MovesOn
+             };
++            self.rest_pause = Seconds::ZERO;
+             self.paths.insert(0, new);
+             return Ok(if SHORT_PATHER || LONG_PATHER {
+                 AfterRequest::Again
+@@ -170,6 +180,7 @@ impl Mover {
+             level.length = Distance::ZERO;
+             level.created = WorldTime::ZERO;
+         }
++        self.rest_pause = Seconds::ZERO;
+         self.paths.insert(0, new);
+         Ok(AfterRequest::Walk)
+     }
+@@ -216,15 +227,33 @@ impl Mover {
          if let Some((target_id, t)) = target
              && !self.is_moving()
              && me.action_state.get() == 8
@@ -3684,7 +3827,7 @@ index 1f873756..713fd7ef 100644
              for id in world.obstruction_candidates(rect, Distance::new(grow), &skip) {
                  let Some(p) = world.get(id) else { continue };
                  let gait = by_id.gait(id);
-@@ -247,12 +274,16 @@ impl Mover {
+@@ -247,12 +276,16 @@ impl Mover {
                      .task_0x99
                      .get(p.player.index())
                      .is_some_and(|m| m.contains(&p.master));
@@ -3704,7 +3847,7 @@ index 1f873756..713fd7ef 100644
                  {
                      continue;
                  }
-@@ -463,6 +494,64 @@ impl Mover {
+@@ -463,6 +496,64 @@ impl Mover {
          Ok(result.reaches().then(|| path.length()))
      }
  
@@ -3769,10 +3912,17 @@ index 1f873756..713fd7ef 100644
      /// The length of the tile planner's path (`FUN_140f7c530` with the radii `radii`, range 0, no
      /// closed tiles, the tile search for a human player, no smoothing) from the unit to `to`, and
      /// the planner's result; None without a planner for the unit's restriction.
-@@ -493,3 +582,10 @@ impl Mover {
+@@ -493,3 +584,17 @@ impl Mover {
          Ok(Some((found, path.length)))
      }
  }
++
++/// `GENIE_EXPERIMENT_PAUSEALL_188329`: a walker's pause reaches a unit with path data but no
++/// walked level (0x1214f05-0x1214f33, 0x1215229-0x1215250, slot 0x640 = 0x12191b0; findings 89).
++pub(crate) fn pauseall_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_PAUSEALL_188329").is_some())
++}
 +
 +/// `GENIE_EXPERIMENT_DROPIGNORE_188329`: the drop-off worker ignore query as 188329 runs it
 +/// (0x120ef00-0x120f344, findings 78).
@@ -3781,7 +3931,7 @@ index 1f873756..713fd7ef 100644
 +    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_DROPIGNORE_188329").is_some())
 +}
 diff --git a/crates/engine/genie-core/src/movement/path_end.rs b/crates/engine/genie-core/src/movement/path_end.rs
-index 8dd9623e..862ae3da 100644
+index 8dd9623e..899c8975 100644
 --- a/crates/engine/genie-core/src/movement/path_end.rs
 +++ b/crates/engine/genie-core/src/movement/path_end.rs
 @@ -31,7 +31,7 @@ use crate::movement::{
@@ -3934,15 +4084,17 @@ index 8dd9623e..862ae3da 100644
      /// The test before a non-quiet `MoveTo`'s path end follows its moved target (`0x140aa2a70` in
      /// state 4): the top path (`FUN_140f960f0`) and the walked level's own path, that level being
      /// level 0, are both held, and the level's current waypoint (`FUN_140f9bcd0`) is the top
-@@ -298,6 +432,7 @@ impl Mover {
+@@ -298,7 +432,9 @@ impl Mover {
          now: WorldTime,
          planned: bool,
      ) {
 +        self.future = None;
          let repath_time = self.paths.first().map_or(Seconds::ZERO, |l| l.repath_time);
++        self.rest_pause = Seconds::ZERO;
          self.paths = vec![PathData {
              level: if planned {
-@@ -344,14 +479,37 @@ impl Mover {
+                 WaypointLevel::Top
+@@ -344,14 +480,37 @@ impl Mover {
      ) {
          let start = from.vector();
          let mut path = Path::default();
@@ -3982,6 +4134,14 @@ index 8dd9623e..862ae3da 100644
              let end = goal.vector();
              let last = point_or_zero(&path, WaypointIndex::last_of(path.points.len()));
              let mut d = end - last;
+@@ -386,6 +545,7 @@ impl Mover {
+             path_flags & !PathFlags::BACK_AND_FORTH
+         };
+         let repath_time = self.paths.first().map_or(Seconds::ZERO, |l| l.repath_time);
++        self.rest_pause = Seconds::ZERO;
+         self.paths = vec![PathData {
+             level: WaypointLevel::Top,
+             points: path.points,
 diff --git a/crates/engine/genie-core/src/movement/request_plans.rs b/crates/engine/genie-core/src/movement/request_plans.rs
 index 8c1a150a..77fd054c 100644
 --- a/crates/engine/genie-core/src/movement/request_plans.rs
@@ -4046,7 +4206,7 @@ index 8c1a150a..77fd054c 100644
          let blocked = r.fails()
              || length <= EPSILON
 diff --git a/crates/engine/genie-core/src/movement/step.rs b/crates/engine/genie-core/src/movement/step.rs
-index 75476db0..ec500bd4 100644
+index 75476db0..e1cc0d50 100644
 --- a/crates/engine/genie-core/src/movement/step.rs
 +++ b/crates/engine/genie-core/src/movement/step.rs
 @@ -107,6 +107,12 @@ impl Mover {
@@ -4070,7 +4230,15 @@ index 75476db0..ec500bd4 100644
              // the animated object's constructor (FUN_141070cf0): animation speed (+0x7b8) 0
              animated: Animated::new(Speed::ZERO),
              forward: BVector::new(1.0, 0.0, 0.0),
-@@ -566,6 +573,15 @@ impl Mover {
+@@ -216,6 +223,7 @@ impl Mover {
+             last_turn: Seconds::ZERO,
+             angle,
+             pauses: Vec::new(),
++            rest_pause: Seconds::ZERO,
+             in_the_way: Vec::new(),
+             sprite_facets,
+         }
+@@ -566,6 +574,15 @@ impl Mover {
          let position = self.moved_at.vector();
          let level = self.paths.walked()?;
          let waypoint = point_or_zero_of(level, level.waypoint);
@@ -4087,11 +4255,14 @@ index 75476db0..ec500bd4 100644
              self.paths.walked_mut()?.flags |= LevelFlags::REACHED | LevelFlags::AT_WAYPOINT;
              return Ok(Next::Again);
 diff --git a/crates/engine/genie-core/src/movement/tests.rs b/crates/engine/genie-core/src/movement/tests.rs
-index eb4f2f5f..0aa3187d 100644
+index eb4f2f5f..d53b88be 100644
 --- a/crates/engine/genie-core/src/movement/tests.rs
 +++ b/crates/engine/genie-core/src/movement/tests.rs
-@@ -223,6 +223,7 @@ pub(crate) fn builder_9177() -> Mover {
+@@ -221,8 +221,10 @@ pub(crate) fn builder_9177() -> Mover {
+         angle: Angle::ZERO,
+         animated: Animated::default(),
          pauses: Vec::new(),
++        rest_pause: Seconds::ZERO,
          in_the_way: Vec::new(),
          sprite_facets: None,
 +        future: None,
@@ -4115,7 +4286,7 @@ index 5f058dd9..b167fc33 100644
              self.own_move_give_up(actions, c, roles)?;
          }
 diff --git a/crates/engine/genie-core/src/movement/walk.rs b/crates/engine/genie-core/src/movement/walk.rs
-index ff48ae22..d725068d 100644
+index ff48ae22..a1ef6224 100644
 --- a/crates/engine/genie-core/src/movement/walk.rs
 +++ b/crates/engine/genie-core/src/movement/walk.rs
 @@ -152,6 +152,17 @@ impl Mover {
@@ -4136,6 +4307,20 @@ index ff48ae22..d725068d 100644
          if self.paths.walked()?.flags.contains(LevelFlags::REACHED) && turn == Angle::ZERO {
              return Ok(clipped);
          }
+@@ -255,9 +266,10 @@ impl Mover {
+     /// 0.
+     #[must_use]
+     pub fn paused(&self) -> bool {
+-        self.paths
+-            .first()
+-            .is_some_and(|l| Seconds::ZERO < l.pause_time)
++        match self.paths.first() {
++            Some(l) => Seconds::ZERO < l.pause_time,
++            None => crate::movement::pauseall_188329() && Seconds::ZERO < self.rest_pause,
++        }
+     }
+ 
+     /// The speed control toward the waypoint (slot 198, `0x141150a80`): a unit whose turn fell
 diff --git a/crates/engine/genie-core/src/movement/waypoint.rs b/crates/engine/genie-core/src/movement/waypoint.rs
 index 54c082c7..13031ea9 100644
 --- a/crates/engine/genie-core/src/movement/waypoint.rs
@@ -4233,6 +4418,26 @@ index a4790a15..9dff401e 100644
      /// `unit` goes to the end of the list.
      pub fn push(&mut self, unit: Unit) {
          self.units.push(unit);
+diff --git a/crates/engine/genie-core/src/objects/release.rs b/crates/engine/genie-core/src/objects/release.rs
+index bd8b67b7..b04ae357 100644
+--- a/crates/engine/genie-core/src/objects/release.rs
++++ b/crates/engine/genie-core/src/objects/release.rs
+@@ -192,8 +192,13 @@ impl World {
+         else {
+             return;
+         };
+-        if let Some(level) = self.parts.mover_mut(u.id).and_then(|m| m.paths.first_mut()) {
+-            level.pause_time = pause;
++        if let Some(m) = self.parts.mover_mut(u.id) {
++            match m.paths.first_mut() {
++                Some(level) => level.pause_time = pause,
++                // 188329: the path data without a walked level keeps it (findings 89)
++                None if crate::movement::pauseall_188329() => m.rest_pause = pause,
++                None => {}
++            }
+         }
+     }
+ }
 diff --git a/crates/engine/genie-core/src/objects/unit/mod.rs b/crates/engine/genie-core/src/objects/unit/mod.rs
 index e8e94a15..fbfa090c 100644
 --- a/crates/engine/genie-core/src/objects/unit/mod.rs
@@ -4285,6 +4490,43 @@ index 7c1fba27..0e8d1c60 100644
                  };
                  c.lend_at((&mut *self, &mut *actions), |w, p, i| {
                      w.order_work(p, i, &work)
+diff --git a/crates/engine/genie-core/src/objects/unit/top.rs b/crates/engine/genie-core/src/objects/unit/top.rs
+index cee0a80b..c1040a9b 100644
+--- a/crates/engine/genie-core/src/objects/unit/top.rs
++++ b/crates/engine/genie-core/src/objects/unit/top.rs
+@@ -128,7 +128,9 @@ impl Unit {
+                     .top_action()
+                     .is_some_and(|a| matches!(a.state.get(), 6 | 7)),
+             last_move: m.last_move,
+-            pause: m.paths.first().map(|l| l.pause_time),
++            pause: m.paths.first().map(|l| l.pause_time).or_else(|| {
++                crate::movement::pauseall_188329().then_some(m.rest_pause)
++            }),
+             human_order: self.last_human_order,
+             path_made: m
+                 .paths
+diff --git a/crates/engine/genie-core/src/objects/unit/update.rs b/crates/engine/genie-core/src/objects/unit/update.rs
+index d7751598..0b639f9e 100644
+--- a/crates/engine/genie-core/src/objects/unit/update.rs
++++ b/crates/engine/genie-core/src/objects/unit/update.rs
+@@ -310,10 +310,15 @@ impl Unit {
+             if c.w.object(id).is_none() {
+                 continue;
+             }
+-            let Some(level) = c.w.parts.mover_mut(id).and_then(|m| m.paths.first_mut()) else {
++            let Some(m) = c.w.parts.mover_mut(id) else {
+                 continue;
+             };
+-            level.pause_time = pause;
++            match m.paths.first_mut() {
++                Some(level) => level.pause_time = pause,
++                // 188329: the path data without a walked level keeps it (findings 89)
++                None if crate::movement::pauseall_188329() => m.rest_pause = pause,
++                None => {}
++            }
+         }
+         if c.w
+             .parts
 diff --git a/crates/engine/genie-core/src/orders/actions.rs b/crates/engine/genie-core/src/orders/actions.rs
 index 00aaf602..3ac37dc9 100644
 --- a/crates/engine/genie-core/src/orders/actions.rs
@@ -6195,11 +6437,14 @@ index 1a1bfc98..bdca75be 100644
          pasture_food: AttributeId::named(288),
          pasture_livestock: AttributeId::named(289),
 diff --git a/crates/engine/genie-core/src/testing/scene.rs b/crates/engine/genie-core/src/testing/scene.rs
-index fec0f643..7369a036 100644
+index fec0f643..6d578c0c 100644
 --- a/crates/engine/genie-core/src/testing/scene.rs
 +++ b/crates/engine/genie-core/src/testing/scene.rs
-@@ -688,6 +688,7 @@ fn standing(stats: MoveStats, at: Position) -> Mover {
+@@ -686,8 +686,10 @@ fn standing(stats: MoveStats, at: Position) -> Mover {
+         angle: Angle::ZERO,
+         animated: Animated::default(),
          pauses: Vec::new(),
++        rest_pause: Seconds::ZERO,
          in_the_way: Vec::new(),
          sprite_facets: None,
 +        future: None,
@@ -12237,10 +12482,14 @@ index d79318cd..9bc800f3 100644
                      // the object's type: the save's factory types 70 and 80, any other below
                      kind: if o.tribe_combat_object.is_some() {
 diff --git a/crates/tools/genie-oracle/src/movers.rs b/crates/tools/genie-oracle/src/movers.rs
-index a098b509..0eda6a04 100644
+index a098b509..4f9de5bd 100644
 --- a/crates/tools/genie-oracle/src/movers.rs
 +++ b/crates/tools/genie-oracle/src/movers.rs
-@@ -243,6 +243,7 @@ pub(super) fn mover(
+@@ -240,9 +240,11 @@ pub(super) fn mover(
+         last_turn: Seconds::new(m.turn_towards_time),
+         angle: Angle::new(m.angle),
+         pauses: Vec::new(),
++        rest_pause: Seconds::ZERO,
          in_the_way: Vec::new(),
          // the current sprite's, which the unit's update takes from its sprite
          sprite_facets: None,
