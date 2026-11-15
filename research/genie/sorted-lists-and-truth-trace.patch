@@ -1277,15 +1277,22 @@ index 3ab90215..b2721a8b 100644
  
      /// Case 6, the work: on a farm's stops (the game's `+0xc14` being 0) the time at the stop
 diff --git a/crates/engine/genie-core/src/gathering/gather/work.rs b/crates/engine/genie-core/src/gathering/gather/work.rs
-index b1ab9a1e..b7c54bbc 100644
+index b1ab9a1e..318e7833 100644
 --- a/crates/engine/genie-core/src/gathering/gather/work.rs
 +++ b/crates/engine/genie-core/src/gathering/gather/work.rs
-@@ -64,6 +64,13 @@ impl GatherAction {
+@@ -64,6 +64,20 @@ impl GatherAction {
                  "a gather's set_state 6 on master 1893 or 1897",
              ));
          }
 +        // 188329 `set_state(6)` (0xb7f773..0xb7f78d): a target of class 8, 32 or 15 pulls the unit
 +        // against it (0x1116f60), as the Hunt's does (finding 49)
++        // ENG-25 diagnostic (item 5, N4): a mine faced from a tile that differs on both axes
++        if std::env::var_os("GENIE_TRACE_ITEM5").is_some() && matches!(target.class.get(), 8 | 32) {
++            let (u, t) = (unit.position(), target.position);
++            if u.x().floor() != t.x().floor() && u.y().floor() != t.y().floor() {
++                eprintln!("ITEM5 N4 player={:?} unit={:?} target={:?}", c.player, unit.id, target.id);
++            }
++        }
 +        if std::env::var_os("GENIE_EXPERIMENT_GATHER_SNAP_188329").is_some()
 +            && matches!(target.class.get(), 8 | 32 | 15)
 +        {
@@ -1294,7 +1301,7 @@ index b1ab9a1e..b7c54bbc 100644
          self.timer = Seconds::ZERO;
          Self::show(c, unit, self.walk_sprite(unit, r).or(r.sprites.standing));
          Ok(Next::Stay)
-@@ -102,6 +109,8 @@ impl GatherAction {
+@@ -102,6 +116,8 @@ impl GatherAction {
          if held != kind && !both_food(kind, held) {
              unit.life.attribute_kind = kind;
              unit.life.amount = Amount::ZERO;
@@ -1303,7 +1310,7 @@ index b1ab9a1e..b7c54bbc 100644
          }
          Self::show(c, unit, r.sprites.working.or(r.sprites.standing));
      }
-@@ -146,10 +155,15 @@ impl GatherAction {
+@@ -146,10 +162,15 @@ impl GatherAction {
              target.amount = Amount::ZERO;
          }
          *held += gain;
@@ -1319,7 +1326,7 @@ index b1ab9a1e..b7c54bbc 100644
          }
          // a farm's food sold at once (attribute 96): the load goes to the player as food (slot
          // 0xf8 with 1), the unit holds none, and the gathering goes on
-@@ -160,6 +174,7 @@ impl GatherAction {
+@@ -160,6 +181,7 @@ impl GatherAction {
          {
              let sold = mem_take(&mut unit.life.amount);
              c.give_load(c.w.model.slots.attribute.food, sold)?;
@@ -8047,6 +8054,21 @@ index 48ac7e77..d028e01d 100644
      /// The lion's handler (`FUN_140c266f0`): its completed attack sets its idle timeout
      /// (`FUN_140c41bc0` with 1000, then slot 0x1a8), drops the target and stops; a moved target
      /// is [`UnitAi::lion_target_moved`]'s. Both cases, and any other notify, go on to the base
+diff --git a/crates/engine/genie-core/src/unit_ai/order_kinds.rs b/crates/engine/genie-core/src/unit_ai/order_kinds.rs
+index 281192de..c41ec5e6 100644
+--- a/crates/engine/genie-core/src/unit_ai/order_kinds.rs
++++ b/crates/engine/genie-core/src/unit_ai/order_kinds.rs
+@@ -397,6 +397,10 @@ impl UnitAi {
+                 },
+             };
+             let Some(kind) = self.resource_kind(class, roles) else {
++                // ENG-25 diagnostic (item 5, session B): 188329 searches 0xd22c20 here
++                if std::env::var_os("GENIE_TRACE_ITEM5").is_some() {
++                    eprintln!("ITEM5 B_GONE class={class:?}");
++                }
+                 return Ok(OrderOutcome::NotTaken);
+             };
+             // slot 0x88 (`FUN_140c4b0f0`): slot 0x80 from the order's shown point, without a
 diff --git a/crates/engine/genie-core/src/unit_ai/process_order.rs b/crates/engine/genie-core/src/unit_ai/process_order.rs
 index 6f60bbc2..9d9b867f 100644
 --- a/crates/engine/genie-core/src/unit_ai/process_order.rs
