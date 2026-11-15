@@ -270,8 +270,38 @@ index d89aa138..6f4c2f59 100644
          for (kind, amount) in adds {
              self.players
                  .player_mut(owner)?
+diff --git a/crates/engine/genie-core/src/combat/attack/hits.rs b/crates/engine/genie-core/src/combat/attack/hits.rs
+index d8cbc980..7b95dc90 100644
+--- a/crates/engine/genie-core/src/combat/attack/hits.rs
++++ b/crates/engine/genie-core/src/combat/attack/hits.rs
+@@ -35,13 +35,15 @@ use crate::world::layer::MasterRoles;
+ /// `+0x8` when the record names an owner that has its master, else its own; None for a missile
+ /// whose record names no owner, `FUN_14113e550`: a factor of 1), what lands it ([`HitKind`]: a
+ /// shield of charge type 4 blocks a missile's instead of 5) and the attacker's hit chance
+-/// (`+0x83e`).
++/// (`+0x83e`), and the hit's own factor (slot 0x920's float: 1, or 0.5 for a missed missile's
++/// hit on another object than its target, 188329 `0xb8fd60`).
+ #[derive(Clone, Copy, Debug, PartialEq)]
+ pub(crate) struct Hit {
+     pub at: Position,
+     pub from_z: Option<f32>,
+     pub kind: HitKind,
+     pub chance: HitChance,
++    pub scale: f32,
+ }
+ 
+ /// What the swing does after its hit, before it waits for its sprite's loop (`FUN_140a82ae0`
+@@ -172,7 +174,7 @@ pub(crate) fn strike(
+             let theirs = victim.building.as_ref().map_or(Relics::NONE, |t| t.relics);
+             building_elevation_factor(f, b.relics, victim.kind, theirs, damage_tuning)
+         })
+-    });
++    }) * hit.scale;
+     let weapons = own.weapons.clone();
+     let mut others: Vec<&mut Victim> = blasted.iter_mut().collect();
+     take(
 diff --git a/crates/engine/genie-core/src/combat/attack/tests.rs b/crates/engine/genie-core/src/combat/attack/tests.rs
-index c9d08c60..a89b2374 100644
+index c9d08c60..ec83b53d 100644
 --- a/crates/engine/genie-core/src/combat/attack/tests.rs
 +++ b/crates/engine/genie-core/src/combat/attack/tests.rs
 @@ -598,8 +598,10 @@ fn soldier_mover(speed: f32) -> Mover {
@@ -285,6 +315,156 @@ index c9d08c60..a89b2374 100644
      }
  }
  
+@@ -965,6 +967,7 @@ fn strike_on_an_annex_hits_its_main_building() {
+         from_z: Some(0.0),
+         kind: HitKind::Melee,
+         chance: HitChance::of_data(100),
++        scale: 1.0,
+     };
+     let struck = strike(
+         &mut own,
+@@ -1020,6 +1023,7 @@ fn building_relic_raises_its_missile_hit() {
+             from_z: Some(2.0),
+             kind: HitKind::Missile,
+             chance: HitChance::of_data(100),
++            scale: 1.0,
+         };
+         let _ = strike(
+             &mut own,
+diff --git a/crates/engine/genie-core/src/combat/attack/walk_and_swing.rs b/crates/engine/genie-core/src/combat/attack/walk_and_swing.rs
+index 13b2a730..1ce6d2c9 100644
+--- a/crates/engine/genie-core/src/combat/attack/walk_and_swing.rs
++++ b/crates/engine/genie-core/src/combat/attack/walk_and_swing.rs
+@@ -419,6 +419,7 @@ impl Attack {
+             from_z: Some(f.own.position.z()),
+             kind: HitKind::Melee,
+             chance,
++            scale: 1.0,
+         };
+         let struck = strike(&mut f.own, &mut f.victim, blasted, hit, object_rng, layer)?;
+         Ok(struck.executed)
+diff --git a/crates/engine/genie-core/src/combat/missile/unit.rs b/crates/engine/genie-core/src/combat/missile/unit.rs
+index 9edd4dcf..663bf562 100644
+--- a/crates/engine/genie-core/src/combat/missile/unit.rs
++++ b/crates/engine/genie-core/src/combat/missile/unit.rs
+@@ -216,8 +216,10 @@ impl Unit {
+     /// ([`Unit::missile_strike`]); unless the master's vanish mode has
+     /// [`crate::combat::missile::VanishMode::PASSES_THROUGH`] or a shield blocked it, the missile
+     /// ends (`set_state` 1: slot 0xd8, its hit points 0). The step's objects become the met ones
+-    /// (`+0x88`) when there are any. A missed missile's hit on another object than its target, hit
+-    /// mode 2 and the Hussite wagon's case (`+0x90`) are not modelled.
++    /// (`+0x88`) when there are any. Hit
++    /// mode 2 and the Hussite wagon's case (`+0x90`) are not modelled. A missed missile's hit on another
++    /// object than its target strikes that object at the factor 0.5 (188329 `0xb8fd60`; the master's
++    /// own factor for smart mode bit 1 is not modelled).
+     pub(crate) fn missile_hits(
+         &mut self,
+         actions: &mut Action,
+@@ -248,7 +250,8 @@ impl Unit {
+                     if Some(id) != action.target.map(MissileTargetId::id) {
+                         continue;
+                     }
+-                    let result = self.missile_strike(actions, action, fired, c, roles)?;
++                    let on = action.target.map(MissileTargetId::id);
++                    let result = self.missile_strike(actions, action, fired, (on, 1.0), c, roles)?;
+                     action.result = result;
+                     if !stats.vanish_mode.contains(VanishMode::PASSES_THROUGH)
+                         && result != StrikeResult::Shielded
+@@ -262,11 +265,27 @@ impl Unit {
+                         continue;
+                     }
+                     if Some(id) != action.target.map(MissileTargetId::id) {
+-                        return Err(GenieError::unsupported(
+-                            "a missed missile meeting another object than its target",
+-                        ));
++                        // 188329 0xb8fd60 (hit mode 1): the object it meets is struck in its
++                        // target's stead (slot 0x920) at the factor 0.5 (`DAT_1431b1420`), or the
++                        // master's own (`+0x308`) when its smart mode has bit 1; it ends unless it
++                        // passes through or a shield blocked it.
++                        if stats.smart_mode.bits() & 2 != 0 {
++                            return Err(GenieError::unsupported(
++                                "a missed missile's hit on another object at its master's factor (smart mode bit 1)",
++                            ));
++                        }
++                        let result =
++                            self.missile_strike(actions, action, fired, (Some(id), 0.5), c, roles)?;
++                        action.result = result;
++                        if !stats.vanish_mode.contains(VanishMode::PASSES_THROUGH)
++                            && result != StrikeResult::Shielded
++                        {
++                            self.end_missile(action);
++                        }
++                        continue;
+                     }
+-                    let result = self.missile_strike(actions, action, fired, c, roles)?;
++                    let on = action.target.map(MissileTargetId::id);
++                    let result = self.missile_strike(actions, action, fired, (on, 1.0), c, roles)?;
+                     action.result = result;
+                     // the master's dying sprite plays there (a sprite of its own, not held)
+                     if (stats.vanish_mode.contains(VanishMode::PASSES_THROUGH)
+@@ -378,6 +397,7 @@ impl Unit {
+         actions: &mut Action,
+         action: &MissileAction,
+         fired: Fired,
++        (on, scale): (Option<ObjectId>, f32),
+         c: &mut Step<'_>,
+         roles: &Roles,
+     ) -> Result<StrikeResult, GenieError> {
+@@ -386,9 +406,9 @@ impl Unit {
+             return Err(GenieError::unsupported("a charge projectile's own hit"));
+         }
+         if action.fired_from.is_none() {
+-            return self.own_strike(actions, action, fired.by, c, roles);
++            return self.own_strike(actions, action, fired.by, (on, scale), c, roles);
+         }
+-        let mut victim = victim(c, action.target, roles)?;
++        let mut victim = victim(c, on, roles)?;
+         let (p, mode_680) = (c.player, c.w.mode_680);
+         let shooter_slot = c.w.live_index(p, action.fired_from);
+         let World {
+@@ -441,6 +461,7 @@ impl Unit {
+             from_z: Some(action.origin.position.z()),
+             kind: HitKind::Missile,
+             chance: master.combat_part().hit_chance,
++            scale,
+         };
+         let object = streams.get(Stream::Object);
+         let struck = strike(
+@@ -487,6 +508,7 @@ impl Unit {
+         actions: &mut Action,
+         action: &MissileAction,
+         fired_from: Option<ShooterId>,
++        (on, scale): (Option<ObjectId>, f32),
+         c: &mut Step<'_>,
+         roles: &Roles,
+     ) -> Result<StrikeResult, GenieError> {
+@@ -520,7 +542,7 @@ impl Unit {
+         );
+         // the missile's own part is out of the unit while it flies
+         own.source.fired_from = fired_from;
+-        let mut victim = victim(c, action.target, roles)?.ok_or(GenieError::unsupported(
++        let mut victim = victim(c, on, roles)?.ok_or(GenieError::unsupported(
+             "a missile's target the slice does not hold live",
+         ))?;
+         let victim = &mut victim;
+@@ -529,6 +551,7 @@ impl Unit {
+             from_z: None,
+             kind: HitKind::Missile,
+             chance: master.combat_part().hit_chance,
++            scale,
+         };
+         let object = c.w.streams.get(Stream::Object);
+         let struck = strike(
+@@ -638,7 +661,8 @@ impl Unit {
+         if stats.hit_mode.strikes_on_landing(owner)
+             && on_target(self.position(), stats.radius, v.position, v.radius)
+         {
+-            let result = self.missile_strike(actions, action, fired, c, roles)?;
++            let on = action.target.map(MissileTargetId::id);
++            let result = self.missile_strike(actions, action, fired, (on, 1.0), c, roles)?;
+             action.result = result;
+             if result != StrikeResult::Shielded {
+                 self.end_missile(action);
 diff --git a/crates/engine/genie-core/src/combat/volley/launch.rs b/crates/engine/genie-core/src/combat/volley/launch.rs
 index 9a856bbb..26b92bdb 100644
 --- a/crates/engine/genie-core/src/combat/volley/launch.rs
@@ -864,8 +1044,84 @@ index 9510abdd..74c7e5d5 100644
          gather_search_tuning,
      )
  }
+diff --git a/crates/engine/genie-core/src/gathering/drop_off.rs b/crates/engine/genie-core/src/gathering/drop_off.rs
+index 1e001e13..c5944259 100644
+--- a/crates/engine/genie-core/src/gathering/drop_off.rs
++++ b/crates/engine/genie-core/src/gathering/drop_off.rs
+@@ -8,9 +8,10 @@ use crate::gathering::drop_sites::SitePlace;
+ use crate::gathering::drop_sites::SiteSearch;
+ use crate::gathering::drop_sites::{Seeker, drop_site_search};
+ use crate::gathering::gather::GatherState;
++use crate::gathering::gather::FARM_WAIT_TIME;
+ use crate::gathering::gather::unit::NO_GATHER;
+ use crate::gathering::gather::{GatherRetarget, Walks};
+-use crate::gathering::gather::{Resource, StopRate, productivity_of, waits_for_farm};
++use crate::gathering::gather::{Resource, StopRate, productivity_of};
+ use crate::gathering::hunt::NO_HUNT;
+ use crate::map::Distance;
+ use crate::map::Position;
+@@ -37,6 +38,7 @@ use crate::unit_ai::civilian_kind;
+ use crate::unit_ai::world_view::DropWorld;
+ use crate::world::Seconds;
+ use crate::world::index::ObjectsRef;
++use crate::world::layer::MasterRoles;
+ use crate::world::layer::Roles;
+ use crate::world::lets::{release, take};
+ use crate::world::others::OthersRef;
+@@ -128,7 +130,9 @@ impl Unit {
+     }
+ 
+     /// Nothing found after the drop: a Gather with its point walks there to search again
+-    /// (`set_state(11)` within the task's range; a farmer's 0xf3 is not modelled); without one
++    /// (`set_state(11)` within the task's range), a farmer's (masters 259, 214, 1891, 1892; 188329
++    /// `0xb800b0` after the deposit, `0xb7e500` case 0xf3) waits a second for another farm
++    /// (`set_state(0xf3)`: as the search's, the unit AI's notify 0x202, the unit stands); without one
+     /// (`LAB_140a8ed55`) a computer player's Gather is done (its code; its deletion lets the drop
+     /// site go), a human's idles (`set_state(2)`: its targets and point cleared, its sprite
+     /// [`Unit::idle_sprite`]'s) and lets its drop site go.
+@@ -139,11 +143,9 @@ impl Unit {
+         by: Releaser,
+         roles: &Roles,
+     ) -> Result<HeadCode, GenieError> {
+-        let farm_waits = waits_for_farm(
+-            self.life.master_id,
+-            actions.list.gather().and_then(|g| g.target_class),
+-            roles,
+-        );
++        let farm_waits = roles
++            .of_master(self.life.master_id)
++            .contains(MasterRoles::FARM_WAITER);
+         let walks = self.move_walks(
+             c.w.parts.mover_of(self.id),
+             MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
+@@ -157,9 +159,22 @@ impl Unit {
+         let gather = actions.list.gather_mut().ok_or(NO_GATHER)?;
+         if gather.point.x() != -1.0 && gather.point.y() != -1.0 {
+             if farm_waits {
+-                return Err(GenieError::unsupported(
+-                    "a farmer that found nothing after its drop-off (set_state 0xf3)",
+-                ));
++                let shows = self.idle_sprite(actions, c)?;
++                let gather = actions.list.gather_mut().ok_or(NO_GATHER)?;
++                gather.tear_down(c.w.parts.mover_mut(self.id))?;
++                gather.state = GatherState::FarmWait;
++                gather.timer = FARM_WAIT_TIME;
++                if let Some(g) = shows {
++                    new_sprite(
++                        &mut self.sprite,
++                        c.w.parts.move_stats_mut(self.id),
++                        g,
++                        c.w.streams.get(Stream::Sprite),
++                        c.w.model.tuning.sprite,
++                    );
++                }
++                self.gather_search(actions, c)?;
++                return Ok(HeadCode::Keeps);
+             }
+             // set_state(11) without a target: to the point within the task's range
+             let mover =
 diff --git a/crates/engine/genie-core/src/gathering/gather/mod.rs b/crates/engine/genie-core/src/gathering/gather/mod.rs
-index 88cd0044..e6259455 100644
+index 88cd0044..b63c22ce 100644
 --- a/crates/engine/genie-core/src/gathering/gather/mod.rs
 +++ b/crates/engine/genie-core/src/gathering/gather/mod.rs
 @@ -14,6 +14,7 @@
@@ -876,6 +1132,15 @@ index 88cd0044..e6259455 100644
  use crate::gathering::FarmStops;
  use crate::gathering::StopIndex;
  use crate::gathering::hunt::{HuntSprites, HuntTask};
+@@ -97,7 +98,7 @@ pub const GATHER: ActionKind = ActionKind::named(5);
+ /// immediate in `0x140a8cd40`).
+ const SEARCH_WAIT: Seconds = Seconds::new(-10.0);
+ /// `set_state(0xf3)`'s timer: a second (`0xbf800000`, an immediate in `0x140a8cd40`).
+-const FARM_WAIT_TIME: Seconds = Seconds::new(-1.0);
++pub(crate) const FARM_WAIT_TIME: Seconds = Seconds::new(-1.0);
+ /// `mGatherX` of none (`DAT_14330ec20`, −1.0, read at `0x140a8d1c6`).
+ const NO_GATHER_POINT: f32 = GATHER_NO_GATHER_POINT;
+ 
 @@ -218,6 +219,8 @@ pub(crate) struct GatherReads {
      pub(crate) capacity: Amount,
      /// The player's attribute the task's `attribute_type2` names, when above 0; else 1.
@@ -7366,11 +7631,48 @@ index b388f155..d2925c47 100644
      /// What a search of the unit AI covers (`FUN_140c63e20`): the classes its constructor gave
      /// it ([`cared_classes`]), within its search radius, the line of sight plus 1 if that is
      /// farther, plus its growth (`+0x1e8`, `FUN_140c2e080`'s fourth argument: 7 for the villager
+diff --git a/crates/engine/genie-core/src/unit_ai/handle.rs b/crates/engine/genie-core/src/unit_ai/handle.rs
+index 21df231c..873fd12d 100644
+--- a/crates/engine/genie-core/src/unit_ai/handle.rs
++++ b/crates/engine/genie-core/src/unit_ai/handle.rs
+@@ -47,12 +47,13 @@ impl UnitAi {
+             UnitAiKind::Building => self.building_notify(n, time, at, player_kind, ai_rng, side),
+             UnitAiKind::Livestock => self.livestock_notify(n, time, at, player_kind, ai_rng, side),
+             UnitAiKind::Artifact => self.artifact_notify(n, time, at, player_kind, ai_rng, side),
+-            UnitAiKind::Predator
+-            | UnitAiKind::Ranged
+-            | UnitAiKind::Ranged2
+-            | UnitAiKind::Priest => Err(GenieError::unsupported(
+-                "the notify handler of a unit-AI type not modelled",
+-            )),
++            UnitAiKind::Priest => self.priest_notify(n, time, at, player_kind, ai_rng, side),
++            UnitAiKind::Predator | UnitAiKind::Ranged | UnitAiKind::Ranged2 => {
++                eprintln!("UNMODELLED_AI_NOTIFY ai={:?} {n:?}", self.ai_kind);
++                Err(GenieError::unsupported(
++                    "the notify handler of a unit-AI type not modelled",
++                ))
++            }
+         }
+     }
+ 
 diff --git a/crates/engine/genie-core/src/unit_ai/idle.rs b/crates/engine/genie-core/src/unit_ai/idle.rs
-index 28ca0268..32b392f0 100644
+index 28ca0268..38635434 100644
 --- a/crates/engine/genie-core/src/unit_ai/idle.rs
 +++ b/crates/engine/genie-core/src/unit_ai/idle.rs
-@@ -645,7 +645,7 @@ impl UnitAi {
+@@ -66,6 +66,12 @@ impl UnitAi {
+             UnitAiKind::Tower => self.tower_idle(at, player_kind, side, ai),
+             UnitAiKind::Artifact => self.artifact_idle(at, side, ai),
+             UnitAiKind::Building | UnitAiKind::Livestock => Ok(IdleOutcome::Idle),
++            // the priest's (188329 0xcfdb10): a monk carrying a relic (class 0x2b) only lowers
++            // its last human order time (0xd1c2e0), then 5
++            UnitAiKind::Priest if at.class.is_some_and(|c| c.get() == 0x2b) => {
++                self.cap_human_order(side, ai)?;
++                Ok(IdleOutcome::Idle)
++            }
+             UnitAiKind::Predator
+             | UnitAiKind::Ranged
+             | UnitAiKind::Ranged2
+@@ -645,7 +651,7 @@ impl UnitAi {
      /// What the attack tests read of the unit AI ([`Seeker`]), its current target's master type
      /// `target_master_kind` as the world holds it.
      #[must_use]
@@ -7379,7 +7681,7 @@ index 28ca0268..32b392f0 100644
          Seeker {
              stance: self.stance,
              state_position: self.state_position,
-@@ -655,6 +655,16 @@ impl UnitAi {
+@@ -655,6 +661,16 @@ impl UnitAi {
              target_class: self.target_class,
              last_target_class: self.last_target_class,
              patrol_path: self.patrol_path.is_some(),
@@ -7683,6 +7985,68 @@ index d0cbfb72..5adf364c 100644
      Some({
          let held = roles.of_class(class);
          if held.intersects(
+diff --git a/crates/engine/genie-core/src/unit_ai/kind_notifies.rs b/crates/engine/genie-core/src/unit_ai/kind_notifies.rs
+index 48ac7e77..d028e01d 100644
+--- a/crates/engine/genie-core/src/unit_ai/kind_notifies.rs
++++ b/crates/engine/genie-core/src/unit_ai/kind_notifies.rs
+@@ -75,6 +75,57 @@ impl UnitAi {
+         }
+     }
+ 
++    /// The priest's handler (188329 `0xd047b0`, slot 0x238 of the table `0x3245b70`, whose slot
++    /// 0x1e0 answers 9): a failed, invalidated or searching action (0x1f9, 0x1fb, 0x202) of a
++    /// human player's converting monk (`+0x44` 0x25c) forgets the target (`0xd38f90`) and stops
++    /// (slot 0xb0 with 1); a computer's conversion and a heal look for another target (slots
++    /// 0x260, 0x258; not modelled); any other forgets the target and stops with its order
++    /// (slot 0xb0 with 0). Slot 0x48 hands the notify to the owner (not held); those cases
++    /// answer 2. A moved target (0x1fc) the unit no longer holds forgets it, stops (slot 0xb0
++    /// with 1) and goes on to the base handler; one it still holds (`0xd44470`) is not
++    /// modelled. Any other notify is the base handler's (`0xd33c40`).
++    pub(super) fn priest_notify(
++        &mut self,
++        n: Notify,
++        time: Millis,
++        at: &Surroundings,
++        player_kind: PlayerKind,
++        ai_rng: &mut Well512,
++        side: &mut dyn UnitSide,
++    ) -> Result<u32, GenieError> {
++        match n.kind {
++            NotifyKind::TARGET_MOVED => {
++                if self.current_target.is_some() && at.target.is_some() {
++                    return Err(GenieError::unsupported(
++                        "a priest's moved target it still holds (188329 0xd44470)",
++                    ));
++                }
++                self.remove_target();
++                self.stop_current(StopOrder::Keep, at, side, ai_rng)?;
++                self.base_notify(n, time, at, player_kind, ai_rng, side)
++            }
++            NotifyKind::ACTION_FAILED
++            | NotifyKind::ACTION_INVALIDATED
++            | NotifyKind::REQUIRES_SEARCH => {
++                let converting = self.current_action == Some(AiAction::Convert);
++                if converting && !player_kind.is_computer() {
++                    self.remove_target();
++                    self.stop_current(StopOrder::Keep, at, side, ai_rng)?;
++                    return Ok(GO_ON);
++                }
++                if converting || self.current_action == Some(AiAction::Heal) {
++                    return Err(GenieError::unsupported(
++                        "a priest's search for another to convert or heal (slots 0x260, 0x258)",
++                    ));
++                }
++                self.remove_target();
++                self.stop_current(StopOrder::End, at, side, ai_rng)?;
++                Ok(GO_ON)
++            }
++            _ => self.base_notify(n, time, at, player_kind, ai_rng, side),
++        }
++    }
++
+     /// The lion's handler (`FUN_140c266f0`): its completed attack sets its idle timeout
+     /// (`FUN_140c41bc0` with 1000, then slot 0x1a8), drops the target and stops; a moved target
+     /// is [`UnitAi::lion_target_moved`]'s. Both cases, and any other notify, go on to the base
 diff --git a/crates/engine/genie-core/src/unit_ai/process_order.rs b/crates/engine/genie-core/src/unit_ai/process_order.rs
 index 6f60bbc2..9d9b867f 100644
 --- a/crates/engine/genie-core/src/unit_ai/process_order.rs
