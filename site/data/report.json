@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-15T03:41:56.177098+00:00",
-  "last_checked_at": "2026-11-15T03:37:21.364619+00:00",
+  "updated_at": "2026-11-15T06:32:59.320894+00:00",
+  "last_checked_at": "2026-11-15T06:30:09.078668+00:00",
   "sync_error": null,
   "profile": {
     "id": 26260702,
@@ -37,7 +37,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 25,
+        "analysis_revision": 26,
         "duration_game_seconds": 2511.57,
         "civilization": "Chinese",
         "random_civ": true,
@@ -41599,21 +41599,24 @@
                 "kind": "sheep",
                 "eaten": 133.0,
                 "first_seconds": 30.0,
-                "last_seconds": 100.0
+                "last_seconds": 100.0,
+                "full": 150.0
               },
               {
                 "id": 9565,
                 "kind": "sheep",
                 "eaten": 133.4,
                 "first_seconds": 110.0,
-                "last_seconds": 170.0
+                "last_seconds": 170.0,
+                "full": 150.0
               },
               {
                 "id": 9712,
                 "kind": "deer",
                 "eaten": 113.8,
                 "first_seconds": 200.0,
-                "last_seconds": 290.0
+                "last_seconds": 290.0,
+                "full": 140.0
               },
               {
                 "id": 9795,
@@ -41636,35 +41639,40 @@
                 "kind": "sheep",
                 "eaten": 129.6,
                 "first_seconds": 70.0,
-                "last_seconds": 120.0
+                "last_seconds": 120.0,
+                "full": 150.0
               },
               {
                 "id": 9566,
                 "kind": "sheep",
                 "eaten": 137.2,
                 "first_seconds": 150.0,
-                "last_seconds": 180.0
+                "last_seconds": 180.0,
+                "full": 150.0
               },
               {
                 "id": 9568,
                 "kind": "sheep",
                 "eaten": 140.0,
                 "first_seconds": 210.0,
-                "last_seconds": 230.0
+                "last_seconds": 230.0,
+                "full": 150.0
               },
               {
                 "id": 9569,
                 "kind": "sheep",
                 "eaten": 141.0,
                 "first_seconds": 250.0,
-                "last_seconds": 270.0
+                "last_seconds": 270.0,
+                "full": 150.0
               },
               {
                 "id": 9562,
                 "kind": "sheep",
                 "eaten": 139.2,
                 "first_seconds": 300.0,
-                "last_seconds": 320.0
+                "last_seconds": 320.0,
+                "full": 150.0
               },
               {
                 "id": 9560,
@@ -42129,7 +42137,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 25,
+        "analysis_revision": 26,
         "duration_game_seconds": 2463.58,
         "civilization": "Britons",
         "random_civ": false,
@@ -80208,63 +80216,72 @@
                 "kind": "sheep",
                 "eaten": 87.8,
                 "first_seconds": 60.0,
-                "last_seconds": 80.0
+                "last_seconds": 80.0,
+                "full": 100.0
               },
               {
                 "id": 9765,
                 "kind": "sheep",
                 "eaten": 91.5,
                 "first_seconds": 110.0,
-                "last_seconds": 120.0
+                "last_seconds": 120.0,
+                "full": 100.0
               },
               {
                 "id": 9767,
                 "kind": "sheep",
                 "eaten": 91.5,
                 "first_seconds": 150.0,
-                "last_seconds": 160.0
+                "last_seconds": 160.0,
+                "full": 100.0
               },
               {
                 "id": 9770,
                 "kind": "sheep",
                 "eaten": 89.5,
                 "first_seconds": 190.0,
-                "last_seconds": 260.0
+                "last_seconds": 260.0,
+                "full": 100.0
               },
               {
                 "id": 9769,
                 "kind": "sheep",
                 "eaten": 87.5,
                 "first_seconds": 240.0,
-                "last_seconds": 270.0
+                "last_seconds": 270.0,
+                "full": 100.0
               },
               {
                 "id": 9910,
                 "kind": "deer",
                 "eaten": 121.5,
                 "first_seconds": 250.0,
-                "last_seconds": 260.0
+                "last_seconds": 260.0,
+                "full": 140.0
               },
               {
                 "id": 9763,
                 "kind": "sheep",
                 "eaten": 87.5,
                 "first_seconds": 290.0,
-                "last_seconds": 320.0
+                "last_seconds": 320.0,
+                "full": 100.0
               },
               {
                 "id": 9761,
                 "kind": "sheep",
                 "eaten": 83.9,
                 "first_seconds": 350.0,
-                "last_seconds": 440.0
+                "last_seconds": 440.0,
+                "full": 100.0
               },
               {
                 "id": 9988,
                 "kind": "boar",
                 "eaten": 252.0,
                 "first_seconds": 360.0,
-                "last_seconds": 400.0
+                "last_seconds": 400.0,
+                "full": 300.0
               },
               {
                 "id": 9768,
@@ -80278,7 +80295,8 @@
                 "kind": "deer",
                 "eaten": 114.2,
                 "first_seconds": 420.0,
-                "last_seconds": 440.0
+                "last_seconds": 440.0,
+                "full": 140.0
               }
             ],
             "opponent": [
@@ -80287,56 +80305,64 @@
                 "kind": "sheep",
                 "eaten": 85.6,
                 "first_seconds": 70.0,
-                "last_seconds": 100.0
+                "last_seconds": 100.0,
+                "full": 100.0
               },
               {
                 "id": 9771,
                 "kind": "sheep",
                 "eaten": 89.7,
                 "first_seconds": 130.0,
-                "last_seconds": 140.0
+                "last_seconds": 140.0,
+                "full": 100.0
               },
               {
                 "id": 9764,
                 "kind": "sheep",
                 "eaten": 78.1,
                 "first_seconds": 170.0,
-                "last_seconds": 260.0
+                "last_seconds": 260.0,
+                "full": 100.0
               },
               {
                 "id": 9762,
                 "kind": "sheep",
                 "eaten": 53.2,
                 "first_seconds": 190.0,
-                "last_seconds": 360.0
+                "last_seconds": 360.0,
+                "full": 100.0
               },
               {
                 "id": 9990,
                 "kind": "boar",
                 "eaten": 259.4,
                 "first_seconds": 220.0,
-                "last_seconds": 390.0
+                "last_seconds": 390.0,
+                "full": 300.0
               },
               {
                 "id": 9989,
                 "kind": "boar",
                 "eaten": 271.3,
                 "first_seconds": 390.0,
-                "last_seconds": 390.0
+                "last_seconds": 390.0,
+                "full": 300.0
               },
               {
                 "id": 9773,
                 "kind": "sheep",
                 "eaten": 81.7,
                 "first_seconds": 400.0,
-                "last_seconds": 450.0
+                "last_seconds": 450.0,
+                "full": 100.0
               },
               {
                 "id": 9766,
                 "kind": "sheep",
                 "eaten": 87.3,
                 "first_seconds": 420.0,
-                "last_seconds": 450.0
+                "last_seconds": 450.0,
+                "full": 100.0
               }
             ]
           }
@@ -80789,7 +80815,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 25,
+        "analysis_revision": 26,
         "duration_game_seconds": 2518.89,
         "civilization": "Franks",
         "random_civ": false,
@@ -127790,63 +127816,72 @@
                 "kind": "sheep",
                 "eaten": 131.6,
                 "first_seconds": 60.0,
-                "last_seconds": 110.0
+                "last_seconds": 110.0,
+                "full": 150.0
               },
               {
                 "id": 4082,
                 "kind": "sheep",
                 "eaten": 134.4,
                 "first_seconds": 140.0,
-                "last_seconds": 180.0
+                "last_seconds": 180.0,
+                "full": 150.0
               },
               {
                 "id": 4084,
                 "kind": "sheep",
                 "eaten": 127.8,
                 "first_seconds": 210.0,
-                "last_seconds": 280.0
+                "last_seconds": 280.0,
+                "full": 150.0
               },
               {
                 "id": 4088,
                 "kind": "sheep",
                 "eaten": 129.4,
                 "first_seconds": 290.0,
-                "last_seconds": 370.0
+                "last_seconds": 370.0,
+                "full": 150.0
               },
               {
                 "id": 4395,
                 "kind": "boar",
                 "eaten": 282.8,
                 "first_seconds": 310.0,
-                "last_seconds": 370.0
+                "last_seconds": 370.0,
+                "full": 340.0
               },
               {
                 "id": 4089,
                 "kind": "sheep",
                 "eaten": 134.3,
                 "first_seconds": 400.0,
-                "last_seconds": 440.0
+                "last_seconds": 440.0,
+                "full": 150.0
               },
               {
                 "id": 4086,
                 "kind": "sheep",
                 "eaten": 132.6,
                 "first_seconds": 440.0,
-                "last_seconds": 510.0
+                "last_seconds": 510.0,
+                "full": 150.0
               },
               {
                 "id": 4396,
                 "kind": "boar",
                 "eaten": 289.4,
                 "first_seconds": 440.0,
-                "last_seconds": 520.0
+                "last_seconds": 520.0,
+                "full": 340.0
               },
               {
                 "id": 4087,
                 "kind": "sheep",
                 "eaten": 130.8,
                 "first_seconds": 550.0,
-                "last_seconds": 600.0
+                "last_seconds": 600.0,
+                "full": 150.0
               }
             ],
             "opponent": [
@@ -127855,56 +127890,64 @@
                 "kind": "sheep",
                 "eaten": 127.2,
                 "first_seconds": 70.0,
-                "last_seconds": 130.0
+                "last_seconds": 130.0,
+                "full": 150.0
               },
               {
                 "id": 4397,
                 "kind": "boar",
                 "eaten": 291.8,
                 "first_seconds": 140.0,
-                "last_seconds": 240.0
+                "last_seconds": 240.0,
+                "full": 340.0
               },
               {
                 "id": 4081,
                 "kind": "sheep",
                 "eaten": 136.7,
                 "first_seconds": 280.0,
-                "last_seconds": 310.0
+                "last_seconds": 310.0,
+                "full": 150.0
               },
               {
                 "id": 4090,
                 "kind": "sheep",
                 "eaten": 124.8,
                 "first_seconds": 360.0,
-                "last_seconds": 430.0
+                "last_seconds": 430.0,
+                "full": 150.0
               },
               {
                 "id": 4398,
                 "kind": "boar",
                 "eaten": 295.7,
                 "first_seconds": 380.0,
-                "last_seconds": 430.0
+                "last_seconds": 430.0,
+                "full": 340.0
               },
               {
                 "id": 4091,
                 "kind": "sheep",
                 "eaten": 131.0,
                 "first_seconds": 430.0,
-                "last_seconds": 510.0
+                "last_seconds": 510.0,
+                "full": 150.0
               },
               {
                 "id": 4083,
                 "kind": "sheep",
                 "eaten": 133.7,
                 "first_seconds": 450.0,
-                "last_seconds": 510.0
+                "last_seconds": 510.0,
+                "full": 150.0
               },
               {
                 "id": 4092,
                 "kind": "sheep",
                 "eaten": 133.3,
                 "first_seconds": 540.0,
-                "last_seconds": 590.0
+                "last_seconds": 590.0,
+                "full": 150.0
               },
               {
                 "id": 4093,
@@ -128427,7 +128470,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 25,
+        "analysis_revision": 26,
         "duration_game_seconds": 1201.99,
         "civilization": "Britons",
         "random_civ": false,
@@ -155217,7 +155260,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 25,
+        "analysis_revision": 26,
         "duration_game_seconds": 1471.54,
         "civilization": "Franks",
         "random_civ": false,
