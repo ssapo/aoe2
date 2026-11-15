@@ -64,6 +64,52 @@ def resource_mean(curve, side, start, end):
     return int(weighted/covered+0.5) if covered >= (end-start)*0.9 else None
 
 
+FOOD_MINUTES = range(60, 601, 60)  # food is compared up to 10:00, inside the span the engine replay was verified
+
+
+def food_sources(engine, side):
+    """Engine food by source for one side at whole minutes within the verified span.
+
+    `at`: {"300": [sheep, hunt (boar+deer), berries, farm, rest (fish+other)]} cumulative food brought in.
+    `left`: food left on animals this side finished alone by that minute (only when the engine gave `full`)."""
+    if not isinstance(engine, dict) or not finite(engine.get('verified_until_seconds')):
+        return None
+    until = engine['verified_until_seconds']
+    points = (engine.get('by_source') or {}).get('points')
+    if not isinstance(points, list):
+        return None
+    start = 1 if side == 0 else 10
+    rows = {}
+    for p in points:
+        if isinstance(p, list) and len(p) == 19 and all(finite(v) for v in p):
+            rows[round(p[0], 1)] = p
+    at = {}
+    for minute in FOOD_MINUTES:
+        p = rows.get(float(minute))
+        if minute > until or p is None:
+            continue
+        f = p[start:start+7]
+        at[str(minute)] = [round(v) for v in (f[0], f[1]+f[2], f[3], f[4], f[5]+f[6])]
+    if not at:
+        return None
+    result = {'until': round(until, 1), 'at': at}
+    animals = engine.get('animals')
+    if isinstance(animals, dict) and finite(animals.get('until_seconds')):
+        everyone = [a for k in ('own', 'opponent') for a in (animals.get(k) or []) if isinstance(a, dict)]
+        mine = [a for a in (animals.get('own' if side == 0 else 'opponent') or []) if isinstance(a, dict)]
+        if any('full' in a for a in everyone):
+            left = {}
+            for minute in FOOD_MINUTES:
+                if minute > min(until, animals['until_seconds']):
+                    continue
+                left[str(minute)] = round(sum(a['full']-a['eaten'] for a in mine
+                                              if finite(a.get('full')) and finite(a.get('eaten')) and a['full'] >= a['eaten']
+                                              and finite(a.get('last_seconds')) and a['last_seconds'] <= minute))
+            if left:
+                result['left'] = left
+    return result
+
+
 def observation(match, analysis, side, player, rating):
     metrics = analysis['metrics'] if side == 0 else analysis['opponents'][0]['metrics']
     summary = analysis.get('review', {}).get('own' if side == 0 else 'opponent', {})
@@ -88,11 +134,12 @@ def observation(match, analysis, side, player, rating):
             checkpoints[str(at)] = row
     if not ages and not checkpoints:
         return None
+    food = food_sources(analysis.get('engine_income'), side)
     return {'match_id': match['id'], 'profile_id': player['profile_id'], 'name': player['name'],
             'rating': rating, 'started_at': match['started_at'], 'map': match['map'],
             'civilization': analysis.get('civilization') if side == 0 else analysis['opponents'][0].get('civilization'),
             **classify(metrics, analysis.get('duration_game_seconds', 0)),
-            'ages': ages, 'checkpoints': checkpoints}
+            'ages': ages, 'checkpoints': checkpoints, **({'food': food} if food else {})}
 
 
 def build(reports, index, now=None, existing=None):
@@ -102,12 +149,13 @@ def build(reports, index, now=None, existing=None):
     samples = {}
     # Keep compact observations when a source report rolls out of its history.
     # Recheck eligibility and age on every build; newly parsed rows replace old ones.
-    if (existing or {}).get('method_revision') in (1, 2):
+    if (existing or {}).get('method_revision') in (1, 2, 3):
         for row in existing.get('samples', []):
             try:
                 started = datetime.fromisoformat(row['started_at'])
                 if row['profile_id'] in ranked and cutoff <= started <= now:
                     # v1 resource/age calculations are unchanged; only discard the old first-unit classification.
+                    # v2 rows simply lack `food` (engine food by source, added in v3).
                     kept = {**row, 'rating': ranked[row['profile_id']]['rating']}
                     if existing.get('method_revision') == 1:
                         kept.update(opening=None, opening_label=None)
@@ -139,7 +187,7 @@ def build(reports, index, now=None, existing=None):
                     row['started_at'] = started.isoformat()
                     row['recording_profile_id'] = report['profile']['id']
                     samples[(match['id'], pid)] = row
-    return {'schema_version': 1, 'method_revision': 2, 'generated_at': now.isoformat(), 'ranking_updated_at': index.get('updated_at'),
+    return {'schema_version': 1, 'method_revision': 3, 'generated_at': now.isoformat(), 'ranking_updated_at': index.get('updated_at'),
             'min_rating': MIN_RATING, 'days': 30,
             'samples': sorted(samples.values(), key=lambda r: (r['started_at'], r['match_id'], r['profile_id']), reverse=True)}
 

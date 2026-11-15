@@ -313,6 +313,7 @@
     renderMatches();
   }
   const civNames={Achaemenids:'아케메네스',Armenians:'아르메니아',Athenians:'아테네',Aztecs:'아즈텍',Bengalis:'벵골',Berbers:'베르베르',Bohemians:'보헤미아',Britons:'브리튼',Bulgarians:'불가리아',Burgundians:'부르고뉴',Burmese:'버마',Byzantines:'비잔틴',Celts:'켈트',Chinese:'중국',Cumans:'쿠만',Danes:'덴마크',Dravidians:'드라비다',Ethiopians:'에티오피아',Franks:'프랑크',Georgians:'조지아',Goths:'고트',Gurjaras:'구르자라',Hindustanis:'힌두스탄',Huns:'훈',Incas:'잉카',Italians:'이탈리아',Japanese:'일본',Jurchens:'여진',Khitans:'거란',Khmer:'크메르',Koreans:'한국',Lithuanians:'리투아니아',Macedonians:'마케도니아',Magyars:'마자르',Malay:'말레이',Malians:'말리',Mapuche:'마푸체',Maya:'마야',Mongols:'몽골',Muisca:'무이스카',Persians:'페르시아',Poles:'폴란드',Portuguese:'포르투갈',Puru:'푸루',Romans:'로마',Saracens:'사라센',Saxons:'색슨',Shu:'촉',Sicilians:'시칠리아',Slavs:'슬라브',Spanish:'스페인',Spartans:'스파르타',Tatars:'타타르',Teutons:'튜턴',Thracians:'트라키아',Tupi:'투피',Turks:'투르크',Varangians:'바랑기아',Vietnamese:'베트남',Vikings:'바이킹',Wei:'위',Wu:'오'};
+  window.SSAPOCivNames=civNames; // Korean civilization names for the 2000+ comparison labels
   const civIconFiles={Maya:'mayans'};
   const randomMark='<span class="civ-random" title="랜덤으로 고른 문명"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="13" rx="3"/><circle cx="5.2" cy="5.2" r="1.25"/><circle cx="10.8" cy="10.8" r="1.25"/><circle cx="8" cy="8" r="1.25"/></svg>랜덤</span>';
   function missingNotes(a){

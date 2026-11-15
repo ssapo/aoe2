@@ -46,14 +46,16 @@
   const kindLabel=maps=>(MAP_GROUPS.find(g=>(maps||[]).some(m=>g.maps.includes(m)))||{label:'비슷한 맵'}).label;
   const MIN_MATCHES=5,MIN_PLAYERS=2;
   const groupOf=map=>MAP_GROUPS.find(g=>g.maps.includes(map))||null;
-  /* {reference, shortage}: the same map first (same civilization, then mixed), then the map's group the same way.
-     reference.tier is 'map' or 'group' and reference.maps lists the maps its games were played on (most games first). */
+  /* {reference, shortage}: the narrowest set of games that still has enough of them.
+     Place comes first (the same map, then its open/closed group), then the same civilization, then the same opening:
+     map+civ+opening, map+civ, map+opening, map, then the same four inside the group.
+     reference.tier is 'map' or 'group', reference.filters lists 'civ'/'opening' used, reference.maps the maps played (most games first). */
   function choose(source,context,pick){
     if(source?.schema_version!==1||!finite(source.min_rating)||source.min_rating<2000||!Array.isArray(source.samples))return {reference:null,shortage:null};
     const group=groupOf(context.map);
     const usable=source.samples.filter(s=>s&&s.match_id!==context.matchId&&s.profile_id!==context.profileId&&finite(s.rating)&&s.rating>=source.min_rating).map(s=>({sample:s,value:pick(s)})).filter(r=>finite(r.value));
     const same=usable.filter(r=>r.sample.map===context.map),grouped=group?usable.filter(r=>group.maps.includes(r.sample.map)):[];
-    function aggregate(rows,sameCiv,tier){
+    function aggregate(rows,filters,tier){
       const byPlayer=new Map();
       for(const r of [...rows].sort((a,b)=>String(b.sample.started_at).localeCompare(String(a.sample.started_at)))){
         const id=r.sample.profile_id,list=byPlayer.get(id)||[];
@@ -67,35 +69,96 @@
       for(const r of kept){const set=perMap.get(r.sample.map)||new Set();set.add(r.sample.match_id);perMap.set(r.sample.map,set);}
       const maps=[...perMap.entries()].sort((a,b)=>b[1].size-a[1].size||String(a[0]).localeCompare(String(b[0]))).map(e=>e[0]);
       return {matches,players:byPlayer.size,reference:{median:Math.round(quantile(centers,.5)),q1:Math.round(quantile(centers,.25)),q3:Math.round(quantile(centers,.75)),
-        n:kept.length,matches,players:byPlayer.size,sameCiv,tier,group:tier==='group'?group.id:null,maps,names:[...byPlayer.values()].map(r=>r[0].sample.name),openingLabel:kept[0].sample.opening_label}};
+        n:kept.length,matches,players:byPlayer.size,sameCiv:filters.includes('civ'),filters,tier,group:tier==='group'?group.id:null,maps,
+        civilization:filters.includes('civ')?context.civilization:null,
+        names:[...byPlayer.values()].map(r=>r[0].sample.name),openingLabel:kept[0].sample.opening_label}};
     }
-    const civ=rows=>rows.filter(r=>r.sample.civilization===context.civilization);
-    const sameAll=aggregate(same,false,'map');
-    const reference=aggregate(civ(same),true,'map').reference||sameAll.reference;
-    if(reference)return {reference,shortage:null};
-    const groupAll=group?aggregate(grouped,false,'group'):null;
-    const fallback=group?aggregate(civ(grouped),true,'group').reference||groupAll.reference:null;
-    if(fallback)return {reference:fallback,shortage:null};
+    const sets=[['civ','opening'],['civ'],['opening'],[]].filter(f=>(!f.includes('civ')||context.civilization)&&(!f.includes('opening')||context.opening));
+    const narrow=(rows,f)=>rows.filter(r=>(!f.includes('civ')||r.sample.civilization===context.civilization)&&(!f.includes('opening')||r.sample.opening===context.opening));
+    let sameAll=null,groupAll=null;
+    for(const [tier,rows] of [['map',same],...(group?[['group',grouped]]:[])]){
+      for(const f of sets){
+        const result=aggregate(narrow(rows,f),f,tier);
+        if(!f.length){if(tier==='map')sameAll=result;else groupAll=result;}
+        if(result.reference)return {reference:result.reference,shortage:null};
+      }
+    }
     return {reference:null,shortage:{same:sameAll.matches,group:groupAll?groupAll.matches:null}};
   }
   const select=(source,context,pick)=>choose(source,context,pick).reference;
+  const civName=civ=>(global.SSAPOCivNames&&global.SSAPOCivNames[civ])||civ;
+  /* Which games a reference used, in plain words without the count: "열린 맵 · 프랑크 · 스카웃". */
+  function where(reference){
+    if(!reference||!['map','group'].includes(reference.tier))return '';
+    const filters=reference.filters||(reference.sameCiv?['civ']:[]);
+    return [reference.tier==='map'?'같은 맵':kindLabel(reference.maps),
+      ...(filters.includes('civ')&&reference.civilization?[civName(reference.civilization)]:[]),
+      ...(filters.includes('opening')&&reference.openingLabel?[reference.openingLabel]:[])].join(' · ');
+  }
   /* Plain words for what a reference was built from; '' for a reference without that record. */
   function basis(reference){
     if(!reference||!finite(reference.matches))return '';
-    if(reference.tier==='map')return `같은 맵 ${reference.matches}경기`;
-    if(reference.tier==='group')return `${kindLabel(reference.maps)}(${(reference.maps||[]).join('·')}) ${reference.matches}경기`;
-    return '';
+    const place=where(reference);
+    return place?`${place} ${reference.matches}경기`:'';
   }
   function shortageText(result){
     const s=result?.shortage;
     if(!s||['resources','ages','villagers'].some(k=>result[k]?.length))return '';
     return `이 맵은 ${result.minRating||2000}점 이상 기준 경기가 부족해요(같은 맵 ${s.same}경기, ${s.group===null?'열린 맵·닫힌 맵 어느 쪽에도 안 넣은 맵':`같은 종류 맵 ${s.group}경기`}; ${MIN_MATCHES}경기·${MIN_PLAYERS}명 이상 필요)`;
   }
+  /* Engine food by source at whole minutes inside the verified span (mirror of scripts/ranked_benchmarks.py food_sources).
+     at[minute] = [sheep, hunt, berries, farm, rest]; left[minute] = food left on animals this side finished alone by then. */
+  const FOOD_LIMIT=600,FOOD_FROM=240;
+  function foodAt(engine,side=0){
+    if(!engine||!finite(engine.verified_until_seconds)||!Array.isArray(engine.by_source?.points))return null;
+    const until=engine.verified_until_seconds,start=side===0?1:10,rows=new Map();
+    for(const p of engine.by_source.points)if(Array.isArray(p)&&p.length===19&&p.every(finite))rows.set(Math.round(p[0]*10)/10,p);
+    const at={};
+    for(let minute=60;minute<=FOOD_LIMIT;minute+=60){
+      const p=rows.get(minute);if(minute>until||!p)continue;
+      const f=p.slice(start,start+7);at[minute]=[f[0],f[1]+f[2],f[3],f[4],f[5]+f[6]].map(Math.round);
+    }
+    if(!Object.keys(at).length)return null;
+    const out={until,at},animals=engine.animals;
+    if(animals&&finite(animals.until_seconds)){
+      const all=[...(animals.own||[]),...(animals.opponent||[])].filter(a=>a&&typeof a==='object'),mine=(animals[side===0?'own':'opponent']||[]).filter(a=>a&&typeof a==='object');
+      if(all.some(a=>'full' in a)){
+        const left={};
+        for(let minute=60;minute<=Math.min(FOOD_LIMIT,until,animals.until_seconds);minute+=60)
+          left[minute]=Math.round(mine.filter(a=>finite(a.full)&&finite(a.eaten)&&a.full>=a.eaten&&finite(a.last_seconds)&&a.last_seconds<=minute).reduce((sum,a)=>sum+a.full-a.eaten,0));
+        if(Object.keys(left).length)out.left=left;
+      }
+    }
+    return out;
+  }
+  const FOOD_NAMES=['가축','사냥','열매','농장'];
+  /* Food shares and food left at one common time: the player's verified end clamped to 10:00, whole minutes;
+     only pro games verified at least that long count. null when either side lacks the data. */
+  function foodRows(analysis,context,source){
+    const own=foodAt(analysis?.engine_income);
+    if(!own)return null;
+    const at=Math.floor(Math.min(own.until,FOOD_LIMIT)/60)*60,mine=own.at[at];
+    if(at<FOOD_FROM||!mine)return null;
+    const sum=list=>list.reduce((a,b)=>a+b,0),total=sum(mine);
+    if(total<=0)return null;
+    const sampleAt=s=>{const f=s?.food;return f&&finite(f.until)&&f.until>=at&&Array.isArray(f.at?.[at])&&f.at[at].length===5&&f.at[at].every(finite)?f.at[at]:null;};
+    const rows=[];
+    FOOD_NAMES.forEach((name,i)=>{
+      const reference=choose(source,context,s=>{const v=sampleAt(s),t=v&&sum(v);return t>0?v[i]/t*100:null;}).reference,value=Math.round(mine[i]/total*100);
+      if(reference&&(value>0||reference.median>0))rows.push({label:`${name} 비율`,value,reference,delta:value-reference.median,unit:'%'});
+    });
+    if(finite(own.left?.[at])){
+      const reference=choose(source,context,s=>sampleAt(s)&&finite(s.food.left?.[at])?s.food.left[at]:null).reference;
+      if(reference)rows.push({label:'남긴 식량',value:own.left[at],reference,delta:own.left[at]-reference.median,unit:'food',left:true});
+    }
+    return rows.length?{seconds:at,rows}:null;
+  }
   function compare(match,profileId,source,state){
     const a=match?.analysis,m=a?.metrics,own=a?.review?.own;
-    const result={resources:[],ages:[],villagers:[],ownResources:ownWindows(a?.state_curve,a?.duration_game_seconds,state),minRating:source?.min_rating||2000};
+    const result={resources:[],ages:[],villagers:[],food:null,ownResources:ownWindows(a?.state_curve,a?.duration_game_seconds,state),minRating:source?.min_rating||2000};
     if(!a||!own?.available||m?.recording_restored||source?.schema_version!==1)return result;
     const context={matchId:match.id,profileId,map:match.map,civilization:a.civilization,opening:own.opening};
+    result.food=foodRows(a,context,source);
     const pickFrom=picker=>{
       const chosen=choose(source,context,picker),short=chosen.shortage;
       if(short&&(!result.shortage||short.same+(short.group||0)>result.shortage.same+(result.shortage.group||0)))result.shortage=short;
@@ -121,9 +184,26 @@
     }
     return result;
   }
+  /* Food comparison: a details table in the numbers tab, one or two short lines in the overview. */
+  function foodGap(r){
+    if(r.delta===0)return '같음';
+    const n=Math.round(Math.abs(r.delta));
+    return r.unit==='%'?`${n}%p ${r.delta>0?'높음':'낮음'}`:`${num(n)} ${r.delta>0?'많음':'적음'}`;
+  }
+  function renderFood(result,compact,basisNote){
+    const f=result?.food;
+    if(!f||!f.rows.length)return '';
+    const value=(r,v)=>r.unit==='%'?`${Math.round(v)}%`:num(v),rating=result.minRating||2000;
+    if(compact){
+      const shares=f.rows.filter(r=>r.unit==='%'),widest=[...shares].sort((a,b)=>Math.abs(b.delta)-Math.abs(a.delta))[0],left=f.rows.find(r=>r.left);
+      return [widest,left].filter(Boolean).map(r=>`<p><span>${clock(f.seconds)} ${esc(r.label)} <b>${value(r,r.value)}</b></span><small>${rating}+ ${value(r,r.reference.median)} · ${foodGap(r)} · ${esc(basis(r.reference))}</small></p>`).join('');
+    }
+    const rows=f.rows.map(r=>`<tr><th scope="row">${esc(r.label)}</th><td>${value(r,r.value)}</td><td>${value(r,r.reference.median)}</td><td>${foodGap(r)}</td></tr>`).join('');
+    return `<details class="ranked-details"><summary>식량 출처 비교 <small>${clock(f.seconds)} 시점</small></summary><div class="table-scroll"><table class="timeline comparison ranked-table"><thead><tr><th>항목</th><th>나</th><th>${rating}+</th><th>차이</th></tr></thead><tbody>${rows}</tbody></table></div>${basisNote(f.rows)}<p class="ranked-basis"><span>경기 재현으로 확인된 구간 안에서 ${clock(f.seconds)}까지 일꾼이 가져온 식량의 비율이에요. 남긴 식량은 다 먹고 떠난 양·사냥감에 남은 양이에요.</span></p></details>`;
+  }
   function render(result,compact=false){
     const short=shortageText(result);
-    if(!result||(!short&&!['resources','ages','villagers','ownResources'].some(k=>result[k]?.length)))return '';
+    if(!result||(!short&&!result.food&&!['resources','ages','villagers','ownResources'].some(k=>result[k]?.length)))return '';
     const based=r=>{const text=basis(r.reference);return text?` · ${esc(text)}`:'';};
     const gap=(r,time=false)=>{
       if(r.delta===0)return '같음';
@@ -139,8 +219,7 @@
     const basisNote=rows=>{
       const used=rows.filter(r=>basis(r.reference));
       if(!used.length)return '';
-      const where=r=>r.reference.tier==='group'?`${kindLabel(r.reference.maps)}(${(r.reference.maps||[]).join('·')})`:'같은 맵';
-      const places=[...new Set(used.map(where))],counts=used.map(r=>r.reference.matches),low=Math.min(...counts),high=Math.max(...counts);
+      const places=[...new Set(used.map(r=>where(r.reference)))],counts=used.map(r=>r.reference.matches),low=Math.min(...counts),high=Math.max(...counts);
       const text=places.length===1?`기준: ${result.minRating}점 이상 · ${places[0]} ${low===high?low:`${low}~${high}`}경기`:`기준(${result.minRating}점 이상) — ${used.map(r=>`${r.label}: ${basis(r.reference)}`).join(' / ')}`;
       return `<p class="ranked-basis">${esc(text)}${used.some(r=>r.reference.tier==='group')?' <span>같은 맵 기준 경기가 부족해서 같은 종류(열린 맵/닫힌 맵)끼리 비교했어요.</span>':''}</p>`;
     };
@@ -150,9 +229,10 @@
       const time=result.ages.includes(r);
       return `<p><span>${esc(r.label)} <b>${time?clock(r.value):num(r.value)}</b></span><small>${result.minRating}+ ${time?clock(r.reference.median):num(r.reference.median)} · ${gap(r,time)}${based(r)}</small></p>`;
     }).join('');
-    const details=compact?(quick?`<div class="ranked-quick">${quick}</div>`:''):[['ages','시대업',true],['villagers','시간대별 주민',false],['resources','시간대별 자원',false]].filter(([key])=>result[key].length).map(([key,title,time])=>`<details class="ranked-details"><summary>${title} 비교</summary>${table(result[key],time)}</details>`).join('');
+    const food=renderFood(result,compact,basisNote);
+    const details=compact?(quick||food?`<div class="ranked-quick">${quick}${food}</div>`:''):[['ages','시대업',true],['villagers','시간대별 주민',false],['resources','시간대별 자원',false]].filter(([key])=>result[key].length).map(([key,title,time])=>`<details class="ranked-details"><summary>${title} 비교</summary>${table(result[key],time)}</details>`).join('')+food;
     return `<section class="ranked-benchmarks"><div class="panel-toolbar"><h3 class="detail-heading">내 자원 흐름</h3>${compact?'<button class="subtle" data-open-panel="numbers">자세히 →</button>':''}</div>${heroHtml}${details}${short?`<p class="ranked-basis ranked-shortage">${esc(short)}</p>`:''}</section>`;
   }
-  const api={select,choose,compare,render,stageAt,tcBand,basis,shortageText,groupOf,kindLabel,MAP_GROUPS};
+  const api={select,choose,compare,render,stageAt,tcBand,basis,where,shortageText,groupOf,kindLabel,MAP_GROUPS,foodAt,foodRows,renderFood};
   if(typeof module==='object'&&module.exports)module.exports=api;else global.SSAPORankedBenchmarks=api;
 })(typeof window==='undefined'?globalThis:window);
