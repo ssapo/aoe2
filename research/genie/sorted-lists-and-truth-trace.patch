@@ -331,6 +331,66 @@ index c9d08c60..ec83b53d 100644
          };
          let _ = strike(
              &mut own,
+diff --git a/crates/engine/genie-core/src/combat/attack/unit.rs b/crates/engine/genie-core/src/combat/attack/unit.rs
+index 4b8e5d77..a5faf86c 100644
+--- a/crates/engine/genie-core/src/combat/attack/unit.rs
++++ b/crates/engine/genie-core/src/combat/attack/unit.rs
+@@ -19,7 +19,9 @@ use crate::objects::masters::PlayersMasters;
+ use crate::objects::teardown::HeadCode;
+ use crate::objects::unit::Unit;
+ use crate::objects::unit::object_master;
++use crate::objects::ObjectState;
+ use crate::players::PlayerKind;
++use crate::players::PlayerId;
+ use crate::world::ATTACKER_MASTER;
+ use crate::world::Seconds;
+ use crate::world::WorldTime;
+@@ -174,9 +176,42 @@ impl Unit {
+             roles,
+             &c.w.model.tuning.turn,
+         );
+-        let victim = victim(c, attack.target, roles)?.ok_or(GenieError::unsupported(
+-            "an attack's target the slice does not hold live",
+-        ))?;
++        let Some(victim) = victim(c, attack.target, roles)? else {
++            // ENG-27: 188329 Attack update 0xb73f20 — the target's id is kept but the world's
++            // lookup (0x141616cf0) finds no object: slot 0x68 with none, then the same path as
++            // a dead target (the target null: the unit AI forgets it, 0xd38f90, whatever its
++            // player). The quiet one (a hunt's sub-action) and state 2 stay unmodelled.
++            let own = own.ok_or(ATTACKER_MASTER)?;
++            if attack.state == AttackState::Killed {
++                // state 2 skips the dead-target test (`+0x18 != 2`): the target pointer goes
++                // (slot 0x68 with none, a removed object lets nothing go) and case 1's step runs
++                attack.timer += c.dt.seconds();
++                let code = attack.killed_step(c, self);
++                if let Some(a) = actions.list.attack_mut() {
++                    *a = attack;
++                }
++                return Ok(HeadCode::of(code?));
++            }
++            if !attack.voice.is_loud() {
++                return Err(GenieError::unsupported(
++                    "an attack's target the slice does not hold live",
++                ));
++            }
++            let mut gone = own.clone();
++            gone.player = if own.player == PlayerId::new(0) {
++                PlayerId::new(1)
++            } else {
++                own.player
++            };
++            gone.state = ObjectState::Dead;
++            let f = Fight { victim: gone, own };
++            attack.timer += c.dt.seconds();
++            let code = attack.target_died(c, self, &f, &r, roles);
++            if let Some(a) = actions.list.attack_mut() {
++                *a = attack;
++            }
++            return Ok(HeadCode::of(code?));
++        };
+         let own = own.ok_or(ATTACKER_MASTER)?;
+         let mut f = Fight { victim, own };
+         // written back before an error too: the stop's context reads the list
 diff --git a/crates/engine/genie-core/src/combat/attack/walk_and_swing.rs b/crates/engine/genie-core/src/combat/attack/walk_and_swing.rs
 index 13b2a730..1ce6d2c9 100644
 --- a/crates/engine/genie-core/src/combat/attack/walk_and_swing.rs
@@ -1277,10 +1337,10 @@ index 3ab90215..b2721a8b 100644
  
      /// Case 6, the work: on a farm's stops (the game's `+0xc14` being 0) the time at the stop
 diff --git a/crates/engine/genie-core/src/gathering/gather/work.rs b/crates/engine/genie-core/src/gathering/gather/work.rs
-index b1ab9a1e..318e7833 100644
+index b1ab9a1e..fa462bea 100644
 --- a/crates/engine/genie-core/src/gathering/gather/work.rs
 +++ b/crates/engine/genie-core/src/gathering/gather/work.rs
-@@ -64,6 +64,20 @@ impl GatherAction {
+@@ -64,6 +64,26 @@ impl GatherAction {
                  "a gather's set_state 6 on master 1893 or 1897",
              ));
          }
@@ -1290,7 +1350,13 @@ index b1ab9a1e..318e7833 100644
 +        if std::env::var_os("GENIE_TRACE_ITEM5").is_some() && matches!(target.class.get(), 8 | 32) {
 +            let (u, t) = (unit.position(), target.position);
 +            if u.x().floor() != t.x().floor() && u.y().floor() != t.y().floor() {
-+                eprintln!("ITEM5 N4 player={:?} unit={:?} target={:?}", c.player, unit.id, target.id);
++                // ENG-27: 188329 skips the re-target when the unit AI has an order (0xd28770,
++                // `+0x3c != -1`); the truth's two cases (518470161 10522, 517426097 P2) hold 0x2c5
++                let order = c.w.parts.unit_ai.get(unit.id).map(|a| a.current_order);
++                eprintln!(
++                    "ITEM5 N4 player={:?} unit={:?} target={:?} order={order:?}",
++                    c.player, unit.id, target.id
++                );
 +            }
 +        }
 +        if std::env::var_os("GENIE_EXPERIMENT_GATHER_SNAP_188329").is_some()
@@ -1301,7 +1367,7 @@ index b1ab9a1e..318e7833 100644
          self.timer = Seconds::ZERO;
          Self::show(c, unit, self.walk_sprite(unit, r).or(r.sprites.standing));
          Ok(Next::Stay)
-@@ -102,6 +116,8 @@ impl GatherAction {
+@@ -102,6 +122,8 @@ impl GatherAction {
          if held != kind && !both_food(kind, held) {
              unit.life.attribute_kind = kind;
              unit.life.amount = Amount::ZERO;
@@ -1310,7 +1376,7 @@ index b1ab9a1e..318e7833 100644
          }
          Self::show(c, unit, r.sprites.working.or(r.sprites.standing));
      }
-@@ -146,10 +162,15 @@ impl GatherAction {
+@@ -146,10 +168,15 @@ impl GatherAction {
              target.amount = Amount::ZERO;
          }
          *held += gain;
@@ -1326,7 +1392,7 @@ index b1ab9a1e..318e7833 100644
          }
          // a farm's food sold at once (attribute 96): the load goes to the player as food (slot
          // 0xf8 with 1), the unit holds none, and the gathering goes on
-@@ -160,6 +181,7 @@ impl GatherAction {
+@@ -160,6 +187,7 @@ impl GatherAction {
          {
              let sold = mem_take(&mut unit.life.amount);
              c.give_load(c.w.model.slots.attribute.food, sold)?;
@@ -7639,7 +7705,7 @@ index b388f155..d2925c47 100644
      /// it ([`cared_classes`]), within its search radius, the line of sight plus 1 if that is
      /// farther, plus its growth (`+0x1e8`, `FUN_140c2e080`'s fourth argument: 7 for the villager
 diff --git a/crates/engine/genie-core/src/unit_ai/handle.rs b/crates/engine/genie-core/src/unit_ai/handle.rs
-index 21df231c..873fd12d 100644
+index 21df231c..4df86d30 100644
 --- a/crates/engine/genie-core/src/unit_ai/handle.rs
 +++ b/crates/engine/genie-core/src/unit_ai/handle.rs
 @@ -47,12 +47,13 @@ impl UnitAi {
@@ -7662,6 +7728,21 @@ index 21df231c..873fd12d 100644
          }
      }
  
+@@ -230,6 +231,14 @@ impl UnitAi {
+             NotifyKind::DAMAGED | NotifyKind::MISSILE_WARNING => {
+                 self.damaged(n, time, at, player_kind, ai_rng, side)
+             }
++            // ENG-27: 188329 base handler 0xd33c40, case 0x1fe (0xd3688e): the unit's slot 0x3f8
++            // (nothing on the unit vtable 0x32a4698; another object's override is not held), the
++            // target goes (0xd38f90) and the action stops (slot 0xb0 with 1, 0xd352f0); 2
++            NotifyKind::TOO_CLOSE => {
++                self.remove_target();
++                self.stop_current(StopOrder::Keep, at, side, ai_rng)?;
++                Ok(GO_ON)
++            }
+             NotifyKind::IN_THE_WAY => self.in_the_way(n, at, side, ai_rng),
+             NotifyKind::SENT_OFF => self.sent_off(n, side, ai_rng, roles, unit_ai_tuning),
+             // a unit of a group sent off a footprint: the action value 0x2c0
 diff --git a/crates/engine/genie-core/src/unit_ai/idle.rs b/crates/engine/genie-core/src/unit_ai/idle.rs
 index 28ca0268..38635434 100644
 --- a/crates/engine/genie-core/src/unit_ai/idle.rs
@@ -9263,6 +9344,28 @@ index 9912d9e7..a645c607 100644
          }
      }
  }
+diff --git a/crates/engine/genie-core/src/world/step.rs b/crates/engine/genie-core/src/world/step.rs
+index ba6fdc83..d00f9c03 100644
+--- a/crates/engine/genie-core/src/world/step.rs
++++ b/crates/engine/genie-core/src/world/step.rs
+@@ -242,6 +242,17 @@ impl Step<'_> {
+         kind: AttributeId,
+         amount: Amount,
+     ) -> Result<(), GenieError> {
++        if std::env::var_os("GENIE_TRACE_DROP").is_some() {
++            // ENG-27: each load given to a player, its float's bits
++            eprintln!(
++                "DROP ms={} p={} kind={} amount={} bits={:08x}",
++                self.w.world_time.millis(),
++                self.player.index(),
++                i16::from(kind),
++                amount.get(),
++                amount.get().to_bits()
++            );
++        }
+         let mut adds = Vec::new();
+         unit_give_load(
+             (
 diff --git a/crates/engine/genie-core/src/world/world_update.rs b/crates/engine/genie-core/src/world/world_update.rs
 index f127e410..c81b0510 100644
 --- a/crates/engine/genie-core/src/world/world_update.rs
@@ -13351,7 +13454,7 @@ index 90a8616f..77c5309d 100644
      let masters = install_read(dat.as_ref())?;
      let run = census_run(&recording, Some(&masters), limit)?;
 diff --git a/crates/tools/genie-oracle/src/census.rs b/crates/tools/genie-oracle/src/census.rs
-index 99849470..9a3eb80b 100644
+index 99849470..2db8af15 100644
 --- a/crates/tools/genie-oracle/src/census.rs
 +++ b/crates/tools/genie-oracle/src/census.rs
 @@ -112,7 +112,20 @@ pub fn census_run(
@@ -13531,7 +13634,16 @@ index 99849470..9a3eb80b 100644
              end = CensusEnd::AllDone;
              break;
          }
-@@ -221,6 +376,15 @@ impl Census {
+@@ -193,6 +348,8 @@ impl Census {
+                 && let Some((tick, object, why)) =
+                     turns.players.get(p).and_then(|q| q.unsupported.as_ref())
+             {
++                // ENG-27: the stop's whole error (its context) on stderr
++                eprintln!("STOPCTX player={p} update={} object={object:?} {why:?}", tick.get());
+                 player.stop = Some(CensusStop::of(tick.get(), *object, why));
+             }
+         }
+@@ -221,6 +378,15 @@ impl Census {
              ) else {
                  continue;
              };
