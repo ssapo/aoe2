@@ -2527,10 +2527,10 @@ index e101e2d0..f7de2eaa 100644
      /// index it has then, and the objects of their searches.
      fn member_views(
 diff --git a/crates/engine/genie-core/src/groups/steer/detour.rs b/crates/engine/genie-core/src/groups/steer/detour.rs
-index 22a83675..e3c9261a 100644
+index 22a83675..6dfc95c5 100644
 --- a/crates/engine/genie-core/src/groups/steer/detour.rs
 +++ b/crates/engine/genie-core/src/groups/steer/detour.rs
-@@ -93,9 +93,28 @@ impl World {
+@@ -93,9 +93,35 @@ impl World {
              .transform_position;
          let [place, forward, _, _] = g.motion.position;
          let (moving, waits) = (g.motion.moving(), g.motion.waits_to_move());
@@ -2541,7 +2541,14 @@ index 22a83675..e3c9261a 100644
          let r = self.rounder(id, differentiators)?;
 -        let (way, serves) = self.find_way(&r, (to, forward, place))?;
 -        if serves && !moving && !waits && ends_farther(&way.record, to, gap) {
-+        let (way, serves) = self.find_way(&r, (to, forward, place), unformed)?;
++        let (mut way, mut serves) = self.find_way(&r, (to, forward, place), unformed)?;
++        // EXPERIMENT (GENIE_EXPERIMENT_CROWDEND_188329, findings 92; 188329
++        // `0x10f1457`..`0x10f17be`): a served way whose end crowds another member is moved to
++        // the first ring point with fewer crowding members and found again.
++        let crowdend = crowdend_188329();
++        if serves && crowdend {
++            serves = self.crowded_end(group, &r, &mut way)?;
++        }
 +        if crate::groups::trace_forming() {
 +            eprintln!(
 +                "FORMING_WAY ms={} id={} unformed={unformed} to=({}, {}) gap={} result={:?} serves={serves} planned={} goal=({}, {}) points={:?}",
@@ -2561,7 +2568,171 @@ index 22a83675..e3c9261a 100644
              self.stop_member(id)?;
              self.show_standing(id)?;
              self.move_record(group, index)?.consecutive_move_failures = 0;
-@@ -140,6 +159,7 @@ impl World {
+@@ -103,13 +129,21 @@ impl World {
+             return Ok(());
+         }
+         if serves {
++            let last_point = way.record.points.last().copied();
+             let now = self.world_time;
+             if self.object(id).is_some()
+                 && let Some(m) = self.parts.mover_mut(id)
+             {
+                 m.take_record_path(way.record.points, way.record.length, now, way.planned);
+             }
+-            let goal = (way.goal, ROUND_TIMER, ROUND_TIMER);
++            // 188329 `0x10f1a0f`..`0x10f1a54`: the own move's goal is the path's last point
++            // (`0x106f250`, stored at `+0xf8[i] + 0xc` by `0x1107710`) — findings 92
++            let goal_at = if crowdend {
++                last_point.unwrap_or(way.goal)
++            } else {
++                way.goal
++            };
++            let goal = (goal_at, ROUND_TIMER, ROUND_TIMER);
+             let _ =
+                 self.set_specific_move(group, id, (MovePath::NONE, MoveReason::Detour), goal)?;
+         }
+@@ -119,6 +153,140 @@ impl World {
+         Ok(())
+     }
+ 
++    /// 188329 `0x10c60d0`: how many members of group `group` other than `unit` crowd `p`: one
++    /// for a member's place (slot 0x568, `+0x3bc`) and one for its active own move's goal
++    /// (`+0xf8[i] + 0xc`), each within the squared distance (`0x96ec40`: height, x, then y)
++    /// below twice the square of the group's smallest member radius (`+0x158`); `unit` itself
++    /// is skipped entirely, a member whose object is gone counts by its own move only.
++    fn crowding(&self, group: GroupId, unit: ObjectId, p: BVector) -> Result<u32, GenieError> {
++        let g = self.groups.held(group)?;
++        let rr = g.smallest_unit_radius.get();
++        let lim = {
++            let s = rr * rr;
++            s + s
++        };
++        let d2 = |a: BVector| {
++            let (dx, dh, dy) = (a.x() - p.x(), a.height() - p.height(), a.y() - p.y());
++            dh * dh + dx * dx + dy * dy
++        };
++        let mut n = 0u32;
++        for m in g.members.iter() {
++            if let Some((_, u)) = self.object(m.id) {
++                if m.id == unit {
++                    continue;
++                }
++                // COMISS with JBE: a NaN does not count
++                if lim > d2(u.position().vector()) {
++                    n += 1;
++                }
++            }
++            if m.specific_move.active != 0 && lim > d2(m.specific_move.goal) {
++                n += 1;
++            }
++        }
++        Ok(n)
++    }
++
++    /// 188329 `0x10f1457`..`0x10f17be` (`GENIE_EXPERIMENT_CROWDEND_188329`, findings 92): the
++    /// served way's last point crowded ([`World::crowding`]) moves to the first point on rings
++    /// 1..3 of step `+0x158 * 0.5` around it (`0x10c8250`: i then j from -k to k, the ring's
++    /// points only, held inside the map by the master's radii + 0.01) with fewer crowding
++    /// members, stopping at none; there, for a member with a footprint and a height near it,
++    /// the short pather (a path of 2 points longer than [`EPSILON`] and a result other than 4
++    /// kept, else its points emptied), else the tile planner (none: released; a path of 2 points
++    /// longer than [`EPSILON`] kept, else emptied); the way serves when the result is 1 or 2.
++    /// Not near or no footprint: the old way as it is. Whether the way serves.
++    fn crowded_end(
++        &mut self,
++        group: GroupId,
++        r: &Rounder<'_>,
++        way: &mut Way,
++    ) -> Result<bool, GenieError> {
++        let Some(&end) = way.record.points.last() else {
++            return Ok(true);
++        };
++        let mut best = self.crowding(group, r.id, end)?;
++        if best == 0 {
++            return Ok(true);
++        }
++        let step = self.groups.held(group)?.smallest_unit_radius.get() * ROUND_RADIUS;
++        let map = self.spatial.map;
++        let (w, h) = (map.width() as f32, map.height() as f32);
++        let (lx, ly) = (r.radius.x() + 0.01, r.radius.y() + 0.01);
++        let hold = |v: f32, lo: f32, top: f32| -> f32 {
++            if lo > v {
++                lo
++            } else if top - lo < v {
++                top - lo
++            } else {
++                v
++            }
++        };
++        let mut found = None;
++        'rings: for k in 1..=3i32 {
++            for i in -k..=k {
++                for j in -k..=k {
++                    if i.abs() != k && j.abs() != k {
++                        continue;
++                    }
++                    let c = end + BVector::new(i as f32 * step, 0.0, j as f32 * step);
++                    let c = c.with_x(hold(c.x(), lx, w)).with_y(hold(c.y(), ly, h));
++                    let n = self.crowding(group, r.id, c)?;
++                    if n < best {
++                        best = n;
++                        found = Some(c);
++                        if best == 0 {
++                            break 'rings;
++                        }
++                    }
++                }
++            }
++        }
++        let Some(c) = found else {
++            return Ok(true);
++        };
++        way.goal = c;
++        if !(r.solid && r.near(c.x(), c.y())) {
++            // 0x10f168e: the result (1 or 2) unchanged, the old path kept
++            return Ok(true);
++        }
++        let from = r.at.ground();
++        let res = self.round_short(
++            r.walker,
++            r.player_kind,
++            from,
++            c,
++            r.differentiators,
++            &mut way.record,
++        )?;
++        let good = |p: &Path| 2 <= p.points.len() && !at_most_or_unordered(p.length.get(), EPSILON);
++        if good(&way.record) {
++            if res != ShortFound::Invalid {
++                way.result = res;
++                way.planned = false;
++                return Ok(res.leads());
++            }
++        } else {
++            way.record.points.clear();
++        }
++        // 0x10f169a..: the tile planner to C (0x1058020 -> 0x1057a40), measured
++        match self.round_plan(r.restriction, r.at.ground(), c, &mut way.record)? {
++            Some(f) => {
++                way.record.measure();
++                let s = planned_as_short(f);
++                way.result = s;
++                way.planned = true;
++                if good(&way.record) {
++                    Ok(s.leads())
++                } else {
++                    way.record.points.clear();
++                    Ok(false)
++                }
++            }
++            None => Ok(false),
++        }
++    }
++
+     /// The member `index` of group `group`'s record of its specific move.
+     fn move_record(
+         &mut self,
+@@ -140,6 +308,7 @@ impl World {
          &mut self,
          r: &Rounder<'_>,
          (to, forward, place): (BVector, BVector, BVector),
@@ -2569,7 +2740,7 @@ index 22a83675..e3c9261a 100644
      ) -> Result<(Way, bool), GenieError> {
          let mut way = Way {
              record: Path::default(),
-@@ -147,7 +167,9 @@ impl World {
+@@ -147,7 +316,9 @@ impl World {
              planned: false,
              goal: to,
          };
@@ -2580,7 +2751,7 @@ index 22a83675..e3c9261a 100644
          if way.result != ShortFound::Reached {
              self.round_one_step(r, to, forward, &mut way)?;
              if !way.result.leads() {
-@@ -238,7 +260,15 @@ impl World {
+@@ -238,7 +409,15 @@ impl World {
                  r.differentiators,
                  &mut way.record,
              )?;
@@ -2597,7 +2768,7 @@ index 22a83675..e3c9261a 100644
              {
                  way.record.points.clear();
              } else {
-@@ -246,7 +276,9 @@ impl World {
+@@ -246,7 +425,9 @@ impl World {
                  served = !res.fails();
              }
          }
@@ -2607,7 +2778,7 @@ index 22a83675..e3c9261a 100644
              && let Some(found) =
                  self.round_plan(r.restriction, r.at.ground(), to, &mut way.record)?
          {
-@@ -338,8 +370,9 @@ impl World {
+@@ -338,8 +519,9 @@ impl World {
                  way.result = ShortFound::Blocked;
                  way.record.points.clear();
              }
@@ -2619,7 +2790,7 @@ index 22a83675..e3c9261a 100644
          {
              way.result = planned_as_short(found);
              way.planned = true;
-@@ -411,7 +444,7 @@ impl World {
+@@ -411,7 +593,7 @@ impl World {
      /// The way round's long pather (`FUN_140f9eb70` with the record) for member `id` from the
      /// tile of `from` to the tile of `to`, range 0, no target: whether it reached the goal, and
      /// the path.
@@ -2628,7 +2799,7 @@ index 22a83675..e3c9261a 100644
          &self,
          id: ObjectId,
          from: Point,
-@@ -529,6 +562,14 @@ pub(super) const fn planned_as_short(found: Found) -> ShortFound {
+@@ -529,6 +711,21 @@ pub(super) const fn planned_as_short(found: Found) -> ShortFound {
  /// The way round found so far: the record's path (a new path record, `FUN_14152eea0`), the
  /// pather's result (the tile planner's read as the short pather's, [`planned_as_short`]),
  /// whether the tile planner made it, and where the member goes.
@@ -2638,6 +2809,13 @@ index 22a83675..e3c9261a 100644
 +fn notileplan_188329() -> bool {
 +    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
 +    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_NOTILEPLAN_188329").is_some())
++}
++
++/// `GENIE_EXPERIMENT_CROWDEND_188329`: the way round's crowded end and the own move's goal at
++/// the path's last point, as 188329 0x10ef890 runs them (findings 92).
++fn crowdend_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_CROWDEND_188329").is_some())
 +}
 +
  struct Way {
@@ -5536,6 +5714,21 @@ index 7277973c..778db9c6 100644
          out.append(chosen);
          Ok(result)
      }
+diff --git a/crates/engine/genie-core/src/players/ai_module/unit_ai_side.rs b/crates/engine/genie-core/src/players/ai_module/unit_ai_side.rs
+index ffe1915f..1d7f0ac2 100644
+--- a/crates/engine/genie-core/src/players/ai_module/unit_ai_side.rs
++++ b/crates/engine/genie-core/src/players/ai_module/unit_ai_side.rs
+@@ -111,7 +111,9 @@ impl UnitView<'_, '_> {
+                 .info
+                 .explorer
+                 .is_some_and(|e| e == id || view.find(e).is_some());
+-            let centre = match town_centre_unit(view, self.c.w.model.slots.master)? {
++            let owner = self.new_owner.unwrap_or(self.c.player);
++            let tracker = self.c.w.players.get(owner.index()).map(|q| &q.tracker);
++            let centre = match town_centre_unit(view, self.c.w.model.slots.master, tracker)? {
+                 Some(u) => {
+                     let sight = u
+                         .master(self.c.w.master_tables(), self.player)?
 diff --git a/crates/engine/genie-core/src/players/diplomacy.rs b/crates/engine/genie-core/src/players/diplomacy.rs
 index 79d51f79..14281911 100644
 --- a/crates/engine/genie-core/src/players/diplomacy.rs
@@ -7708,8 +7901,73 @@ index 1ecba910..2359a475 100644
          Ok(BREAK)
      }
  
+diff --git a/crates/engine/genie-core/src/unit_ai/world_view/commands.rs b/crates/engine/genie-core/src/unit_ai/world_view/commands.rs
+index ea0838e3..fa603b75 100644
+--- a/crates/engine/genie-core/src/unit_ai/world_view/commands.rs
++++ b/crates/engine/genie-core/src/unit_ai/world_view/commands.rs
+@@ -13,6 +13,7 @@ use crate::objects::unit::Unit;
+ use crate::orders::GARRISON;
+ use crate::players::Amount;
+ use crate::players::world_player::town_centres;
++use crate::players::tracker::{ListKey, Tracker};
+ use crate::unit_ai::Answer;
+ use crate::unit_ai::task_finder::Actor;
+ use crate::unit_ai::task_finder::TaskOn;
+@@ -303,28 +304,43 @@ impl UnitView<'_, '_> {
+ 
+ /// `FUN_1416597e0` with 0: the player's first town centre, by the player's index of objects by
+ /// master (`player+0x18`, `FUN_14104f560`: those of master 109, then 444, [`town_centres`]), as
+-/// its tile. The index's order within a master is not held: two objects of the first master
+-/// found are not modelled.
++/// its tile. Two objects of the first master found: the first the player's `tracker` files
++/// under it (the index's order, as [`crate::world::World::town_centre_at`] with 0 reads it;
++/// findings 93).
+ pub(crate) fn town_centre(
+     units: OthersRef<'_>,
+     masters: MasterSlots,
++    tracker: Option<&Tracker>,
+ ) -> Result<Option<Tile>, GenieError> {
+-    Ok(town_centre_unit(units, masters)?
++    Ok(town_centre_unit(units, masters, tracker)?
+         .map(|u| Tile::new(u.position().x() as i32, u.position().y() as i32)))
+ }
+ 
+ /// [`town_centre`] as the object.
+-pub(crate) fn town_centre_unit(
+-    units: OthersRef<'_>,
++pub(crate) fn town_centre_unit<'a>(
++    units: OthersRef<'a>,
+     masters: MasterSlots,
+-) -> Result<Option<&Unit>, GenieError> {
++    tracker: Option<&Tracker>,
++) -> Result<Option<&'a Unit>, GenieError> {
+     for master in town_centres(masters) {
+         let mut found = units.own_iter().filter(|u| u.life.master_id == master);
+         let Some(first) = found.next() else { continue };
+         if found.next().is_some() {
+-            return Err(GenieError::unsupported(
+-                "two town centres (the order of the player's index)",
+-            ));
++            let Some(tracker) = tracker else {
++                return Err(GenieError::unsupported(
++                    "two town centres (the order of the player's index)",
++                ));
++            };
++            // the index's list of the master in its order: its first id the world holds
++            if let Some(u) = tracker
++                .list(ListKey::master(master))
++                .iter()
++                .copied()
++                .flatten()
++                .find_map(|id| units.own(id))
++            {
++                return Ok(Some(u));
++            }
+         }
+         return Ok(Some(first));
+     }
 diff --git a/crates/engine/genie-core/src/unit_ai/world_view/side.rs b/crates/engine/genie-core/src/unit_ai/world_view/side.rs
-index 77dc93ea..ca2421e5 100644
+index 77dc93ea..f2acd6eb 100644
 --- a/crates/engine/genie-core/src/unit_ai/world_view/side.rs
 +++ b/crates/engine/genie-core/src/unit_ai/world_view/side.rs
 @@ -56,6 +56,139 @@ use crate::world::others::OthersRef;
@@ -8016,6 +8274,22 @@ index 77dc93ea..ca2421e5 100644
      fn closest(&mut self, search: &Search<'_>) -> Result<Found, GenieError> {
          let roles = &self.c.w.model.roles.clone();
          let seeker = match search.pick {
+@@ -522,6 +794,7 @@ impl UnitSide for UnitView<'_, '_> {
+         ai: &UnitAi,
+         rng: &mut Well512,
+     ) -> Result<Option<Tile>, GenieError> {
++        let owner = self.new_owner.unwrap_or(self.c.player);
+         let tc = town_centre(
+             owner_view(
+                 &self.c.w.players,
+@@ -530,6 +803,7 @@ impl UnitSide for UnitView<'_, '_> {
+                 self.new_owner,
+             )?,
+             self.c.w.model.slots.master,
++            self.c.w.players.get(owner.index()).map(|q| &q.tracker),
+         )?;
+         let (at, player_kind) = (self.unit.position(), self.player_kind);
+         // the search about the town centre only while the player has no scout map
 diff --git a/crates/engine/genie-core/src/unit_ai/world_view/unit_view.rs b/crates/engine/genie-core/src/unit_ai/world_view/unit_view.rs
 index 9fe88757..f8bf962f 100644
 --- a/crates/engine/genie-core/src/unit_ai/world_view/unit_view.rs
