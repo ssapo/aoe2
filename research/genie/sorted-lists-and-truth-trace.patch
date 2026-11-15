@@ -404,10 +404,87 @@ index 13b2a730..1ce6d2c9 100644
          let struck = strike(&mut f.own, &mut f.victim, blasted, hit, object_rng, layer)?;
          Ok(struck.executed)
 diff --git a/crates/engine/genie-core/src/combat/missile/unit.rs b/crates/engine/genie-core/src/combat/missile/unit.rs
-index 9edd4dcf..663bf562 100644
+index 9edd4dcf..64c59e93 100644
 --- a/crates/engine/genie-core/src/combat/missile/unit.rs
 +++ b/crates/engine/genie-core/src/combat/missile/unit.rs
-@@ -216,8 +216,10 @@ impl Unit {
+@@ -41,6 +41,7 @@ use crate::world::index::ObjectsRef;
+ use crate::world::layer::Roles;
+ use crate::world::lets::release;
+ use crate::world::others::OthersRef;
++use crate::world::parts::Part;
+ use crate::world::player::Player;
+ use crate::world::slots::PlayerSlots;
+ use crate::world::step::Step;
+@@ -54,8 +55,8 @@ impl Unit {
+     /// slot 0x58, holds it on the map and puts it on the ground by its fly mode once it is no
+     /// farther than 0.1 from its point, [`crate::combat::missile::grounded`]); the objects its step
+     /// crossed meet it ([`Unit::missile_hits`]); a missile whose height is the ground's lands
+-    /// ([`Unit::missile_lands`]). A dead shooter's weapons going to the missile
+-    /// (`FUN_14113e170`), the sprite's pitch facet and the projectile types 1 and 2 are not
++    /// ([`Unit::missile_lands`]). A dead shooter's weapons go to the missile
++    /// ([`Unit::take_dead_shooters_weapons`]). The sprite's pitch facet and the projectile types 1 and 2 are not
+     /// modelled.
+     pub(crate) fn fly(
+         &mut self,
+@@ -80,8 +81,7 @@ impl Unit {
+     ///
+     /// # Errors
+     ///
+-    /// A target or a shooter in the world the slice cannot read, and a dead shooter (its
+-    /// weapons going to the missile, `FUN_14113e170`).
++    /// A target or a shooter in the world the slice cannot read.
+     pub(crate) fn missile_ends(
+         &mut self,
+         action: &mut MissileAction,
+@@ -116,10 +116,46 @@ impl Unit {
+             action.target = None;
+         }
+         if action.fired_from.is_some() && shooter_state.is_some_and(dead) {
++            self.take_dead_shooters_weapons(action.fired_from, c)?;
++            action.fired_from = None;
++        }
++        Ok(())
++    }
++
++    /// 188329 `0xb8fd60` (`0xb8ff80`..`0xb8ffa4`): a missile whose shooter (its action's second
++    /// target) is dead (`0x1252480`: state 3 and up but 6) takes the shooter's weapons
++    /// (`0x1202350`) and lets the shooter go (`0xb6b9b0` with none). `0x1202350`: only a missile
++    /// without a master of its own (`+0x200`) gets one, a copy of the master it reads, into which
++    /// the shooter master's weapons (count `+0x2b0`, list `+0x2b8`), `+0x2c0` (the terrain bonus,
++    /// 2 bytes), `+0x2c4` (the bonus damage resistance) and `+0x2cc` (the area effect's range)
++    /// go; a missile that has one keeps it as it is.
++    fn take_dead_shooters_weapons(
++        &self,
++        shooter: Option<ShooterId>,
++        c: &mut Step<'_>,
++    ) -> Result<(), GenieError> {
++        if c.w.parts.own_master.get(self.id).is_some() {
++            return Ok(());
++        }
++        let p = c.player;
++        let from = OthersRef::of(&c.w.players, &c.w.index, p)?
++            .own(shooter)
++            .ok_or(GenieError::unsupported("a missile's dead shooter outside its list"))?
++            .master(c.w.master_tables(), p)?
++            .combat_part()
++            .clone();
++        let mut own = self.master(c.w.master_tables(), p)?.clone();
++        if let Some(combat) = own.combat.as_mut() {
++            combat.weapons = from.weapons;
++            combat.terrain_bonus = from.terrain_bonus;
++            combat.resistance = from.resistance;
++            combat.area_effect = from.area_effect;
++        } else {
+             return Err(GenieError::unsupported(
+-                "a missile whose shooter died (its weapons, FUN_14113e170)",
++                "a missile whose master has no combat layer",
+             ));
+         }
++        c.w.set_part(self.id, Part::OwnMaster(Box::new(own)))?;
+         Ok(())
+     }
+ 
+@@ -216,8 +252,10 @@ impl Unit {
      /// ([`Unit::missile_strike`]); unless the master's vanish mode has
      /// [`crate::combat::missile::VanishMode::PASSES_THROUGH`] or a shield blocked it, the missile
      /// ends (`set_state` 1: slot 0xd8, its hit points 0). The step's objects become the met ones
@@ -420,7 +497,7 @@ index 9edd4dcf..663bf562 100644
      pub(crate) fn missile_hits(
          &mut self,
          actions: &mut Action,
-@@ -248,7 +250,8 @@ impl Unit {
+@@ -248,7 +286,8 @@ impl Unit {
                      if Some(id) != action.target.map(MissileTargetId::id) {
                          continue;
                      }
@@ -430,7 +507,7 @@ index 9edd4dcf..663bf562 100644
                      action.result = result;
                      if !stats.vanish_mode.contains(VanishMode::PASSES_THROUGH)
                          && result != StrikeResult::Shielded
-@@ -262,11 +265,27 @@ impl Unit {
+@@ -262,11 +301,27 @@ impl Unit {
                          continue;
                      }
                      if Some(id) != action.target.map(MissileTargetId::id) {
@@ -462,7 +539,7 @@ index 9edd4dcf..663bf562 100644
                      action.result = result;
                      // the master's dying sprite plays there (a sprite of its own, not held)
                      if (stats.vanish_mode.contains(VanishMode::PASSES_THROUGH)
-@@ -378,6 +397,7 @@ impl Unit {
+@@ -378,6 +433,7 @@ impl Unit {
          actions: &mut Action,
          action: &MissileAction,
          fired: Fired,
@@ -470,7 +547,7 @@ index 9edd4dcf..663bf562 100644
          c: &mut Step<'_>,
          roles: &Roles,
      ) -> Result<StrikeResult, GenieError> {
-@@ -386,9 +406,9 @@ impl Unit {
+@@ -386,9 +442,9 @@ impl Unit {
              return Err(GenieError::unsupported("a charge projectile's own hit"));
          }
          if action.fired_from.is_none() {
@@ -482,7 +559,7 @@ index 9edd4dcf..663bf562 100644
          let (p, mode_680) = (c.player, c.w.mode_680);
          let shooter_slot = c.w.live_index(p, action.fired_from);
          let World {
-@@ -441,6 +461,7 @@ impl Unit {
+@@ -441,6 +497,7 @@ impl Unit {
              from_z: Some(action.origin.position.z()),
              kind: HitKind::Missile,
              chance: master.combat_part().hit_chance,
@@ -490,7 +567,7 @@ index 9edd4dcf..663bf562 100644
          };
          let object = streams.get(Stream::Object);
          let struck = strike(
-@@ -487,6 +508,7 @@ impl Unit {
+@@ -487,6 +544,7 @@ impl Unit {
          actions: &mut Action,
          action: &MissileAction,
          fired_from: Option<ShooterId>,
@@ -498,7 +575,7 @@ index 9edd4dcf..663bf562 100644
          c: &mut Step<'_>,
          roles: &Roles,
      ) -> Result<StrikeResult, GenieError> {
-@@ -520,7 +542,7 @@ impl Unit {
+@@ -520,7 +578,7 @@ impl Unit {
          );
          // the missile's own part is out of the unit while it flies
          own.source.fired_from = fired_from;
@@ -507,7 +584,7 @@ index 9edd4dcf..663bf562 100644
              "a missile's target the slice does not hold live",
          ))?;
          let victim = &mut victim;
-@@ -529,6 +551,7 @@ impl Unit {
+@@ -529,6 +587,7 @@ impl Unit {
              from_z: None,
              kind: HitKind::Missile,
              chance: master.combat_part().hit_chance,
@@ -515,7 +592,7 @@ index 9edd4dcf..663bf562 100644
          };
          let object = c.w.streams.get(Stream::Object);
          let struck = strike(
-@@ -638,7 +661,8 @@ impl Unit {
+@@ -638,7 +697,8 @@ impl Unit {
          if stats.hit_mode.strikes_on_landing(owner)
              && on_target(self.position(), stats.radius, v.position, v.radius)
          {
@@ -540,6 +617,123 @@ index 9a856bbb..26b92bdb 100644
          };
          let mut position = mover.set_position(shot.at, c.w.spatial.map, &c.w.model.tuning.movement);
          if !flying {
+diff --git a/crates/engine/genie-core/src/commands/builders.rs b/crates/engine/genie-core/src/commands/builders.rs
+index 1c85e4af..e12c25c7 100644
+--- a/crates/engine/genie-core/src/commands/builders.rs
++++ b/crates/engine/genie-core/src/commands/builders.rs
+@@ -116,9 +116,13 @@ impl World {
+         if to_queue {
+             self.queue_builder((q, idx), site, position, commits)?;
+         } else if STATIC_KINDS_END <= kind && q == player {
+-            let task = self.build_task(q, id, site, position)?;
+-            self.empty_queue_for_work(q, idx, kind)?;
+-            self.build_directly(q, idx, task, site, position)?;
++            match self.build_task(q, id, site, position)? {
++                Some(task) => {
++                    self.empty_queue_for_work(q, idx, kind)?;
++                    self.build_directly(q, idx, task, site, position)?;
++                }
++                None => self.walk_to_foundation(q, idx, foundation, position)?,
++            }
+         } else if STATIC_KINDS_END <= kind {
+             self.empty_queue_for_work(q, idx, kind)?;
+             // another player's unit: slot 0x128's slot 0x7e8 finds whatever task it has on
+@@ -173,16 +177,17 @@ impl World {
+ 
+     /// What slot 0x128 on `foundation` (of `master`, player `fp`'s, at `position`) takes for the
+     /// builder `id` of player `q`: the master it builds with ([`work_master`], with
+-    /// `q`'s masters and attributes) and the Build action of that master's task. A builder
+-    /// whose action would be replaced, without a Build task for it or with one not enabled, is
+-    /// not modelled.
++    /// `q`'s masters and attributes) and the Build action of that master's task; None for a
++    /// builder without a Build task for it or with one not enabled (188329: the direct way is
++    /// the work command with filter −1 on the foundation, [`World::walk_to_foundation`]). A
++    /// builder whose action would be replaced is not modelled.
+     pub(crate) fn build_task(
+         &self,
+         q: PlayerId,
+         id: ObjectId,
+         (fp, foundation, master): (PlayerId, FoundationId, MasterId),
+         position: Position,
+-    ) -> Result<(MasterId, BuildAction), GenieError> {
++    ) -> Result<Option<(MasterId, BuildAction)>, GenieError> {
+         let masters = self.model.masters.of(q).ok_or(GenieError::unsupported(
+             "BUILD tasks the builders: no master table",
+         ))?;
+@@ -231,7 +236,7 @@ impl World {
+             general: Some(&target),
+             terrain: self.task_terrain(Position::new(position.x(), position.y(), 0.0)),
+         };
+-        let (with, task) = work_master(
++        let Some((with, task)) = work_master(
+             masters,
+             &actor,
+             &on,
+@@ -240,18 +245,11 @@ impl World {
+             self.model.slots,
+             &self.model.roles,
+         )?
+-        .ok_or(GenieError::unsupported(
+-            "a builder with no task for its foundation",
+-        ))?;
+-        if task.action_kind != ActionKind::BUILD {
+-            return Err(GenieError::unsupported(
+-                "a builder whose task for its foundation is not Build",
+-            ));
+-        }
+-        if !enabled(&owner.attributes, task.enablement) {
+-            return Err(GenieError::unsupported(
+-                "a builder whose Build task is not enabled",
+-            ));
++        else {
++            return Ok(None);
++        };
++        if task.action_kind != ActionKind::BUILD || !enabled(&owner.attributes, task.enablement) {
++            return Ok(None);
+         }
+         let builder = masters.get(with).ok_or(NO_WORK_MASTER)?;
+         let to = WalkTo {
+@@ -274,10 +272,38 @@ impl World {
+             ),
+             &self.model.roles,
+         );
+-        Ok((
++        Ok(Some((
+             with,
+             BuildAction::start(to, task, &move_reads, &self.model.tuning.move_to)?,
+-        ))
++        )))
++    }
++
++    /// 188329's direct builder without a Build task for `foundation` (the BUILD loop 0x16e94d3,
++    /// BUILD_WALL's 0x16d7adc): the unit's slot 0x138 (`0x12c6590`: `+0x69c` 1, its unit AI's
++    /// queue emptied, `0xd38dc0`) and `0x113b510`'s work command (`0x1140670`) on the foundation
++    /// at (`at`'s x, y, 0) with filter −1, which takes whatever task the unit has there or,
++    /// with none, walks it to the foundation ([`World::work_command`]).
++    pub(crate) fn walk_to_foundation(
++        &mut self,
++        q: PlayerId,
++        idx: ListIndex,
++        foundation: FoundationId,
++        at: Position,
++    ) -> Result<(), GenieError> {
++        let kind = self
++            .players
++            .live(q, idx)?
++            .master(self.master_tables(), q)?
++            .kind;
++        self.empty_queue_for_work(q, idx, kind)?;
++        let work = Work {
++            target: Some(foundation.id()),
++            point: Position::new(at.x(), at.y(), 0.0),
++            carry_test: false,
++            filter: None,
++            source: OrderSource::Direct,
++        };
++        self.work_command(q, idx, &work)
+     }
+ 
+     /// The queue path of a builder at `idx` of player `q` (slot 0x30 into slot 0x28): its
 diff --git a/crates/engine/genie-core/src/commands/mod.rs b/crates/engine/genie-core/src/commands/mod.rs
 index d2edcddb..227bdaf4 100644
 --- a/crates/engine/genie-core/src/commands/mod.rs
@@ -649,6 +843,25 @@ index 12e38a35..73eb2561 100644
              pasture: None,
              my_pasture: None,
              group: GroupLink::default(),
+diff --git a/crates/engine/genie-core/src/commands/wall.rs b/crates/engine/genie-core/src/commands/wall.rs
+index 15ff0cfd..f2c27328 100644
+--- a/crates/engine/genie-core/src/commands/wall.rs
++++ b/crates/engine/genie-core/src/commands/wall.rs
+@@ -374,9 +374,12 @@ impl World {
+             .get(self.players.live(q, idx)?.id)
+             .is_none_or(|ai| !w.queued && (!w.commits || !ai.has_unready_order()));
+         if direct {
+-            let task: (MasterId, BuildAction) =
++            let task: Option<(MasterId, BuildAction)> =
+                 self.build_task(q, id, (player, foundation, master), at)?;
+-            self.build_directly(q, idx, task, (player, foundation, master), at)?;
++            match task {
++                Some(task) => self.build_directly(q, idx, task, (player, foundation, master), at)?,
++                None => self.walk_to_foundation(q, idx, foundation, at)?,
++            }
+         } else {
+             for &(f, p) in placed {
+                 self.queue_build(q, idx, (player, f, master), p)?;
 diff --git a/crates/engine/genie-core/src/construction/build/completion.rs b/crates/engine/genie-core/src/construction/build/completion.rs
 index f58c1e4d..9b6c51f9 100644
 --- a/crates/engine/genie-core/src/construction/build/completion.rs
@@ -764,6 +977,42 @@ index d42efbec..8b973922 100644
          }
          for &id in self.garrison.iter().rev() {
              let Some(u) = OthersRef::of(&c.w.players, &c.w.index, c.player)?.own(id) else {
+diff --git a/crates/engine/genie-core/src/construction/gates.rs b/crates/engine/genie-core/src/construction/gates.rs
+index 92c1f195..59410b34 100644
+--- a/crates/engine/genie-core/src/construction/gates.rs
++++ b/crates/engine/genie-core/src/construction/gates.rs
+@@ -50,6 +50,31 @@ pub fn lets_pass(
+         && spatial.allied_with(player, owner)
+ }
+ 
++/// Slot 0x6d8 (188329; the old slot 0x678) of object `id` for a unit of `player`, as the
++/// obstruction manager's line queries ask it (0x111d6ab): a gate's ([`lets_pass`], 0x128c1b0)
++/// with its owner, building layer and master; no for an object the world does not hold or one
++/// out for its update.
++pub(crate) fn passes_gate(
++    spatial: &Spatial,
++    by_id: ObjectsRef<'_>,
++    id: ObjectId,
++    player: PlayerId,
++) -> Result<bool, GenieError> {
++    let Some((owner, gate, master)) = by_id.with_master(id)? else {
++        return Ok(false);
++    };
++    let Some(layer) = by_id.building(id) else {
++        return Ok(false);
++    };
++    Ok(lets_pass(
++        (gate, layer, master),
++        owner,
++        player,
++        spatial,
++        by_id.roles(),
++    ))
++}
++
+ /// The units in gate `gate` (`FUN_1411d0570`): the obstruction manager's query from its first
+ /// annex to its second (`+0xbc0`, `+0xbc8`) with flags 0x10, the gate and its annexes ignored
+ /// (`FUN_1410562e0`), every record and the query grown by `TurnTuning::gate_grow` (`FUN_1410562d0`), any
 diff --git a/crates/engine/genie-core/src/garrison/let_out.rs b/crates/engine/genie-core/src/garrison/let_out.rs
 index e526db7f..d4937d04 100644
 --- a/crates/engine/genie-core/src/garrison/let_out.rs
@@ -1180,6 +1429,23 @@ index 1e001e13..c5944259 100644
              }
              // set_state(11) without a target: to the point within the task's range
              let mover =
+diff --git a/crates/engine/genie-core/src/gathering/farm_queue.rs b/crates/engine/genie-core/src/gathering/farm_queue.rs
+index 40398a75..697d377b 100644
+--- a/crates/engine/genie-core/src/gathering/farm_queue.rs
++++ b/crates/engine/genie-core/src/gathering/farm_queue.rs
+@@ -359,8 +359,10 @@ impl World {
+         }
+         let id = self.players.live(p, idx)?.id;
+         let site = (p, FoundationId::new(foundation), master);
+-        let task = self.build_task(p, id, site, at)?;
+-        self.build_directly(p, idx, task, site, at)?;
++        match self.build_task(p, id, site, at)? {
++            Some(task) => self.build_directly(p, idx, task, site, at)?,
++            None => self.walk_to_foundation(p, idx, FoundationId::new(foundation), at)?,
++        }
+         Ok(Reseed::Made)
+     }
+ 
 diff --git a/crates/engine/genie-core/src/gathering/gather/mod.rs b/crates/engine/genie-core/src/gathering/gather/mod.rs
 index 88cd0044..b63c22ce 100644
 --- a/crates/engine/genie-core/src/gathering/gather/mod.rs
@@ -3722,6 +3988,94 @@ index 4cc3b283..36f7407d 100644
  mod sight;
  mod tile_sight;
  
+diff --git a/crates/engine/genie-core/src/map/spatial/pather.rs b/crates/engine/genie-core/src/map/spatial/pather.rs
+index 4be84371..28a61938 100644
+--- a/crates/engine/genie-core/src/map/spatial/pather.rs
++++ b/crates/engine/genie-core/src/map/spatial/pather.rs
+@@ -13,6 +13,8 @@ use crate::objects::masters::ObstructionKind;
+ use crate::pathing::tile_path::SegmentTest;
+ use crate::world::index::ObjectsRef;
+ use crate::world::layer::ClassRoles;
++use crate::construction::gates::passes_gate;
++use crate::players::PlayerId;
+ 
+ /// A record a pather query met (an entry of `FUN_141051900`'s list): an object's, a temporary
+ /// tile record's or a map edge's ([`RecordId`]), with its box (`+0x20`..`+0x2c`).
+@@ -65,6 +67,7 @@ impl Spatial {
+         mask: TerrainMask,
+         (ignore, by_id): (&[RecordId], ObjectsRef<'_>),
+         limit: HitLimit,
++        asker: Option<PlayerId>,
+     ) -> Result<Vec<Hit>, GenieError> {
+         const MOST_HITS: usize = 25;
+         let roles = by_id.roles();
+@@ -124,11 +127,14 @@ impl Spatial {
+                     "a pather query meeting a record of kind 11 (its own radii)",
+                 ));
+             }
+-            // The class of a gate, which a player's allies may pass (slot 0x678, `FUN_1411d4a30`).
+-            if roles.of_class(p.class).contains(ClassRoles::GATE) {
+-                return Err(GenieError::unsupported(
+-                    "a pather query meeting a gate (its players' passage, slot 0x678)",
+-                ));
++            // 188329 0x111d6ab..0x111d6d0: for an asking player (`+0x7c` not −2) a record whose
++            // object's slot 0x6d8 (a gate's 0x128c1b0, [`lets_pass`]; any other object's 0)
++            // answers yes is passed, not met
++            if let Some(asker) = asker
++                && roles.of_class(p.class).contains(ClassRoles::GATE)
++                && passes_gate(self, by_id, id, asker)?
++            {
++                continue;
+             }
+             hits.push(Hit {
+                 id: RecordId::from(id),
+@@ -151,9 +157,23 @@ impl Spatial {
+         mask: TerrainMask,
+         ignore: &[RecordId],
+         by_id: ObjectsRef<'_>,
++    ) -> Result<bool, GenieError> {
++        self.pather_blocked_for(a, b, buffer, mask, (ignore, by_id), None)
++    }
++
++    /// [`Spatial::pather_blocked`] asked by player `asker` (the pather's: gates it may pass are
++    /// passed; none, `−2`, passes none).
++    pub fn pather_blocked_for(
++        &mut self,
++        a: Point,
++        b: Point,
++        buffer: Option<Distance>,
++        mask: TerrainMask,
++        (ignore, by_id): (&[RecordId], ObjectsRef<'_>),
++        asker: Option<PlayerId>,
+     ) -> Result<bool, GenieError> {
+         Ok(!self
+-            .pather_query(a, b, buffer, mask, (ignore, by_id), HitLimit::First)?
++            .pather_query(a, b, buffer, mask, (ignore, by_id), HitLimit::First, asker)?
+             .is_empty())
+     }
+ 
+@@ -168,7 +188,20 @@ impl Spatial {
+         ignore: &[RecordId],
+         by_id: ObjectsRef<'_>,
+     ) -> Result<Vec<Hit>, GenieError> {
+-        self.pather_query(a, b, buffer, mask, (ignore, by_id), HitLimit::Most)
++        self.pather_hits_for(a, b, buffer, mask, (ignore, by_id), None)
++    }
++
++    /// [`Spatial::pather_hits`] asked by player `asker` ([`Spatial::pather_blocked_for`]).
++    pub fn pather_hits_for(
++        &mut self,
++        a: Point,
++        b: Point,
++        buffer: Option<Distance>,
++        mask: TerrainMask,
++        (ignore, by_id): (&[RecordId], ObjectsRef<'_>),
++        asker: Option<PlayerId>,
++    ) -> Result<Vec<Hit>, GenieError> {
++        self.pather_query(a, b, buffer, mask, (ignore, by_id), HitLimit::Most, asker)
+     }
+ }
+ 
 diff --git a/crates/engine/genie-core/src/map/spatial/search.rs b/crates/engine/genie-core/src/map/spatial/search.rs
 index 877228f6..2b5b448e 100644
 --- a/crates/engine/genie-core/src/map/spatial/search.rs
@@ -5324,10 +5678,10 @@ index d65b2d84..ecf8ab20 100644
              return Ok(());
          };
 diff --git a/crates/engine/genie-core/src/orders/mod.rs b/crates/engine/genie-core/src/orders/mod.rs
-index b97f7d35..802ae37a 100644
+index b97f7d35..2b4aa61d 100644
 --- a/crates/engine/genie-core/src/orders/mod.rs
 +++ b/crates/engine/genie-core/src/orders/mod.rs
-@@ -61,6 +61,7 @@ pub use self::order_flags::OrderFlags;
+@@ -61,9 +61,11 @@ pub use self::order_flags::OrderFlags;
  mod patrol;
  pub use self::patrol::SavedPatrols;
  mod points;
@@ -5335,7 +5689,11 @@ index b97f7d35..802ae37a 100644
  mod split;
  pub mod start_work;
  mod tasks;
-@@ -183,6 +184,19 @@ impl OrderSource {
++pub(crate) use self::tasks::take_command_answer;
+ pub mod town_bell;
+ mod unit_order;
+ mod work;
+@@ -183,6 +185,19 @@ impl OrderSource {
      }
  }
  
@@ -5355,7 +5713,7 @@ index b97f7d35..802ae37a 100644
  /// What a unit's slot 0x7e8 (`FUN_141227190`) is given through slot 0x128: the target, the point
  /// (x, y, z), the work command's carried-resource test and task filter, and the unit's `+0xa14`
  /// while it runs ([`OrderSource`]): only a direct order's new action's notify clears the unit
-@@ -263,6 +277,9 @@ pub(crate) struct Split {
+@@ -263,6 +278,9 @@ pub(crate) struct Split {
      /// The owner of the list's first unit (`DAT_143f11960`), whose groups a new group of the
      /// split joins; None for a list whose first unit is gone (the game's −1).
      pub(crate) owner: Option<PlayerId>,
@@ -5365,6 +5723,19 @@ index b97f7d35..802ae37a 100644
      pub(crate) loose: Vec<ObjectId>,
      pub(crate) groups: Vec<Vec<ObjectId>>,
      /// The units a path from them did not join (`+0x3a48`, a `std::unordered_set` the splitter
+@@ -299,12 +317,6 @@ type SplitPath<'a> =
+ /// The action's point on neither axis (`DAT_14330ec20`).
+ const NO_POINT: f32 = GARRISON_NO_POINT;
+ 
+-/// A hunt command on an object the world does not hold.
+-pub(crate) const HUNT_TARGET_GONE: GenieError =
+-    GenieError::unsupported("a hunt command on an object the world does not hold");
+-/// A hunt command whose unit has no task for its target.
+-pub(crate) const NO_HUNT_TASK: GenieError =
+-    GenieError::unsupported("a hunt command without a task");
+ 
+ const TROPHIES: RangeInclusive<i16> = 1650..=1653;
+ 
 diff --git a/crates/engine/genie-core/src/orders/moves.rs b/crates/engine/genie-core/src/orders/moves.rs
 index 29f5d776..5e243a42 100644
 --- a/crates/engine/genie-core/src/orders/moves.rs
@@ -5568,6 +5939,99 @@ index b0488a3d..6f5d131a 100644
                          master_id,
                      )
                  },
+diff --git a/crates/engine/genie-core/src/orders/tasks.rs b/crates/engine/genie-core/src/orders/tasks.rs
+index c4870659..b986c5a4 100644
+--- a/crates/engine/genie-core/src/orders/tasks.rs
++++ b/crates/engine/genie-core/src/orders/tasks.rs
+@@ -20,7 +20,6 @@ use crate::objects::masters::Task;
+ use crate::objects::{ObjectId, ObjectKey};
+ use crate::orders::MasterSwap;
+ use crate::orders::gather::HuntOrder;
+-use crate::orders::{HUNT_TARGET_GONE, NO_HUNT_TASK};
+ use crate::players::PlayerId;
+ use crate::unit_ai::AiAction;
+ use crate::unit_ai::Notifies;
+@@ -41,6 +40,21 @@ const REPAIR_TARGET_GONE: GenieError =
+ /// A builder whose Build the retake found gone right after it checked.
+ const NO_BUILD: GenieError = GenieError::unreachable("a Build taken from a builder that has none");
+ 
++thread_local! {
++    /// The answer of the last hunt or gather command an AI ran (188329: slot 0x390 / 0x398
++    /// answer 1 or 0), read once by the unit AI's side ([`take_command_answer`]).
++    static COMMAND_TAKEN: std::cell::Cell<bool> = const { std::cell::Cell::new(true) };
++}
++
++/// The answer of the last hunt or gather command (true: taken), which it resets.
++pub(crate) fn take_command_answer() -> bool {
++    COMMAND_TAKEN.with(|c| c.replace(true))
++}
++
++fn answer_command(taken: bool) {
++    COMMAND_TAKEN.with(|c| c.set(taken));
++}
++
+ impl World {
+     /// `HuntObject`'s unit part (`FUN_140c4e220`, [`crate::unit_ai::AiCommand::HuntObject`], after
+     /// the AI's stop, slot 0xb0 with 1, which stopped the unit at once): its hunt command (object
+@@ -48,19 +62,23 @@ impl World {
+     /// ([`World::find_work_task`] with any filter and the master switch) and a new Hunt on it,
+     /// whatever its action type or requirement (`FUN_140ac2dd0`), replaces the unit's actions
+     /// ([`World::start_hunt`] without the unit AI's notify: `HuntObject` set the AI itself). A
+-    /// target the world does not hold or no task would fail the command, which the unit AI took
+-    /// as done: not modelled.
++    /// target the world does not hold or no task answers 0 and changes nothing (188329
++    /// `0x12c9bc0`; [`take_command_answer`]).
+     pub(crate) fn hunt_command(
+         &mut self,
+         player: PlayerId,
+         idx: ListIndex,
+         target: ObjectId,
+     ) -> Result<(), GenieError> {
+-        let (_, t) = self.object(target).ok_or(HUNT_TARGET_GONE)?;
++        answer_command(false);
++        let Some((_, t)) = self.object(target) else {
++            return Ok(());
++        };
+         let point = t.position();
+-        let task = self
+-            .find_work_task(player, idx, target, None, MasterSwap::Change)?
+-            .ok_or(NO_HUNT_TASK)?;
++        let Some(task) = self.find_work_task(player, idx, target, None, MasterSwap::Change)? else {
++            return Ok(());
++        };
++        answer_command(true);
+         self.start_hunt(HuntOrder {
+             player,
+             index: idx,
+@@ -89,21 +107,21 @@ impl World {
+     /// Gather on the task replaces the unit's actions (`FUN_140a88310`, `FUN_140a98620`, slot
+     /// 0x808: [`World::start_gather`] without the unit AI's notify), whatever the task's action
+     /// type (a farm's foundation: the builder's Build task). A target the world does not hold or
+-    /// no task would fail the command, which the unit AI took as done: not modelled.
++    /// no task answers 0 and changes nothing (188329 `0x11533c0`; [`take_command_answer`]).
+     pub(crate) fn gather_command(
+         &mut self,
+         player: PlayerId,
+         idx: ListIndex,
+         target: ObjectId,
+     ) -> Result<(), GenieError> {
++        answer_command(false);
+         if self.object(target).is_none() {
+-            return Err(GenieError::unsupported(
+-                "a gather command on an object the world does not hold",
+-            ));
++            return Ok(());
+         }
+-        let task = self
+-            .find_work_task(player, idx, target, None, MasterSwap::Change)?
+-            .ok_or(GenieError::unsupported("a gather command without a task"))?;
++        let Some(task) = self.find_work_task(player, idx, target, None, MasterSwap::Change)? else {
++            return Ok(());
++        };
++        answer_command(true);
+         let unit = &self.players.live(player, idx)?;
+         if self.parts.actions_of(unit.id).top_action_kind() == Some(GATHER)
+             && self
 diff --git a/crates/engine/genie-core/src/orders/tests.rs b/crates/engine/genie-core/src/orders/tests.rs
 index 465e724e..0a3983fe 100644
 --- a/crates/engine/genie-core/src/orders/tests.rs
@@ -5648,7 +6112,7 @@ index 72090fb3..3f1a775d 100644
                      source: OrderSource::Queued,
                  },
 diff --git a/crates/engine/genie-core/src/orders/work.rs b/crates/engine/genie-core/src/orders/work.rs
-index 9e2d36cf..588c47b6 100644
+index 9e2d36cf..f5c2ed4d 100644
 --- a/crates/engine/genie-core/src/orders/work.rs
 +++ b/crates/engine/genie-core/src/orders/work.rs
 @@ -33,6 +33,7 @@ use crate::orders::OrderSource;
@@ -5659,6 +6123,15 @@ index 9e2d36cf..588c47b6 100644
  use crate::players::Amount;
  use crate::players::PlayerId;
  use crate::unit_ai::AiAction;
+@@ -192,7 +193,7 @@ impl World {
+     /// task of [`crate::objects::masters::work_master`] (the master changes, slot 0x90), the task's
+     /// requirement, then the task's action from the action list's factory (slot 0x10), the unit
+     /// AI's notify (slot 0x828) and the install (slot 0x808).
+-    pub(super) fn work_command(
++    pub(crate) fn work_command(
+         &mut self,
+         player: PlayerId,
+         idx: ListIndex,
 @@ -496,14 +497,51 @@ impl World {
              // the factory makes no action of a mule cart's task: the move without one
              CART_TASK => self.work_move(player, idx, target, point, (notifies, source)),
@@ -5725,6 +6198,65 @@ index 9e2d36cf..588c47b6 100644
          }
      }
  
+diff --git a/crates/engine/genie-core/src/pathing/hull_path/node_lists.rs b/crates/engine/genie-core/src/pathing/hull_path/node_lists.rs
+index c9cd54a1..21f5e897 100644
+--- a/crates/engine/genie-core/src/pathing/hull_path/node_lists.rs
++++ b/crates/engine/genie-core/src/pathing/hull_path/node_lists.rs
+@@ -269,7 +269,14 @@ impl HullPather<'_> {
+     pub(super) fn blocked(&mut self, a: Point, b: Point) -> Result<bool, GenieError> {
+         if self
+             .world
+-            .pather_blocked(a, b, self.buffer, self.mask, &self.ignore, self.by_id)?
++            .pather_blocked_for(
++                a,
++                b,
++                self.buffer,
++                self.mask,
++                (&self.ignore, self.by_id),
++                self.player,
++            )?
+         {
+             return Ok(true);
+         }
+@@ -283,7 +290,14 @@ impl HullPather<'_> {
+     pub(super) fn hits(&mut self, a: Point, b: Point) -> Result<Vec<Hit>, GenieError> {
+         let mut hits =
+             self.world
+-                .pather_hits(a, b, self.buffer, self.mask, &self.ignore, self.by_id)?;
++                .pather_hits_for(
++                    a,
++                    b,
++                    self.buffer,
++                    self.mask,
++                    (&self.ignore, self.by_id),
++                    self.player,
++                )?;
+         for id in self.included_movers(a, b)? {
+             if let Some(p) = self.world.get(id) {
+                 hits.push(Hit {
+diff --git a/crates/engine/genie-core/src/pathing/hull_path/obstacles.rs b/crates/engine/genie-core/src/pathing/hull_path/obstacles.rs
+index 2c6cc59d..846944ae 100644
+--- a/crates/engine/genie-core/src/pathing/hull_path/obstacles.rs
++++ b/crates/engine/genie-core/src/pathing/hull_path/obstacles.rs
+@@ -179,10 +179,14 @@ impl HullPather<'_> {
+         if !roles.of_class(p.class).contains(ClassRoles::GATE) || player.is_none() {
+             return Ok(false);
+         }
+-        let gates = self.gates.ok_or(GenieError::unsupported(
+-            "a gate in the old short pather's area (its players' passage, slot 0x678)",
+-        ))?;
+-        Ok(gates.contains(&id))
++        let Some(player) = player else {
++            return Ok(false);
++        };
++        // the world's gates as they stand when the caller gave none (188329 slot 0x6d8)
++        match self.gates {
++            Some(gates) => Ok(gates.contains(&id)),
++            None => crate::construction::gates::passes_gate(&*self.world, self.by_id, id, player),
++        }
+     }
+ 
+     /// One object's box into the hulls ([`HullPather::add_tile_objects`]).
 diff --git a/crates/engine/genie-core/src/pathing/long_path/cost.rs b/crates/engine/genie-core/src/pathing/long_path/cost.rs
 index bce9f3c0..9b7ea512 100644
 --- a/crates/engine/genie-core/src/pathing/long_path/cost.rs
@@ -7306,6 +7838,20 @@ index 7a8bacbb..f5493e8f 100644
                  return Ok(());
              }
          }
+diff --git a/crates/engine/genie-core/src/unit_ai/attack_orders.rs b/crates/engine/genie-core/src/unit_ai/attack_orders.rs
+index 38514e3f..1e07358a 100644
+--- a/crates/engine/genie-core/src/unit_ai/attack_orders.rs
++++ b/crates/engine/genie-core/src/unit_ai/attack_orders.rs
+@@ -240,8 +240,7 @@ impl UnitAi {
+             .of_class(t.class)
+             .intersects(ClassRoles::PREY | ClassRoles::PREDATOR | ClassRoles::TREE)
+         {
+-            self.hunt_object(target, t.class, t.position, at, side, rng)?;
+-            return Ok(Answer::Taken);
++            return self.hunt_object(target, t.class, t.position, at, side, rng);
+         }
+         self.attack_object(target, OrderForce::Forced, TargetRules::Own, at, side)
+     }
 diff --git a/crates/engine/genie-core/src/unit_ai/attack_pick.rs b/crates/engine/genie-core/src/unit_ai/attack_pick.rs
 index 4bca7b20..05c44079 100644
 --- a/crates/engine/genie-core/src/unit_ai/attack_pick.rs
@@ -7620,6 +8166,50 @@ index 7e435e73..81690f9c 100644
 +    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
 +    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_WAYGROUP_188329").is_some())
 +}
+diff --git a/crates/engine/genie-core/src/unit_ai/damaged.rs b/crates/engine/genie-core/src/unit_ai/damaged.rs
+index 0a0c9d88..e6685468 100644
+--- a/crates/engine/genie-core/src/unit_ai/damaged.rs
++++ b/crates/engine/genie-core/src/unit_ai/damaged.rs
+@@ -18,6 +18,7 @@ use crate::players::PlayerId;
+ use crate::players::PlayerKind;
+ use crate::players::QueryRelation;
+ use crate::unit_ai::AiAction;
++use crate::unit_ai::Answer;
+ use crate::unit_ai::AiCommand;
+ use crate::unit_ai::AiLayer;
+ use crate::unit_ai::GroupState;
+@@ -522,9 +523,10 @@ impl UnitAi {
+ 
+     /// `HuntObject` (slot 0xc8, `FUN_140c4e220`) forced on `target` (its master's `class` and its
+     /// `point`): the current action stops at once (slot 0xb0 with 1, [`UnitAi::stop_current`]),
+-    /// then the unit's hunt command runs on the target ([`AiCommand::HuntObject`]); taken as done
+-    /// (the caller stops on a failure): the hunt action value (`0x265`) becomes current, the
+-    /// stopped one the last, the target with its class and point (the last ones kept).
++    /// then the unit's hunt command runs on the target ([`AiCommand::HuntObject`]); taken (188329
++    /// `0xd279c0`: the command answering 1), the hunt action value (`0x265`) becomes current, the
++    /// stopped one the last, the target with its class and point (the last ones kept); not
++    /// taken, nothing more is written.
+     pub(super) fn hunt_object(
+         &mut self,
+         target: ObjectId,
+@@ -533,12 +535,15 @@ impl UnitAi {
+         at: &Surroundings,
+         side: &mut dyn UnitSide,
+         rng: &mut Well512,
+-    ) -> Result<(), GenieError> {
++    ) -> Result<Answer, GenieError> {
+         self.stop_current(StopOrder::Keep, at, side, rng)?;
+         side.effect_now(Effect::Command(AiCommand::HuntObject(target)), self, rng)?;
++        if side.command_answer() == Answer::NotTaken {
++            return Ok(Answer::NotTaken);
++        }
+         self.set_action(Some(AiAction::Hunt));
+         self.set_target(Some(target), class.or_none(), point);
+-        Ok(())
++        Ok(Answer::Taken)
+     }
+ 
+     /// Slot 0x30 with the current order, immediate and in front (`FUN_140c55c90` as the
 diff --git a/crates/engine/genie-core/src/unit_ai/flight.rs b/crates/engine/genie-core/src/unit_ai/flight.rs
 index b388f155..d2925c47 100644
 --- a/crates/engine/genie-core/src/unit_ai/flight.rs
@@ -8136,10 +8726,30 @@ index 48ac7e77..d028e01d 100644
      /// (`FUN_140c41bc0` with 1000, then slot 0x1a8), drops the target and stops; a moved target
      /// is [`UnitAi::lion_target_moved`]'s. Both cases, and any other notify, go on to the base
 diff --git a/crates/engine/genie-core/src/unit_ai/order_kinds.rs b/crates/engine/genie-core/src/unit_ai/order_kinds.rs
-index 281192de..c41ec5e6 100644
+index 281192de..2c1492fa 100644
 --- a/crates/engine/genie-core/src/unit_ai/order_kinds.rs
 +++ b/crates/engine/genie-core/src/unit_ai/order_kinds.rs
-@@ -397,6 +397,10 @@ impl UnitAi {
+@@ -163,8 +163,7 @@ impl UnitAi {
+             },
+             side,
+             rng,
+-        )?;
+-        Ok(Answer::Taken)
++        )
+     }
+ 
+     /// `HuntObject` (slot 0xc8, `FUN_140c4e220`) forced on the order's `target`: the action stops
+@@ -186,8 +185,7 @@ impl UnitAi {
+             self.stop_current(StopOrder::Keep, at, side, rng)?;
+             return Ok(Answer::NotTaken);
+         };
+-        self.hunt_object(target, t.class, t.position, at, side, rng)?;
+-        Ok(Answer::Taken)
++        self.hunt_object(target, t.class, t.position, at, side, rng)
+     }
+ 
+     /// Slot 0x168 (`FUN_140c4dab0`, "GOT A FOLLOW ORDER"), the follow of object `target` within
+@@ -397,6 +395,10 @@ impl UnitAi {
                  },
              };
              let Some(kind) = self.resource_kind(class, roles) else {
@@ -8177,7 +8787,7 @@ index 516e920b..02ac9264 100644
              return Ok(MiscEnd::GoesOn);
          }
 diff --git a/crates/engine/genie-core/src/unit_ai/side.rs b/crates/engine/genie-core/src/unit_ai/side.rs
-index 7fd24514..b0ef18a3 100644
+index 7fd24514..8c7a6bf6 100644
 --- a/crates/engine/genie-core/src/unit_ai/side.rs
 +++ b/crates/engine/genie-core/src/unit_ai/side.rs
 @@ -37,6 +37,43 @@ pub trait UnitSide {
@@ -8224,7 +8834,21 @@ index 7fd24514..b0ef18a3 100644
      /// The unit's attack command on object `target` (slot 0x338, `FUN_14120cea0`), forced or
      /// not, while its unit AI stands as `ai`: true when the unit attacks it, with the notifies
      /// the command posts to the unit AI (kind and parameters), which the AI queues.
-@@ -196,6 +233,33 @@ pub trait UnitSide {
+@@ -84,6 +121,13 @@ pub trait UnitSide {
+         Err(WITHOUT_UNIT)
+     }
+ 
++    /// The answer of the hunt or gather command the last [`UnitSide::effect_now`] ran (188329
++    /// slot 0x390 / 0x398: 1 taken, 0 not: no target or no task); taken for a side that does
++    /// not run commands.
++    fn command_answer(&mut self) -> Answer {
++        Answer::Taken
++    }
++
+     /// The unit's slot 0x2d0 as it stands now: its top action may be interrupted
+     /// ([`SurroundingFlags::INTERRUPTIBLE`] at the update's start).
+     ///
+@@ -196,6 +240,33 @@ pub trait UnitSide {
          Err(GenieError::unsupported("a reach test without the world"))
      }
  
@@ -8258,7 +8882,7 @@ index 7fd24514..b0ef18a3 100644
      /// What the base handler's case 0x216 reads ([`OffFootprint`]) for a unit sent off the
      /// footprint of `site` (its master's radii `radius`).
      ///
-@@ -240,6 +304,19 @@ pub trait UnitSide {
+@@ -240,6 +311,19 @@ pub trait UnitSide {
          Err(GenieError::unsupported("a call for help without the world"))
      }
  
@@ -8640,7 +9264,7 @@ index dc286d39..90819b3c 100644
 +    failed || slot.state == crate::groups::SlotState::InPlace
 +}
 diff --git a/crates/engine/genie-core/src/unit_ai/update.rs b/crates/engine/genie-core/src/unit_ai/update.rs
-index 1ecba910..2359a475 100644
+index 1ecba910..fa5ad72e 100644
 --- a/crates/engine/genie-core/src/unit_ai/update.rs
 +++ b/crates/engine/genie-core/src/unit_ai/update.rs
 @@ -4,6 +4,7 @@
@@ -8651,7 +9275,15 @@ index 1ecba910..2359a475 100644
  use crate::objects::ObjectState;
  use crate::objects::WorkerCount;
  use crate::objects::masters::ClassId;
-@@ -113,6 +114,9 @@ impl UnitAi {
+@@ -14,6 +15,7 @@ use crate::players::PlayerId;
+ use crate::players::PlayerKind;
+ use crate::players::QueryRelation;
+ use crate::unit_ai::AiAction;
++use crate::unit_ai::Answer;
+ use crate::unit_ai::AiCommand;
+ use crate::unit_ai::IdleOutcome;
+ use crate::unit_ai::OrderForce;
+@@ -113,6 +115,9 @@ impl UnitAi {
              && self.can_order(at, OrderTest::Any)
              && at.group.is_none_or(|g| g.contains(GroupState::IDLE))
              && !at.flags.contains(SurroundingFlags::GARRISONED)
@@ -8661,7 +9293,7 @@ index 1ecba910..2359a475 100644
          {
              self.run_orders(at, side, player_kind, ai)?;
          }
-@@ -387,8 +391,9 @@ impl UnitAi {
+@@ -387,8 +392,9 @@ impl UnitAi {
      /// with 1, [`UnitAi::hunt_object`]) and the processing breaks; finding none, a human player's
      /// villager does nothing more. A class the slot names a kind of searches by it (slot 0x80,
      /// `ClosestResourceObject` from the notify's drop site, its third parameter: kind 0 below 2
@@ -8673,7 +9305,7 @@ index 1ecba910..2359a475 100644
      pub(super) fn hunter_search(
          &mut self,
          n: Notify,
-@@ -406,18 +411,27 @@ impl UnitAi {
+@@ -406,18 +412,27 @@ impl UnitAi {
              self.stop_current(StopOrder::Keep, at, side, rng)?;
              return Ok(GO_ON);
          };
@@ -8705,7 +9337,7 @@ index 1ecba910..2359a475 100644
                          master: None,
                          workers: if roles.of_class(class).contains(ClassRoles::FARM) {
                              WorkerCount::ONE
-@@ -428,8 +442,47 @@ impl UnitAi {
+@@ -428,8 +443,47 @@ impl UnitAi {
                          reach: true,
                      },
                      memory: Memory::default(),
@@ -8755,30 +9387,26 @@ index 1ecba910..2359a475 100644
                  match (found.id, found.position) {
                      (Some(id), Some(position)) => Some(Gatherable {
                          id,
-@@ -467,9 +520,54 @@ impl UnitAi {
+@@ -467,9 +521,50 @@ impl UnitAi {
              return Ok(GO_ON);
          };
          if roles.of_class(class).contains(ClassRoles::FARM) {
 -            return Err(GenieError::unsupported("a hunter's search finding a farm"));
 +            // upstream 5617e484 (before: an unsupported stop)
 +            return self.task_to_farm(found.id, at, side, rng);
++        }
++        // 188329 0xd27a74 (HuntObject, slot 0xc8: the unit's hunt command, slot 0x390, not
++        // answering 1 returns 0) and 0xd004a0's tail after it (0xd01721: 0xd38f90, slot 0xb0
++        // with 1, slot 0x48): the target goes and the action stops (a back-to-work search of a
++        // class the unit has no task for, 520397411 P1 update 28046)
++        if self.hunt_object(found.id, found.class, found.position, at, side, rng)?
++            == Answer::NotTaken
++        {
++            self.remove_target();
++            self.stop_current(StopOrder::Keep, at, side, rng)?;
++            return Ok(GO_ON);
          }
 -        self.hunt_object(found.id, found.class, found.position, at, side, rng)?;
-+        match self.hunt_object(found.id, found.class, found.position, at, side, rng) {
-+            // 188329 0xd27a74 (HuntObject, slot 0xc8: the unit's hunt command, slot 0x390, not
-+            // answering 1 returns 0) and 0xd004a0's tail after it (0xd38f90, slot 0xb0 with 1,
-+            // slot 0x48): the target goes and the action stops (GENIE_EXPERIMENT_BACKWORK_ORDER_188329;
-+            // a back-to-work search of a class the unit has no task for, 520397411 P1 update 28046)
-+            Err(e)
-+                if std::env::var_os("GENIE_EXPERIMENT_BACKWORK_ORDER_188329").is_some()
-+                    && format!("{e:?}").contains("a hunt command without a task") =>
-+            {
-+                self.remove_target();
-+                self.stop_current(StopOrder::Keep, at, side, rng)?;
-+                return Ok(GO_ON);
-+            }
-+            r => r?,
-+        }
 +        Ok(BREAK)
 +    }
 +
@@ -8812,6 +9440,50 @@ index 1ecba910..2359a475 100644
          Ok(BREAK)
      }
  
+@@ -558,28 +653,37 @@ impl UnitAi {
+             }
+             return Ok(GO_ON);
+         };
+-        self.gather_object(found, side, rng)?;
++        // 188329 0xd01ca7 / 0xd02fd1 (GatherObject answering 0): 0xd01af7 / 0xd0302e, the
++        // target goes and the action stops (0xd38f90, slot 0xb0 with 1)
++        if self.gather_object(found, side, rng)? == Answer::NotTaken {
++            self.remove_target();
++            self.stop_current(StopOrder::Keep, at, side, rng)?;
++            return Ok(GO_ON);
++        }
+         Ok(BREAK)
+     }
+ 
+     /// `GatherObject` (slot 0xd0, `FUN_140c4dd50`) forced on what the search found: the unit's
+-    /// gather command runs on it ([`AiCommand::GatherObject`]); taken as done (the caller stops on a
+-    /// failure): the gather action value (`0x261`) becomes current, the last the one before, the
+-    /// target with its class and place (the last ones kept).
++    /// gather command runs on it ([`AiCommand::GatherObject`]); taken (188329 `0xd274b0`: the
++    /// command answering 1), the gather action value (`0x261`) becomes current, the last the one
++    /// before, the target with its class and place (the last ones kept); not taken, nothing.
+     pub(super) fn gather_object(
+         &mut self,
+         found: Gatherable,
+         side: &mut dyn UnitSide,
+         rng: &mut Well512,
+-    ) -> Result<(), GenieError> {
++    ) -> Result<Answer, GenieError> {
+         side.effect_now(
+             Effect::Command(AiCommand::GatherObject(found.id)),
+             self,
+             rng,
+         )?;
++        if side.command_answer() == Answer::NotTaken {
++            return Ok(Answer::NotTaken);
++        }
+         self.set_action(Some(AiAction::Gather));
+         self.set_target(Some(found.id), found.class.or_none(), found.position);
+-        Ok(())
++        Ok(Answer::Taken)
+     }
+ 
+     /// The target block's attack whose target died (`0x140c66b10`): processIdle (slot 0x240 with
 diff --git a/crates/engine/genie-core/src/unit_ai/world_view/commands.rs b/crates/engine/genie-core/src/unit_ai/world_view/commands.rs
 index ea0838e3..fa603b75 100644
 --- a/crates/engine/genie-core/src/unit_ai/world_view/commands.rs
@@ -8878,7 +9550,7 @@ index ea0838e3..fa603b75 100644
          return Ok(Some(first));
      }
 diff --git a/crates/engine/genie-core/src/unit_ai/world_view/side.rs b/crates/engine/genie-core/src/unit_ai/world_view/side.rs
-index 77dc93ea..859f3ad4 100644
+index 77dc93ea..28cea420 100644
 --- a/crates/engine/genie-core/src/unit_ai/world_view/side.rs
 +++ b/crates/engine/genie-core/src/unit_ai/world_view/side.rs
 @@ -56,6 +56,139 @@ use crate::world::others::OthersRef;
@@ -9193,7 +9865,22 @@ index 77dc93ea..859f3ad4 100644
      fn closest(&mut self, search: &Search<'_>) -> Result<Found, GenieError> {
          let roles = &self.c.w.model.roles.clone();
          let seeker = match search.pick {
-@@ -522,6 +795,7 @@ impl UnitSide for UnitView<'_, '_> {
+@@ -505,6 +778,14 @@ impl UnitSide for UnitView<'_, '_> {
+         done
+     }
+ 
++    fn command_answer(&mut self) -> Answer {
++        if crate::orders::take_command_answer() {
++            Answer::Taken
++        } else {
++            Answer::NotTaken
++        }
++    }
++
+     fn busy_now(&mut self) -> Result<bool, GenieError> {
+         Ok(
+             self.actions.top_action_kind().is_some()
+@@ -522,6 +803,7 @@ impl UnitSide for UnitView<'_, '_> {
          ai: &UnitAi,
          rng: &mut Well512,
      ) -> Result<Option<Tile>, GenieError> {
@@ -9201,7 +9888,7 @@ index 77dc93ea..859f3ad4 100644
          let tc = town_centre(
              owner_view(
                  &self.c.w.players,
-@@ -530,6 +804,7 @@ impl UnitSide for UnitView<'_, '_> {
+@@ -530,6 +812,7 @@ impl UnitSide for UnitView<'_, '_> {
                  self.new_owner,
              )?,
              self.c.w.model.slots.master,

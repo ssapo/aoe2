@@ -1094,3 +1094,43 @@
 - 진단: 멈출 때 오류 전체(맥락 포함)를 stderr에 `STOPCTX` 줄로(`genie-oracle` `census.rs`).
 - 결과(`K27q_*` = 지금 기본 + 이 둘, `K27d_*`): 세 판이 끝까지(75,000) 멈추지 않음 — 521113438(P1 47,745, P2 48,398 이웃 멈춤 둘 다 없어짐), 520199364(P2 63,553, P1 63,926), 521113779(P1 62,723). 첫 어긋남·확인 체크포인트·사이트 구간은 그대로(4:15.9, 1:52.7, 2:58.4). 다른 열한 판 + 열한 리플 + 동물 판 셋 + V 일곱 판은 `.out`·CPWORDS 줄이 `P26_*`·`J25e_*`와 바이트까지 같다(518239882 57 / 54).
 - 읽었지만 안 넣은 것: 쏜 유닛이 죽은 투사체(517429796 P1 54,621) — 원본 Missile 갱신 0xb8fd60(vtable 0x3225cc8 slot 6) 첫머리: 두 번째 대상(쏜 유닛)이 있고 0x1252480(상태 3~5, 6 제외)이면 0x1202350(투사체에 자기 마스터 사본을 만들고 쏜 유닛 마스터의 무기 수 +0x2b0·무기 목록 +0x2b8(4바이트씩)·+0x2c0(2)·+0x2c4(4)·+0x2cc(4)를 복사; 디컴파일 `re/out_K27/b.c`) 뒤 0xb6b9b0(두 번째 대상 없음). 엔진에 넣으려면 투사체 개체의 own_master 사본에 쏜 유닛 마스터의 무기를 넣고 `fired_from`을 지운다(`combat/missile/unit.rs` `missile_ends`). 건축가 BuildWall(521333824 P1 55,636, 짓기 작업 없는 유닛이 목록에 섞임)과 처치 보상 0xa1(521069970 P2 57,234)은 안 읽음.
+
+## 110. 프로 경기 묶음 B: 원본 UNIT_ORDER의 내려놓기(6~8) 처리는 엔진과 같다 — 원인 못 찾음 (엔진 변경 없음; ENG-28)
+
+- 사례: 108번의 셋(517429796 P2 update 11,995, 520842005 P2 11,372, 520199364 P1 14,948). DropOffAndBack(8)으로 사냥꾼 여럿이 TC 옆에서 한꺼번에 입금, 원본이 약 1 적음.
+- 원본(188329, 디컴파일 `re/out_k/k6.c` 377~455줄 = UNIT_ORDER 처리 0x16ecf20의 case 6·7·8; 디스어셈블로 0xb690d0·0x1252480 확인): 유닛마다 형식 > 0x27, 0x1251e40이 0, 짐(+0x168) > 0일 때만. 명령 7·8이고 맨 위 행동이 0x6e(Hunt)·5(Gather)·0x65(Build)면: 8이면서 행동에 대상·점이 없으면 기록 0x12bacf0 → 행동 slot 0x78 → 돌아가기 0x12b9920, 아니면 slot 0x78만. 그 밖(명령 6, 다른 행동): 마스터에 내려놓을 곳이 있으면 0x141229bb0로 찾고(없으면 0x141727ac0 표), 형식 > 0x45면 work(slot 0x8a8, 작업 0x6e = 짐 종류 15·1·0, 아니면 5), 8이면 돌아가기. Hunt·Gather의 slot 0x78 = 0xb690d0: 짐 종류가 작업 자원과 맞으면 set_state(8), 아니면 유닛 AI 통지 0x21c. Hunt set_state(8)(0xbb4a80 case 8, `re/out_c/h1.c` 1227~)은 내려놓을 곳을 찾아 MoveTo를 만든다(바로 입금 아님).
+- 엔진: `orders/unit_order.rs` `unit_order`·`drop_off_ask`·`asked_drop_off`, `orders/drop_site.rs` `drop_off_unasked`, `gathering/hunt/drop_off.rs` `set_drop` — 순서·조건 모두 같다(기록과 0x78의 순서만 엔진은 "다른 짐 통지 → 기록"인데 자원과 무관). **확인된 차이 없음, 고친 것 없음.**
+- 새로 본 것(`K27b_517429796.err`의 RES 줄): 517429796 P2는 같은 체크포인트 구간(151.7~158.2초)에 입금이 아닌 자원 변화 **식량 +35, 돌 +10**(153.660초, DROP 줄 없음, 그 update에 P2 명령 없음)이 하나 더 있다. 다른 두 판(520842005, 520199364)의 구간에는 입금과 주민 −50뿐. 무엇인지 모름(처치 보상 0xa1·덤 작업 등 후보, 추정). 108번의 "δ ≈ 1"을 그 +35가 원본에서 +34였던 것으로도 설명할 수 있어 517429796은 이것부터 가려야 한다.
+- 다음 첫 동작: 원본 기록 B(108번 사양) 그대로. 기록 없이 하려면 517429796 P2 153.660초 +35/+10의 출처를 엔진 추적(그 update의 GAIN·EXTRA·처치)으로 찾기.
+
+## 111. 쏜 유닛이 죽은 투사체: 쏜 유닛 마스터의 무기를 투사체 자기 마스터에 복사 (스위치 없음, 멈춤 고침; ENG-28)
+
+- 사례: 517429796 P1 update 54,621 "a missile whose shooter died (its weapons, FUN_14113e170)".
+- 원본: 투사체 갱신 0xb8fd60의 0xb8ff80~0xb8ffa4(디스어셈블): 두 번째 대상(쏜 유닛, +0x28)이 있고 0x1252480(상태 ≥ 3이고 ≠ 6)이면 0x1202350(투사체, 쏜 유닛) 뒤 0xb6b9b0(두 번째 대상 없음) — 0x1202350의 답과 상관없이. 0x1202350(`re/out_K27/b.c`): 투사체에 자기 마스터(+0x200)가 **없을 때만** 읽던 마스터를 복제(마스터 slot 0x48)해 자기 것으로 하고, 쏜 유닛 마스터의 무기 수 +0x2b0·무기 목록 +0x2b8(4바이트씩)·+0x2c0(2바이트)·+0x2c4(4)·+0x2cc(4)를 복사. 마스터 배치가 옛 빌드보다 0x560 앞이라(무기 +0x818 ↔ 0x2b8) +0x2c0 = 지형 보너스(옛 +0x820), +0x2c4 = 보너스 피해 저항(+0x824), +0x2cc = 범위 피해 반지름(+0x82c)으로 읽었다(크기 2·4·4가 맞음; 이름 대응은 추정).
+- 엔진: `combat/missile/unit.rs` `missile_ends` — 멈춤 대신 새 `Unit::take_dead_shooters_weapons`(자기 마스터가 없을 때만 `Part::OwnMaster`로 복사본을 만들고 `weapons`·`terrain_bonus`·`resistance`·`area_effect`를 쏜 유닛 마스터 값으로) 뒤 `action.fired_from = None`(투사체 +0x998은 그대로 → 피해 통지는 여전히 쏜 유닛 id).
+- 결과(`L28a*` 대 `K27d_*`/`K27q_*`): 517429796 P1 54,621 → **54,672 새 멈춤 "a shooterless missile with an origin (its elevation, FUN_14113e550)"**(쏜 유닛 없이 치는 투사체의 높이 배율, `own_strike`). 다른 판 `.out`·CPWORDS 바이트까지 같음.
+- 확인 못 한 것: 0x2c0·0x2c4·0x2cc의 이름(크기와 위치로만 대응). 높이 배율: 188329 투사체 객체의 높이 slot(옛 0x1f0, 188329에서 0x1f0은 다른 함수 0x1267060)을 못 찾음. 다음 첫 동작: 0xb8fd60에서 쏜 유닛 없을 때의 slot 0x920(투사체 자신) → 높이 배율을 부르는 곳을 따라가 원점 주인이 있을 때의 값 읽기.
+
+## 112. 짓기 작업이 없는 건축가: 원본은 일반 work 명령으로 기초에 걸어가게 한다 (스위치 없음, 멈춤 고침; ENG-28, R3 메모 1)
+
+- 사례: "a builder with no task for its foundation" — 520162577 P2 44,417(BUILD_WALL), 520282194 P1 42,058(BUILD_WALL), 521333824 P1 55,636(BUILD_WALL), 520592057 P2 51,417(BUILD). 모두 첫 어긋남 뒤.
+- 원본(R3 `runs/R3_out/builder-no-task.md`): BUILD(0x16e94d3)·BUILD_WALL(0x16d7adc)의 바로 가는 건축가는 유닛 slot 0x138(0x12c6590: +0x69c = 1, 유닛 AI 대기열 비우기 0xd38dc0) → 0x113b510 → work 명령 0x1140670(기초, (x, y, 0), 필터 −1). 작업이 없으면 0x1140670이 기초로 걸어가게 한다. 따로 "짓기 작업" 갈래는 없다.
+- 엔진: `commands/builders.rs` `build_task`가 작업 없음·Build 아님·안 켜짐에 오류 대신 `None`; 새 `World::walk_to_foundation`(대기열 비우기 + `work_command`(기초, 점 (x, y, 0), 필터 없음, Direct)); 부르는 곳 셋(`direct_builder`, `commands/wall.rs` `wall_builder_takes`, `gathering/farm_queue.rs`)이 `None`이면 그것을. `orders/work.rs` `work_command`를 `pub(crate)`로.
+- 결과(`L28c*` 대 `L28a*`): 520282194·520592057은 **멈춤 없음(75,000까지)**, 521333824 P1 55,636 → 59,578 "a farm's bonus near a master (FUN_1411d3cd0)", 520162577 P2 44,417 → 같은 update의 다른 멈춤 "a wall builder past the foundations the game shares out". 첫 어긋남·확인 체크포인트 그대로(바뀐 CPWORDS는 모두 옛 멈춤 뒤).
+- 확인 못 한 것: 0xd38dc0이 엔진 `empty_queue_for_work`와 같은지(R3도 안 읽음).
+
+## 113. 사냥·채집 명령이 작업을 못 찾을 때: 원본은 0을 답하고 아무것도 안 바꾼다 (스위치 없음, 멈춤 고침; ENG-28, R3 메모 2)
+
+- 사례: 520352957 P1 35,394 "a hunt command without a task"(4590 마스터 83), 518801961 P1 56,792 "a gather command without a task"(4491 마스터 120).
+- 원본(R3 `runs/R3_out/hunt-gather-no-task.md`): HuntObject 0xd279c0 = 멈춤(slot 0xb0) 뒤 유닛 slot 0x390(0x12c9bc0) — 대상 없음·작업 없음이면 0, 그때 유닛 AI는 아무것도 안 쓴다; GatherObject 0xd274b0도 같은 꼴(slot 0x398 = 0x11533c0, 멈춤 없음). 부르는 쪽은 0을 받으면 0xd004a0에서 대상 잊기(0xd38f90) + 멈춤.
+- 엔진: `orders/tasks.rs` `hunt_command`·`gather_command`가 대상 없음·작업 없음에 오류 대신 답 0을 남김(스레드 로컬 `take_command_answer`); `UnitSide::command_answer`(세계 쪽만 그 답, 나머지는 Taken); `UnitAi::hunt_object`·`gather_object`가 `Answer`를 돌려주고 NotTaken이면 행동·대상을 안 씀; `civilian_attack`·`hunt_order`·`gather_order`는 그 답을 그대로; `unit_ai/update.rs`의 돌아가기 사냥(전엔 `BACKWORK_ORDER` 문자열 비교)과 민간인 채집 찾기는 NotTaken이면 대상 잊기 + 멈춤 + 계속. 상수 `HUNT_TARGET_GONE`·`NO_HUNT_TASK` 지움.
+- 결과(`L28c*`): 518801961은 **멈춤 없음(75,000까지)**, 520352957 P1 35,394 → 가이아 39,061 "an attacker whose hits apply effects (FUN_14107bdf0)"(P1 39,097·P2 39,342는 이웃 멈춤). 첫 어긋남·확인 체크포인트 그대로.
+- 확인 못 한 것: 두 판이 어느 부르는 쪽을 거쳤는지(R3 추정), 0xd01b1f·0xd006f5 뒤의 이어짐, 기본 통지(0xd35c67)의 채집(엔진에 없음).
+
+## 114. 길 찾기 질의가 문을 만날 때: 묻는 선수가 지나갈 수 있는 문은 걸림이 아니다 (스위치 없음, 멈춤 고침; ENG-28, R3 메모 4)
+
+- 사례: 519002991 P2 42,117 "a pather query meeting a gate (its players' passage, slot 0x678)", 519930254 P1 65,810 "a gate in the old short pather's area".
+- 원본(R3 `runs/R3_out/pather-gate.md`): 선 질의 0x111d550·0x111d750의 0x111d6ab~0x111d6d0 — 묻는 선수(+0x7c)가 −2가 아니고 기록의 개체가 있으면 개체 slot 0x6d8(건물 0x128c1b0 = 엔진 `lets_pass`, 다른 개체 0)이 참이면 다음 기록(걸림 아님).
+- 엔진: `construction/gates.rs` 새 `passes_gate`(by_id로 주인·건물 층·마스터를 찾아 `lets_pass`); `map/spatial/pather.rs` `pather_query`에 `asker` 인자, 문 클래스이고 지나가면 `continue`; 새 `pather_blocked_for`·`pather_hits_for`(옛 함수는 None으로, 시험용); `pathing/hull_path/node_lists.rs` `blocked`·`hits`가 `self.player`를 넘김; `obstacles.rs` `passes`는 넘겨받은 문 목록이 없으면 `passes_gate`.
+- 결과(`L28d*` 대 `L28c*`): 519002991·519930254 모두 **멈춤 없음(75,000까지)**. 다른 판 바이트까지 같음.
+- 확인 못 한 것: +0x7c가 어디서 정해지는지(엔진 `HullPather.player`로 가정, R3와 같음).

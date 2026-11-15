@@ -46,6 +46,8 @@ Codex의 초기 이동·내려놓기·주둔 복귀 정적 조사는 [결과·�
 
 ### 2.1 리플 3개 (2026-11-13 세션 M4, 지금 기본 = 스위치 27개: 아래 25개 + `FARMSPOT` 52 + `MOVEEND` 53; 25개 = 옛 17개(`J_f_*`) + `MASTERHP` 40 + `GARRISON_RECORD` 41 + `RESSEARCH` 43 + `EXPLORE_WAIT` 44 + `PATROLRANGE` 45 + `HELPCALL` 46 + `PLANCHOICE` 47 + `GATHER_SNAP` 49; HUNT에 42번 포함; `SEARCH_CLEAR=unit`; 스위치 없는 50·51번 포함. 실행 `M4_p_239`, `M4_p_161`, `M4_p_097`; 518470161·517426097은 update 75,000까지; 한 줄 스위치 목록 `runs\M4_envs.txt`)
 
+**2026-11-16 낮, 세션 L28(ONBOARDING `ENG-28`): 기본 스위치 변경 없음(`runs\M6_envs.txt` 그대로; exe `runs\census_base.exe` = `census_L28d.exe`). 엔진 멈춤 넷을 원본대로 없앰(스위치 없음, 111~114번): 쏜 유닛이 죽은 투사체(517429796 P1 54,621 → 54,672 새 멈춤), 짓기 작업 없는 건축가(520282194·520592057 끝까지, 521333824 P1 → 59,578, 520162577 P2 같은 update의 다른 멈춤), 사냥·채집 명령의 작업 없음(518801961 끝까지, 520352957 → 39,061), 길 찾기의 문(519002991·519930254 끝까지). 첫 어긋남·확인 체크포인트·사이트 구간은 전부 그대로(518239882 57 / 54; 실행 `L28a`~`L28d`, 비교 `K27_cmp.py`). 묶음 B는 원본 UNIT_ORDER 내려놓기가 엔진과 같음을 읽어 확인, 원인 못 찾음(110번).**
+
 **2026-11-16 오전, 세션 K27(ONBOARDING `ENG-27`): 기본 스위치 변경 없음(`runs\M6_envs.txt` 그대로; exe `runs\census_base.exe` = `census_K27d.exe`). 엔진 멈춤 둘을 원본대로 없앰(스위치 없음, 109번): 사라진 공격 대상(0xb73f20), 유닛 AI 통지 0x1fe(0xd33c40). 프로 14판 표의 첫 어긋남·사이트 구간·U15 표의 숫자 그대로(518239882 57 / 54); 바뀐 것은 "엔진 멈춤" 칸 셋: 521113438·520199364·521113779은 이제 멈춤 없음(75,000까지; 실행 `K27q_*`). N4는 원본도 안 하는 갈래(107번), 묶음 B는 DropOffAndBack 명령의 입금으로 좁힘(108번, 원본 기록 필요).**
 
 **2026-11-16 새벽, 세션 P26(ONBOARDING `ENG-26`): 프로 경기 14판을 지금 기본(`runs\M6_envs.txt`, exe `runs\census_base.exe` = `census_J25e.exe`)으로 돌려 분류만 함 — 엔진 변경 없음, 아래 U15 표 그대로(518239882 57 / 54). 프로 경기의 사이트 구간은 1:52.7~5:27.2로 짧고, 여섯 판은 첫 체크포인트부터 어긋난다. 이른 원인 둘(A: 처음 몇 초의 AI 난수 뽑기 수, B: 사냥 내려놓기 ±1)은 원본 기록이 있어야 한다(106번, `runs/P26_out/pros.md`).**
@@ -57,13 +59,13 @@ Codex의 초기 이동·내려놓기·주둔 복귀 정적 조사는 [결과·�
 | 519444998 (Lucho) | Dravidians / Georgians | Enclosed (닫힘) | 8.9 {9:736} / 8.9 {7:3,9:279} | 158.4 -1 / 125.9 -22 | 1:59.4 | P1 없음; P2 없음 |
 | 521113438 (ACCM) | Ethiopians / Mapuche | Atacama | 210.4 {7:23,9:6} / 184.4 {7:25,9:6} | 288.4 -10 / 262.4 -1 | 4:15.9 | P1 멈춤 47745: an attack's target the slice does not hold live; P2 멈춤 48398: an object of a stopped player may be near |
 | 521069970 (Liereyy) | Maya / Danes | Socotra | 164.7 {7:221} / 203.7 {7:-7} | 333.7 -10 / 372.7 -1 | 5:27.2 | P1 멈춤 57441: an object of a stopped player may be near; P2 멈춤 57234: a kill reward task (action type 0xa1) |
-| 521333824 (Lewis) | Poles / Goths | Hideout (닫힘) | 164.7 {7:-56} / 184.2 {7:-42} | 249.2 -25 / 268.7 -6 | 4:02.7 | P1 멈춤 55636: a builder with no task for its foundation; P2 멈춤 55644: an object of a stopped player may be near |
+| 521333824 (Lewis) | Poles / Goths | Hideout (닫힘) | 164.7 {7:-56} / 184.2 {7:-42} | 249.2 -25 / 268.7 -6 | 4:02.7 | P1 멈춤 59578: a farm's bonus near a master (FUN_1411d3cd0); P2 멈춤 59643: an object of a stopped player may be near (L28) |
 | 520821782 (MbL) | Teutons / Berbers | Golden Pit | 51.9 {9:44} / 51.9 {7:136,9:237} | 200.4 +6 / 265.4 -9 | 3:13.9 | P1 없음; P2 없음 |
 | 521153105 (Sitaux) | Burgundians / Wu | Arabia | 54.2 {7:2} / 119.2 {7:2} | 119.2 -5 / 190.7 +43 | 1:52.7 | P1 없음; P2 없음 |
 | 518985913 (Hera) | Khmer / Japanese | Arabian Desert | 73.7 {7:9,9:6} / 145.2 {7:-106} | 151.7 -23 / 275.2 -1 | 2:25.2 | P1 없음; P2 없음 |
 | 520176967 (Sebastian) | Mongols / Danes | Enclosed (닫힘) | 177.7 {9:128,10:-2} / 67.2 {7:106,9:-6} | 281.7 -3 / 119.2 -4 | 1:52.7 | P1 없음; P2 없음 |
 | 520842005 (Blve) | Malians / Italians | Arabian Desert | 8.9 {7:1,9:6} / 8.9 {7:2} | 190.9 -11 / 151.9 -1 | 2:25.4 | P1 없음; P2 없음 |
-| 517429796 (Nicov) | Wei / Saxons | Arabian Desert | 8.7 {9:-147} / 8.7 {7:-14,9:583} | 171.2 -37 / 158.2 +1 | 2:31.7 | P1 멈춤 54621: a missile whose shooter died (its weapons, FUN_14113e170); P2 멈춤 54882: an object of a stopped player may be near |
+| 517429796 (Nicov) | Wei / Saxons | Arabian Desert | 8.7 {9:-147} / 8.7 {7:-14,9:583} | 171.2 -37 / 158.2 +1 | 2:31.7 | P1 멈춤 54672: a shooterless missile with an origin (its elevation, FUN_14113e550); P2 멈춤 54882: an object of a stopped player may be near (L28) |
 | 521113779 (Yo) | Burmese / Celts | Arena (닫힘) | 28.9 {9:-265} / 28.9 {9:476} | 210.9 -3 / 184.9 -1 | 2:58.4 | P1 멈춤 62723: a notify kind the base handler does not model; P2 없음 |
 | 520199364 (dogao) | Burgundians / Japanese | MegaRandom | 164.7 {7:15} / 67.2 {7:-5} | 197.2 -1 / 119.2 -23 | 1:52.7 | P1 멈춤 63926: an object of a stopped player may be near; P2 멈춤 63553: an attack's target the slice does not hold live |
 | 519908353 (SoraKuma) | Poles / Turks | Steppe | 129.9 {7:-73} / 162.4 {7:2} | 188.4 -4 / 233.9 +11 | 3:01.9 | P1 멈춤 48368: a farm's bonus near a master (FUN_1411d3cd0); P2 멈춤 49398: an object of a stopped player may be near |
@@ -424,6 +426,7 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 12.5 미해결 (이른 순)
 
+- (2026-11-16 세션 L28 = ONBOARDING `ENG-28`; 실행 `L28a`~`L28d`(+`P` 프로 판), 한 번에 `runs\K27_go.ps1 -Exe <exe> -Cmd "bash runs/L28_all.sh <접두>"`) **엔진 멈춤(전부 첫 어긋남 뒤)**: 517429796 P1 54,672 "a shooterless missile with an origin (its elevation, FUN_14113e550)"(111번 뒤; 다음 첫 동작: 0xb8fd60의 쏜 유닛 없는 slot 0x920 → 높이 배율 함수 찾기); 520352957 가이아 39,061 "an attacker whose hits apply effects (FUN_14107bdf0)"(R3 메모 3의 0x1149850); 521333824 P1 59,578 "a farm's bonus near a master"; 520162577 P2 44,417 "a wall builder past the foundations the game shares out"; R3 메모 3(처치 보너스 0x9a·처치 보상 0xa1, `runs/R3_out/kill-bonus-reward.md`)은 안 넣음(마스터 2550·8685 대상의 작업 값 덤프가 먼저). **묶음 B(110번)**: 원본 내려놓기 명령은 엔진과 같다; 517429796 P2 153.660초의 식량 +35·돌 +10(입금 아님)의 출처부터.
 - (2026-11-16 세션 K27 = ONBOARDING `ENG-27`; 실행 `K27b_*`, `K27o_*`, `K27d_*`, `K27q_*`) **프로 경기 묶음 B(108번)**: 네 선수 중 셋은 UNIT_ORDER 8 `DropOffAndBack`으로 사냥꾼 여럿이 한꺼번에 입금한 update에서 원본이 약 1 적게 받는다(δ ∈ (0.953, 1.048]). 다음 첫 동작: 원본 기록 B(108번 끝 사양: 517429796 P2 update 11,990~12,000) — 기록 없이 하려면 188329 UNIT_ORDER 처리의 case 8(옛 `FUN_14161e370`)과 Hunt `set_state(8)`을 읽어 엔진 `orders/unit_order.rs` `asked_drop_off`와 대조. **엔진 멈춤(첫 어긋남 뒤)**: 쏜 유닛이 죽은 투사체(517429796 P1 54,621; 원본 0xb8fd60 → 0x1202350 읽음, 109번 끝에 넣을 자리), BuildWall에 짓기 작업 없는 유닛(521333824 P1 55,636; 안 읽음), 처치 보상 0xa1(521069970 P2 57,234; 피해 함수 못 찾음). 채집 N4는 끝남(107번: 원본도 명령 있는 채집꾼에선 안 함).
 - (2026-11-16 세션 P26 = ONBOARDING `ENG-26`; 실행 `P26_*`, `P26r_*`, `P26t1`, `P26t2`, `P26s_*`) **프로 경기 14판의 이른 원인(106번)**: ① A — 첫 체크포인트(약 9초)부터 두 선수의 단어 9만 다른 5판(519444998, 517429796, 520930307, 521113779, 520821782): AI 난수 뽑기 수 차이로 추정, 원인 개체 모름. 다음 첫 동작: 원본 기록 A(106번 사양, 517429796 0~9초 매 틱 `airng`·유닛 AI). ② B — 사냥·사슴 입금 직후 단어 1 ±1(520842005 P2 151.9초, 517429796 P2 158.2초가 사이트 구간을 정함). 다음 첫 동작: 원본 기록 B(517429796 P2 151.6~158.2초). ③ 엔진 멈춤(첫 어긋남 뒤): "an attack's target the slice does not hold live"(521113438 P1 47,745, 520199364 P2 63,553), "a kill reward task (action type 0xa1)"(521069970 P2 57,234), "a missile whose shooter died"(517429796 P1 54,621), "a notify kind the base handler does not model"(521113779 P1 62,723), "a farm's bonus near a master"(519908353 P1 48,368). 다음 첫 동작: 188329의 피해 처리 함수(옛 `FUN_141082e80`)를 찾는다 — 0xb8fd60(빗나간 투사체가 치는 곳, 102번)에서 부르는 피해 함수를 따라간다.
 - (2026-11-15 세션 J25 = ONBOARDING `ENG-25`; 실행 `J25a_*`~`J25d_*`, `J25base_*`, `J25*_old_*`) **엔진 멈춤(전부 첫 어긋남 뒤)**: 520596921 P2 46,128 "a farm in a builder's search for more work"(12.5 5번의 건설 C4가 실제로 나옴; 다음 첫 동작: 105번 끝 — 188329 0x1695c10의 농장 갈래 읽기); 520219269 P2 64,159 "an attacker's kill bonus task (action type 0x9a)"(머리말의 유형 154 작업, 안 읽음; 다음 첫 동작: 원본 피해 처리에서 처치 때 유형 154 작업을 쓰는 곳 찾기 — 엔진 `combat/damage/taking.rs` 491줄); 519002991 P2 42,117 "a pather query meeting a gate (slot 0x678)"(안 봄); 520352957 P1 35,394 "a hunt command without a task", 520162577 P2 44,417·520282194 P1 42,058 "a builder with no task for its foundation", 518801961 P1 56,792 "a gather command without a task"(지금 기본 `J25base_V_*`의 멈춤; 안 봄). 수도사의 남은 갈래(0x1fc에서 대상을 잡고 있을 때 0xd44470, 컴퓨터 전향·치료의 다시 찾기, 유물 없는 수도사의 할 일 없음 0xcfdb10 나머지)는 멈춤으로 남김. **5번 목록 점검**(105번 표): 멈춤으로 보이는 것 중 실제로 나온 것은 C4 하나, 명령 0x83·농장 D2는 안 나옴, R2-D8b·걷기 D7은 이미 들어 있음; 진단 줄을 단 둘 중 **채집 N4는 첫 어긋남 전에 나옴**(518470161 P1 782.9초~ 주민 10522, 517426097 P2 698.4초~; 안 넣음 — 다음 첫 동작: 원본 0xb7f76f 앞·0xd28770·0xb7b960을 읽고 `truth5`로 10522의 대상 확인), 세션 B의 사라진 대상 명령은 첫 어긋남 뒤에만; 나머지 조용한 갈래들은 확인 못 함.
@@ -541,7 +544,7 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 13.1 사례 하나를 끝낼 때마다 (고쳤든 못 고쳤든)
 
-`truth-log-findings.md` 맨 끝에 번호를 이어 한 절을 쓴다(지금 마지막은 109번; 63번에는 뒤에 "63 추가" 절이 있고 73번이 그 다음 이어지는 기록이다). 형식:
+`truth-log-findings.md` 맨 끝에 번호를 이어 한 절을 쓴다(지금 마지막은 114번; 63번에는 뒤에 "63 추가" 절이 있고 73번이 그 다음 이어지는 기록이다). 형식:
 
 ```
 ## <번호>. <한 줄 제목> (스위치 `GENIE_EXPERIMENT_...`에 추가 / 새 스위치 / 스위치 없음)
@@ -578,6 +581,11 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 - **기본 묶음에 넣는 판정 규칙(2026-11-12 바뀜)**: 리플·선수마다 "첫 어긋남" = (모든 체크포인트 단어 중 가장 이른 불일치, 자원 첫 차이 > 0.01) 중 이른 시각. 스위치를 켠 실행에서 세 리플 모든 선수의 첫 어긋남이 앞당겨지지 않으면 기본에 넣는다. 같은 실행에서 그 선수의 첫 어긋남 뒤에 생긴 불일치·앞당김은 뒤따른 것으로 보고 판정을 막지 않는다(대신 12.5에 열린 문제로 적는다). 예전 규칙(어느 단어든 첫 불일치가 하나라도 앞당겨지면 안 넣음)은 너무 엄격해서 바꿨다. 숫자는 `summ2.sh`의 "first word mismatch"와 "first difference > 0.01"에서 뽑는다.
 
 ### 13.4 지금 하던 일 (멈출 때마다 이 절을 덮어쓴다)
+
+**2026-11-16 낮, Claude (세션 L28 = ONBOARDING `ENG-28`, 자동). 결론: 반쯤 하던 일 없음. ① 묶음 B(110번): 원본 UNIT_ORDER 처리 0x16ecf20 case 6~8과 Hunt slot 0x78·set_state(8)을 읽음 — 엔진과 같다, 고친 것 없음; 517429796 P2 구간에 입금 아닌 식량 +35·돌 +10이 있음(새 단서). ② 쏜 유닛이 죽은 투사체(111번) 넣음 → 517429796 P1 54,672 새 멈춤(높이 배율). ③ R3 메모 1·2·4(112~114번) 넣음 → 멈춤 다섯 판이 끝까지. R3 메모 3(0x9a·0xa1)은 데이터 덤프가 먼저라 안 넣음. 숫자(첫 어긋남·체크포인트·사이트 구간·518239882 57 / 54) 그대로.**
+
+- 엔진 소스 `genie`: 빌드됨, 저장소 패치와 같음(PC 사본 `runs\L28.patch`, sha256 LF `2608c117…a1fcc8bd`, 732,464바이트). `runs\census_base.exe` = `census_L28d.exe`. 빌드 `runs\I24_build.ps1 -Tag <이름>`(WMI로 떼어), 실행 `runs\K27_go.ps1 -Exe <exe> -Cmd "bash runs/L28_all.sh <접두>"`(열한 리플 + 동물 셋 + V 일곱 + 프로 14판 `<접두>P_*`), 비교 `python3 runs/K27_cmp.py <새> <옛>`.
+- 다음 첫 동작: R3 메모 3(처치 보너스·보상)을 마스터 작업 덤프부터; 또는 517429796 P2 153.660초 +35/+10의 출처(엔진 추적). 원본 기록 A·B가 있으면 그것이 먼저.
 
 **2026-11-16 오전, Claude (세션 K27 = ONBOARDING `ENG-27`, 자동). 결론: 반쯤 하던 일 없음. ① 채집 N4(107번): 원본 0xb7e500 case 6을 다 읽음 — 유닛 AI에 명령이 있으면(`+0x3c != -1`) 대각선 재선정을 안 한다; `truth5`·`truth6`의 두 사례 모두 명령 0x2c5, 엔진의 N4 348번도 모두 명령 있음 → 넣을 것 없음. ② 묶음 B(108번): 셋은 `DropOffAndBack` 입금 update에서 원본이 약 1 적음 — 원인은 원본 기록이 있어야(사양 108번 끝). ③ 멈춤 둘 없앰(109번, 스위치 없음): 사라진 공격 대상, 통지 0x1fe → 프로 세 판이 끝까지 돈다. 숫자(첫 어긋남·체크포인트·사이트 구간·518239882 57 / 54) 그대로.**
 
