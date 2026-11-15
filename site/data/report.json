@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-15T14:55:37.984472+00:00",
-  "last_checked_at": "2026-11-15T14:51:20.742396+00:00",
+  "updated_at": "2026-11-15T15:05:24.673722+00:00",
+  "last_checked_at": "2026-11-15T15:02:39.800446+00:00",
   "sync_error": null,
   "profile": {
     "id": 26260702,
@@ -44620,8 +44620,7 @@
         }
       },
       "attempts": 1,
-      "source_url": "https://www.aoe2insights.com/match/521358922/",
-      "analysis_note": "명령 기록 분석 완료"
+      "source_url": "https://www.aoe2insights.com/match/521358922/"
     },
     {
       "id": 521349117,
@@ -84298,8 +84297,7 @@
         }
       },
       "attempts": 1,
-      "source_url": "https://www.aoe2insights.com/match/521349117/",
-      "analysis_note": "명령 기록 분석 완료"
+      "source_url": "https://www.aoe2insights.com/match/521349117/"
     },
     {
       "id": 521343860,
@@ -113622,8 +113620,7 @@
         }
       },
       "attempts": 1,
-      "source_url": "https://www.aoe2insights.com/match/521343860/",
-      "analysis_note": "명령 기록 분석 완료"
+      "source_url": "https://www.aoe2insights.com/match/521343860/"
     },
     {
       "id": 521333261,
@@ -552175,7 +552172,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 23,
+        "analysis_revision": 29,
         "duration_game_seconds": 2497.19,
         "civilization": "Britons",
         "random_civ": false,
@@ -600108,21 +600105,24 @@
                 "kind": "sheep",
                 "eaten": 135.8,
                 "first_seconds": 100.0,
-                "last_seconds": 140.0
+                "last_seconds": 140.0,
+                "full": 150.0
               },
               {
                 "id": 5143,
                 "kind": "sheep",
                 "eaten": 137.2,
                 "first_seconds": 160.0,
-                "last_seconds": 190.0
+                "last_seconds": 190.0,
+                "full": 150.0
               },
               {
                 "id": 5147,
                 "kind": "sheep",
                 "eaten": 134.5,
                 "first_seconds": 220.0,
-                "last_seconds": 260.0
+                "last_seconds": 260.0,
+                "full": 150.0
               }
             ],
             "opponent": [
@@ -600131,28 +600131,32 @@
                 "kind": "sheep",
                 "eaten": 136.4,
                 "first_seconds": 100.0,
-                "last_seconds": 130.0
+                "last_seconds": 130.0,
+                "full": 150.0
               },
               {
                 "id": 5142,
                 "kind": "sheep",
                 "eaten": 138.4,
                 "first_seconds": 160.0,
-                "last_seconds": 190.0
+                "last_seconds": 190.0,
+                "full": 150.0
               },
               {
                 "id": 5150,
                 "kind": "sheep",
                 "eaten": 137.9,
                 "first_seconds": 220.0,
-                "last_seconds": 240.0
+                "last_seconds": 240.0,
+                "full": 150.0
               },
               {
                 "id": 5151,
                 "kind": "sheep",
                 "eaten": 125.5,
                 "first_seconds": 250.0,
-                "last_seconds": 340.0
+                "last_seconds": 340.0,
+                "full": 150.0
               },
               {
                 "id": 5303,
@@ -600705,7 +600709,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 23,
+        "analysis_revision": 29,
         "duration_game_seconds": 2714.76,
         "civilization": "Franks",
         "random_civ": false,
@@ -663804,7 +663808,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 23,
+        "analysis_revision": 29,
         "duration_game_seconds": 2427.93,
         "civilization": "Franks",
         "random_civ": false,
@@ -710120,19 +710124,217 @@
               230,
               0,
               0
+            ],
+            [
+              370.0,
+              640,
+              226,
+              0,
+              0,
+              822,
+              240,
+              0,
+              0
+            ],
+            [
+              380.0,
+              640,
+              236,
+              0,
+              0,
+              834,
+              270,
+              0,
+              0
+            ],
+            [
+              390.0,
+              896,
+              256,
+              0,
+              0,
+              834,
+              270,
+              0,
+              0
+            ],
+            [
+              400.0,
+              896,
+              266,
+              0,
+              0,
+              834,
+              280,
+              0,
+              0
+            ],
+            [
+              410.0,
+              896,
+              276,
+              0,
+              0,
+              1030,
+              300,
+              0,
+              0
+            ],
+            [
+              420.0,
+              956,
+              306,
+              0,
+              0,
+              1123,
+              310,
+              0,
+              0
+            ],
+            [
+              430.0,
+              1014,
+              306,
+              0,
+              0,
+              1123,
+              330,
+              0,
+              0
+            ],
+            [
+              440.0,
+              1101,
+              326,
+              0,
+              0,
+              1137,
+              330,
+              0,
+              0
+            ],
+            [
+              450.0,
+              1121,
+              346,
+              0,
+              0,
+              1157,
+              340,
+              0,
+              0
+            ],
+            [
+              460.0,
+              1254,
+              346,
+              0,
+              0,
+              1274,
+              360,
+              0,
+              0
+            ],
+            [
+              470.0,
+              1254,
+              366,
+              0,
+              0,
+              1274,
+              370,
+              0,
+              0
+            ],
+            [
+              480.0,
+              1327,
+              386,
+              0,
+              0,
+              1284,
+              380,
+              0,
+              0
+            ],
+            [
+              490.0,
+              1357,
+              386,
+              0,
+              0,
+              1310,
+              430,
+              10,
+              0
+            ],
+            [
+              500.0,
+              1387,
+              416,
+              0,
+              0,
+              1320,
+              450,
+              10,
+              0
+            ],
+            [
+              510.0,
+              1436,
+              416,
+              0,
+              0,
+              1384,
+              450,
+              10,
+              0
+            ],
+            [
+              520.0,
+              1436,
+              431,
+              0,
+              0,
+              1394,
+              510,
+              10,
+              0
+            ],
+            [
+              530.0,
+              1446,
+              471,
+              0,
+              0,
+              1419,
+              541,
+              10,
+              0
+            ],
+            [
+              540.0,
+              1486,
+              491,
+              0,
+              0,
+              1419,
+              541,
+              10,
+              0
             ]
           ],
-          "verified_until_seconds": 366.4,
+          "verified_until_seconds": 548.4,
           "own_total": [
-            640,
-            226,
+            1496,
+            551,
             0,
             0
           ],
           "opponent_total": [
-            687,
-            240,
-            0,
+            1419,
+            551,
+            10,
             0
           ],
           "by_source": {
@@ -710913,67 +711115,469 @@
                 0,
                 0,
                 0
+              ],
+              [
+                370.0,
+                471,
+                120,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                328,
+                431,
+                63,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                380.0,
+                471,
+                120,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                340,
+                431,
+                63,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                390.0,
+                517,
+                330,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                340,
+                431,
+                63,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                400.0,
+                517,
+                330,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                340,
+                431,
+                63,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                410.0,
+                517,
+                330,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                342,
+                557,
+                131,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                420.0,
+                567,
+                330,
+                0,
+                10,
+                0,
+                0,
+                0,
+                0,
+                0,
+                342,
+                600,
+                131,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                430.0,
+                567,
+                377,
+                0,
+                20,
+                0,
+                0,
+                0,
+                0,
+                0,
+                342,
+                600,
+                131,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                440.0,
+                604,
+                377,
+                0,
+                20,
+                0,
+                0,
+                0,
+                0,
+                0,
+                356,
+                600,
+                131,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                450.0,
+                604,
+                377,
+                0,
+                40,
+                0,
+                0,
+                0,
+                0,
+                0,
+                376,
+                600,
+                131,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                460.0,
+                619,
+                485,
+                0,
+                50,
+                0,
+                0,
+                0,
+                0,
+                0,
+                428,
+                600,
+                196,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                470.0,
+                619,
+                485,
+                0,
+                50,
+                0,
+                0,
+                0,
+                0,
+                0,
+                428,
+                600,
+                196,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                480.0,
+                619,
+                528,
+                0,
+                80,
+                0,
+                0,
+                0,
+                0,
+                0,
+                438,
+                600,
+                196,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                490.0,
+                639,
+                528,
+                0,
+                90,
+                0,
+                0,
+                0,
+                0,
+                0,
+                464,
+                600,
+                196,
+                0,
+                0,
+                0,
+                0,
+                10,
+                0
+              ],
+              [
+                500.0,
+                669,
+                528,
+                0,
+                90,
+                0,
+                0,
+                0,
+                0,
+                0,
+                474,
+                600,
+                196,
+                0,
+                0,
+                0,
+                0,
+                10,
+                0
+              ],
+              [
+                510.0,
+                689,
+                528,
+                0,
+                120,
+                0,
+                0,
+                0,
+                0,
+                0,
+                474,
+                600,
+                260,
+                0,
+                0,
+                0,
+                0,
+                10,
+                0
+              ],
+              [
+                520.0,
+                689,
+                528,
+                0,
+                120,
+                0,
+                0,
+                0,
+                0,
+                0,
+                484,
+                600,
+                260,
+                0,
+                0,
+                0,
+                0,
+                10,
+                0
+              ],
+              [
+                530.0,
+                689,
+                528,
+                0,
+                130,
+                0,
+                0,
+                0,
+                0,
+                0,
+                509,
+                600,
+                260,
+                0,
+                0,
+                0,
+                0,
+                10,
+                0
+              ],
+              [
+                540.0,
+                689,
+                528,
+                0,
+                170,
+                0,
+                0,
+                0,
+                0,
+                0,
+                509,
+                600,
+                260,
+                0,
+                0,
+                0,
+                0,
+                10,
+                0
               ]
             ]
           },
           "animals": {
-            "until_seconds": 360.0,
+            "until_seconds": 540.0,
             "own": [
               {
                 "id": 4408,
                 "kind": "sheep",
                 "eaten": 85.6,
                 "first_seconds": 70.0,
-                "last_seconds": 90.0
+                "last_seconds": 90.0,
+                "full": 100.0
               },
               {
                 "id": 4406,
                 "kind": "sheep",
                 "eaten": 89.2,
                 "first_seconds": 120.0,
-                "last_seconds": 140.0
+                "last_seconds": 140.0,
+                "full": 100.0
               },
               {
                 "id": 4404,
                 "kind": "sheep",
                 "eaten": 89.5,
                 "first_seconds": 170.0,
-                "last_seconds": 190.0
+                "last_seconds": 190.0,
+                "full": 100.0
               },
               {
                 "id": 4412,
                 "kind": "sheep",
                 "eaten": 86.3,
                 "first_seconds": 220.0,
-                "last_seconds": 240.0
+                "last_seconds": 240.0,
+                "full": 100.0
               },
               {
                 "id": 4787,
                 "kind": "boar",
-                "eaten": 107.0,
+                "eaten": 259.6,
                 "first_seconds": 230.0,
-                "last_seconds": 310.0
+                "last_seconds": 430.0,
+                "full": 340.0
               },
               {
                 "id": 4413,
                 "kind": "sheep",
                 "eaten": 80.1,
                 "first_seconds": 280.0,
-                "last_seconds": 330.0
+                "last_seconds": 330.0,
+                "full": 100.0
               },
               {
                 "id": 4788,
                 "kind": "boar",
-                "eaten": 12.7,
+                "eaten": 268.2,
                 "first_seconds": 310.0,
-                "last_seconds": 310.0
+                "last_seconds": 480.0,
+                "full": 340.0
               },
               {
                 "id": 4411,
                 "kind": "sheep",
-                "eaten": 30.0,
+                "eaten": 85.9,
                 "first_seconds": 360.0,
-                "last_seconds": 360.0
+                "last_seconds": 390.0,
+                "full": 100.0
+              },
+              {
+                "id": 4402,
+                "kind": "sheep",
+                "eaten": 87.3,
+                "first_seconds": 420.0,
+                "last_seconds": 440.0,
+                "full": 100.0
+              },
+              {
+                "id": 4410,
+                "kind": "sheep",
+                "eaten": 84.7,
+                "first_seconds": 460.0,
+                "last_seconds": 510.0,
+                "full": 100.0
               }
             ],
             "opponent": [
@@ -710982,49 +711586,96 @@
                 "kind": "sheep",
                 "eaten": 86.1,
                 "first_seconds": 60.0,
-                "last_seconds": 90.0
+                "last_seconds": 90.0,
+                "full": 100.0
               },
               {
                 "id": 4409,
                 "kind": "sheep",
                 "eaten": 89.1,
                 "first_seconds": 120.0,
-                "last_seconds": 140.0
+                "last_seconds": 140.0,
+                "full": 100.0
               },
               {
                 "id": 4415,
                 "kind": "sheep",
                 "eaten": 85.5,
                 "first_seconds": 170.0,
-                "last_seconds": 200.0
+                "last_seconds": 200.0,
+                "full": 100.0
               },
               {
                 "id": 4789,
                 "kind": "boar",
                 "eaten": 297.9,
                 "first_seconds": 200.0,
-                "last_seconds": 300.0
+                "last_seconds": 300.0,
+                "full": 340.0
               },
               {
                 "id": 4564,
                 "kind": "deer",
                 "eaten": 63.0,
                 "first_seconds": 310.0,
-                "last_seconds": 360.0
+                "last_seconds": 360.0,
+                "full": 75.0
               },
               {
                 "id": 4403,
                 "kind": "sheep",
-                "eaten": 43.5,
+                "eaten": 79.1,
                 "first_seconds": 320.0,
-                "last_seconds": 350.0
+                "last_seconds": 380.0,
+                "full": 100.0
               },
               {
                 "id": 4790,
                 "kind": "boar",
-                "eaten": 12.4,
+                "eaten": 301.7,
                 "first_seconds": 350.0,
-                "last_seconds": 350.0
+                "last_seconds": 420.0,
+                "full": 340.0
+              },
+              {
+                "id": 4405,
+                "kind": "sheep",
+                "eaten": 88.0,
+                "first_seconds": 410.0,
+                "last_seconds": 460.0,
+                "full": 100.0
+              },
+              {
+                "id": 4566,
+                "kind": "deer",
+                "eaten": 67.9,
+                "first_seconds": 410.0,
+                "last_seconds": 410.0,
+                "full": 75.0
+              },
+              {
+                "id": 4565,
+                "kind": "deer",
+                "eaten": 65.3,
+                "first_seconds": 460.0,
+                "last_seconds": 460.0,
+                "full": 75.0
+              },
+              {
+                "id": 4414,
+                "kind": "sheep",
+                "eaten": 80.9,
+                "first_seconds": 480.0,
+                "last_seconds": 530.0,
+                "full": 100.0
+              },
+              {
+                "id": 4562,
+                "kind": "deer",
+                "eaten": 64.2,
+                "first_seconds": 510.0,
+                "last_seconds": 510.0,
+                "full": 75.0
               }
             ]
           }
@@ -711464,7 +712115,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 23,
+        "analysis_revision": 29,
         "duration_game_seconds": 2191.44,
         "civilization": "Franks",
         "random_civ": false,
@@ -798325,7 +798976,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 21,
+        "analysis_revision": 29,
         "duration_game_seconds": 2043.06,
         "civilization": "Franks",
         "random_civ": false,
@@ -834628,18 +835279,62 @@
               962,
               0,
               0
+            ],
+            [
+              720.0,
+              2210,
+              947,
+              0,
+              0,
+              1862,
+              1012,
+              0,
+              0
+            ],
+            [
+              730.0,
+              2230,
+              987,
+              0,
+              0,
+              1882,
+              1042,
+              0,
+              0
+            ],
+            [
+              740.0,
+              2300,
+              1027,
+              0,
+              0,
+              1912,
+              1092,
+              0,
+              0
+            ],
+            [
+              750.0,
+              2326,
+              1078,
+              0,
+              0,
+              1942,
+              1146,
+              0,
+              0
             ]
           ],
-          "verified_until_seconds": 710.6,
+          "verified_until_seconds": 752.5,
           "own_total": [
-            2190,
-            907,
+            2326,
+            1088,
             0,
             0
           ],
           "opponent_total": [
-            1822,
-            962,
+            1942,
+            1146,
             0,
             0
           ],
@@ -836156,81 +836851,175 @@
                 0,
                 0,
                 0
+              ],
+              [
+                720.0,
+                686,
+                549,
+                0,
+                675,
+                50,
+                0,
+                0,
+                0,
+                0,
+                679,
+                602,
+                219,
+                212,
+                100,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                730.0,
+                686,
+                549,
+                0,
+                685,
+                60,
+                0,
+                0,
+                0,
+                0,
+                679,
+                602,
+                219,
+                222,
+                110,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                740.0,
+                686,
+                549,
+                0,
+                745,
+                70,
+                0,
+                0,
+                0,
+                0,
+                679,
+                602,
+                219,
+                232,
+                130,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                750.0,
+                686,
+                549,
+                0,
+                751,
+                90,
+                0,
+                0,
+                0,
+                0,
+                679,
+                602,
+                219,
+                242,
+                150,
+                0,
+                0,
+                0,
+                0
               ]
             ]
           },
           "animals": {
-            "until_seconds": 710.0,
+            "until_seconds": 750.0,
             "own": [
               {
                 "id": 3661,
                 "kind": "sheep",
                 "eaten": 85.8,
                 "first_seconds": 60.0,
-                "last_seconds": 90.0
+                "last_seconds": 90.0,
+                "full": 100.0
               },
               {
                 "id": 3665,
                 "kind": "sheep",
                 "eaten": 87.2,
                 "first_seconds": 120.0,
-                "last_seconds": 150.0
+                "last_seconds": 150.0,
+                "full": 100.0
               },
               {
                 "id": 3672,
                 "kind": "sheep",
                 "eaten": 88.5,
                 "first_seconds": 170.0,
-                "last_seconds": 200.0
+                "last_seconds": 200.0,
+                "full": 100.0
               },
               {
                 "id": 3663,
                 "kind": "sheep",
                 "eaten": 84.4,
                 "first_seconds": 230.0,
-                "last_seconds": 270.0
+                "last_seconds": 270.0,
+                "full": 100.0
               },
               {
                 "id": 4016,
                 "kind": "boar",
                 "eaten": 270.1,
                 "first_seconds": 240.0,
-                "last_seconds": 410.0
+                "last_seconds": 410.0,
+                "full": 340.0
               },
               {
                 "id": 3669,
                 "kind": "sheep",
                 "eaten": 84.5,
                 "first_seconds": 290.0,
-                "last_seconds": 330.0
+                "last_seconds": 330.0,
+                "full": 100.0
               },
               {
                 "id": 3671,
                 "kind": "sheep",
                 "eaten": 84.4,
                 "first_seconds": 370.0,
-                "last_seconds": 400.0
+                "last_seconds": 400.0,
+                "full": 100.0
               },
               {
                 "id": 3670,
                 "kind": "sheep",
                 "eaten": 84.5,
                 "first_seconds": 430.0,
-                "last_seconds": 470.0
+                "last_seconds": 470.0,
+                "full": 100.0
               },
               {
                 "id": 4015,
                 "kind": "boar",
                 "eaten": 278.7,
                 "first_seconds": 440.0,
-                "last_seconds": 560.0
+                "last_seconds": 560.0,
+                "full": 340.0
               },
               {
                 "id": 3667,
                 "kind": "sheep",
                 "eaten": 87.1,
                 "first_seconds": 450.0,
-                "last_seconds": 500.0
+                "last_seconds": 500.0,
+                "full": 100.0
               }
             ],
             "opponent": [
@@ -836239,84 +837028,96 @@
                 "kind": "sheep",
                 "eaten": 86.2,
                 "first_seconds": 60.0,
-                "last_seconds": 90.0
+                "last_seconds": 90.0,
+                "full": 100.0
               },
               {
                 "id": 3668,
                 "kind": "sheep",
                 "eaten": 90.0,
                 "first_seconds": 130.0,
-                "last_seconds": 140.0
+                "last_seconds": 140.0,
+                "full": 100.0
               },
               {
                 "id": 3666,
                 "kind": "sheep",
                 "eaten": 90.3,
                 "first_seconds": 170.0,
-                "last_seconds": 180.0
+                "last_seconds": 180.0,
+                "full": 100.0
               },
               {
                 "id": 3673,
                 "kind": "sheep",
                 "eaten": 79.9,
                 "first_seconds": 210.0,
-                "last_seconds": 220.0
+                "last_seconds": 220.0,
+                "full": 100.0
               },
               {
                 "id": 4018,
                 "kind": "boar",
                 "eaten": 294.9,
                 "first_seconds": 250.0,
-                "last_seconds": 350.0
+                "last_seconds": 350.0,
+                "full": 340.0
               },
               {
                 "id": 4017,
                 "kind": "boar",
                 "eaten": 307.4,
                 "first_seconds": 320.0,
-                "last_seconds": 400.0
+                "last_seconds": 400.0,
+                "full": 340.0
               },
               {
                 "id": 3827,
                 "kind": "deer",
                 "eaten": 103.3,
                 "first_seconds": 330.0,
-                "last_seconds": 400.0
+                "last_seconds": 400.0,
+                "full": 140.0
               },
               {
                 "id": 3675,
                 "kind": "sheep",
                 "eaten": 84.2,
                 "first_seconds": 430.0,
-                "last_seconds": 470.0
+                "last_seconds": 470.0,
+                "full": 100.0
               },
               {
                 "id": 3676,
                 "kind": "sheep",
                 "eaten": 81.2,
                 "first_seconds": 500.0,
-                "last_seconds": 540.0
+                "last_seconds": 540.0,
+                "full": 100.0
               },
               {
                 "id": 3828,
                 "kind": "deer",
                 "eaten": 115.9,
                 "first_seconds": 530.0,
-                "last_seconds": 540.0
+                "last_seconds": 540.0,
+                "full": 140.0
               },
               {
                 "id": 3674,
                 "kind": "sheep",
                 "eaten": 86.5,
                 "first_seconds": 580.0,
-                "last_seconds": 600.0
+                "last_seconds": 600.0,
+                "full": 100.0
               },
               {
                 "id": 3662,
                 "kind": "sheep",
                 "eaten": 80.9,
                 "first_seconds": 640.0,
-                "last_seconds": 680.0
+                "last_seconds": 680.0,
+                "full": 100.0
               }
             ]
           }
