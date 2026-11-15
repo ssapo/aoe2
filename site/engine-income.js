@@ -70,7 +70,7 @@
     }).join('')}</ul>`;
   }
   /* By animal: what each side's gatherers brought in from every single sheep, boar and deer by the counted time.
-     `full` (an animal's whole food) is not in today's data; when a row carries it, what was left is shown too. */
+     `full` (an animal's whole food) is stored only for an animal finished and not shared by the counted time; then what was left is shown too. */
   const KINDS=[['sheep','가축',['sheep']],['hunt','사냥',['boar','deer']],['other','기타 동물',[]]];
   const LEFT_SHARE=.2;
   function animals(d){

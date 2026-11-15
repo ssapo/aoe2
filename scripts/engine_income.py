@@ -25,9 +25,12 @@ By animal: with GENIE_TRACE_GAIN_ANIMALS the engine adds, after those lines, one
 line with every sheep, boar or deer food was taken from: its id, class and how much of
 it each player's gatherers have dropped off so far. The last such line at or before the
 verified time gives the animals each player has eaten; the marks at which an animal's
-amount first rose and last rose give when (10 second steps). The line does not carry an
-animal's full food, so what was left to rot is not known and is not stored. An engine
-without GAINA lines leaves the animals part absent.
+amount first rose and last rose give when (10 second steps). A newer engine also prints
+each animal's full food (`full`: its master's first storage amount, what it had when it
+became a resource); it is stored as `full` when the animal is no longer being eaten at
+that line (nobody took food from it since the line before) and the other player took
+nothing from it, so `full - eaten` is what was left to rot. An engine without GAINA lines
+leaves the animals part absent; one without `full` leaves the field out.
 """
 import json
 import os
@@ -116,7 +119,7 @@ def by_source(lines, own_number, opponent_number, until_ms, offset=0.0):
 
 
 def parse_animals(lines):
-    """[(ms, {id: (class, [dropped off per player number])})] from GAINA lines, in order."""
+    """[(ms, {id: (class, [dropped off per player number], gathered, full or None)})] from GAINA lines, in order."""
     out = []
     for line in lines:
         if not line.startswith('GAINA '):
@@ -125,7 +128,10 @@ def parse_animals(lines):
             row = json.loads(line[6:])
             found = {}
             for animal in row['animals']:
-                found[int(animal['id'])] = (int(animal['class']), [float(v) for v in animal.get('given') or []])
+                full = animal.get('full')
+                found[int(animal['id'])] = (int(animal['class']), [float(v) for v in animal.get('given') or []],
+                                            float(animal.get('gathered') or 0.0),
+                                            float(full) if isinstance(full, (int, float)) and full > 0 else None)
             out.append((int(row['ms']), found))
         except (ValueError, KeyError, TypeError):
             continue
@@ -142,26 +148,43 @@ def animals(lines, own_number, opponent_number, until_ms, offset=0.0):
         given = found[key][1] if key in found else []
         return given[number] if 0 <= number < len(given) else 0.0
 
-    def side(number):
+    last = rows[-1][1]
+    before_last = rows[-2][1] if len(rows) > 1 else {}
+
+    def full_of(key, other):
+        """The animal's full food when it is finished at the last line (taken from no more since the line
+        before, all of it dropped off) and the other player took nothing from it; else None."""
+        _, _, gathered, full = last[key]
+        if full is None or key not in before_last or abs(before_last[key][2] - gathered) > 0.005:
+            return None
+        if amount(last, key, other) >= 0.05 or full + 0.05 < gathered or sum(last[key][1]) + 0.05 < gathered:
+            return None                            # shared, odd, or some of it still carried
+        return round(full, 1)
+
+    def side(number, other):
         out = []
-        for key, (kind, _) in rows[-1][1].items():
+        for key, (kind, *_rest) in last.items():
             eaten = round(amount(rows[-1][1], key, number), 1)
             if eaten < 0.5:
                 continue
-            first = last = None
+            first = last_mark = None
             before = 0.0
             for ms, found in rows:
                 now = amount(found, key, number)
                 if now > before + 0.005:
                     mark = round(ms // (STEP * 1000) * STEP + offset, 1)
                     first = mark if first is None else first
-                    last = mark
+                    last_mark = mark
                     before = now
-            out.append({'id': key, 'kind': ANIMAL_KINDS.get(kind, 'other'), 'eaten': eaten,
-                        'first_seconds': first, 'last_seconds': last})
+            row = {'id': key, 'kind': ANIMAL_KINDS.get(kind, 'other'), 'eaten': eaten,
+                   'first_seconds': first, 'last_seconds': last_mark}
+            full = full_of(key, other)
+            if full is not None:
+                row['full'] = full
+            out.append(row)
         return sorted(out, key=lambda a: (a['first_seconds'], a['id']))
 
-    own, opponent = side(own_number), side(opponent_number)
+    own, opponent = side(own_number, opponent_number), side(opponent_number, own_number)
     if not own and not opponent:
         return None
     return {'until_seconds': round(rows[-1][0] // (STEP * 1000) * STEP + offset, 1), 'own': own, 'opponent': opponent}

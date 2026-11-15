@@ -114,6 +114,30 @@ class EngineIncomeTest(unittest.TestCase):
         self.assertEqual(animals(self.animal_lines(), 1, 2, 35000, offset=2.5)['own'][0],
                          {'id': 3661, 'kind': 'sheep', 'eaten': 30.0, 'first_seconds': 32.5, 'last_seconds': 32.5})
 
+    def test_full_food_is_stored_only_for_a_finished_unshared_animal(self):
+        def line(ms, rows):
+            return 'GAINA ' + __import__('json').dumps({'ms': ms, 'animals': [
+                {'id': i, 'master': 0, 'class': c, 'gathered': g, 'full': f, 'given': list(given)}
+                for i, c, g, f, given in rows]})
+        lines = [
+            line(10003, [(3661, 58, 60.0, 100.0, [0.0, 60.0]), (4016, 10, 100.0, 340.0, [0.0, 100.0])]),
+            line(20001, [(3661, 58, 85.81, 100.0, [0.0, 85.81]), (4016, 10, 200.0, 340.0, [0.0, 190.0]),
+                         (3827, 9, 103.34, 140.0, [0.0, 0.0, 103.34]), (3828, 9, 50.0, 140.0, [0.0, 20.0, 30.0])]),
+            line(30002, [(3661, 58, 85.81, 100.0, [0.0, 85.81]), (4016, 10, 270.07, 340.0, [0.0, 270.07]),
+                         (3827, 9, 103.34, 140.0, [0.0, 0.0, 103.34]), (3828, 9, 50.0, 140.0, [0.0, 20.0, 30.0]),
+                         (3662, 58, 10.0, 100.0, [0.0, 10.0])]),
+        ]
+        got = animals(lines, 1, 2, 30002)
+        own = {a['id']: a for a in got['own']}
+        self.assertEqual(own[3661]['full'], 100.0)          # finished: 14.2 left to rot
+        self.assertNotIn('full', own[4016])                 # still being eaten at the last line
+        self.assertNotIn('full', own[3828])                 # shared with the other player
+        self.assertNotIn('full', own[3662])                 # first seen in the last line
+        self.assertEqual(got['opponent'][0], {'id': 3827, 'kind': 'deer', 'eaten': 103.3,
+                                              'first_seconds': 20, 'last_seconds': 20, 'full': 140.0})
+        carried = lines[:2] + [lines[1].replace('"ms": 20001', '"ms": 30002').replace('[0.0, 85.81]', '[0.0, 80.0]')]
+        self.assertNotIn('full', {a['id']: a for a in animals(carried, 1, 2, 30002)['own']}[3661])  # some still carried
+
     def test_without_gaina_lines_or_eaten_animals_the_animals_part_is_absent(self):
         self.assertIsNone(animals(self.lines(), 1, 2, 400000))
         self.assertIsNone(animals(self.animal_lines(), 1, 2, 25000))              # only carried food so far
