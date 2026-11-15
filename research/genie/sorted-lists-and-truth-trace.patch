@@ -2155,7 +2155,7 @@ index 398a973c..8fe3628e 100644
              self.stop_all_units(group, StopScope::Busy)?;
          }
 diff --git a/crates/engine/genie-core/src/groups/place.rs b/crates/engine/genie-core/src/groups/place.rs
-index 51f6a791..560b2370 100644
+index 51f6a791..584af934 100644
 --- a/crates/engine/genie-core/src/groups/place.rs
 +++ b/crates/engine/genie-core/src/groups/place.rs
 @@ -16,6 +16,8 @@ use crate::map::DistanceSquared;
@@ -2191,7 +2191,7 @@ index 51f6a791..560b2370 100644
          let g = self.groups.held_mut(group)?;
          g.stored_positions.clear_points();
          g.motion.new_position[0] = at;
-@@ -402,6 +409,226 @@ impl World {
+@@ -402,6 +409,230 @@ impl World {
          Ok(())
      }
  
@@ -2407,8 +2407,12 @@ index 51f6a791..560b2370 100644
 +        }
 +        if crate::groups::trace_forming() {
 +            eprintln!(
-+                "FORMING_FRONTPATH found={found:?} radii={} raw={raw:?} points={:?}",
++                "FORMING_FRONTPATH found={found:?} radii={} from=({}, {}) to=({}, {}) raw={raw:?} points={:?}",
 +                req.radii.get(),
++                w.x(),
++                w.y(),
++                c.x(),
++                c.y(),
 +                out.points
 +            );
 +        }
@@ -2418,7 +2422,7 @@ index 51f6a791..560b2370 100644
      /// The terrain classes master `master` of player `p` lets its objects stand on: its
      /// restriction (`+0x606`) in the map's table (`FUN_141054630`).
      ///
-@@ -870,3 +1097,29 @@ mod tests {
+@@ -870,3 +1101,29 @@ mod tests {
          );
      }
  }
@@ -7076,6 +7080,35 @@ index 87f4b772..a360891f 100644
      }
      Ok(Distance::new(least))
  }
+diff --git a/crates/engine/genie-core/src/unit_ai/attacked.rs b/crates/engine/genie-core/src/unit_ai/attacked.rs
+index 7e435e73..81690f9c 100644
+--- a/crates/engine/genie-core/src/unit_ai/attacked.rs
++++ b/crates/engine/genie-core/src/unit_ai/attacked.rs
+@@ -361,7 +361,11 @@ impl UnitAi {
+             && let Some(met) = ObjectId::of_field(n.p[0])
+             && at.unit(met).is_some()
+             && self.retarget_disabled == 0
+-            && self.current_order.is_none()
++            // EXPERIMENT (GENIE_EXPERIMENT_WAYGROUP_188329, findings 95): 188329 0xd36a9f..
++            // 0xd36ab2 (handler 0xd33c40) also lets a unit with an order (`+0x3c != -1`) attack
++            // the unit in its way when that unit is in a group (its `+0x210 != -1`).
++            && (self.current_order.is_none()
++                || (waygroup_188329() && at.unit(met).is_some_and(|u| u.grouped)))
+             && self.stance == UnitStance::Aggressive
+         {
+             // slot 0xb8 forced, by the type
+@@ -548,3 +552,11 @@ impl UnitAi {
+         }
+     }
+ }
++
++/// `GENIE_EXPERIMENT_WAYGROUP_188329`: notify 0x215's attack on the unit in the way also for a
++/// unit with an order when the unit in the way is in a group, as 188329 0xd36a9f..0xd36ab2 tests
++/// it (findings 95).
++fn waygroup_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_WAYGROUP_188329").is_some())
++}
 diff --git a/crates/engine/genie-core/src/unit_ai/flight.rs b/crates/engine/genie-core/src/unit_ai/flight.rs
 index b388f155..d2925c47 100644
 --- a/crates/engine/genie-core/src/unit_ai/flight.rs
@@ -7477,6 +7510,18 @@ index d0cbfb72..5adf364c 100644
      Some({
          let held = roles.of_class(class);
          if held.intersects(
+diff --git a/crates/engine/genie-core/src/unit_ai/process_order.rs b/crates/engine/genie-core/src/unit_ai/process_order.rs
+index 6f60bbc2..9d9b867f 100644
+--- a/crates/engine/genie-core/src/unit_ai/process_order.rs
++++ b/crates/engine/genie-core/src/unit_ai/process_order.rs
+@@ -445,6 +445,7 @@ impl UnitAi {
+                 kind: at.kind,
+                 main: None,
+                 allied: true,
++                grouped: at.group.is_some(),
+             }));
+         }
+         at.unit(id)
 diff --git a/crates/engine/genie-core/src/unit_ai/retarget.rs b/crates/engine/genie-core/src/unit_ai/retarget.rs
 index 516e920b..02ac9264 100644
 --- a/crates/engine/genie-core/src/unit_ai/retarget.rs
@@ -7594,7 +7639,7 @@ index 7fd24514..b0ef18a3 100644
      /// hold it (`FUN_1415417a0`).
      ///
 diff --git a/crates/engine/genie-core/src/unit_ai/surroundings.rs b/crates/engine/genie-core/src/unit_ai/surroundings.rs
-index 7cc2f5c9..f3765381 100644
+index 7cc2f5c9..4c63b8e5 100644
 --- a/crates/engine/genie-core/src/unit_ai/surroundings.rs
 +++ b/crates/engine/genie-core/src/unit_ai/surroundings.rs
 @@ -299,6 +299,11 @@ pub(super) struct LiveTop {
@@ -7623,6 +7668,16 @@ index 7cc2f5c9..f3765381 100644
      }
  }
  
+@@ -359,6 +371,9 @@ pub struct UnitSeen {
+     /// The unit's owner counts its owner as its own or an ally (`FUN_141663d90` with the ally
+     /// flag, [`crate::unit_ai::task_finder::allied`]).
+     pub allied: bool,
++    /// It is in a unit group (`+0x210 != -1`, [`crate::groups::GroupLink`]); 188329's notify
++    /// 0x215 lets a unit with an order attack such a unit in its way (findings 95).
++    pub grouped: bool,
+ }
+ 
+ /// What a computer player's unit weighs of an object on a damage notify ([`UnitAi::damaged`]):
 diff --git a/crates/engine/genie-core/src/unit_ai/tests.rs b/crates/engine/genie-core/src/unit_ai/tests.rs
 index 4cc9cc71..b603cd5e 100644
 --- a/crates/engine/genie-core/src/unit_ai/tests.rs
@@ -7661,7 +7716,7 @@ index 4cc9cc71..b603cd5e 100644
      let (r, w) = hear(PlayerKind::Human, Vec::new());
      assert_eq!(r, Ok(GO_ON));
 diff --git a/crates/engine/genie-core/src/unit_ai/unit.rs b/crates/engine/genie-core/src/unit_ai/unit.rs
-index dc286d39..3934ba44 100644
+index dc286d39..90819b3c 100644
 --- a/crates/engine/genie-core/src/unit_ai/unit.rs
 +++ b/crates/engine/genie-core/src/unit_ai/unit.rs
 @@ -89,9 +89,13 @@ impl Unit {
@@ -7757,7 +7812,15 @@ index dc286d39..3934ba44 100644
                          ai.update(dt, world_time, player_kind, &at, ai_stream, side)
                      }
                      (None, _) => ai
-@@ -691,3 +720,32 @@ impl Unit {
+@@ -656,6 +685,7 @@ impl Unit {
+                     owner,
+                     AllyTest::WithRelation4,
+                 ),
++                grouped: u.group.id.is_some(),
+             });
+         }
+         Ok(seen)
+@@ -691,3 +721,32 @@ impl Unit {
          Ok(())
      }
  }
@@ -8029,7 +8092,7 @@ index ea0838e3..fa603b75 100644
          return Ok(Some(first));
      }
 diff --git a/crates/engine/genie-core/src/unit_ai/world_view/side.rs b/crates/engine/genie-core/src/unit_ai/world_view/side.rs
-index 77dc93ea..f2acd6eb 100644
+index 77dc93ea..859f3ad4 100644
 --- a/crates/engine/genie-core/src/unit_ai/world_view/side.rs
 +++ b/crates/engine/genie-core/src/unit_ai/world_view/side.rs
 @@ -56,6 +56,139 @@ use crate::world::others::OthersRef;
@@ -8223,7 +8286,15 @@ index 77dc93ea..f2acd6eb 100644
          let roles = &self.c.w.model.roles.clone();
          let lists = self.c.w.spatial.searched().ok_or(GenieError::unsupported(
              "a search that reads the registry's last answer (before any query)",
-@@ -286,6 +459,80 @@ impl UnitSide for UnitView<'_, '_> {
+@@ -258,6 +431,7 @@ impl UnitSide for UnitView<'_, '_> {
+                 owner,
+                 AllyTest::WithRelation4,
+             ),
++            grouped: u.group.id.is_some(),
+         }))
+     }
+ 
+@@ -286,6 +460,80 @@ impl UnitSide for UnitView<'_, '_> {
          Ok(class)
      }
  
@@ -8304,7 +8375,7 @@ index 77dc93ea..f2acd6eb 100644
      fn reaches(&mut self, target: ObjectId, range: Distance) -> Result<bool, GenieError> {
          let mut plan = Planning {
              pathing: &mut self.c.w.pathing,
-@@ -322,6 +569,31 @@ impl UnitSide for UnitView<'_, '_> {
+@@ -322,6 +570,31 @@ impl UnitSide for UnitView<'_, '_> {
          )
      }
  
@@ -8336,7 +8407,7 @@ index 77dc93ea..f2acd6eb 100644
      fn closest(&mut self, search: &Search<'_>) -> Result<Found, GenieError> {
          let roles = &self.c.w.model.roles.clone();
          let seeker = match search.pick {
-@@ -522,6 +794,7 @@ impl UnitSide for UnitView<'_, '_> {
+@@ -522,6 +795,7 @@ impl UnitSide for UnitView<'_, '_> {
          ai: &UnitAi,
          rng: &mut Well512,
      ) -> Result<Option<Tile>, GenieError> {
@@ -8344,7 +8415,7 @@ index 77dc93ea..f2acd6eb 100644
          let tc = town_centre(
              owner_view(
                  &self.c.w.players,
-@@ -530,6 +803,7 @@ impl UnitSide for UnitView<'_, '_> {
+@@ -530,6 +804,7 @@ impl UnitSide for UnitView<'_, '_> {
                  self.new_owner,
              )?,
              self.c.w.model.slots.master,
