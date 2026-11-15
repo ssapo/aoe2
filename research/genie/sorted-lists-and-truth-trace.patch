@@ -3629,7 +3629,7 @@ index 8ae7fee5..35ac2065 100644
              return MoveTo::Failed;
          }
 diff --git a/crates/engine/genie-core/src/movement/new_path.rs b/crates/engine/genie-core/src/movement/new_path.rs
-index 1f873756..069ceae3 100644
+index 1f873756..713fd7ef 100644
 --- a/crates/engine/genie-core/src/movement/new_path.rs
 +++ b/crates/engine/genie-core/src/movement/new_path.rs
 @@ -65,6 +65,15 @@ impl Mover {
@@ -3648,7 +3648,29 @@ index 1f873756..069ceae3 100644
              if level.waypoint.at_or_past_last(level.points.len()) {
                  if level.continue_counter.left() {
                      // the unit pauses itself (slot 0x5f0, the walked level's `+0x34`) and stops
-@@ -224,7 +233,12 @@ impl Mover {
+@@ -216,15 +225,33 @@ impl Mover {
+         if let Some((target_id, t)) = target
+             && !self.is_moving()
+             && me.action_state.get() == 8
++            && (!dropignore_188329()
++                || world.get(me.id).is_some_and(|p| {
++                    roles
++                        .of_class(p.class)
++                        .intersects(ClassRoles::VILLAGER | ClassRoles::FISHING_SHIP)
++                }))
+         {
+-            let grow = self.stats.radius.x() + movement_tuning.range_floor;
++            // 188329 0x120efb4-0x120efc9: the query range is the walker's radius × 4.0 + 0.1
++            // (0x31fd878, 0x3202890; findings 48 D1); the walker must be of class 4 or 0x15
++            // (0x120f0c2)
++            let grow = if dropignore_188329() {
++                self.stats.radius.x() * 4.0 + 0.1
++            } else {
++                self.stats.radius.x() + movement_tuning.range_floor
++            };
+             // the query's point: slot 0x520, +0x824
+             let (x, y) = (self.moved_at.x(), self.moved_at.y());
+             let rect = Rect::new(x, y, x, y);
              world.check_known_records(rect.grown(Distance::new(grow)))?;
              let owner = world.get(me.id).map(|p| p.player);
              let r = self.stats.radius.x();
@@ -3662,7 +3684,27 @@ index 1f873756..069ceae3 100644
              for id in world.obstruction_candidates(rect, Distance::new(grow), &skip) {
                  let Some(p) = world.get(id) else { continue };
                  let gait = by_id.gait(id);
-@@ -463,6 +477,64 @@ impl Mover {
+@@ -247,12 +274,16 @@ impl Mover {
+                     .task_0x99
+                     .get(p.player.index())
+                     .is_some_and(|m| m.contains(&p.master));
+-                if !roles.of_class(p.class).intersects(
++                // 188329 0x120f24a: only the classes 4 and 0x15 (or slot 0x528 for a building)
++                let worker_roles = if dropignore_188329() {
++                    ClassRoles::VILLAGER | ClassRoles::FISHING_SHIP
++                } else {
+                     ClassRoles::TRADE_BOAT
+                         | ClassRoles::VILLAGER
+                         | ClassRoles::TRADE_CART
+-                        | ClassRoles::FISHING_SHIP,
+-                ) && !worker_building
++                        | ClassRoles::FISHING_SHIP
++                };
++                if !roles.of_class(p.class).intersects(worker_roles) && !worker_building
+                 {
+                     continue;
+                 }
+@@ -463,6 +494,64 @@ impl Mover {
          Ok(result.reaches().then(|| path.length()))
      }
  
@@ -3727,6 +3769,17 @@ index 1f873756..069ceae3 100644
      /// The length of the tile planner's path (`FUN_140f7c530` with the radii `radii`, range 0, no
      /// closed tiles, the tile search for a human player, no smoothing) from the unit to `to`, and
      /// the planner's result; None without a planner for the unit's restriction.
+@@ -493,3 +582,10 @@ impl Mover {
+         Ok(Some((found, path.length)))
+     }
+ }
++
++/// `GENIE_EXPERIMENT_DROPIGNORE_188329`: the drop-off worker ignore query as 188329 runs it
++/// (0x120ef00-0x120f344, findings 78).
++pub(crate) fn dropignore_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_DROPIGNORE_188329").is_some())
++}
 diff --git a/crates/engine/genie-core/src/movement/path_end.rs b/crates/engine/genie-core/src/movement/path_end.rs
 index 8dd9623e..862ae3da 100644
 --- a/crates/engine/genie-core/src/movement/path_end.rs
@@ -4352,7 +4405,7 @@ index d65b2d84..ecf8ab20 100644
              return Ok(());
          };
 diff --git a/crates/engine/genie-core/src/orders/mod.rs b/crates/engine/genie-core/src/orders/mod.rs
-index b97f7d35..abb7c9b3 100644
+index b97f7d35..802ae37a 100644
 --- a/crates/engine/genie-core/src/orders/mod.rs
 +++ b/crates/engine/genie-core/src/orders/mod.rs
 @@ -61,6 +61,7 @@ pub use self::order_flags::OrderFlags;
@@ -4383,6 +4436,16 @@ index b97f7d35..abb7c9b3 100644
  /// What a unit's slot 0x7e8 (`FUN_141227190`) is given through slot 0x128: the target, the point
  /// (x, y, z), the work command's carried-resource test and task filter, and the unit's `+0xa14`
  /// while it runs ([`OrderSource`]): only a direct order's new action's notify clears the unit
+@@ -263,6 +277,9 @@ pub(crate) struct Split {
+     /// The owner of the list's first unit (`DAT_143f11960`), whose groups a new group of the
+     /// split joins; None for a list whose first unit is gone (the game's −1).
+     pub(crate) owner: Option<PlayerId>,
++    /// 188329: the order's target and whether it is queued, which the run splitter
++    /// (0x10b4480) reads (`GENIE_EXPERIMENT_SPLITTARGET_188329`); None for an order without.
++    pub(crate) aim: Option<(ObjectId, bool)>,
+     pub(crate) loose: Vec<ObjectId>,
+     pub(crate) groups: Vec<Vec<ObjectId>>,
+     /// The units a path from them did not join (`+0x3a48`, a `std::unordered_set` the splitter
 diff --git a/crates/engine/genie-core/src/orders/moves.rs b/crates/engine/genie-core/src/orders/moves.rs
 index 29f5d776..5e243a42 100644
 --- a/crates/engine/genie-core/src/orders/moves.rs
@@ -4453,6 +4516,118 @@ index 29f5d776..5e243a42 100644
          if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
              ai.orders.clear();
          }
+diff --git a/crates/engine/genie-core/src/orders/split.rs b/crates/engine/genie-core/src/orders/split.rs
+index b8bda6ff..e0c5d943 100644
+--- a/crates/engine/genie-core/src/orders/split.rs
++++ b/crates/engine/genie-core/src/orders/split.rs
+@@ -3,6 +3,7 @@
+ use crate::GenieError;
+ use crate::map::Distance;
+ use crate::map::Point;
++use crate::movement::footprint_gap_squared;
+ use crate::math::fmath::{at_most_or_unordered, sqrt};
+ use crate::movement::Speed;
+ use crate::objects::ObjectId;
+@@ -42,8 +43,11 @@ impl World {
+             &[id] if self.place(id).is_none() => return Ok(()),
+             _ => {}
+         }
++        let aim = order
++            .target
++            .map(|t| (t, order.flags.contains(OrderFlags::QUEUED)));
+         let loose = self
+-            .split(units, &|_| true, ControlKey::Up)
++            .split_aimed(units, &|_| true, ControlKey::Up, aim)
+             .and_then(|mut s| self.interact_groups(&mut s, order).map(|()| s.loose));
+         self.groups.count_command();
+         let loose = loose?;
+@@ -123,6 +127,18 @@ impl World {
+         units: &[Option<ObjectId>],
+         kept: &dyn Fn(ObjectId) -> bool,
+         control: ControlKey,
++    ) -> Result<Split, GenieError> {
++        self.split_aimed(units, kept, control, None)
++    }
++
++    /// [`World::split`] for an order with a target (`aim`: its id and whether it is queued),
++    /// which 188329's run splitter reads ([`Split::aim`]).
++    pub(crate) fn split_aimed(
++        &mut self,
++        units: &[Option<ObjectId>],
++        kept: &dyn Fn(ObjectId) -> bool,
++        control: ControlKey,
++        aim: Option<(ObjectId, bool)>,
+     ) -> Result<Split, GenieError> {
+         // FUN_140fd9ae0 splits only when the list's first unit exists (its owner): else no unit
+         // takes the order
+@@ -141,6 +157,7 @@ impl World {
+         }
+         let mut split = Split {
+             owner: Some(owner),
++            aim,
+             ..Split::default()
+         };
+         for run in sorted.chunks(60) {
+@@ -165,6 +182,48 @@ impl World {
+             split.loose.extend(left.iter().map(|u| u.id));
+             return Ok(());
+         }
++        // 188329 0x10b4880-0x10b4aa0 (GENIE_EXPERIMENT_SPLITTARGET_188329, findings 79): with a
++        // target, the centroid of the units left (x, y, z sums over their count) is taken; in
++        // the run's order a unit is loose when it is above type 69 of formation category 0, or
++        // when its squared distance to the centroid (y² + x² + z²) is more than its squared
++        // footprint gap to the target (0x124daf0). The test "within its range (slot 0x250) of
++        // the target" (not queued) is not modelled: slot 0x250 is 0 for a unit without a
++        // weapon range, so it never holds for a melee unit.
++        if splittarget_188329()
++            && let Some((target, _queued)) = split.aim
++            && let Some(t) = self.spatial.get(target).copied()
++            && !left.is_empty()
++        {
++            let (mut sx, mut sy, mut sz) = (0.0_f32, 0.0_f32, 0.0_f32);
++            for u in &left {
++                sx += u.position.x();
++                sy += u.position.y();
++                sz += u.position.z();
++            }
++            #[allow(clippy::cast_precision_loss)]
++            let n = left.len() as f32;
++            let (cx, cy, cz) = (sx / n, sy / n, sz / n);
++            let mut rest = Vec::with_capacity(left.len());
++            for u in left {
++                let mut loose = MAX_UNGROUPED < u.kind && !u.grouped;
++                if let Some(me) = self.spatial.get(u.id) {
++                    let gap =
++                        footprint_gap_squared(u.position, me.radius, t.position, t.radius).get();
++                    let dx = cx - u.position.x();
++                    let dy = cy - u.position.y();
++                    let dz = cz - u.position.z();
++                    if gap < dy * dy + dx * dx + dz * dz {
++                        loose = true;
++                    }
++                }
++                if loose {
++                    split.loose.push(u.id);
++                } else {
++                    rest.push(u);
++                }
++            }
++            left = rest;
++        }
+         // units above type 69 of formation category 0 stay loose (the dock test FUN_141158210 is
+         // 1 only on an `E` tile in game type 12)
+         let (loose, rest): (Vec<Splittable>, Vec<Splittable>) = left
+@@ -438,3 +497,10 @@ pub(super) fn splits_together(
+     }
+     Ok(at_most_or_unordered(d, f.influence.get()))
+ }
++
++/// `GENIE_EXPERIMENT_SPLITTARGET_188329`: 188329's run splitter (0x10b4480) leaves loose the
++/// units of a targeted order nearer the target than the units' centroid (findings 79).
++pub(crate) fn splittarget_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_SPLITTARGET_188329").is_some())
++}
 diff --git a/crates/engine/genie-core/src/orders/start_work.rs b/crates/engine/genie-core/src/orders/start_work.rs
 index b0488a3d..6f5d131a 100644
 --- a/crates/engine/genie-core/src/orders/start_work.rs
@@ -4474,6 +4649,18 @@ index b0488a3d..6f5d131a 100644
                          master_id,
                      )
                  },
+diff --git a/crates/engine/genie-core/src/orders/tests.rs b/crates/engine/genie-core/src/orders/tests.rs
+index 465e724e..0a3983fe 100644
+--- a/crates/engine/genie-core/src/orders/tests.rs
++++ b/crates/engine/genie-core/src/orders/tests.rs
+@@ -4667,6 +4667,7 @@ fn kept_group_takes_the_loose_soldiers_about_it() {
+     t.groups.get_mut(group_id(5)).unwrap().motion.position[0] = BVector::new(21.0, 0.0, 20.0);
+     let mut split = Split {
+         owner: Some(PlayerId::new(1)),
++        aim: None,
+         loose: object_id_list([13, 14, 15]),
+         groups: vec![object_id_list([11, 12])],
+         far: [object_id(15)].into(),
 diff --git a/crates/engine/genie-core/src/orders/town_bell.rs b/crates/engine/genie-core/src/orders/town_bell.rs
 index 72090fb3..3f1a775d 100644
 --- a/crates/engine/genie-core/src/orders/town_bell.rs
