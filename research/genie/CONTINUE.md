@@ -46,6 +46,27 @@ Codex의 초기 이동·내려놓기·주둔 복귀 정적 조사는 [결과·�
 
 ### 2.1 리플 3개 (2026-11-13 세션 M4, 지금 기본 = 스위치 27개: 아래 25개 + `FARMSPOT` 52 + `MOVEEND` 53; 25개 = 옛 17개(`J_f_*`) + `MASTERHP` 40 + `GARRISON_RECORD` 41 + `RESSEARCH` 43 + `EXPLORE_WAIT` 44 + `PATROLRANGE` 45 + `HELPCALL` 46 + `PLANCHOICE` 47 + `GATHER_SNAP` 49; HUNT에 42번 포함; `SEARCH_CLEAR=unit`; 스위치 없는 50·51번 포함. 실행 `M4_p_239`, `M4_p_161`, `M4_p_097`; 518470161·517426097은 update 75,000까지; 한 줄 스위치 목록 `runs\M4_envs.txt`)
 
+**2026-11-16 새벽, 세션 P26(ONBOARDING `ENG-26`): 프로 경기 14판을 지금 기본(`runs\M6_envs.txt`, exe `runs\census_base.exe` = `census_J25e.exe`)으로 돌려 분류만 함 — 엔진 변경 없음, 아래 U15 표 그대로(518239882 57 / 54). 프로 경기의 사이트 구간은 1:52.7~5:27.2로 짧고, 여섯 판은 첫 체크포인트부터 어긋난다. 이른 원인 둘(A: 처음 몇 초의 AI 난수 뽑기 수, B: 사냥 내려놓기 ±1)은 원본 기록이 있어야 한다(106번, `runs/P26_out/pros.md`).**
+
+**프로 경기 14판 (2026-11-16 세션 P26, 실행 `P26_<경기>`, update 75,000까지, `GENIE_TRACE_COMMANDS=1`; 한 번에 `runs\J25_launch.ps1 -Cmd "bash runs/P26_launch.sh <접두>"`, 표 `python3 runs/P26_out/tab.py <접두>`; 첫 어긋남은 `{단어: 엔진−기록}`)**
+
+| 경기 (프로) | 문명 P1 / P2 | 맵 | 첫 어긋남 P1 / P2 (초 {단어}) | 단어 1 첫 불일치 P1 / P2 | 사이트 구간 | 엔진 멈춤 |
+|---|---|---|---|---|---|---|
+| 519444998 (Lucho) | Dravidians / Georgians | Enclosed (닫힘) | 8.9 {9:736} / 8.9 {7:3,9:279} | 158.4 -1 / 125.9 -22 | 1:59.4 | P1 없음; P2 없음 |
+| 521113438 (ACCM) | Ethiopians / Mapuche | Atacama | 210.4 {7:23,9:6} / 184.4 {7:25,9:6} | 288.4 -10 / 262.4 -1 | 4:15.9 | P1 멈춤 47745: an attack's target the slice does not hold live; P2 멈춤 48398: an object of a stopped player may be near |
+| 521069970 (Liereyy) | Maya / Danes | Socotra | 164.7 {7:221} / 203.7 {7:-7} | 333.7 -10 / 372.7 -1 | 5:27.2 | P1 멈춤 57441: an object of a stopped player may be near; P2 멈춤 57234: a kill reward task (action type 0xa1) |
+| 521333824 (Lewis) | Poles / Goths | Hideout (닫힘) | 164.7 {7:-56} / 184.2 {7:-42} | 249.2 -25 / 268.7 -6 | 4:02.7 | P1 멈춤 55636: a builder with no task for its foundation; P2 멈춤 55644: an object of a stopped player may be near |
+| 520821782 (MbL) | Teutons / Berbers | Golden Pit | 51.9 {9:44} / 51.9 {7:136,9:237} | 200.4 +6 / 265.4 -9 | 3:13.9 | P1 없음; P2 없음 |
+| 521153105 (Sitaux) | Burgundians / Wu | Arabia | 54.2 {7:2} / 119.2 {7:2} | 119.2 -5 / 190.7 +43 | 1:52.7 | P1 없음; P2 없음 |
+| 518985913 (Hera) | Khmer / Japanese | Arabian Desert | 73.7 {7:9,9:6} / 145.2 {7:-106} | 151.7 -23 / 275.2 -1 | 2:25.2 | P1 없음; P2 없음 |
+| 520176967 (Sebastian) | Mongols / Danes | Enclosed (닫힘) | 177.7 {9:128,10:-2} / 67.2 {7:106,9:-6} | 281.7 -3 / 119.2 -4 | 1:52.7 | P1 없음; P2 없음 |
+| 520842005 (Blve) | Malians / Italians | Arabian Desert | 8.9 {7:1,9:6} / 8.9 {7:2} | 190.9 -11 / 151.9 -1 | 2:25.4 | P1 없음; P2 없음 |
+| 517429796 (Nicov) | Wei / Saxons | Arabian Desert | 8.7 {9:-147} / 8.7 {7:-14,9:583} | 171.2 -37 / 158.2 +1 | 2:31.7 | P1 멈춤 54621: a missile whose shooter died (its weapons, FUN_14113e170); P2 멈춤 54882: an object of a stopped player may be near |
+| 521113779 (Yo) | Burmese / Celts | Arena (닫힘) | 28.9 {9:-265} / 28.9 {9:476} | 210.9 -3 / 184.9 -1 | 2:58.4 | P1 멈춤 62723: a notify kind the base handler does not model; P2 없음 |
+| 520199364 (dogao) | Burgundians / Japanese | MegaRandom | 164.7 {7:15} / 67.2 {7:-5} | 197.2 -1 / 119.2 -23 | 1:52.7 | P1 멈춤 63926: an object of a stopped player may be near; P2 멈춤 63553: an attack's target the slice does not hold live |
+| 519908353 (SoraKuma) | Poles / Turks | Steppe | 129.9 {7:-73} / 162.4 {7:2} | 188.4 -4 / 233.9 +11 | 3:01.9 | P1 멈춤 48368: a farm's bonus near a master (FUN_1411d3cd0); P2 멈춤 49398: an object of a stopped player may be near |
+| 520930307 (Ciskhan) | Cumans / Huns | Arabia | 9.2 {9:-351} / 9.2 {7:-14,9:-716} | 152.2 -22 / 119.7 +50 | 1:53.2 | P1 없음; P2 없음 |
+
 **2026-11-15 밤, 세션 J25(ONBOARDING `ENG-25`): 기본 스위치 변경 없음(`runs\M6_envs.txt` 그대로; exe `runs\census_base.exe` = `census_J25e.exe`). 엔진 멈춤 셋을 원본대로 없앰(스위치 없음): 빗나간 투사체가 대상 아닌 개체를 침(102번; 지금 기본에선 안 나는 멈춤, 옛 조합의 519700670 63,571 → 끝까지), 수도사(유형 9) 통지·유물 든 수도사의 할 일 없음(103번; 520596921 P1 43,412 → 이웃 멈춤 47,280, 대신 P2 46,128 "a farm in a builder's search for more work"), 농부의 내려놓은 뒤 0xf3(104번; 520219269 P2 63,458 → 64,159 "kill bonus task 0x9a"). 그 밖의 열세 판 + V 여섯 판의 `.out`·체크포인트 줄은 고치기 전과 바이트까지 같다 → U15 표의 첫 어긋남·확인 체크포인트·사이트 구간 그대로(518239882 57 / 54).**
 
 **2026-11-15 밤 늦게, 세션 I24(ONBOARDING `ENG-24`): 기본 스위치 변경 없음(`runs\M6_envs.txt` 그대로; exe `runs\census_base.exe` = `census_I24b.exe`). 엔진 멈춤 둘을 원본대로 없앰(스위치 없음): 유물 줍기 행동 0x84(99번; 520596921 P1 41,712 → 43,412), 스스로 완공되는 건물의 속성 204 단계(100번; 520219269 P2 63,232 → 63,458). 열세 판의 `.out`·체크포인트 줄은 `H23e_*`와 바이트까지 같다 → U15 표의 첫 어긋남·확인 체크포인트·사이트 구간 그대로(518239882 57 / 54).**
@@ -401,6 +422,7 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 12.5 미해결 (이른 순)
 
+- (2026-11-16 세션 P26 = ONBOARDING `ENG-26`; 실행 `P26_*`, `P26r_*`, `P26t1`, `P26t2`, `P26s_*`) **프로 경기 14판의 이른 원인(106번)**: ① A — 첫 체크포인트(약 9초)부터 두 선수의 단어 9만 다른 5판(519444998, 517429796, 520930307, 521113779, 520821782): AI 난수 뽑기 수 차이로 추정, 원인 개체 모름. 다음 첫 동작: 원본 기록 A(106번 사양, 517429796 0~9초 매 틱 `airng`·유닛 AI). ② B — 사냥·사슴 입금 직후 단어 1 ±1(520842005 P2 151.9초, 517429796 P2 158.2초가 사이트 구간을 정함). 다음 첫 동작: 원본 기록 B(517429796 P2 151.6~158.2초). ③ 엔진 멈춤(첫 어긋남 뒤): "an attack's target the slice does not hold live"(521113438 P1 47,745, 520199364 P2 63,553), "a kill reward task (action type 0xa1)"(521069970 P2 57,234), "a missile whose shooter died"(517429796 P1 54,621), "a notify kind the base handler does not model"(521113779 P1 62,723), "a farm's bonus near a master"(519908353 P1 48,368). 다음 첫 동작: 188329의 피해 처리 함수(옛 `FUN_141082e80`)를 찾는다 — 0xb8fd60(빗나간 투사체가 치는 곳, 102번)에서 부르는 피해 함수를 따라간다.
 - (2026-11-15 세션 J25 = ONBOARDING `ENG-25`; 실행 `J25a_*`~`J25d_*`, `J25base_*`, `J25*_old_*`) **엔진 멈춤(전부 첫 어긋남 뒤)**: 520596921 P2 46,128 "a farm in a builder's search for more work"(12.5 5번의 건설 C4가 실제로 나옴; 다음 첫 동작: 105번 끝 — 188329 0x1695c10의 농장 갈래 읽기); 520219269 P2 64,159 "an attacker's kill bonus task (action type 0x9a)"(머리말의 유형 154 작업, 안 읽음; 다음 첫 동작: 원본 피해 처리에서 처치 때 유형 154 작업을 쓰는 곳 찾기 — 엔진 `combat/damage/taking.rs` 491줄); 519002991 P2 42,117 "a pather query meeting a gate (slot 0x678)"(안 봄); 520352957 P1 35,394 "a hunt command without a task", 520162577 P2 44,417·520282194 P1 42,058 "a builder with no task for its foundation", 518801961 P1 56,792 "a gather command without a task"(지금 기본 `J25base_V_*`의 멈춤; 안 봄). 수도사의 남은 갈래(0x1fc에서 대상을 잡고 있을 때 0xd44470, 컴퓨터 전향·치료의 다시 찾기, 유물 없는 수도사의 할 일 없음 0xcfdb10 나머지)는 멈춤으로 남김. **5번 목록 점검**(105번 표): 멈춤으로 보이는 것 중 실제로 나온 것은 C4 하나, 명령 0x83·농장 D2는 안 나옴, R2-D8b·걷기 D7은 이미 들어 있음; 진단 줄을 단 둘 중 **채집 N4는 첫 어긋남 전에 나옴**(518470161 P1 782.9초~ 주민 10522, 517426097 P2 698.4초~; 안 넣음 — 다음 첫 동작: 원본 0xb7f76f 앞·0xd28770·0xb7b960을 읽고 `truth5`로 10522의 대상 확인), 세션 B의 사라진 대상 명령은 첫 어긋남 뒤에만; 나머지 조용한 갈래들은 확인 못 함.
 - (2026-11-15 세션 I24 = ONBOARDING `ENG-24`; 실행 `I24a_q_921`, `I24on_*`, `I24on_V_520219269`) **엔진 멈춤(전부 첫 어긋남 뒤)**: 520596921 P1 43,412 "the notify handler of a unit-AI type not modelled"(99번 뒤, 안 봄; 다음 첫 동작: `GENIE_TRACE_COMMANDS=1`로 43,412 앞을 보고 어느 유닛·AI 종류인지 찾기 — 유물을 든 수도사(마스터 286)일 수 있다, 추정); 520219269 P2 63,458 "a farmer that found nothing after its drop-off (set_state 0xf3)"(100번 뒤); 519002991·519700670 빗나간 투사체(101번: 원본 갈래 0xb8fd60 안에서 읽음, 다음 첫 동작은 101번 끝); 520352957 타격 효과(188329 주소 못 찾음); 520162577 농장 보너스(0x127e5a0, 0x128b590, 안 읽음). 아래 5번 목록(읽었지만 안 넣은 것)은 이번에 실제 경기에 나오는지 확인하지 못했다(시간 부족) — 하나씩 진단 줄을 넣어 열한 리플 + 동물 판 + V 판을 돌려야 가린다.
 - (2026-11-15 세션 H23 = ONBOARDING `ENG-23`; 실행 `H23c_q_921`, `H23d_*`) **엔진 멈춤 520596921 P1 41,712 "the action factory for a task the slice does not model"**(97번 뒤): 작업 찾기가 이제 클래스 0x2a 대상(유물)에 작업 0x84(수도사 목록의 작업 28, 진단 `UNMODELLED_TASK`, 실행 `H23e_q_921`)를 돌려주고, 그 행동(유물 줍기)을 엔진이 못 만든다. 다음 첫 동작: 188329 행동 공장(작업 → 행동, 엔진 `orders/work.rs` `start_task`)에서 0x84 갈래를 찾아 유물 줍기 행동을 읽는다. 작업 찾기 안에서 아직 안 읽은 것: 치료 작업 고르기 0x133d7ab~, 꼬리 나머지 0x133dfa6~, 가이아 대상 바이트 +0x51c(0x114aaa0).
@@ -516,7 +538,7 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 13.1 사례 하나를 끝낼 때마다 (고쳤든 못 고쳤든)
 
-`truth-log-findings.md` 맨 끝에 번호를 이어 한 절을 쓴다(지금 마지막은 105번; 63번에는 뒤에 "63 추가" 절이 있고 73번이 그 다음 이어지는 기록이다). 형식:
+`truth-log-findings.md` 맨 끝에 번호를 이어 한 절을 쓴다(지금 마지막은 106번; 63번에는 뒤에 "63 추가" 절이 있고 73번이 그 다음 이어지는 기록이다). 형식:
 
 ```
 ## <번호>. <한 줄 제목> (스위치 `GENIE_EXPERIMENT_...`에 추가 / 새 스위치 / 스위치 없음)
@@ -553,6 +575,11 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 - **기본 묶음에 넣는 판정 규칙(2026-11-12 바뀜)**: 리플·선수마다 "첫 어긋남" = (모든 체크포인트 단어 중 가장 이른 불일치, 자원 첫 차이 > 0.01) 중 이른 시각. 스위치를 켠 실행에서 세 리플 모든 선수의 첫 어긋남이 앞당겨지지 않으면 기본에 넣는다. 같은 실행에서 그 선수의 첫 어긋남 뒤에 생긴 불일치·앞당김은 뒤따른 것으로 보고 판정을 막지 않는다(대신 12.5에 열린 문제로 적는다). 예전 규칙(어느 단어든 첫 불일치가 하나라도 앞당겨지면 안 넣음)은 너무 엄격해서 바꿨다. 숫자는 `summ2.sh`의 "first word mismatch"와 "first difference > 0.01"에서 뽑는다.
 
 ### 13.4 지금 하던 일 (멈출 때마다 이 절을 덮어쓴다)
+
+**2026-11-16 새벽, Claude (세션 P26 = ONBOARDING `ENG-26`). 결론: 반쯤 하던 일 없음, 엔진 변경 없음. 프로 14명의 랭크 1대1 14판(빌드 188329)을 지금 기본으로 돌려 표를 만들고(2.1 맨 위) 이른 원인을 묶었다(106번, `runs/P26_out/pros.md`): A 첫 체크포인트의 AI 난수(5판), B 사냥 내려놓기 ±1(사이트 구간 2판), C 경기 중 위치(나머지), D 엔진 멈춤 6종(사이트 무관). A·B는 체크포인트만으로 못 가려 원본 기록이 있어야 하고, D의 0xa1은 188329 피해 처리 함수를 못 찾아 안 읽었다.**
+
+- 엔진 소스 `genie`: J25와 같음(패치 그대로, `runs\census_base.exe` = `census_J25e.exe`). 기본 스위치 `runs\M6_envs.txt` 그대로. 리플 14개는 `genie-replays\<경기>\`(목록 `runs\P26_out\picks.txt`: 경기, 프로 id, 이름). 도구: `runs/P26_launch.sh <접두> [env]`(14판 75,000), `runs/P26_short.sh <접두> <update> [env]`, `runs/P26_out/tab.py <접두>`, `runs/P26_out/res_at.py <err> <선수> <초>`(저장소 `tools/`에 사본).
+- 다음 첫 동작: 원본 기록 A(517429796 0~9초, 106번 사양)를 뜬다 — 다섯 판을 한꺼번에 풀 가능성이 가장 크다. 기록 없이 하려면 12.5 맨 위 P26 항목 ③(피해 처리 함수 찾기 → 0xa1, 공격 대상 멈춤 2판).
 
 **2026-11-15 밤, Claude (세션 J25 = ONBOARDING `ENG-25`, 자동). 결론: 반쯤 하던 일 없음. ① 빗나간 투사체가 대상 아닌 개체를 0.5 배율로 침(102번, `Hit.scale`) — 지금 기본에선 그 갈래가 안 나와 숫자 변화 없음, 옛 조합 519700670에서 멈춤이 없어짐을 확인. ② 수도사 통지 0xd047b0·유물 든 수도사의 할 일 없음 0xcfdb10(103번). ③ 농부 0xf3(104번). ④ 5번 목록: 건설 C4가 520596921 P2 46,128에 실제로 나옴(읽기 시작, 안 넣음), 나머지 표는 105번.**
 
