@@ -7678,6 +7678,152 @@ index 7cc2f5c9..4c63b8e5 100644
  }
  
  /// What a computer player's unit weighs of an object on a damage notify ([`UnitAi::damaged`]):
+diff --git a/crates/engine/genie-core/src/unit_ai/task_finder/mod.rs b/crates/engine/genie-core/src/unit_ai/task_finder/mod.rs
+index d11a4839..52ea12ce 100644
+--- a/crates/engine/genie-core/src/unit_ai/task_finder/mod.rs
++++ b/crates/engine/genie-core/src/unit_ai/task_finder/mod.rs
+@@ -476,6 +476,81 @@ fn finder_head<'m>(
+     Ok(Finding::Next)
+ }
+ 
++/// Whether `master`'s class is the monk's (0x12, `cmp r12w, 0x12` at `0x133d05b`).
++fn monk_class(master: &Master) -> bool {
++    master.class.get() == 0x12
++}
++
++/// 188329's conversion branch of the task finder (`0x133d0ab`..`0x133d5c5`, findings 97): a
++/// target of another player in a state below 3, not allied (`0x1732ca0`, flag 1), of a player
++/// above gaia, of a class other than 1, 0x3c, 0x2a, 0x3a, 0x1e and 0xe and a master other than
++/// 0x32 and 0x4a3, takes the list's conversion task (0x68; a monk under no filter, else under
++/// filter 0x68): the first for the target's master, else the last for its class, else the last
++/// for any class and master. Without one a monk has none, another unit goes on. A gaia target
++/// of type 50 or above is not modelled (`0x13d4310`, `0x114aaa0`). Without a target, or when
++/// the target does not qualify, the finder goes on (the monk to its task 0x84 at `0x133d61c`,
++/// another unit to its search for one at `0x133d5cc`: the same next step here).
++fn conversion<'m>(
++    list: &'m Master,
++    actor: &Actor<'_>,
++    target: Option<&TaskTarget<'_>>,
++    filter: Option<ActionKind>,
++    dip: &impl Diplomacy,
++) -> Result<Finding<'m>, GenieError> {
++    let Some(t) = target else {
++        return Ok(Finding::Next);
++    };
++    if t.player == actor.player || ObjectState::Dying <= t.state {
++        return Ok(Finding::Next);
++    }
++    // every failed test goes on alike, so the class and master tests come first here
++    if [1, 0x3c, 0x2a, 0x3a, 0x1e, 0xe].contains(&t.master.class.get())
++        || t.master.id == MasterId::named(0x32)
++        || t.master.id == MasterId::named(0x4a3)
++    {
++        return Ok(Finding::Next);
++    }
++    if t.player == PlayerId::GAIA {
++        if MasterKind::RGE_COMBAT <= t.master.kind {
++            eprintln!(
++                "CONVERT_GAIA target={} class={} master={:?}",
++                t.id.get(),
++                t.master.class.get(),
++                t.master.id
++            );
++            return Err(GenieError::unsupported(
++                "the task finder's conversion of a gaia object of type 50 or above",
++            ));
++        }
++        return Ok(Finding::Next);
++    }
++    if dip.allied(actor.player, t.player, AllyTest::WithRelation4) {
++        return Ok(Finding::Next);
++    }
++    let monk = monk_class(actor.master);
++    let (mut by_class, mut any) = (None, None);
++    for task in &list.action_part().tasks {
++        if task.action_kind != ActionKind::CONVERT
++            || !((monk && filter.is_none()) || filter == Some(ActionKind::CONVERT))
++        {
++            continue;
++        }
++        if task.object_group.is_none() && task.object_id.is_none() {
++            any = Some(task);
++        }
++        if task.object_group == Some(t.master.class) {
++            by_class = Some(task);
++        }
++        if task.object_id == Some(t.master.id) {
++            return Ok(Finding::Answer(Some(task)));
++        }
++    }
++    if let Some(task) = by_class.or(any) {
++        return Ok(Finding::Answer(Some(task)));
++    }
++    Ok(if monk { Finding::Answer(None) } else { Finding::Next })
++}
++
+ /// The task finder's tail (`LAB_14127ba9e`, `LAB_14127bb9f`): task 13 for an own, allied or
+ /// artifact target below state 3 (under that filter alone); a villager on livestock, or on
+ /// what is inside something, takes task 110; anything else the general search
+@@ -493,32 +568,41 @@ fn finder_tail<'m>(
+     let target = on.target;
+     let own = actor.master;
+     // the tail: conversions, task 0x84, healing, task 0x88, the siege and class-53 tasks
+-    let monk = roles.of_class(own.class).contains(ClassRoles::MONK);
+     let converts = list
+         .action_part()
+         .tasks
+         .iter()
+         .any(|t| t.action_kind == ActionKind::CONVERT);
+-    if target.is_some() && (monk || (converts && filter == Some(ActionKind::CONVERT))) {
+-        return Err(GenieError::unsupported(
+-            "the task finder's conversion (0x68)",
+-        ));
++    // 188329 0x133d052..0x133d5c5 (findings 97): a monk (class 0x12) or a list with a
++    // conversion task takes the conversion branch
++    if monk_class(own) || converts {
++        match conversion(list, actor, target, filter, dip)? {
++            Finding::Answer(task) => return Ok(task),
++            Finding::Next => {}
++        }
+     }
+-    if list
+-        .action_part()
+-        .tasks
+-        .iter()
+-        .any(|t| t.action_kind == ActionKind::PICK_UP)
+-        && target.is_some_and(|t| roles.of_class(t.master.class).contains(ClassRoles::RELIC))
++    // 188329 0x133d5cc..0x133d6fc (findings 97): a monk, or a list with task 0x84, on a target
++    // of class 0x2a takes the list's first task 0x84 under no filter or filter 0x84
++    let has = |kind: ActionKind| list.action_part().tasks.iter().any(|t| t.action_kind == kind);
++    if (monk_class(own) || has(ActionKind::PICK_UP))
++        && let Some(t) = target
++        && t.master.class.get() == 0x2a
++        && let Some(task) = first(list, |task| {
++            task.action_kind == ActionKind::PICK_UP
++                && (filter.is_none() || filter == Some(ActionKind::PICK_UP))
++        })
+     {
+-        return Err(GenieError::unsupported("the task finder's task 0x84"));
++        return Ok(Some(task));
+     }
+-    if list
+-        .action_part()
+-        .tasks
+-        .iter()
+-        .any(|t| t.action_kind == ActionKind::HEAL)
+-        && target.is_some()
++    // 0x133d6fc..0x133d7a5: a monk, or a list with healing (0x69), heals a target of its own
++    // or an allied player (`0x1732ca0`, flag 1) below its most hit points in a state below 3;
++    // any other target goes on (`0x133df97`, `0x133df9c`)
++    if (monk_class(own) || has(ActionKind::HEAL))
++        && let Some(t) = target
++        && (t.player == actor.player
++            || dip.allied(actor.player, t.player, AllyTest::WithRelation4))
++        && t.hp < t.max_hp
++        && t.state < ObjectState::Dying
+     {
+         return Err(GenieError::unsupported("the task finder's healing (0x69)"));
+     }
 diff --git a/crates/engine/genie-core/src/unit_ai/tests.rs b/crates/engine/genie-core/src/unit_ai/tests.rs
 index 4cc9cc71..b603cd5e 100644
 --- a/crates/engine/genie-core/src/unit_ai/tests.rs
