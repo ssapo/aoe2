@@ -884,6 +884,48 @@ index f58c1e4d..9b6c51f9 100644
          let (p, u) = self.object(id).ok_or(NOT_HELD)?;
          let master = u.master(self.master_tables(), p)?.clone();
          let building = master.building.ok_or(GenieError::unsupported(
+diff --git a/crates/engine/genie-core/src/construction/build/mod.rs b/crates/engine/genie-core/src/construction/build/mod.rs
+index 68b77959..e05968e0 100644
+--- a/crates/engine/genie-core/src/construction/build/mod.rs
++++ b/crates/engine/genie-core/src/construction/build/mod.rs
+@@ -196,6 +196,10 @@ pub struct Completion<'a> {
+     pub player_kind: PlayerKind,
+     /// The building has a unit AI (`+0x6b0`): a mule cart's.
+     pub ai: bool,
++    /// For a farm whose bonus names a master its owner has: whether a live object of that
++    /// master of the owner stands near the farm (188329 `0x128b590`,
++    /// [`crate::world::World::farm_near_master`]); none where the caller did not look.
++    pub near_master: Option<bool>,
+ }
+ 
+ /// What the completion's first part (`FUN_1411c6bd0`) gives its caller: the attributes its owner
+@@ -260,16 +264,18 @@ impl Completion<'_> {
+                     .and_then(MasterId::of_data)
+                     .and_then(|m| self.masters?.get(m))
+                     .is_some();
+-                if has {
+-                    return Err(GenieError::unsupported(
++                // 188329 0x127e5a0: paid when the owner lacks the master or one stands near
++                let paid = !has
++                    || self.near_master.ok_or(GenieError::unsupported(
+                         "a farm's bonus near a master (FUN_1411d3cd0)",
+-                    ));
++                    ))?;
++                if paid {
++                    let attribute = i16::try_from(resource)
++                        .ok()
++                        .and_then(AttributeId::of_data)
++                        .ok_or(NO_ATTRIBUTE)?;
++                    part.attributes.push((attribute, amount));
+                 }
+-                let attribute = i16::try_from(resource)
+-                    .ok()
+-                    .and_then(AttributeId::of_data)
+-                    .ok_or(NO_ATTRIBUTE)?;
+-                part.attributes.push((attribute, amount));
+             }
+             // the game mode is not the editor's (4) in a game
+             part.pasture = roles
 diff --git a/crates/engine/genie-core/src/construction/build/states.rs b/crates/engine/genie-core/src/construction/build/states.rs
 index 76304cf8..e8c11eda 100644
 --- a/crates/engine/genie-core/src/construction/build/states.rs
@@ -908,10 +950,129 @@ index 76304cf8..e8c11eda 100644
      }
  
 diff --git a/crates/engine/genie-core/src/construction/build/world_side.rs b/crates/engine/genie-core/src/construction/build/world_side.rs
-index e59bc443..40306643 100644
+index e59bc443..7f3d5424 100644
 --- a/crates/engine/genie-core/src/construction/build/world_side.rs
 +++ b/crates/engine/genie-core/src/construction/build/world_side.rs
-@@ -258,6 +258,9 @@ impl World {
+@@ -78,6 +78,88 @@ impl World {
+     /// # Errors
+     ///
+     /// What the part does not model.
++    /// 188329 `0x128b590` (the old `FUN_1411d3cd0`): whether a live object of master `m` of
++    /// `owner` stands near the farm `farm` (of `farm_master`). A box of `S` = 4 × (int)((radius
++    /// y + 0.5) × (radius x + 0.5)) tiles around the farm's tile (`(int)` of its place); the farm's
++    /// own tile first (`0x127dd40`: the first object of the tile's list of the owner, state 2,
++    /// master `m`; one there answers yes), then a flood over the four neighbours (−x, +x, −y,
++    /// +y) of each tile within `S / 2 − 1` of the farm's, every tile visited once, each tile's
++    /// first such object kept; yes when one of those, in order, is within a squared footprint
++    /// gap of 2.0 of the farm (`0x124daf0`, `COMISS`/`JAE`).
++    pub(crate) fn farm_near_master(
++        &self,
++        owner: PlayerId,
++        farm: ObjectId,
++        farm_master: &Master,
++        m: MasterId,
++    ) -> bool {
++        use crate::map::Tile;
++        use crate::math::conversions::cvttss2si;
++        let Some(f) = self.spatial.get(farm) else {
++            return false;
++        };
++        let (fpos, frad) = (f.position, f.radius);
++        let r = farm_master.radius;
++        let s = cvttss2si((r.y() + 0.5) * (r.x() + 0.5)).wrapping_mul(4);
++        if s <= 0 {
++            return false;
++        }
++        let half = s / 2;
++        let lim = half - 1;
++        let (fx, fy) = (cvttss2si(fpos.x()), cvttss2si(fpos.y()));
++        let mut seen = vec![false; (s as usize) * (s as usize)];
++        let at = |x: i32, y: i32| -> Option<usize> {
++            let (i, j) = (x + half - fx, y + half - fy);
++            (0 <= i && i < s && 0 <= j && j < s).then(|| (i * s + j) as usize)
++        };
++        let (w, h) = (self.spatial.map.width(), self.spatial.map.height());
++        let first = |x: i32, y: i32| -> Option<(Position, crate::map::Footprint)> {
++            if x < 0 || y < 0 || w <= x || h <= y {
++                return None;
++            }
++            self.spatial
++                .objects_on(Tile::new(x, y))
++                .find(|(id, p)| {
++                    p.player == owner
++                        && p.master == m
++                        && self
++                            .object(*id)
++                            .is_some_and(|(_, u)| u.life.state == ObjectState::Alive)
++                })
++                .map(|(_, p)| (p.position, p.radius))
++        };
++        if let Some(k) = at(fx, fy) {
++            seen[k] = true;
++        }
++        if first(fx, fy).is_some() {
++            return true;
++        }
++        let mut queue = vec![(fx, fy)];
++        let mut found = Vec::new();
++        let mut i = 0;
++        while i < queue.len() {
++            let (x, y) = queue[i];
++            i += 1;
++            if (fx - x).abs() < lim && (fy - y).abs() < lim {
++                for (nx, ny) in [(x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)] {
++                    let Some(k) = at(nx, ny) else {
++                        continue;
++                    };
++                    if !seen[k] {
++                        if let Some(o) = first(nx, ny) {
++                            found.push(o);
++                        }
++                        seen[k] = true;
++                        queue.push((nx, ny));
++                    }
++                }
++            }
++        }
++        found.iter().any(|&(p, r)| {
++            crate::movement::footprint_gap_squared(p, r, fpos, frad).get() <= 2.0
++        })
++    }
++
+     pub(crate) fn completion_part(
+         &mut self,
+         owner: PlayerId,
+@@ -90,12 +172,28 @@ impl World {
+             .building_of(u.id)
+             .construction
+             .ok_or(NO_CONSTRUCTION)?;
++        let bonus = farm_bonus(&self.players.player(owner)?.attributes);
++        let near = crate::math::conversions::cvttss2si(bonus.near.get());
++        let near_master = match i16::try_from(near).ok().and_then(MasterId::of_data) {
++            Some(m)
++                if self
++                    .model
++                    .roles
++                    .of_class(master.class)
++                    .contains(ClassRoles::FARM)
++                    && self.model.masters.of(owner).and_then(|t| t.get(m)).is_some() =>
++            {
++                Some(self.farm_near_master(owner, id, master, m))
++            }
++            _ => None,
++        };
+         let completion = Completion {
+             master: Some(master),
+-            farm_bonus: farm_bonus(&self.players.player(owner)?.attributes),
++            farm_bonus: bonus,
+             masters: self.model.masters.of(owner),
+             player_kind: self.players.player(owner)?.kind,
+             ai: self.parts.unit_ai.contains(u.id),
++            near_master,
+         };
+         let part = completion.first_part(&construction, &self.model.roles)?;
+         // its tracker part (FUN_14104eac0): the foundation leaves the pending lists
+@@ -258,6 +356,9 @@ impl World {
              return Ok(BuildProgress::Ongoing);
          }
          self.set_state(q, at, ObjectState::Alive)?;
@@ -5461,6 +5622,18 @@ index b22ddd84..4028024a 100644
              Self::Build(b) => {
                  if b.added
                      && let Some(target) = b.target
+diff --git a/crates/engine/genie-core/src/objects/unit/death.rs b/crates/engine/genie-core/src/objects/unit/death.rs
+index 91ca8b12..16fcb5d8 100644
+--- a/crates/engine/genie-core/src/objects/unit/death.rs
++++ b/crates/engine/genie-core/src/objects/unit/death.rs
+@@ -209,6 +209,7 @@ impl Unit {
+             masters: c.w.model.masters.of(c.player),
+             player_kind: c.w.players.player(c.player)?.kind,
+             ai,
++            near_master: None,
+         };
+         let part = completion.first_part(construction, roles)?;
+         // its tracker part (FUN_14104eac0): the foundation leaves the pending lists
 diff --git a/crates/engine/genie-core/src/objects/unit/mod.rs b/crates/engine/genie-core/src/objects/unit/mod.rs
 index e8e94a15..fbfa090c 100644
 --- a/crates/engine/genie-core/src/objects/unit/mod.rs

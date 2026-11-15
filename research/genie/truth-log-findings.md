@@ -1134,3 +1134,11 @@
 - 엔진: `construction/gates.rs` 새 `passes_gate`(by_id로 주인·건물 층·마스터를 찾아 `lets_pass`); `map/spatial/pather.rs` `pather_query`에 `asker` 인자, 문 클래스이고 지나가면 `continue`; 새 `pather_blocked_for`·`pather_hits_for`(옛 함수는 None으로, 시험용); `pathing/hull_path/node_lists.rs` `blocked`·`hits`가 `self.player`를 넘김; `obstacles.rs` `passes`는 넘겨받은 문 목록이 없으면 `passes_gate`.
 - 결과(`L28d*` 대 `L28c*`): 519002991·519930254 모두 **멈춤 없음(75,000까지)**. 다른 판 바이트까지 같음.
 - 확인 못 한 것: +0x7c가 어디서 정해지는지(엔진 `HullPather.player`로 가정, R3와 같음).
+
+## 115. 농장 완공 보너스의 "근처 마스터" 검사: 원본대로 넣음 (스위치 없음, 멈춤 고침; ENG-28, R3 메모 7)
+
+- 사례: "a farm's bonus near a master (FUN_1411d3cd0)" — 519908353 P1 48,368, 521333824 P1 59,578(112번 뒤).
+- 원본(R3 `runs/R3_out/farm-bonus-near-master.md`): 지불 0x127e5a0은 `(m < 0 || 주인에게 마스터 m 없음 || 근처(농장, m))`일 때만; 근처 0x128b590 = 농장 칸에서 시작해 S = 4 × (int)((반지름 y + 0.5) × (반지름 x + 0.5)) 상자 안을 네 이웃(−x, +x, −y, +y)으로 퍼지며 칸마다 첫 "주인 같고 상태 2이고 마스터 m"인 개체(0x127dd40)를 모으고, 농장 칸에 있으면 바로 참, 아니면 모은 것 중 제곱 가장자리 간격(0x124daf0) ≤ 2.0이 있으면 참.
+- 엔진: `construction/build/world_side.rs` 새 `World::farm_near_master`(위 순서 그대로, 칸 목록 순서 = `Spatial::objects_on`, 간격 `footprint_gap_squared`); `Completion`에 `near_master: Option<bool>`(완공 경로에서 채움, 죽음 경로 `objects/unit/death.rs`는 None = 옛 멈춤 유지); `Completion::first_part`는 주인에게 마스터가 있으면 근처일 때만 속성을 더함.
+- 결과(`L28e*` 대 `L28d*`): 521333824 **멈춤 없음(75,000까지)**, 519908353 P1 48,368 → 74,244 "a gather's set_state 6 on another player's farm (FUN_141185360)". 다른 판 바이트까지 같음(518239882 57 / 54).
+- 확인 못 한 것: 실제로 보너스가 나갔는지/안 나갔는지(두 판 모두 첫 어긋남 뒤), 원본 부르는 쪽이 m < 0을 먼저 거르는지(R3도 안 읽음).
