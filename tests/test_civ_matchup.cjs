@@ -56,7 +56,7 @@ test('html shows the section with game text and escapes it',()=>{
   assert.ok(html.includes('문명 매치업 및 전략 복기'));
   assert.ok(html.includes('게임 빌드 188329'));
   assert.ok(html.includes(ref.civs.Vietnamese.description[0]));
-  assert.ok(html.includes('생산 명령이지 완료가 아님'));
+  assert.ok(html.includes('대장간·계열 업그레이드·문명 보너스는 모두 했다고 보고 계산'));
   const evil=JSON.parse(JSON.stringify(ref));evil.civs.Vietnamese.description=['<img src=x>'];
   assert.ok(!cm.html(evil,'Vietnamese','Mongols').includes('<img src=x>'));
 });
@@ -145,31 +145,36 @@ test('summary rows are consistent with each other',()=>{
 
 test('summary card html: rows read as sentences, sword between same-size icons, sides by ring colour',()=>{
   const html=cm.html(ref,'Vietnamese','Mongols');
-  const card=html.slice(html.indexOf('matchup-card'),html.indexOf('matchup-more'));
-  for(const title of ['피해야 할 병력 구성','상대 핵심 위협','추천 대응','상대 기술적 빈틈'])assert.ok(card.includes(title));
+  const card=html.slice(html.indexOf('matchup-card'),html.indexOf('<details class="matchup-more">'));
   assert.ok(html.includes('<details class="matchup-more">'));
-  const text=card.replace(/<svg[\s\S]*?<\/svg>/g,'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ');
-  // every row: bold name + one plain sentence, readable without the mouse
-  assert.ok(text.includes('아바레스트병만 모으기 몽골인 정예 초원 창기병이 같은 자원이면 2.4배 유리'));
+  // without match data the Castle Age panel is open and no "decided" sentence is shown
+  const p4=card.slice(card.indexOf('data-age="4" aria-label'));
+  assert.ok(card.includes('data-age="3" aria-label="성주시대">')&&card.includes('data-age="4" aria-label="왕정시대" hidden>'));
+  assert.ok(!card.includes('mc-decided'));
+  for(const title of ['피해야 할 병력 구성','상대 핵심 위협','추천 대응','상대 기술적 빈틈'])assert.ok(p4.includes(title));
+  const text=p4.replace(/<svg[\s\S]*?<\/svg>/g,'').replace(/<details[\s\S]*?<\/details>/g,'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ');
+  // every row: bold name + one plain sentence, readable without the mouse (Imperial Age values)
+  assert.ok(text.includes('아바레스트병만 모으기 몽골인 정예 만구다이가 같은 자원이면 1.5배 유리'));
   assert.ok(text.includes('미늘창병 후사르에 한 대당 +32 추가 피해(기병)'));
-  assert.ok(text.includes('정예 전투 코끼리 정예 만구다이에 같은 자원이면 6.5배 유리 · 몽골인에는 미늘창병이 없음'));
+  assert.ok(text.includes('정예 전투 코끼리 정예 만구다이에 같은 자원이면 3.2배 유리 · 몽골인에는 미늘창병이 없음'));
   assert.ok(text.includes('정예 만구다이 몽골인 보너스로 공격 속도 강화'));
   // gaps: icon + words, four at most, the rest behind one chip
   assert.ok(text.includes('총통병 계열 없음')&&text.includes('미늘창병 없음')&&text.includes('외 2개'));
-  assert.strictEqual((card.match(/class="mc-gapchip"/g)||[]).length,4);
+  const p4card=p4.slice(0,p4.indexOf('mc-agemore'));
+  assert.strictEqual((p4card.match(/class="mc-gapchip"/g)||[]).length,4);
   // pairs: both unit icons, a sword (inline SVG) whose point faces the unit being hit
   assert.ok(card.includes('<svg class="mc-sword"'));
-  const avoidRow=card.slice(card.indexOf('mc-avoid'),card.indexOf('mc-threat'));
-  assert.ok(avoidRow.includes('mc-hit mc-hit-left'));        // their lancer hits my arbalester on the left
+  const avoidRow=p4.slice(p4.indexOf('mc-avoid'),p4.indexOf('mc-threat'));
+  assert.ok(avoidRow.includes('mc-hit mc-hit-left'));        // their unit hits my arbalester on the left
   assert.ok(avoidRow.indexOf('mu mu-mine')<avoidRow.indexOf('mu mu-theirs'));
-  const threatRow=card.slice(card.indexOf('mc-threat'),card.indexOf('mc-counter'));
+  const threatRow=p4.slice(p4.indexOf('mc-threat'),p4.indexOf('mc-counter'));
   assert.ok(!threatRow.includes('mc-hit-left')&&threatRow.indexOf('mu mu-theirs')<threatRow.indexOf('mu mu-mine'));
   assert.ok(!card.includes('mc-chip'));                      // no arrow-and-number chips left
-  assert.ok(card.includes(`src="assets/units/${ref.nodes.u359.icon}.png"`));
-  // the row's tooltip: whose unit is whose, why the bonus applies, the 1-on-1 numbers
-  assert.ok(card.includes("data-tip=\"내 미늘창병 → 상대 후사르\n타격당 피해 38 (추가 피해 기병 32 포함) · 받는 피해 7\n왜: 상대 후사르는 &#39;기병&#39; 방어 클래스를 가짐 → 내 미늘창병의 추가 피해 +32 적용\n1:1로 잡는 시간: 미늘창병 5.9초 · 후사르 16.3초\n비용 60 · 80 → 같은 자원이면 내 쪽이 ×3.7 유리"));
+  assert.ok(card.includes(`src="assets/units/${ref.nodes.u441.icon}.png"`));
+  // the row's tooltip: whose unit is whose, why the bonus applies, the 1-on-1 numbers with Imperial upgrades
+  assert.ok(p4.includes("data-tip=\"내 미늘창병 → 상대 후사르\n타격당 피해 38 (추가 피해 기병 32 포함) · 받는 피해 8\n왜: 상대 후사르는 &#39;기병&#39; 방어 클래스를 가짐 → 내 미늘창병의 추가 피해 +32 적용\n1:1로 잡는 시간: 미늘창병 7.5초 · 후사르 14.3초\n비용 60 · 80 → 같은 자원이면 내 쪽이 ×2.5 유리"));
   assert.ok(card.includes('mc-legend'));
-  assert.ok(card.includes('대장간·문명 보너스 수치·컨트롤 제외'));
+  assert.ok(card.includes('컨트롤·진형·병력 수는 제외'));
   assert.strictEqual(cm.summary(ref,'Spartans','Mongols'),null);
 });
 
@@ -200,4 +205,95 @@ test('the camel case the user misread: their camel → my cavalry archer, and wh
   assert.ok(html.includes(`data-tip="${tip}"`));
   const i=html.indexOf(`data-tip="${tip}"`);
   assert.ok(html.slice(html.lastIndexOf('<span class="mu',i),i).includes('mu-theirs'));
+});
+
+// ── APP-16: threats and answers per age (Feudal / Castle / Imperial) ──
+const age=(u)=>ref.nodes['u'+u];
+const units=s=>[...s.threats,...s.recommend,...s.avoid].map(x=>x.unit);
+test('per age: Feudal vs Mongols is scouts/archer-type, Castle and Imperial bring Mangudai and light cavalry',()=>{
+  for(const mine of ['Vietnamese','Britons','Spanish','Franks']){
+    const f=cm.summary(ref,mine,'Mongols',2).threats.map(t=>t.unit);
+    assert.ok(f.includes(448)||f.some(u=>[0,6].includes(ref.unit_stats[u].class)),`${mine} feudal ${f}`);
+    assert.ok(!f.includes(11)&&!f.includes(561));
+    for(const a of [3,4]){
+      const t=cm.summary(ref,mine,'Mongols',a).threats.map(x=>x.unit);
+      assert.ok(t.includes(a===3?11:561),`${mine} age ${a} mangudai ${t}`);
+      assert.ok(t.includes(a===3?546:441),`${mine} age ${a} light cavalry ${t}`);
+    }
+  }
+});
+test('per age: Feudal Franks threaten with scouts (+20% hit points from Feudal), Castle Britons with archers',()=>{
+  for(const mine of ['Britons','Vietnamese','Mongols'])assert.ok(cm.summary(ref,mine,'Franks',2).threats.some(t=>t.unit===448&&t.boost));
+  for(const mine of ['Mongols','Franks','Vietnamese']){
+    const t=cm.summary(ref,mine,'Britons',3).threats.map(x=>x.unit);
+    assert.ok(t.includes(24)||t.includes(8),`${mine}: ${t}`);
+  }
+});
+test('per age, every ranked pair: no castle unique unit in Feudal; answers and threats exist in that age; gaps not from later ages',()=>{
+  const civs=Object.keys(ref.civs);
+  for(const a of civs)for(const b of civs){
+    if(a===b)continue;
+    for(const g of [2,3,4]){
+      const s=cm.summary(ref,a,b,g);
+      if(g===2)for(const u of units(s))assert.ok(age(u).building!==82&&!(age(u).type==='UniqueUnit'&&age(u).age>2),`${a}/${b} feudal ${age(u).name}`);
+      const has=(civ,u)=>age(u).age<=g&&!ref.civs[civ].missing_units.includes(u)&&(ref.civs[civ].unlock_ages?.[u]||0)<=g;
+      for(const r of s.recommend)assert.ok(has(a,r.unit),`${a}/${b} ${g} answer ${age(r.unit).name}`);
+      for(const t of s.threats)assert.ok(has(b,t.unit),`${a}/${b} ${g} threat ${age(t.unit).name}`);
+      for(const id of [...s.gaps.lines,...s.gaps.tops])assert.ok(age(id).age<=g);
+      for(const id of s.gaps.techs)assert.ok(ref.nodes['t'+id].age<=g);
+    }
+  }
+});
+test('per age stats: blacksmith tiers, line techs and civ bonuses by the age (known in-game values)',()=>{
+  const st=(c,u,a)=>cm.statAt(ref,c,u,a);
+  // Archer in Feudal: Fletching +1 attack/+1 range, Padded Archer Armour +1/+1
+  assert.deepStrictEqual([st('Britons',4,2).pierce_attack,st('Britons',4,2).range,st('Britons',4,2).pierce_armour],[5,5,1]);
+  // Britons foot archers +1 range in Castle and Imperial, Yeomen +1: Crossbowman 9, Arbalester 11
+  assert.strictEqual(st('Britons',24,3).range,9);
+  assert.strictEqual(st('Britons',492,4).range,11);
+  // Franks cavalry +20% hit points (no Bloodlines): Scout 54 in Feudal, Knight 120 in Castle
+  assert.strictEqual(Math.round(st('Franks',448,2).hp),54);
+  assert.strictEqual(Math.round(st('Franks',38,3).hp),120);
+  // the same unit is weaker earlier: a Feudal Archer has less than a Castle one
+  assert.ok(st('Britons',4,2).pierce_attack<st('Britons',4,3).pierce_attack);
+  // Mongol cavalry archers fire faster (×0.8) from the start
+  assert.ok(st('Mongols',39,3).reload<st('Vietnamese',39,3).reload);
+  // a civ that lacks a blacksmith tech does not get it (Mongols: no Ring Archer Armour in Imperial)
+  assert.ok(ref.civs.Mongols.missing_techs.includes(219));
+  assert.ok(!st('Mongols',39,4).techs.includes(219)&&st('Vietnamese',39,4).techs.includes(219));
+});
+test('match context: the age played longest opens, production orders per age, nothing without data',()=>{
+  const cp=(f,c,i)=>({age_checkpoints:{봉건:{reached_seconds:f},성주:{reached_seconds:c},왕정:{reached_seconds:i}}});
+  const theirs={...cp(600,900,2000),full_timeline:[
+    {seconds:100,kind:'QUEUE',label:'Militia',amount:3},{seconds:700,kind:'QUEUE',label:'Scout Cavalry',amount:2},
+    {seconds:950,kind:'QUEUE',label:'Mangudai',amount:5},{seconds:960,kind:'QUEUE',label:'Villager',amount:5},
+    {seconds:2100,kind:'TRAIN',label:'Hussar',amount:4},{seconds:2200,kind:'QUEUE',label:'Hussar',amount:-1}]};
+  const ctx=cm.context({duration:2400,mine:cp(620,880,null),theirs});
+  assert.strictEqual(ctx.open,3);assert.strictEqual(ctx.spent,1120);
+  assert.deepStrictEqual(ctx.made,{2:{Militia:3,'Scout Cavalry':2},3:{Mangudai:5},4:{Hussar:4}});
+  assert.strictEqual(cm.context({duration:500,mine:{},theirs:{}}),null);
+  assert.strictEqual(cm.context(null),null);
+  // the card opens that age, says so in a plain sentence, and puts what they made first with a badge
+  const html=cm.html(ref,'Vietnamese','Mongols',ctx);
+  assert.ok(html.includes('이 경기는 성주시대에서 갈렸어요 — 가장 오래 이어진 시대(약 19분)'));
+  assert.ok(html.includes('data-age="3" aria-selected="true">성주<small>이 경기</small>'));
+  assert.ok(html.includes('data-age="2" aria-label="봉건시대" hidden>'));
+  const castle=html.slice(html.indexOf('data-age="3" aria-label'),html.indexOf('data-age="4" aria-label'));
+  const threats=castle.slice(castle.indexOf('mc-threat'),castle.indexOf('mc-counter'));
+  assert.ok(threats.indexOf('만구다이 <span class="mc-made">상대가 실제로 뽑음 ×5</span>')>0);
+  assert.strictEqual(cm.summary(ref,'Vietnamese','Mongols',3,{11:5}).threats[0].unit,11);
+  // no match data: no sentence, no badge
+  const bare=cm.html(ref,'Vietnamese','Mongols');
+  assert.ok(!bare.includes('mc-decided')&&!bare.includes('mc-made'));
+  // the placeholder keeps the context for when the table arrives, escaped
+  const evil=cm.context({duration:100,mine:cp(10,null,null),theirs:{...cp(10,null,null),full_timeline:[{seconds:20,kind:'QUEUE',label:'<b>x',amount:1}]}});
+  assert.ok(!cm.html(ref,'Vietnamese','Mongols',evil).includes('<b>x'));
+});
+test('lines the opponent made are all kept, even two of one class, and names map to their lines',()=>{
+  const made=cm.madeByRoot(ref,'Franks',{'Scout Cavalry':90,Knight:69,'Throwing Axeman':22,Trebuchet:3,Spearman:2});
+  assert.strictEqual(made[448],90);assert.strictEqual(made[38],69);
+  const t=cm.summary(ref,'Chinese','Franks',4,made).threats.map(x=>x.unit);
+  assert.deepStrictEqual(t.slice(0,2),[546,569]); // Franks have no Hussar: Light Cavalry in Imperial, then Paladin
+  // a name used by two unit ids (Konnik from the castle and from the Krepost) still finds the line
+  assert.ok(Object.keys(cm.madeByRoot(ref,'Bulgarians',{Konnik:20})).length===1);
 });

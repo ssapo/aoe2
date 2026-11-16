@@ -88,6 +88,20 @@ class SavedReferenceTests(unittest.TestCase):
         self.assertNotIn("38", civs["Vietnamese"]["boosts"])
         self.assertEqual(self.data["unit_stats"]["38"]["speed"], 1.35)
 
+    def test_per_age_facts_for_the_matchup_card(self):
+        # APP-16: when each civ bonus step applies, which units a civ tech enables, generic tech effects
+        civs, techs = self.data["civs"], self.data["tech_effects"]
+        self.assertEqual(civs["Franks"]["boosts"]["448"]["from_age"], 2)  # cavalry +20% hit points from Feudal
+        self.assertIn([2, 0, 5, 1.2, "civ"], civs["Franks"]["boosts"]["448"]["steps"])
+        self.assertEqual(civs["Mongols"]["boosts"]["546"]["from_age"], 3)  # light cavalry hit points from Castle
+        self.assertEqual(civs["Mongols"]["unlock_ages"]["11"], 3)  # Mangudai from the Castle Age
+        self.assertEqual(civs["Britons"]["unlock_ages"]["8"], 3)  # Longbowman
+        self.assertEqual(techs["199"]["age"], 2)  # Fletching: +1 pierce attack and +1 range for archers
+        self.assertIn([4, -1, 0, 9, 769.0], techs["199"]["commands"])
+        self.assertIn([4, -1, 0, 12, 1.0], techs["199"]["commands"])
+        self.assertEqual(techs["201"]["age"], 4)  # Bracer
+        self.assertIn([4, -1, 12, 0, 20.0], techs["435"]["commands"])  # Bloodlines +20 hit points
+
     def test_every_node_has_an_icon_number(self):
         nodes = self.data["nodes"]
         self.assertTrue(all(isinstance(n.get("icon"), int) for n in nodes.values()))

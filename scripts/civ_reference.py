@@ -62,6 +62,60 @@ COMBAT_ATTRS = {0, 5, 8, 9, 10, 12, 100, 101, 103, 104, 105, 106}
 MODIFY_KINDS = {0, 4, 5, 10, 14, 15}  # set / add / multiply attribute, and their team versions
 
 
+# Age techs (Feudal, Castle, Imperial) -> age number as in the tech tree's "Age ID" (1 Dark .. 4 Imperial).
+AGE_TECHS = {101: 2, 102: 3, 103: 4}
+# Generic techs whose stat effects the per-age matchup applies (besides every blacksmith tech):
+# Bloodlines, Husbandry, Thumb Ring, Parthian Tactics, Squires, Chemistry.
+STAT_TECHS = [435, 39, 437, 436, 215, 47]
+
+
+def tech_age(dat: dict, tech_id: int, memo: dict | None = None, depth: int = 0) -> int:
+    """The earliest age a tech can be researched: the age techs reached through its requirements.
+
+    A tech needs `required_count` of its listed techs; the earliest age is the required_count-th
+    smallest age among them. No requirement means the Dark Age (1). Cycles or depth > 12 count as 1.
+    """
+    memo = {} if memo is None else memo
+    if tech_id in AGE_TECHS:
+        return AGE_TECHS[tech_id]
+    if tech_id in memo:
+        return memo[tech_id]
+    memo[tech_id] = 1
+    if not 0 <= tech_id < len(dat["techs"]) or depth > 12:
+        return 1
+    t = dat["techs"][tech_id]
+    ages = sorted(tech_age(dat, r, memo, depth + 1) for r in t.get("required", []))
+    need = max(1, min(t.get("required_count") or len(ages), len(ages))) if ages else 0
+    age = ages[need - 1] if ages else 1
+    memo[tech_id] = age
+    return age
+
+
+def stat_commands(dat: dict, effect_id: int) -> list[list]:
+    """The effect's attribute changes on combat stats: [kind, unit, class, attribute, amount]."""
+    if not 0 <= effect_id < len(dat["effects"]):
+        return []
+    return [[k, u, c, a, round(x, 4)] for k, u, c, a, x in dat["effects"][effect_id]["commands"]
+            if k in MODIFY_KINDS and a in COMBAT_ATTRS]
+
+
+def civ_unlocks(dat: dict, civ_id: int, line_units: set[int]) -> dict[str, int]:
+    """Line units this civ gets from one of its own techs (effect "enable unit"), with that tech's earliest age.
+
+    Some unique units sit early in the tech tree but come from a unique tech (Flemish Militia: tree Feudal,
+    enabled by Flemish Revolution in the Imperial Age). Only ages after the Dark Age are kept.
+    """
+    out: dict[str, int] = {}
+    for i, t in enumerate(dat["techs"]):
+        if t["civ"] != civ_id or not 0 <= t["effect"] < len(dat["effects"]):
+            continue
+        for kind, unit, mode, _attr, _amount in dat["effects"][t["effect"]]["commands"]:
+            if kind == 2 and mode == 1 and unit in line_units:
+                age = tech_age(dat, i)
+                out[str(unit)] = min(out.get(str(unit), age), age)
+    return {k: v for k, v in sorted(out.items(), key=lambda kv: int(kv[0])) if v > 1}
+
+
 def civ_boosts(dat: dict, civ_id: int, line_units: set[int]) -> dict[str, dict]:
     """Units of this civ's lines that its own effects change, with the attributes changed.
 
@@ -72,22 +126,28 @@ def civ_boosts(dat: dict, civ_id: int, line_units: set[int]) -> dict[str, dict]:
     """
     civ = dat["civs"][civ_id]
     classes = {uid: u["class"] for uid, u in civ["units"].items()}
-    sources = [(civ["tech_tree"], "civ"), (civ["team_bonus"], "civ")]
-    sources += [(t["effect"], "unique" if t["cost"] else "civ") for t in dat["techs"] if t["civ"] == civ_id]
+    # (effect, source, age it applies from): tech-tree and team bonus effects apply from the start
+    sources = [(civ["tech_tree"], "civ", 1), (civ["team_bonus"], "civ", 1)]
+    sources += [(t["effect"], "unique" if t["cost"] else "civ", tech_age(dat, i))
+                for i, t in enumerate(dat["techs"]) if t["civ"] == civ_id]
     boosts: dict[str, dict] = {}
-    for effect_id, source in sources:
+    for effect_id, source, age in sources:
         if not 0 <= effect_id < len(dat["effects"]):
             continue
-        for kind, unit, cls, attr, _amount in dat["effects"][effect_id]["commands"]:
+        for kind, unit, cls, attr, amount in dat["effects"][effect_id]["commands"]:
             if kind not in MODIFY_KINDS or attr not in COMBAT_ATTRS:
                 continue
             hit = [unit] if unit >= 0 else [u for u in line_units if cls >= 0 and classes.get(u) == cls]
             for uid in hit:
                 if uid in line_units:
-                    entry = boosts.setdefault(str(uid), {"attrs": set(), "sources": set()})
+                    entry = boosts.setdefault(str(uid), {"attrs": set(), "sources": set(), "steps": set()})
                     entry["attrs"].add(attr)
                     entry["sources"].add(source)
-    return {k: {"attrs": sorted(v["attrs"]), "sources": sorted(v["sources"])} for k, v in sorted(boosts.items(), key=lambda kv: int(kv[0]))}
+                    # [age, attribute, kind, amount, source]: the per-age matchup applies these by age
+                    entry["steps"].add((age, attr, kind, round(amount, 4), source))
+    return {k: {"attrs": sorted(v["attrs"]), "sources": sorted(v["sources"]), "from_age": min(s[0] for s in v["steps"]),
+                "steps": [list(s) for s in sorted(v["steps"])]}
+            for k, v in sorted(boosts.items(), key=lambda kv: int(kv[0]))}
 
 
 class Reader:
@@ -265,9 +325,9 @@ def read_dat(path: Path) -> dict:
         civs.append({"name": name, "units": units, "tech_tree": tech_tree, "team_bonus": team_bonus})
     techs = []
     for _ in range(r.one("h")):
-        r.skip(12)
+        required = r.read("6h")
         costs = [r.read("hhB") for _ in range(3)]
-        r.skip(2)
+        required_count = r.one("h")
         civ, _mode = r.read("hh")
         if v < 31:
             r.skip(2)
@@ -281,7 +341,8 @@ def read_dat(path: Path) -> dict:
             r.skip(1)
         if v >= 31:
             r.skip(r.one("h") * 9)
-        techs.append({"civ": civ, "effect": effect, "name": name, "cost": sum(a for k, a, f in costs if k >= 0 and f)})
+        techs.append({"civ": civ, "effect": effect, "name": name, "cost": sum(a for k, a, f in costs if k >= 0 and f),
+                      "required": [t for t in required if t >= 0], "required_count": required_count})
     return {"version": v, "civs": civs, "effects": effects, "techs": techs}
 
 
@@ -413,6 +474,8 @@ def build(game: Path, build_number: int) -> dict:
             "missing_techs": sorted(set(missing_techs)),
             "lines": lines,
             "boosts": civ_boosts(dat, civ_id, {u for chain in lines for u in chain}),
+            # unit id -> age its civ tech enables it (when later than the Dark Age); see civ_unlocks
+            "unlock_ages": civ_unlocks(dat, civ_id, {u for chain in lines for u in chain}),
         }
     return {
         "schema_version": SCHEMA_VERSION,
@@ -427,6 +490,12 @@ def build(game: Path, build_number: int) -> dict:
         "tech_groups": TECH_GROUPS,
         "nodes": dict(sorted(nodes_meta.items(), key=lambda kv: (kv[0][0], int(kv[0][1:])))),
         "unit_stats": dict(sorted(units_meta.items(), key=lambda kv: int(kv[0]))),
+        # generic techs the per-age matchup applies (all blacksmith techs + STAT_TECHS): their tech-tree age and
+        # combat stat changes [kind, unit, class, attribute, amount] (attack/armour amount = class * 256 + value)
+        "tech_effects": {str(t): {"age": nodes_meta[f"t{t}"]["age"], "commands": stat_commands(dat, dat["techs"][t]["effect"])}
+                         for t in sorted({int(k[1:]) for k, m in nodes_meta.items() if k[0] == "t" and m["building"] == 103
+                                          and m["type"] == "Research"} | set(STAT_TECHS))
+                         if f"t{t}" in nodes_meta},
         "civs": dict(sorted(civs.items())),
     }
 
