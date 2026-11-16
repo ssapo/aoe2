@@ -391,6 +391,19 @@ index 4b8e5d77..a5faf86c 100644
          let own = own.ok_or(ATTACKER_MASTER)?;
          let mut f = Fight { victim, own };
          // written back before an error too: the stop's context reads the list
+diff --git a/crates/engine/genie-core/src/combat/attack/unit_ai_side.rs b/crates/engine/genie-core/src/combat/attack/unit_ai_side.rs
+index 699206ba..89df321c 100644
+--- a/crates/engine/genie-core/src/combat/attack/unit_ai_side.rs
++++ b/crates/engine/genie-core/src/combat/attack/unit_ai_side.rs
+@@ -300,7 +300,7 @@ impl UnitView<'_, '_> {
+     /// objects or another player's; None for an object the view does not hold (the owner's
+     /// sleeping objects, or the old owner's of a unit taken over in its update, whose attributes
+     /// it does not hold).
+-    fn victim_of_target(&self, id: ObjectId, roles: &Roles) -> Result<Option<Victim>, GenieError> {
++    pub(crate) fn victim_of_target(&self, id: ObjectId, roles: &Roles) -> Result<Option<Victim>, GenieError> {
+         let view = owner_view(
+             &self.c.w.players,
+             &self.c.w.index,
 diff --git a/crates/engine/genie-core/src/combat/attack/walk_and_swing.rs b/crates/engine/genie-core/src/combat/attack/walk_and_swing.rs
 index 13b2a730..1ce6d2c9 100644
 --- a/crates/engine/genie-core/src/combat/attack/walk_and_swing.rs
@@ -7083,7 +7096,7 @@ index 72090fb3..3f1a775d 100644
                      source: OrderSource::Queued,
                  },
 diff --git a/crates/engine/genie-core/src/orders/work.rs b/crates/engine/genie-core/src/orders/work.rs
-index 9e2d36cf..f5c2ed4d 100644
+index 9e2d36cf..dd0ee143 100644
 --- a/crates/engine/genie-core/src/orders/work.rs
 +++ b/crates/engine/genie-core/src/orders/work.rs
 @@ -33,6 +33,7 @@ use crate::orders::OrderSource;
@@ -7103,7 +7116,37 @@ index 9e2d36cf..f5c2ed4d 100644
          &mut self,
          player: PlayerId,
          idx: ListIndex,
-@@ -496,14 +497,51 @@ impl World {
+@@ -381,6 +382,29 @@ impl World {
+             _ if top == Some(TRANSPORT) && task.action_kind == TRANSPORT => {
+                 self.retake_transport((player, idx), (target, point), task, notifies)?
+             }
++            // 188329 the relic pick-up's slot 0x48 (0xbc3e00) on the same task answers 1: on its
++            // own relic (`+0x20`, of class 0x2a) nothing changes; another relic it takes (slot
++            // 0x68) and walks to (set_state 4), any other object ends it (set_state 0xd)
++            _ if top == Some(RELIC_PICKUP) && task.action_kind == RELIC_PICKUP => {
++                let own = self
++                    .parts
++                    .actions_of(unit.id)
++                    .list
++                    .relic_pickup()
++                    .and_then(|a| a.target);
++                let relic = match target.and_then(|t| self.locate(t)) {
++                    Some((q, t, _)) => t.master(self.master_tables(), q)?.class.get() == 0x2a,
++                    None => false,
++                };
++                if !(relic && target.is_some() && target == own) {
++                    return Err(GenieError::unsupported(
++                        "a work command on a relic pick-up for another object (0xbc3e00)",
++                    )
++                    .with("relic", relic)
++                    .with("target", ObjectId::field(target)));
++                }
++                Answer::Taken
++            }
+             // the top action's slot 0x48 (FUN_140a977a0) on the same task: the base's
+             // (FUN_140a7bf40: the MoveTo's, the Enter's, the missile's, the Fly's, the Make's, the
+             // wait for a foundation's) answers 0, and the work goes on to the factory
+@@ -496,14 +520,51 @@ impl World {
              // the factory makes no action of a mule cart's task: the move without one
              CART_TASK => self.work_move(player, idx, target, point, (notifies, source)),
              TRANSPORT => self.start_transport((player, idx), (target, point), task, notifies),
@@ -7156,7 +7199,7 @@ index 9e2d36cf..f5c2ed4d 100644
      /// [`World::start_task`]'s actions on an object: the Enter, Attack, Hunt, Build, Repair or
      /// Gather on `target` starts.
      fn start_object_task(
-@@ -537,7 +575,11 @@ impl World {
+@@ -537,7 +598,11 @@ impl World {
              ActionKind::BUILD => self.start_build(player, idx, target, task, point, notifies),
              REPAIR => self.start_repair(player, idx, target, task, point, notifies),
              GATHER => self.start_gather(player, idx, target, task, Some((point, notifies))),
@@ -9305,23 +9348,64 @@ index 21df231c..4df86d30 100644
              NotifyKind::SENT_OFF => self.sent_off(n, side, ai_rng, roles, unit_ai_tuning),
              // a unit of a group sent off a footprint: the action value 0x2c0
 diff --git a/crates/engine/genie-core/src/unit_ai/idle.rs b/crates/engine/genie-core/src/unit_ai/idle.rs
-index 28ca0268..38635434 100644
+index 28ca0268..0659899d 100644
 --- a/crates/engine/genie-core/src/unit_ai/idle.rs
 +++ b/crates/engine/genie-core/src/unit_ai/idle.rs
-@@ -66,6 +66,12 @@ impl UnitAi {
-             UnitAiKind::Tower => self.tower_idle(at, player_kind, side, ai),
+@@ -63,13 +63,11 @@ impl UnitAi {
+             UnitAiKind::Soldier => self.soldier_idle(at, player_kind, ai, side),
+             UnitAiKind::Trade | UnitAiKind::Fishing => self.ship_idle(at, player_kind, ai, side),
+             UnitAiKind::Siege => self.siege_idle(at, player_kind, ai, side),
+-            UnitAiKind::Tower => self.tower_idle(at, player_kind, side, ai),
++            UnitAiKind::Tower => self.tower_idle(at, player_kind, side, ai, &TOWER_CARED),
              UnitAiKind::Artifact => self.artifact_idle(at, side, ai),
              UnitAiKind::Building | UnitAiKind::Livestock => Ok(IdleOutcome::Idle),
-+            // the priest's (188329 0xcfdb10): a monk carrying a relic (class 0x2b) only lowers
-+            // its last human order time (0xd1c2e0), then 5
-+            UnitAiKind::Priest if at.class.is_some_and(|c| c.get() == 0x2b) => {
-+                self.cap_human_order(side, ai)?;
-+                Ok(IdleOutcome::Idle)
-+            }
-             UnitAiKind::Predator
-             | UnitAiKind::Ranged
-             | UnitAiKind::Ranged2
-@@ -645,7 +651,7 @@ impl UnitAi {
+-            UnitAiKind::Predator
+-            | UnitAiKind::Ranged
+-            | UnitAiKind::Ranged2
+-            | UnitAiKind::Priest => Err(GenieError::unsupported(
++            UnitAiKind::Priest => self.priest_idle(at, player_kind, ai, side),
++            UnitAiKind::Predator | UnitAiKind::Ranged | UnitAiKind::Ranged2 => Err(GenieError::unsupported(
+                 "processIdle (slot 0x240) of a unit-AI type not modelled",
+             )),
+         }
+@@ -571,7 +569,9 @@ impl UnitAi {
+         Ok(())
+     }
+ 
+-    /// The base unit AI's idle check (slot 72, `FUN_140c564c0`), the tower's (factory type 15):
++    /// The base unit AI's idle check (slot 72, `FUN_140c564c0`; 188329 `0xd31a30`, slot 0x240 of
++    /// five unit-AI types, which the priest's calls with 1), the tower's (factory type 15), over
++    /// the unit AI's cared `classes` (`+0x190`):
+     /// slot 0x250 first retries no order (the tower's slot 0x60 taking none as retryable), then
+     /// the inlined cap of `FUN_140c41e50` ([`UnitAi::cap_human_order`]). In `NoAttack` (stance
+     /// 3) it only searches (slot 0x50 with mode 1 from its place, [`Pick::Look`] over its cared
+@@ -585,6 +585,7 @@ impl UnitAi {
+         player_kind: PlayerKind,
+         side: &mut dyn UnitSide,
+         rng: &mut Well512,
++        classes: &[ClassId],
+     ) -> Result<IdleOutcome, GenieError> {
+         let unit_ai_tuning = &at.unit_ai_tuning;
+         self.cap_human_order(side, rng)?;
+@@ -592,7 +593,7 @@ impl UnitAi {
+             let found = side.closest(&Search {
+                 at: at.position.ground(),
+                 radius: attack_search_radius(at),
+-                classes: &TOWER_CARED,
++                classes,
+                 size: at.size,
+                 pick: Pick::Look,
+                 memory: Memory::default(),
+@@ -603,7 +604,7 @@ impl UnitAi {
+         let found = side.closest(&Search {
+             at: at.position.ground(),
+             radius: attack_search_radius(at),
+-            classes: &TOWER_CARED,
++            classes,
+             size: at.size,
+             pick: Pick::Attack {
+                 lowest: if at.flags.contains(SurroundingFlags::SCENARIO)
+@@ -645,7 +646,7 @@ impl UnitAi {
      /// What the attack tests read of the unit AI ([`Seeker`]), its current target's master type
      /// `target_master_kind` as the world holds it.
      #[must_use]
@@ -9330,7 +9414,7 @@ index 28ca0268..38635434 100644
          Seeker {
              stance: self.stance,
              state_position: self.state_position,
-@@ -655,6 +661,16 @@ impl UnitAi {
+@@ -655,6 +656,16 @@ impl UnitAi {
              target_class: self.target_class,
              last_target_class: self.last_target_class,
              patrol_path: self.patrol_path.is_some(),
@@ -9696,6 +9780,18 @@ index 48ac7e77..d028e01d 100644
      /// The lion's handler (`FUN_140c266f0`): its completed attack sets its idle timeout
      /// (`FUN_140c41bc0` with 1000, then slot 0x1a8), drops the target and stops; a moved target
      /// is [`UnitAi::lion_target_moved`]'s. Both cases, and any other notify, go on to the base
+diff --git a/crates/engine/genie-core/src/unit_ai/mod.rs b/crates/engine/genie-core/src/unit_ai/mod.rs
+index ea0ee786..7113e836 100644
+--- a/crates/engine/genie-core/src/unit_ai/mod.rs
++++ b/crates/engine/genie-core/src/unit_ai/mod.rs
+@@ -34,6 +34,7 @@ mod handle;
+ mod idle;
+ mod idle_animals;
+ mod idle_part;
++mod idle_priest;
+ mod ids;
+ mod issuer;
+ mod kind_notifies;
 diff --git a/crates/engine/genie-core/src/unit_ai/order_kinds.rs b/crates/engine/genie-core/src/unit_ai/order_kinds.rs
 index 281192de..2c1492fa 100644
 --- a/crates/engine/genie-core/src/unit_ai/order_kinds.rs
@@ -9774,10 +9870,18 @@ index 516e920b..93e14d2f 100644
          }
          Ok(MiscEnd::GoesOn)
 diff --git a/crates/engine/genie-core/src/unit_ai/side.rs b/crates/engine/genie-core/src/unit_ai/side.rs
-index 7fd24514..8c7a6bf6 100644
+index 7fd24514..b8592b56 100644
 --- a/crates/engine/genie-core/src/unit_ai/side.rs
 +++ b/crates/engine/genie-core/src/unit_ai/side.rs
-@@ -37,6 +37,43 @@ pub trait UnitSide {
+@@ -19,6 +19,7 @@ use crate::objects::{ObjectState, WorkerCount};
+ use crate::ownership::CaptureKind;
+ use crate::players::PlayerId;
+ use crate::players::PlayerKind;
++use crate::players::UnitRelation;
+ use crate::unit_ai::Answer;
+ use crate::unit_ai::OrderForce;
+ use crate::unit_ai::{
+@@ -37,6 +38,43 @@ pub trait UnitSide {
      /// What the search does not model.
      fn closest(&mut self, search: &Search<'_>) -> Result<Found, GenieError>;
  
@@ -9821,7 +9925,7 @@ index 7fd24514..8c7a6bf6 100644
      /// The unit's attack command on object `target` (slot 0x338, `FUN_14120cea0`), forced or
      /// not, while its unit AI stands as `ai`: true when the unit attacks it, with the notifies
      /// the command posts to the unit AI (kind and parameters), which the AI queues.
-@@ -84,6 +121,13 @@ pub trait UnitSide {
+@@ -84,6 +122,13 @@ pub trait UnitSide {
          Err(WITHOUT_UNIT)
      }
  
@@ -9835,7 +9939,7 @@ index 7fd24514..8c7a6bf6 100644
      /// The unit's slot 0x2d0 as it stands now: its top action may be interrupted
      /// ([`SurroundingFlags::INTERRUPTIBLE`] at the update's start).
      ///
-@@ -196,6 +240,33 @@ pub trait UnitSide {
+@@ -196,6 +241,33 @@ pub trait UnitSide {
          Err(GenieError::unsupported("a reach test without the world"))
      }
  
@@ -9869,7 +9973,7 @@ index 7fd24514..8c7a6bf6 100644
      /// What the base handler's case 0x216 reads ([`OffFootprint`]) for a unit sent off the
      /// footprint of `site` (its master's radii `radius`).
      ///
-@@ -240,6 +311,19 @@ pub trait UnitSide {
+@@ -240,6 +312,19 @@ pub trait UnitSide {
          Err(GenieError::unsupported("a call for help without the world"))
      }
  
@@ -9889,6 +9993,38 @@ index 7fd24514..8c7a6bf6 100644
      /// The object `id` as the unit AI reads it ([`UnitSeen`]): None when the world does not
      /// hold it (`FUN_1415417a0`).
      ///
+@@ -381,6 +466,31 @@ pub trait UnitSide {
+             "a soldier's attack in a group without its unit",
+         ))
+     }
++
++    /// How many records the last search left in its list of `relation` (188329: the search
++    /// globals' counts `0x1443caf50`..`0x1443caf60`, which every query refills; the enemies' is
++    /// `0x1443caf60`). The priest's idle check draws its heal chance on the enemies'
++    /// (`0xcfde4d`).
++    ///
++    /// # Errors
++    ///
++    /// A side without the world, or a world that has searched nothing yet.
++    fn searched_count(&self, relation: UnitRelation) -> Result<usize, GenieError> {
++        let _ = relation;
++        Err(WITHOUT_UNIT)
++    }
++
++    /// The walk of the priest's heal search (188329 slot 0x258, `0xcf5ad0` after its own search)
++    /// over the last search's lists of its own, its allies', the neutrals' and its enemies'
++    /// objects, within `range`: the object to heal, if any.
++    ///
++    /// # Errors
++    ///
++    /// A side without the world, or a candidate whose last tests are not modelled.
++    fn heal_target(&mut self, range: Distance) -> Result<Option<ObjectId>, GenieError> {
++        let _ = range;
++        Err(WITHOUT_UNIT)
++    }
+ }
+ 
+ /// A unit AI's call on its unit from a side that holds none (a search's closure).
 diff --git a/crates/engine/genie-core/src/unit_ai/surroundings.rs b/crates/engine/genie-core/src/unit_ai/surroundings.rs
 index 7cc2f5c9..171f8944 100644
 --- a/crates/engine/genie-core/src/unit_ai/surroundings.rs
@@ -9941,7 +10077,7 @@ index 7cc2f5c9..171f8944 100644
  
  /// What a computer player's unit weighs of an object on a damage notify ([`UnitAi::damaged`]):
 diff --git a/crates/engine/genie-core/src/unit_ai/task_finder/mod.rs b/crates/engine/genie-core/src/unit_ai/task_finder/mod.rs
-index d11a4839..52ea12ce 100644
+index d11a4839..2289d9bc 100644
 --- a/crates/engine/genie-core/src/unit_ai/task_finder/mod.rs
 +++ b/crates/engine/genie-core/src/unit_ai/task_finder/mod.rs
 @@ -476,6 +476,81 @@ fn finder_head<'m>(
@@ -10026,7 +10162,7 @@ index d11a4839..52ea12ce 100644
  /// The task finder's tail (`LAB_14127ba9e`, `LAB_14127bb9f`): task 13 for an own, allied or
  /// artifact target below state 3 (under that filter alone); a villager on livestock, or on
  /// what is inside something, takes task 110; anything else the general search
-@@ -493,32 +568,41 @@ fn finder_tail<'m>(
+@@ -493,41 +568,60 @@ fn finder_tail<'m>(
      let target = on.target;
      let own = actor.master;
      // the tail: conversions, task 0x84, healing, task 0x88, the siege and class-53 tasks
@@ -10086,6 +10222,30 @@ index d11a4839..52ea12ce 100644
      {
          return Err(GenieError::unsupported("the task finder's healing (0x69)"));
      }
+-    if roles
+-        .of_class(own.class)
+-        .contains(ClassRoles::MONK_WITH_RELIC)
+-        && target.is_some()
++    // 0x133df97..0x133e048, 0x133e402..0x133e4b1: a monk carrying a relic (class 0x2b) takes the
++    // list's first task 0x88 under no filter or filter 0x88, but only on a target of its own or
++    // an allied player (`0x1732ca0`, flag 1) in a state below 3 whose master is the monastery
++    // (0x68); on any other the finder gives none. Without such a task it goes on.
++    if own.class.get() == 0x2b
++        && let Some(t) = target
++        && let Some(task) = first(list, |task| {
++            task.action_kind == ActionKind::DEPOSIT
++                && (filter.is_none() || filter == Some(ActionKind::DEPOSIT))
++        })
+     {
+-        return Err(GenieError::unsupported("the task finder's task 0x88"));
++        let takes = (t.player == actor.player
++            || dip.allied(actor.player, t.player, AllyTest::WithRelation4))
++            && t.state < ObjectState::Dying
++            && t.master.id == MasterId::named(0x68);
++        return Ok(takes.then_some(task));
+     }
+     if roles
+         .of_class(own.class)
 diff --git a/crates/engine/genie-core/src/unit_ai/tests.rs b/crates/engine/genie-core/src/unit_ai/tests.rs
 index 4cc9cc71..b603cd5e 100644
 --- a/crates/engine/genie-core/src/unit_ai/tests.rs
@@ -10556,10 +10716,18 @@ index ea0838e3..fa603b75 100644
          return Ok(Some(first));
      }
 diff --git a/crates/engine/genie-core/src/unit_ai/world_view/side.rs b/crates/engine/genie-core/src/unit_ai/world_view/side.rs
-index 77dc93ea..28cea420 100644
+index 77dc93ea..59cc443e 100644
 --- a/crates/engine/genie-core/src/unit_ai/world_view/side.rs
 +++ b/crates/engine/genie-core/src/unit_ai/world_view/side.rs
-@@ -56,6 +56,139 @@ use crate::world::others::OthersRef;
+@@ -29,6 +29,7 @@ use crate::objects::ObjectState;
+ use crate::objects::masters::ClassId;
+ use crate::objects::masters::ClassMask;
+ use crate::objects::masters::MasterId;
++use crate::objects::masters::MasterKind;
+ use crate::objects::masters::MasterTables;
+ use crate::objects::masters::ObjectFlags;
+ use crate::objects::masters::player_master;
+@@ -56,6 +57,207 @@ use crate::world::others::OthersRef;
  use crate::world::slots::PlayerSlots;
  use std::mem::{swap, take};
  
@@ -10573,6 +10741,74 @@ index 77dc93ea..28cea420 100644
 +}
 +
 +impl UnitView<'_, '_> {
++    /// The walk of the priest's heal search (188329 `0xcf5ad0`, after its search at its place):
++    /// the lists 1 to 4 of the last search (its own, its allies', the neutrals' and its enemies'
++    /// objects; 2 to 4 would end at 2 with the player's `+0x648`, which genie's player does not
++    /// hold, 0 for every player probed), each record but its own unit's, of an object the world
++    /// holds (`0xd303e0`), skipping the master classes 2, 3, 20, 21, 22, 27, 39, 49, 52, 53 and
++    /// 67, and 13, 51, 54 and 55 unless the world's `+0x6b4` is 1; then a combat unit or building
++    /// (type 70, 80) whose owner's byte 9 (`+0x138`) is not 'E' and whose `+0x671` is 0, below its
++    /// most hit points (slot 200 under slot 0xd0: [`Victim::shown_hp`], [`Victim::most_hp`]), in
++    /// a state below 3 (`+0x188`), within `range` and 2 (`DAT_1431b6518`; the player's `+0x648`
++    /// would lift it) of the record's distance. The best of a list (its master's hit points less
++    /// its hit points less the distance, the first on a tie) ends the walk. The two bytes are not
++    /// read: an object that passes every other test stops.
++    ///
++    /// [`Victim::shown_hp`]: crate::combat::damage::Victim::shown_hp
++    /// [`Victim::most_hp`]: crate::combat::damage::Victim::most_hp
++    fn heal_walk(&mut self, range: Distance) -> Result<Option<ObjectId>, GenieError> {
++        /// The classes the walk passes over (`0xcf5c26`'s switch).
++        const PASSED: [i16; 11] = [2, 3, 0x14, 0x15, 0x16, 0x1b, 0x27, 0x31, 0x34, 0x35, 0x43];
++        /// The classes it also passes over unless the world's `+0x6b4` is 1.
++        const PASSED_MODE_0: [i16; 4] = [0xd, 0x33, 0x36, 0x37];
++        /// `DAT_1431b6518`: how near the object must be.
++        const NEAR: f32 = 2.0;
++        let Some(lists) = self.c.w.spatial.searched() else {
++            return Err(GenieError::unsupported(
++                "a search that reads the registry's last answer (before any query)",
++            ));
++        };
++        let roles = self.c.w.model.roles.clone();
++        let me = self.unit.id;
++        for relation in [
++            UnitRelation::Own,
++            UnitRelation::Ally,
++            UnitRelation::Neutral,
++            UnitRelation::Enemy,
++        ] {
++            for r in &lists[relation] {
++                if r.id == me {
++                    continue;
++                }
++                let Some(v) = self.victim_of_target(r.id, &roles)? else {
++                    continue;
++                };
++                let class = v.class.get();
++                if PASSED.contains(&class)
++                    || (!self.c.w.mode_680.is_one() && PASSED_MODE_0.contains(&class))
++                    || !matches!(v.kind, MasterKind::COMBAT | MasterKind::BUILDING)
++                    || ObjectState::Dying <= v.state
++                    || !(v.shown_hp().get() < v.most_hp().get())
++                {
++                    continue;
++                }
++                let d = r.distance.get();
++                if !(d <= range.get() && d <= NEAR) {
++                    continue;
++                }
++                eprintln!(
++                    "HEAL_CANDIDATE healer={} target={} class={class} distance={d}",
++                    me.get(),
++                    r.id.get()
++                );
++                return Err(GenieError::unsupported(
++                    "a monk's heal candidate (0xcf5ad0: its owner's byte 9 and +0x671 not read)",
++                ));
++            }
++        }
++        Ok(None)
++    }
++
 +    /// 188329 `AskForHelp`'s walk (`0xd1d3d0`..`0xd1dc59`) over the search's lists of the unit's
 +    /// own and its friends' objects (the globals' lists 1 and 2, read again with their counts on
 +    /// every step): each record's object that passes the tests ([`UnitView::help_candidate`])
@@ -10699,7 +10935,7 @@ index 77dc93ea..28cea420 100644
  impl UnitSide for UnitView<'_, '_> {
      fn table_drop_site(&mut self) -> Result<Option<DropSiteId>, GenieError> {
          let class = self
-@@ -129,10 +262,50 @@ impl UnitSide for UnitView<'_, '_> {
+@@ -129,10 +331,50 @@ impl UnitSide for UnitView<'_, '_> {
          self.own_foundation_near()
      }
  
@@ -10750,7 +10986,29 @@ index 77dc93ea..28cea420 100644
          let roles = &self.c.w.model.roles.clone();
          let lists = self.c.w.spatial.searched().ok_or(GenieError::unsupported(
              "a search that reads the registry's last answer (before any query)",
-@@ -258,6 +431,7 @@ impl UnitSide for UnitView<'_, '_> {
+@@ -219,6 +461,21 @@ impl UnitSide for UnitView<'_, '_> {
+         self.picker(None)?.nearest_attacker_of(target)
+     }
+ 
++    fn searched_count(&self, relation: UnitRelation) -> Result<usize, GenieError> {
++        self.c
++            .w
++            .spatial
++            .searched()
++            .map(|lists| lists[relation].len())
++            .ok_or(GenieError::unsupported(
++                "a search that reads the registry's last answer (before any query)",
++            ))
++    }
++
++    fn heal_target(&mut self, range: Distance) -> Result<Option<ObjectId>, GenieError> {
++        self.heal_walk(range)
++    }
++
+     fn seen_unit(&mut self, id: ObjectId) -> Result<Option<UnitSeen>, GenieError> {
+         let Some(p) = self.c.w.spatial.get(id) else {
+             return Ok(None);
+@@ -258,6 +515,7 @@ impl UnitSide for UnitView<'_, '_> {
                  owner,
                  AllyTest::WithRelation4,
              ),
@@ -10758,7 +11016,7 @@ index 77dc93ea..28cea420 100644
          }))
      }
  
-@@ -286,6 +460,80 @@ impl UnitSide for UnitView<'_, '_> {
+@@ -286,6 +544,80 @@ impl UnitSide for UnitView<'_, '_> {
          Ok(class)
      }
  
@@ -10839,7 +11097,7 @@ index 77dc93ea..28cea420 100644
      fn reaches(&mut self, target: ObjectId, range: Distance) -> Result<bool, GenieError> {
          let mut plan = Planning {
              pathing: &mut self.c.w.pathing,
-@@ -322,6 +570,31 @@ impl UnitSide for UnitView<'_, '_> {
+@@ -322,6 +654,31 @@ impl UnitSide for UnitView<'_, '_> {
          )
      }
  
@@ -10871,7 +11129,7 @@ index 77dc93ea..28cea420 100644
      fn closest(&mut self, search: &Search<'_>) -> Result<Found, GenieError> {
          let roles = &self.c.w.model.roles.clone();
          let seeker = match search.pick {
-@@ -505,6 +778,14 @@ impl UnitSide for UnitView<'_, '_> {
+@@ -505,6 +862,14 @@ impl UnitSide for UnitView<'_, '_> {
          done
      }
  
@@ -10886,7 +11144,7 @@ index 77dc93ea..28cea420 100644
      fn busy_now(&mut self) -> Result<bool, GenieError> {
          Ok(
              self.actions.top_action_kind().is_some()
-@@ -522,6 +803,7 @@ impl UnitSide for UnitView<'_, '_> {
+@@ -522,6 +887,7 @@ impl UnitSide for UnitView<'_, '_> {
          ai: &UnitAi,
          rng: &mut Well512,
      ) -> Result<Option<Tile>, GenieError> {
@@ -10894,7 +11152,7 @@ index 77dc93ea..28cea420 100644
          let tc = town_centre(
              owner_view(
                  &self.c.w.players,
-@@ -530,6 +812,7 @@ impl UnitSide for UnitView<'_, '_> {
+@@ -530,6 +896,7 @@ impl UnitSide for UnitView<'_, '_> {
                  self.new_owner,
              )?,
              self.c.w.model.slots.master,
@@ -16919,6 +17177,143 @@ index 00000000..886df08f
 +                Ok(())
 +            }
 +        }
++    }
++}
+diff --git a/crates/engine/genie-core/src/unit_ai/idle_priest.rs b/crates/engine/genie-core/src/unit_ai/idle_priest.rs
+new file mode 100644
+index 00000000..1db1ef0e
+--- /dev/null
++++ b/crates/engine/genie-core/src/unit_ai/idle_priest.rs
+@@ -0,0 +1,131 @@
++//! The priest's idle check (188329 `0xcfdb10`, slot 0x240 of the priest's unit AI).
++
++use crate::GenieError;
++use crate::math::rng::Well512;
++use crate::objects::WorkerCount;
++use crate::players::PlayerKind;
++use crate::players::QueryRelation;
++use crate::players::UnitRelation;
++use crate::unit_ai::IdleOutcome;
++use crate::unit_ai::OrderKind;
++use crate::unit_ai::SurroundingFlags;
++use crate::unit_ai::UnitStance;
++use crate::unit_ai::{
++    Memory, PRIEST_CARED, Pick, Search, Surroundings, UnitAi, UnitSide, attack_search_radius,
++};
++
++impl UnitAi {
++    /// The priest's idle check (188329 `0xcfdb10`). A monk carrying a relic (class 0x2b) only
++    /// lowers its last human order time (`0xd1c2e0`, [`UnitAi::cap_human_order`]): 5.
++    ///
++    /// Any other takes the computer's way when its player is a computer (`0x1728be0`, `+0x10`
++    /// 3) or when its own unit (type 50 or above, `+0xf` above 0x31: every monk) has the byte
++    /// `+0x51c` (`0x114aaa0`) 3, or 0 outside the scenario modes (`0x13d4310`: the options'
++    /// `+0x34` 3, 4, 5 or 15), its player's `+0x648` 0 (not held, 0 for every player probed).
++    /// genie holds no `+0x51c`: the object's constructor (`0x1143b6f`) writes 0, and only a
++    /// scenario's setup and its triggers write it otherwise (`0x114bc60`'s callers), so a
++    /// human player's monk takes the computer's way outside the scenario modes. Its other way, a
++    /// human player's in a scenario mode (the cap, then a heal search within 5, or its player's
++    /// attribute 90 plus 1), is not modelled.
++    ///
++    /// The computer's way: a player that is out (`+0x89` 2, `0x1732d90`; not held, 0 for every
++    /// player probed) gives 5. The base idle check with 1 (`0xd31a30`): its slot 0x250
++    /// (`0xd38720`) retries a last order the priest's slot 0x60 (`0xd07ef0`) takes, heal or
++    /// conversion (`0x2bf`, `0x2c0`), with a `ClosestObject` of the last target's class; that
++    /// search is not modelled. Else the base's own part ([`UnitAi::tower_idle`] over
++    /// [`PRIEST_CARED`]); a 6 ends it. Then the heal: with `n` records in the enemies' list of
++    /// the last search (`0x1443caf60`, [`UnitSide::searched_count`]) above 0, an AI draw `r`
++    /// (`rand15`) and `r % 2n` up to `n` skips it. Outside `NoAttack` (stance 3) its range is its
++    /// unit's line of sight (unit slot 0x228; in `StandGround` its player's attribute 90, not
++    /// modelled); the heal search (slot 0x258, `0xcf5ad0`) first searches from its place (slot
++    /// 0x50 with mode 1, [`Pick::Look`], [`UnitAi::attack_search_alert`]), then walks the lists
++    /// ([`UnitSide::heal_target`]); an object found it heals (slot 0xe0 with 0,
++    /// `0xd27790`, [`UnitAi::work_object`]) and gives 6. Last, outside `StandGround`, the
++    /// closest enemy it reaches (`0xd22c20` with class −1, relation 2, state, master and workers
++    /// −1, reachable) it would walk away from by its range (unit slot 0x248) less their distance
++    /// (`evasiveMoveTo`, slot 0x150), which is not modelled; without one 5.
++    pub(super) fn priest_idle(
++        &mut self,
++        at: &Surroundings,
++        player_kind: PlayerKind,
++        ai: &mut Well512,
++        side: &mut dyn UnitSide,
++    ) -> Result<IdleOutcome, GenieError> {
++        if at.class.is_some_and(|c| c.get() == 0x2b) {
++            self.cap_human_order(side, ai)?;
++            return Ok(IdleOutcome::Idle);
++        }
++        if !player_kind.is_computer() && at.flags.contains(SurroundingFlags::SCENARIO) {
++            return Err(GenieError::unsupported(
++                "a human player's monk's idle check in a scenario mode (0xcfdb10)",
++            ));
++        }
++        if matches!(self.last_order, Some(OrderKind::Heal | OrderKind::Convert))
++            && self.last_target_class.is_some()
++        {
++            return Err(GenieError::unsupported(
++                "a monk's retry of its last heal or conversion (slot 0x250, 0xd38720)",
++            ));
++        }
++        let unit_ai_tuning = &at.unit_ai_tuning;
++        if self.tower_idle(at, player_kind, side, ai, &PRIEST_CARED)? == IdleOutcome::Acted {
++            return Ok(IdleOutcome::Acted);
++        }
++        let enemies = side.searched_count(UnitRelation::Enemy)?;
++        let heals = if enemies == 0 {
++            true
++        } else {
++            let n = u32::try_from(enemies).map_err(|_| {
++                GenieError::unsupported("a search that left more enemies than an int holds")
++            })?;
++            ai.rand15() % (2 * n) > n
++        };
++        if heals && self.stance != UnitStance::NoAttack {
++            if self.stance == UnitStance::StandGround {
++                return Err(GenieError::unsupported(
++                    "a StandGround monk's heal range (its player's attribute 90)",
++                ));
++            }
++            let found = side.closest(&Search {
++                at: at.position.ground(),
++                radius: attack_search_radius(at),
++                classes: &PRIEST_CARED,
++                size: at.size,
++                pick: Pick::Look,
++                memory: Memory::default(),
++            })?;
++            self.attack_search_alert(found, player_kind, unit_ai_tuning)?;
++            if side.heal_target(at.los)?.is_some() {
++                return Err(GenieError::unsupported(
++                    "a monk's heal order from its idle check (slot 0xe0)",
++                ));
++            }
++        }
++        if self.stance == UnitStance::StandGround {
++            return Ok(IdleOutcome::Idle);
++        }
++        let found = side.closest(&Search {
++            at: at.position.ground(),
++            radius: attack_search_radius(at),
++            classes: &PRIEST_CARED,
++            size: at.size,
++            pick: Pick::Closest {
++                group: None,
++                relation: Some(QueryRelation::Enemies),
++                state: None,
++                master: None,
++                workers: WorkerCount::NO_CAP,
++                spared: None,
++                reach: true,
++            },
++            memory: Memory::default(),
++        })?;
++        self.alert(found, at.dt_seconds);
++        if found.id.is_some() {
++            return Err(GenieError::unsupported(
++                "a monk's walk away from the closest enemy (unit slot 0x248, slot 0x150)",
++            ));
++        }
++        Ok(IdleOutcome::Idle)
 +    }
 +}
 diff --git a/crates/tools/genie-oracle/examples/cache_probe.rs b/crates/tools/genie-oracle/examples/cache_probe.rs
