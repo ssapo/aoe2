@@ -530,6 +530,8 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 13.4 지금 하던 일 (멈출 때마다 이 절을 덮어쓴다)
 
+**2026-11-16 밤, Claude (ONBOARDING `ENG-31` full-match: 경기 521084500을 끝까지). 엔진 변경 없음, 엔진 소스 비움, 돌고 있는 실행 없음. 첫 어긋남 P1 392.2초·P2 8.7초(일시적)는 체크포인트만으로 개체를 못 가려 원본 기록 ⑪⑫ 대기(findings 129). 리플 PC `genie-replays\521084500\`, 기준 실행 `runs\F0_521084500`(exe `census_P31c`), 추적 `F0t1`~`F0t4`.**
+
 **2026-11-16 오후, Claude (ONBOARDING `ENG-26` A·B, `ENG-01`, 원본 기록 `truth7~9`). 묶음 A(124번 `e842db9`), ENG-01(125번 `9be7c1c`, 126번 이 문서와 같은 커밋). exe `runs\census_A32a.exe` = 패치 `runs\A32a.patch`(sha256 LF `c5d0ad4a…6f73fec9`, 778,689바이트) = `genie\` 소스. 전체 실행 `A32a*`가 지금 숫자다 — **2.1 표는 아직 옛 값(N29a)이고, 지금 값은 126번 표와 `runs/A31/tab_A32a.txt`·`ptab_A32a.txt`**. 518239882 57 / 54 그대로. 반쯤 하던 일 없음, 돌고 있는 실행 없음, 엔진 소스 비움(다음: 엔진 멈춤 넷은 `eng-stops` 세션).** 도구: `runs/A31_cmp.py`(기록 v7과 OBJECT 줄의 재탐색·look-around·자리 비교), `runs/A31_draws.py`(AI 뽑기 수), `runs/A31/rng.py`·`seedsearch.py`·`seedcmp.py`(기록의 AI 상태 단어로 SeedAll 씨앗 역추적) — 저장소 `tools/A31/`.
 
 **2026-11-16 낮 늦게, Claude (ONBOARDING `ENG-30`: 남은 엔진 멈춤 여섯, 기록 없이). 결론: 둘 고침(findings 120 건설자 빈 칸 없음 → set_state 2, 121 처치 보상 0xa1 지불), 하나 조사만(122 투사체 높이 배율 슬롯), 셋 못 함(아래 5번). 반쯤 하던 일 없음, 돌고 있는 실행·빌드 없음. 엔진 = 연구 커밋 `7fc44df`, exe `runs\census_O30c.exe`(= `genie\` 소스 = 저장소 패치 = `runs\O30c.patch`, sha256 LF `8c1c9981…c160be06`, 769,658바이트). 전체 실행 `O30c*`(열한 리플 + 동물 셋 + V 일곱 + 프로 14판): 520596921·521069970 말고는 N29a와 바이트까지 같고 518239882 57 / 54, main Engine check 통과(`b6776d7`). 이전 세션 기록(아래 문단들)은 그대로 둠 — 숫자가 다르면 이 줄과 2.1이 맞다.** 원본 읽기는 Windows Git Bash에서 `runs/E30_decomp.sh <목록> <이름>`(Ghidra 헤드리스, 출력 `re-kit/re/out_e30/`), vtable 훑기 `runs/E30_vtscan.py`(저장소 `tools/`). 빌드는 이 세션에서 WMI가 막혀 `I24_build.ps1`을 직접(백그라운드) 돌렸다.
