@@ -89,7 +89,7 @@ Codex의 초기 이동·내려놓기·주둔 복귀 정적 조사는 [결과·�
 |---|---|---|---|---|---|---|
 | 519444998 (Lucho) | Dravidians / Georgians | Enclosed (닫힘) | 8.9 {9:736} / 8.9 {7:3,9:279} | 158.4 -1 / 125.9 -22 | 1:59.4 | 없음 |
 | 521113438 (ACCM) | Ethiopians / Mapuche | Atacama | 210.4 {7:23,9:6} / 184.4 {7:25,9:6} | 288.4 -10 / 262.4 -1 | 4:15.9 | 없음(K27, 109번) |
-| 521069970 (Liereyy) | Maya / Danes | Socotra | 164.7 {7:221} / 203.7 {7:-7} | 333.7 -10 / 372.7 -1 | 5:27.2 | P1 57,441 "an object of a stopped player may be near"(뒤따름); P2 57,234 "a kill reward task that pays (action type 0xa1, 0x12c00e0)"(117번에서 좁힘) |
+| 521069970 (Liereyy) | Maya / Danes | Socotra | 164.7 {7:221} / 203.7 {7:-7} | 333.7 -10 / 372.7 -1 | 5:27.2 | 없음(O30c; 옛 P2 57,234 처치 보상 0xa1은 121번, P1 57,441은 뒤따름) |
 | 521333824 (Lewis) | Poles / Goths | Hideout (닫힘) | 164.7 {7:-56} / 184.2 {7:-42} | 249.2 -25 / 268.7 -6 | 4:02.7 | 없음(L28, 112·115번) |
 | 520821782 (MbL) | Teutons / Berbers | Golden Pit | 51.9 {9:44} / 51.9 {7:136,9:237} | 200.4 +6 / 265.4 -9 | 3:13.9 | 없음 |
 | 521153105 (Sitaux) | Burgundians / Wu | Arabia | 54.2 {7:2} / 119.2 {7:2} | 119.2 -5 / 190.7 +43 | 1:52.7 | 없음 |
@@ -418,8 +418,8 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
    - 517426097 796.0초 P1 3997·4007·4022(96·98번): 남은 차이는 W(그룹 길 끝)와 칸 배정 시점. 다음: update 60,990~61,002 기록(98번 끝 사양). 읽기로 더 가려면 0x10d8bd6 근처(그룹 길을 만드는 곳).
 5. **엔진 멈춤 여섯(전부 첫 어긋남 뒤, 사이트 구간과 무관; 기록 없이 할 수 있음)**:
    - 520596921 P1 58,406 "processIdle (slot 0x240) of a unit-AI type not modelled"(사람 선수의 유물 없는 수도사 10646; 옛 57,043은 120번에서 고침): 원본 0xcfdb10의 나머지 갈래와 유형 9 가상표 0x3245b70의 slot 0x258(치료 대상 찾기)을 읽는다(120번 끝).
-   - 521069970 P2 57,234 "a kill reward task that pays (0xa1, 0x12c00e0)"(117번): 선수 +0x198 외교 표를 쓰는 곳을 읽어 엔진 관계 +0x260과 맞추고, 0x1252230·obj+0x900·비용 칸 곱을 읽는다.
-   - 517429796 P1 54,672 "a shooterless missile with an origin (its elevation)"(111·119번): 투사체 vtable을 찾아 0xb8fd60의 slot 0x920 → 높이 배율 함수.
+   - (풀림, 121번) 521069970 P2 57,234 처치 보상 0xa1. 남은 것: 받는 쪽이 적이 아닐 때의 주인 검사(+0x198 표 쓰는 곳)와 피해 기록 +0x59c/+0x5a0.
+   - 517429796 P1 54,672 "a shooterless missile with an origin (its elevation)"(111·119·122번): 188329 slot 0x1f0은 시야 함수라 높이 배율 슬롯을 타격 함수의 가상 호출에서 먼저 찾는다(122번 끝).
    - 519908353 P1 74,244 "a gather's set_state 6 on another player's farm"(115·119번): 원본 Gather set_state 6에서 남의 농장을 가져가는 갈래 읽기.
    - 520162577 P2 44,417 "a wall builder past the foundations the game shares out"(119번): 성벽 명령 분배(0xf63360·0x16e9600, 부록 C의 E5 묶음) 다시 읽기.
    - 520352957 가이아 39,061 "an attacker whose hits apply effects"(R3 메모 6, 119번): 0x1149850.

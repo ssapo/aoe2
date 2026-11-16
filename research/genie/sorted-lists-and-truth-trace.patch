@@ -756,7 +756,7 @@ index 41187161..2752cfa1 100644
          building: (kind == MasterKind::BUILDING).then(|| DamageBuilding {
              main: building.annex_of,
 diff --git a/crates/engine/genie-core/src/combat/victims.rs b/crates/engine/genie-core/src/combat/victims.rs
-index d29be68b..deebd8c3 100644
+index d29be68b..c897b0a3 100644
 --- a/crates/engine/genie-core/src/combat/victims.rs
 +++ b/crates/engine/genie-core/src/combat/victims.rs
 @@ -2,7 +2,7 @@
@@ -807,7 +807,7 @@ index d29be68b..deebd8c3 100644
      };
      let Some((_, _, sleeps)) = c.w.locate(v.id) else {
          return Ok(None);
-@@ -346,7 +356,8 @@ pub(crate) fn file_kill(
+@@ -346,16 +356,40 @@ pub(crate) fn file_kill(
      roles: &Roles,
  ) -> Result<(), GenieError> {
      if k.id != c.me {
@@ -817,7 +817,9 @@ index d29be68b..deebd8c3 100644
      }
      if let Some(kill) = k.kill {
          let master = me.master(c.w.master_tables(), c.player)?.clone();
-@@ -355,7 +366,30 @@ pub(crate) fn file_kill(
+-        c.w.count_killed(c.player, &master, kill)?;
++        c.w.count_killed(c.player, &master, kill, me.id)?;
+         if kill.to_gaia {
              me.ai_change_owner(actions, PlayerId::GAIA, c, roles)?;
          }
      }
@@ -849,31 +851,56 @@ index d29be68b..deebd8c3 100644
  }
  
  /// A strike's write-back where it ran ([`write_back`]), each object's kill and razings right
-@@ -520,7 +554,179 @@ impl World {
+@@ -464,7 +498,8 @@ impl World {
+     ) -> Result<(), GenieError> {
+         let u = &self.players.live(q, j)?;
+         let master = u.master(self.master_tables(), q)?.clone();
+-        self.count_killed(q, &master, kill)?;
++        let id = u.id;
++        self.count_killed(q, &master, kill, id)?;
+         if kill.to_gaia {
+             self.give_gaia(q, j)?;
+         }
+@@ -483,6 +518,7 @@ impl World {
+         q: PlayerId,
+         master: &Master,
+         kill: Kill,
++        id: ObjectId,
+     ) -> Result<(), GenieError> {
+         if self.players.player(q)?.kind.is_computer() {
+             return Err(GenieError::unsupported(
+@@ -520,7 +556,203 @@ impl World {
                      .add_attribute(kind, Amount::new(1.0))?;
              }
          }
 -        self.count_kill_of(q, master, ap)
 +        self.count_kill_of(q, master, ap)?;
-+        self.removal_rewards(q, master, ap)
++        self.removal_rewards(q, master, ap, id)
 +    }
 +
 +    /// The kill record's removal rewards (188329 `0x12b98d0` -> `0x12ba320`, for a killed object of
-+    /// a player, `q` above 0): each task of action type 0xa1 of the killed master pays (`0x12c00e0`)
-+    /// the attacker's player `ap` when its `work_range` is above 1e-7, else `q`: `work_val1`, times
-+    /// the payee's attribute `+0x22` when it has one; a task with flag 4 pays nothing (the kill
-+    /// passes 0). A payment of 0 changes nothing. Not held: the damage record (`+0x59c`, `+0x5a0`)
-+    /// and the payee's diplomacy test (`0x114a9b0`, `player+0x198`), which a task with a work range
-+    /// reads, and the storage and build shares (flags 1 and 2), which a payment above 0 reads.
++    /// a player, `q` above 0): each task of action type 0xa1 of the killed master pays
++    /// (`0x12c00e0`, its fourth argument 0) the attacker's player `ap` when its `work_range` is
++    /// above 1e-7, else `q`. With a work range above 0 the payee must pass the owner test
++    /// (`0x114a9b0`: the task's `owner_kind` makes a mask, 1 -> 2, 2 -> 0x18, 3 -> 1, 4 -> 7,
++    /// 5 -> 0x19, 6 -> 0x1d, else 0x1f, against `1 << q's player+0x198[payee]`). A task with flag 4
++    /// pays nothing. The amount is `work_val1`, times the payee's attribute `+0x22` when it has
++    /// one; with flag 1 it is that times the amount of the killed master's cost slot of resource
++    /// `+0x24` whose paid flag is set (the last such slot; none: 0); with flag 2 an unfinished
++    /// building (`0x1252230`) scales it by its construction share. The payee's slot 0xf8 adds
++    /// it to attribute `+0x24` (with 1, 1). ENG-30, findings 121.
 +    ///
 +    /// # Errors
 +    ///
-+    /// A payment that is not 0 (not modelled), or an attribute a player lacks.
++    /// An owner test this does not decide (the damage record `+0x59c`/`+0x5a0` is not held: the
++    /// payee is the killed object's player, Gaia, an ally or a neutral, for an owner type that
++    /// does not take every value), or an attribute a player lacks.
 +    pub(crate) fn removal_rewards(
 +        &mut self,
 +        q: PlayerId,
 +        master: &Master,
 +        ap: PlayerId,
++        id: ObjectId,
 +    ) -> Result<(), GenieError> {
 +        if q == PlayerId::GAIA {
 +            return Ok(());
@@ -884,48 +911,65 @@ index d29be68b..deebd8c3 100644
 +            .iter()
 +            .filter(|t| t.action_kind == REMOVAL_REWARD)
 +        {
-+            if t.combat_level_flag.bits() & 4 != 0 {
++            let payee = if 1e-7 < t.work_range.get() { ap } else { q };
++            if 0.0 < t.work_range.get() {
++                // 0x114a9b0: every value passes the mask 0x1f (owner types 0 and above 6); the
++                // masks 0x18, 0x19 and 0x1d (types 2, 5, 6) all hold the values 3 and 4, which
++                // the owner types' meanings give another player that is not an ally
++                // (`TargetOwner`); the rest would need the table and the damage record
++                let all = !matches!(t.owner_kind.get(), 1..=6);
++                let enemy_kind = matches!(t.owner_kind.get(), 2 | 5 | 6);
++                let enemy = payee != q
++                    && payee != PlayerId::GAIA
++                    && self.players.player(q)?.relations.get(payee)
++                        == Some(&crate::players::Relation::Enemy);
++                if !all && !(enemy_kind && enemy) {
++                    return Err(GenieError::unsupported(
++                        "a kill reward whose payee the owner test may fail (0x114a9b0, damage record +0x59c)",
++                    )
++                    .with("payee", format!("{payee:?}"))
++                    .with("owner", t.owner_kind.get()));
++                }
++            }
++            let flags = t.combat_level_flag.bits();
++            if flags & 4 != 0 {
 +                continue;
 +            }
-+            let amount = |w: &Self, p: PlayerId| -> Result<f32, GenieError> {
-+                let a = &w.players.player(p)?.attributes;
-+                Ok(t.work_val1.get()
-+                    * t.attribute_kind2
-+                        .and_then(|k| a.get(k.index()))
-+                        .map_or(1.0, |v| v.get()))
-+            };
-+            let payee = if 1e-7 < t.work_range.get() { ap } else { q };
-+            // with a work range the payee may fall back to the object's damage record, which
-+            // only names other players
-+            let mut pays = amount(self, payee)? != 0.0;
-+            if 0.0 < t.work_range.get() {
-+                for p in PlayerId::each(self.players.len()) {
-+                    if p != q && amount(self, p)? != 0.0 {
-+                        pays = true;
++            let mut amount = t.work_val1.get();
++            if let Some(k) = t.attribute_kind2
++                && let Some(v) = self.players.player(payee)?.attributes.get(k.index())
++            {
++                amount *= v.get();
++            }
++            let kind = t.attribute_kind3.ok_or(NOT_HELD)?;
++            let mut out = amount;
++            if flags & 1 != 0 {
++                out = 0.0;
++                for slot in &master.creatable_part().cost {
++                    if slot.attribute == Some(kind) && slot.paid {
++                        out = f32::from(slot.amount.get()) * amount;
 +                    }
 +                }
 +            }
-+            if pays {
-+                return Err(GenieError::unsupported(
-+                    "a kill reward task that pays (action type 0xa1, 0x12c00e0)",
-+                )
-+                .with("killed master", format!("{:?}", master.id))
-+                .with("payee", format!("{payee:?}"))
-+                .with(
-+                    "task",
-+                    format!(
-+                        "id {:?} owner {:?} flag {:#x} val1 {} range {} work_flag {} attr2 {:?} attr3 {:?}",
-+                        t.id,
-+                        t.owner_kind,
-+                        t.combat_level_flag.bits(),
-+                        t.work_val1.get(),
-+                        t.work_range.get(),
-+                        t.work_flag,
-+                        t.attribute_kind2,
-+                        t.attribute_kind3
-+                    ),
-+                ));
++            // 0x1252230: a building (type 80) whose build points (obj+0x900) are below its
++            // build time (the master's +0x338 list, first entry +2, as the completion test
++            // 0x1282297 reads it) scales the payment by their ratio
++            if flags & 2 != 0
++                && master.kind == MasterKind::BUILDING
++                && let Some(cons) = self.parts.building_of(id).construction.as_ref()
++            {
++                let time = f32::from(cons.build_time.get());
++                if cons.progress.get() < time {
++                    out *= cons.progress.get() / time;
++                }
 +            }
++            self.add_resource(
++                payee,
++                kind,
++                Amount::new(out),
++                ResourceStat::Gathered,
++                ResourceShare::Shared,
++            )?;
 +        }
 +        Ok(())
 +    }
@@ -1030,7 +1074,7 @@ index d29be68b..deebd8c3 100644
      }
  
      /// `FUN_1412005b0` on the object `id` killed for player `killer` (a movement damage's,
-@@ -587,6 +793,33 @@ impl World {
+@@ -587,6 +819,33 @@ impl World {
      }
  }
  
