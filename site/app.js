@@ -292,6 +292,12 @@
     renderTimeline();
   }
   function toast(message) { $('#toast').textContent=message; $('#toast').hidden=false; clearTimeout(toastTimer); toastTimer=setTimeout(()=>$('#toast').hidden=true,4000); }
+  // eAPM medians over the selected player's analysed matches: [own, opponents', count].
+  function eapmMedians(){
+    const med=xs=>{const v=xs.filter(x=>Number.isFinite(x)&&x>0).sort((a,b)=>a-b);if(!v.length)return null;const h=v.length>>1;return v.length%2?v[h]:(v[h-1]+v[h])/2;};
+    const done=(report.matches||[]).filter(m=>m.analysis?.metrics);
+    return [med(done.map(m=>m.analysis.metrics.eapm)),med(done.flatMap(m=>(m.analysis.opponents||[]).map(o=>o.metrics?.eapm))),done.filter(m=>Number.isFinite(m.analysis.metrics.eapm)&&m.analysis.metrics.eapm>0).length];
+  }
   function render() {
     const matches = Array.isArray(report.matches) ? report.matches : [];
     const known = matches.filter(m=>['win','loss'].includes(m.result));
@@ -305,6 +311,9 @@
     const delta = latestRated && Number.isFinite(latestRated.rating_before) ? latestRated.rating_after-latestRated.rating_before : null;
     $('#stat-delta').textContent = delta !== null ? `직전 경기 ${delta>0?'+':''}${delta} · 경기 유형별 차이 있음` : '레이팅 없음';
     $('#stat-analysis').textContent = number(matches.filter(m=>m.analysis_status==='complete').length);
+    const [eapmOwn,eapmOpp,eapmCount]=eapmMedians();
+    $('#stat-eapm').textContent = number(eapmOwn===null?null:Math.round(eapmOwn));
+    $('#stat-eapm-note').textContent = eapmCount ? `분석 ${eapmCount}경기 · 상대 중앙값 ${number(Math.round(eapmOpp))}` : '분석된 경기 없음';
     $('#match-count').textContent=number(matches.length);
     $('#updated').textContent = `최근 수집 · ${date(report.updated_at)}`;
     const c = $('#connection');
@@ -452,6 +461,7 @@
     const longest=s=>s.villager_command_gaps.length?Math.max(...s.villager_command_gaps.map(g=>g.seconds)):null;
     const core=[
       ['eAPM',number(mine.eapm),number(theirs.eapm)],
+      ...(()=>{const [o,p,n]=typeof eapmMedians==='function'?eapmMedians():[null,null,0];return n>=3?[[`eAPM 중앙값 · 분석 ${n}경기`,number(Math.round(o)),`상대들 ${number(Math.round(p))}`]]:[];})(),
       ...ageList.filter(age=>Number.isFinite(checkpoint(mine,age).reached_seconds)||Number.isFinite(checkpoint(theirs,age).reached_seconds)).map(age=>[`${age} 도달`,fmtTime(checkpoint(mine,age).reached_seconds),fmtTime(checkpoint(theirs,age).reached_seconds)]),
     ];
     const requests=[
