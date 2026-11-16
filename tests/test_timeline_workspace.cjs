@@ -17,7 +17,7 @@ test('paging and field selection keep the flow tab and scroll position with one 
   get('#production-search').value='';
   get('#field-time-plot').dataset.duration='40';
   const track={...node(),getBoundingClientRect:()=>({left:100,width:400})};
-  const root={querySelector:get,querySelectorAll:selector=>selector==='[role="tab"]'?tabs:selector==='[role="tabpanel"]'?panels:selector==='[data-field-track]'?[track]:selector==='[data-numbers]'?numberTabs:selector==='[data-number-panel]'?numberPanels:[]};
+  const root={querySelector:get,querySelectorAll:selector=>selector==='.review-tabs [role="tab"]'?tabs:selector==='[role="tabpanel"][id^="panel-"]'?panels:selector==='[data-field-track]'?[track]:selector==='[data-numbers]'?numberTabs:selector==='[data-number-panel]'?numberPanels:[]};
   const code=fs.readFileSync(path.join(__dirname,'../site/app.js'),'utf8');
   const ctx=vm.createContext({root,window:{},document:{querySelector:()=>({open:true})},
     label:String,esc:String,number:String,fmtTime:String,performance:{now:()=>0},

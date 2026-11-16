@@ -144,10 +144,12 @@
   }
   function bindWorkspace(root,mine,theirs,other,review,mapData,match) {
     const body=root.querySelector('.review-body');
-    const tabs=[...root.querySelectorAll('[role="tab"]')];
+    // only the analysis tabs: the matchup card has its own age tabs and panels (role="tab"/"tabpanel" too)
+    const tabs=[...root.querySelectorAll('.review-tabs [role="tab"]')];
     const activate=id=>{
+      if(!id)return;
       tabs.forEach(t=>{const selected=t.dataset.panel===id;t.setAttribute('aria-selected',String(selected));t.tabIndex=selected?0:-1;});
-      root.querySelectorAll('[role="tabpanel"]').forEach(p=>p.hidden=p.id!==`panel-${id}`);
+      root.querySelectorAll('[role="tabpanel"][id^="panel-"]').forEach(p=>p.hidden=p.id!==`panel-${id}`);
       body.classList.toggle('timeline-active',id==='timeline');
       body.scrollTop=0;
     };
