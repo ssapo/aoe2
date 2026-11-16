@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-16T01:26:25.265778+00:00",
-  "last_checked_at": "2026-11-16T01:25:39.395324+00:00",
+  "updated_at": "2026-11-16T02:48:33.874189+00:00",
+  "last_checked_at": "2026-11-16T02:48:27.485620+00:00",
   "sync_error": null,
   "profile": {
     "id": 1224481,
@@ -25,13 +25,15 @@
           "profile_id": 3216208,
           "name": "Dimo",
           "is_self": false,
-          "civilization": "Poles"
+          "civilization": "Poles",
+          "rating_before": 2549
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Hindustanis"
+          "civilization": "Hindustanis",
+          "rating_before": 2651
         }
       ],
       "analysis_status": "complete",
@@ -39624,7 +39626,6 @@
       },
       "attempts": 1,
       "source_url": "https://www.aoe2insights.com/match/521511686/",
-      "analysis_note": "명령 기록 분석 완료",
       "civ_choice": {
         "1224481": true,
         "3216208": true
@@ -39646,21 +39647,23 @@
           "profile_id": 5232543,
           "name": "DS_Gali",
           "is_self": false,
-          "civilization": "Goths"
+          "civilization": "Goths",
+          "rating_before": 2664
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Bengalis"
+          "civilization": "Bengalis",
+          "rating_before": 2667
         }
       ],
       "analysis_status": "unavailable",
       "analysis": null,
-      "attempts": 1,
+      "attempts": 2,
       "source_url": "https://www.aoe2insights.com/match/521508853/",
-      "analysis_note": "공개 리플을 확보하지 못했습니다.",
-      "civ_choice_tries": 1
+      "civ_choice_tries": 2,
+      "analysis_note": "공개 리플을 확보하지 못했습니다."
     },
     {
       "id": 521506996,
@@ -39678,13 +39681,15 @@
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Mongols"
+          "civilization": "Mongols",
+          "rating_before": 2650
         },
         {
           "profile_id": 5232543,
           "name": "DS_Gali",
           "is_self": false,
-          "civilization": "Gurjaras"
+          "civilization": "Gurjaras",
+          "rating_before": 2681
         }
       ],
       "analysis_status": "pending",
@@ -39712,13 +39717,15 @@
           "profile_id": 2309468,
           "name": "AiM | Whocl",
           "is_self": false,
-          "civilization": "Shu"
+          "civilization": "Shu",
+          "rating_before": 2596
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Wu"
+          "civilization": "Wu",
+          "rating_before": 2669
         }
       ],
       "analysis_status": "pending",
@@ -39746,13 +39753,15 @@
           "profile_id": 2309468,
           "name": "AiM | Whocl",
           "is_self": false,
-          "civilization": "Turks"
+          "civilization": "Turks",
+          "rating_before": 2610
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Lithuanians"
+          "civilization": "Lithuanians",
+          "rating_before": 2655
         }
       ],
       "analysis_status": "pending",
@@ -39780,19 +39789,25 @@
           "profile_id": 3216208,
           "name": "Dimo",
           "is_self": false,
-          "civilization": "Italians"
+          "civilization": "Italians",
+          "rating_before": 2517
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Khitans"
+          "civilization": "Khitans",
+          "rating_before": 2678
         }
       ],
       "analysis_status": "pending",
       "analysis": null,
       "attempts": 0,
-      "source_url": "https://www.aoe2insights.com/match/521489768/"
+      "source_url": "https://www.aoe2insights.com/match/521489768/",
+      "civ_choice": {
+        "3216208": true,
+        "1224481": true
+      }
     },
     {
       "id": 521478482,
@@ -39810,19 +39825,25 @@
           "profile_id": 251265,
           "name": "TAG_MbL_",
           "is_self": false,
-          "civilization": "Berbers"
+          "civilization": "Berbers",
+          "rating_before": 2942
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Armenians"
+          "civilization": "Armenians",
+          "rating_before": 2684
         }
       ],
       "analysis_status": "pending",
       "analysis": null,
       "attempts": 0,
-      "source_url": "https://www.aoe2insights.com/match/521478482/"
+      "source_url": "https://www.aoe2insights.com/match/521478482/",
+      "civ_choice": {
+        "251265": true,
+        "1224481": true
+      }
     },
     {
       "id": 521087583,
@@ -39840,13 +39861,15 @@
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Teutons"
+          "civilization": "Teutons",
+          "rating_before": 2666
         },
         {
           "profile_id": 2912198,
           "name": "Dennis哥",
           "is_self": false,
-          "civilization": "Maya"
+          "civilization": "Maya",
+          "rating_before": 2715
         }
       ],
       "analysis_status": "complete",
@@ -88728,7 +88751,11 @@
         }
       },
       "attempts": 1,
-      "source_url": "https://www.aoe2insights.com/match/521087583/"
+      "source_url": "https://www.aoe2insights.com/match/521087583/",
+      "civ_choice": {
+        "1224481": true,
+        "2912198": true
+      }
     },
     {
       "id": 521084500,
@@ -88746,13 +88773,15 @@
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Maya"
+          "civilization": "Maya",
+          "rating_before": 2670
         },
         {
           "profile_id": 506898,
           "name": "VIT Liereyy",
           "is_self": false,
-          "civilization": "Sicilians"
+          "civilization": "Sicilians",
+          "rating_before": 2995
         }
       ],
       "analysis_status": "complete",
@@ -119664,13 +119693,15 @@
           "profile_id": 506898,
           "name": "VIT Liereyy",
           "is_self": false,
-          "civilization": "Jurchens"
+          "civilization": "Jurchens",
+          "rating_before": 2991
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Khmer"
+          "civilization": "Khmer",
+          "rating_before": 2674
         }
       ],
       "analysis_status": "complete",
@@ -775030,13 +775061,15 @@
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Celts"
+          "civilization": "Celts",
+          "rating_before": 1543
         },
         {
           "profile_id": 1206772,
           "name": "GdR_Zasha",
           "is_self": false,
-          "civilization": "Khmer"
+          "civilization": "Khmer",
+          "rating_before": 1362
         }
       ],
       "analysis_status": "pending",
@@ -775060,13 +775093,15 @@
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Celts"
+          "civilization": "Celts",
+          "rating_before": 1539
         },
         {
           "profile_id": 1599520,
           "name": "GdR_HaLo",
           "is_self": false,
-          "civilization": "Khmer"
+          "civilization": "Khmer",
+          "rating_before": 1199
         }
       ],
       "analysis_status": "pending",
@@ -775090,13 +775125,15 @@
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Celts"
+          "civilization": "Celts",
+          "rating_before": 1535
         },
         {
           "profile_id": 1599520,
           "name": "GdR_HaLo",
           "is_self": false,
-          "civilization": "Celts"
+          "civilization": "Celts",
+          "rating_before": 1203
         }
       ],
       "analysis_status": "pending",
@@ -775120,13 +775157,15 @@
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Celts"
+          "civilization": "Celts",
+          "rating_before": 1527
         },
         {
           "profile_id": 1409412,
           "name": "GdR_Bozadam",
           "is_self": false,
-          "civilization": "Khmer"
+          "civilization": "Khmer",
+          "rating_before": 1340
         }
       ],
       "analysis_status": "pending",
@@ -775150,13 +775189,15 @@
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Celts"
+          "civilization": "Celts",
+          "rating_before": 1523
         },
         {
           "profile_id": 1599520,
           "name": "GdR_HaLo",
           "is_self": false,
-          "civilization": "Celts"
+          "civilization": "Celts",
+          "rating_before": 1207
         }
       ],
       "analysis_status": "pending",
@@ -775180,13 +775221,15 @@
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Celts"
+          "civilization": "Celts",
+          "rating_before": 1518
         },
         {
           "profile_id": 1599520,
           "name": "GdR_HaLo",
           "is_self": false,
-          "civilization": "Burmese"
+          "civilization": "Burmese",
+          "rating_before": 1212
         }
       ],
       "analysis_status": "pending",
@@ -775210,13 +775253,15 @@
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Celts"
+          "civilization": "Celts",
+          "rating_before": 1541
         },
         {
           "profile_id": 1433902,
           "name": "BerCioSilver",
           "is_self": false,
-          "civilization": "Ethiopians"
+          "civilization": "Ethiopians",
+          "rating_before": 1378
         }
       ],
       "analysis_status": "pending",
@@ -775240,13 +775285,15 @@
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Celts"
+          "civilization": "Celts",
+          "rating_before": 1531
         },
         {
           "profile_id": 1433902,
           "name": "BerCioSilver",
           "is_self": false,
-          "civilization": "Georgians"
+          "civilization": "Georgians",
+          "rating_before": 1388
         }
       ],
       "analysis_status": "pending",
@@ -775270,13 +775317,15 @@
           "profile_id": 9423131,
           "name": "wR.Lucho",
           "is_self": false,
-          "civilization": "Sicilians"
+          "civilization": "Sicilians",
+          "rating_before": 1628
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Japanese"
+          "civilization": "Japanese",
+          "rating_before": 1536
         }
       ],
       "analysis_status": "pending",
@@ -775300,13 +775349,15 @@
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Wei"
+          "civilization": "Wei",
+          "rating_before": 1488
         },
         {
           "profile_id": 182749,
           "name": "DS_Dragonstar",
           "is_self": false,
-          "civilization": "Wei"
+          "civilization": "Wei",
+          "rating_before": 1490
         }
       ],
       "analysis_status": "pending",
@@ -775330,13 +775381,15 @@
           "profile_id": 11440407,
           "name": "DS_Rodrixs",
           "is_self": false,
-          "civilization": "Wei"
+          "civilization": "Wei",
+          "rating_before": 1437
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Wei"
+          "civilization": "Wei",
+          "rating_before": 1507
         }
       ],
       "analysis_status": "pending",
@@ -775360,13 +775413,15 @@
           "profile_id": 2309468,
           "name": "AiM | Whocl",
           "is_self": false,
-          "civilization": "Mongols"
+          "civilization": "Mongols",
+          "rating_before": 1493
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Wei"
+          "civilization": "Wei",
+          "rating_before": 1524
         }
       ],
       "analysis_status": "pending",
@@ -775390,13 +775445,15 @@
           "profile_id": 2309468,
           "name": "AiM | Whocl",
           "is_self": false,
-          "civilization": "Mongols"
+          "civilization": "Mongols",
+          "rating_before": 1474
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Wei"
+          "civilization": "Wei",
+          "rating_before": 1543
         }
       ],
       "analysis_status": "pending",
@@ -775420,13 +775477,15 @@
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Magyars"
+          "civilization": "Magyars",
+          "rating_before": 1554
         },
         {
           "profile_id": 199170,
           "name": "Oni.dogao",
           "is_self": false,
-          "civilization": "Wei"
+          "civilization": "Wei",
+          "rating_before": 1669
         }
       ],
       "analysis_status": "pending",
@@ -775450,13 +775509,15 @@
           "profile_id": 2821779,
           "name": "DS_Pela",
           "is_self": false,
-          "civilization": "Koreans"
+          "civilization": "Koreans",
+          "rating_before": 1476
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Koreans"
+          "civilization": "Koreans",
+          "rating_before": 1541
         }
       ],
       "analysis_status": "pending",
@@ -775480,13 +775541,15 @@
           "profile_id": 3884287,
           "name": "DaddySt4rk",
           "is_self": false,
-          "civilization": "Wei"
+          "civilization": "Wei",
+          "rating_before": 1429
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Burgundians"
+          "civilization": "Burgundians",
+          "rating_before": 1563
         }
       ],
       "analysis_status": "pending",
@@ -775510,13 +775573,15 @@
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Magyars"
+          "civilization": "Magyars",
+          "rating_before": 1576
         },
         {
           "profile_id": 3176045,
           "name": "wR.Prisma",
           "is_self": false,
-          "civilization": "Khitans"
+          "civilization": "Khitans",
+          "rating_before": 1631
         }
       ],
       "analysis_status": "pending",
@@ -775540,13 +775605,15 @@
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Huns"
+          "civilization": "Huns",
+          "rating_before": 1591
         },
         {
           "profile_id": 3176045,
           "name": "wR.Prisma",
           "is_self": false,
-          "civilization": "Khitans"
+          "civilization": "Khitans",
+          "rating_before": 1616
         }
       ],
       "analysis_status": "pending",
@@ -775570,13 +775637,15 @@
           "profile_id": 9423131,
           "name": "wR.Lucho",
           "is_self": false,
-          "civilization": "Huns"
+          "civilization": "Huns",
+          "rating_before": 1639
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Huns"
+          "civilization": "Huns",
+          "rating_before": 1572
         }
       ],
       "analysis_status": "pending",
@@ -775600,13 +775669,15 @@
           "profile_id": 212721,
           "name": "TAG_Sitaux",
           "is_self": false,
-          "civilization": "Poles"
+          "civilization": "Poles",
+          "rating_before": 1872
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Jurchens"
+          "civilization": "Jurchens",
+          "rating_before": 1643
         }
       ],
       "analysis_status": "pending",
@@ -775630,13 +775701,15 @@
           "profile_id": 10311823,
           "name": "[2ZKA] falling_sky",
           "is_self": false,
-          "civilization": "Malay"
+          "civilization": "Malay",
+          "rating_before": 1679
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Hindustanis"
+          "civilization": "Hindustanis",
+          "rating_before": 1869
         }
       ],
       "analysis_status": "pending",
@@ -775660,13 +775733,15 @@
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Incas"
+          "civilization": "Incas",
+          "rating_before": 1620
         },
         {
           "profile_id": 666976,
           "name": "_Barles_",
           "is_self": false,
-          "civilization": "Romans"
+          "civilization": "Romans",
+          "rating_before": 1921
         }
       ],
       "analysis_status": "pending",
@@ -775690,13 +775765,15 @@
           "profile_id": 4221810,
           "name": "hK | Imfury_",
           "is_self": false,
-          "civilization": "Hindustanis"
+          "civilization": "Hindustanis",
+          "rating_before": 1504
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Britons"
+          "civilization": "Britons",
+          "rating_before": 1609
         }
       ],
       "analysis_status": "pending",
@@ -775720,13 +775797,15 @@
           "profile_id": 5188554,
           "name": "Lamo",
           "is_self": false,
-          "civilization": "Burmese"
+          "civilization": "Burmese",
+          "rating_before": 1420
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Ethiopians"
+          "civilization": "Ethiopians",
+          "rating_before": 1601
         }
       ],
       "analysis_status": "pending",
@@ -775750,13 +775829,15 @@
           "profile_id": 339835,
           "name": "DS_StonePleaseAoE",
           "is_self": false,
-          "civilization": "Maya"
+          "civilization": "Maya",
+          "rating_before": 1533
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Maya"
+          "civilization": "Maya",
+          "rating_before": 1587
         }
       ],
       "analysis_status": "pending",
@@ -775780,13 +775861,15 @@
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Goths"
+          "civilization": "Goths",
+          "rating_before": 1598
         },
         {
           "profile_id": 196310,
           "name": "F1Re",
           "is_self": false,
-          "civilization": "Bulgarians"
+          "civilization": "Bulgarians",
+          "rating_before": 1704
         }
       ],
       "analysis_status": "pending",
@@ -775810,13 +775893,15 @@
           "profile_id": 4412109,
           "name": "hK | HGB",
           "is_self": false,
-          "civilization": "Britons"
+          "civilization": "Britons",
+          "rating_before": 1522
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Burgundians"
+          "civilization": "Burgundians",
+          "rating_before": 1585
         }
       ],
       "analysis_status": "pending",
@@ -775840,13 +775925,15 @@
           "profile_id": 1835774,
           "name": "BSL | DOOMSTER",
           "is_self": false,
-          "civilization": "Magyars"
+          "civilization": "Magyars",
+          "rating_before": 1553
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Magyars"
+          "civilization": "Magyars",
+          "rating_before": 1603
         }
       ],
       "analysis_status": "pending",
@@ -775870,13 +775957,15 @@
           "profile_id": 1835774,
           "name": "BSL | DOOMSTER",
           "is_self": false,
-          "civilization": "Georgians"
+          "civilization": "Georgians",
+          "rating_before": 1568
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Magyars"
+          "civilization": "Magyars",
+          "rating_before": 1588
         }
       ],
       "analysis_status": "pending",
@@ -775900,13 +775989,15 @@
           "profile_id": 1835774,
           "name": "BSL | DOOMSTER",
           "is_self": false,
-          "civilization": "Cumans"
+          "civilization": "Cumans",
+          "rating_before": 1549
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Turks"
+          "civilization": "Turks",
+          "rating_before": 1607
         }
       ],
       "analysis_status": "pending",
@@ -775930,13 +776021,15 @@
           "profile_id": 1835774,
           "name": "BSL | DOOMSTER",
           "is_self": false,
-          "civilization": "Britons"
+          "civilization": "Britons",
+          "rating_before": 1564
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Vikings"
+          "civilization": "Vikings",
+          "rating_before": 1592
         }
       ],
       "analysis_status": "pending",
@@ -775960,13 +776053,15 @@
           "profile_id": 2626999,
           "name": "CQ.MaSSa_V",
           "is_self": false,
-          "civilization": "Incas"
+          "civilization": "Incas",
+          "rating_before": 1420
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Teutons"
+          "civilization": "Teutons",
+          "rating_before": 1650
         }
       ],
       "analysis_status": "pending",
@@ -775990,13 +776085,15 @@
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Armenians"
+          "civilization": "Armenians",
+          "rating_before": 1657
         },
         {
           "profile_id": 265517,
           "name": "Daniel",
           "is_self": false,
-          "civilization": "Magyars"
+          "civilization": "Magyars",
+          "rating_before": 1894
         }
       ],
       "analysis_status": "pending",
@@ -776020,13 +776117,15 @@
           "profile_id": 8657232,
           "name": "ड्रैगनस्टार",
           "is_self": false,
-          "civilization": "Sicilians"
+          "civilization": "Sicilians",
+          "rating_before": 1594
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Malians"
+          "civilization": "Malians",
+          "rating_before": 1643
         }
       ],
       "analysis_status": "pending",
@@ -776050,13 +776149,15 @@
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Tatars"
+          "civilization": "Tatars",
+          "rating_before": 1622
         },
         {
           "profile_id": 573282,
           "name": "NOC | Terz",
           "is_self": false,
-          "civilization": "Britons"
+          "civilization": "Britons",
+          "rating_before": 1738
         }
       ],
       "analysis_status": "pending",
@@ -776080,13 +776181,15 @@
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Teutons"
+          "civilization": "Teutons",
+          "rating_before": 1606
         },
         {
           "profile_id": 1038375,
           "name": "TheKroks",
           "is_self": false,
-          "civilization": "Turks"
+          "civilization": "Turks",
+          "rating_before": 1612
         }
       ],
       "analysis_status": "pending",
@@ -776110,13 +776213,15 @@
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Maya"
+          "civilization": "Maya",
+          "rating_before": 1594
         },
         {
           "profile_id": 283035,
           "name": "AVJack",
           "is_self": false,
-          "civilization": "Burgundians"
+          "civilization": "Burgundians",
+          "rating_before": 1507
         }
       ],
       "analysis_status": "pending",
@@ -776140,13 +776245,15 @@
           "profile_id": 429905,
           "name": "Lord Lee So Cacti",
           "is_self": false,
-          "civilization": "Tatars"
+          "civilization": "Tatars",
+          "rating_before": 1579
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Khmer"
+          "civilization": "Khmer",
+          "rating_before": 1587
         }
       ],
       "analysis_status": "pending",
@@ -776170,13 +776277,15 @@
           "profile_id": 663341,
           "name": "Kubiasty",
           "is_self": false,
-          "civilization": "Burmese"
+          "civilization": "Burmese",
+          "rating_before": 1479
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Malay"
+          "civilization": "Malay",
+          "rating_before": 1575
         }
       ],
       "analysis_status": "pending",
@@ -776200,13 +776309,15 @@
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Franks"
+          "civilization": "Franks",
+          "rating_before": 1568
         },
         {
           "profile_id": 757161,
           "name": "The O.G. Manbeast",
           "is_self": false,
-          "civilization": "Khmer"
+          "civilization": "Khmer",
+          "rating_before": 1355
         }
       ],
       "analysis_status": "pending",
@@ -776230,13 +776341,15 @@
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Portuguese"
+          "civilization": "Portuguese",
+          "rating_before": 1761
         },
         {
           "profile_id": 28853,
           "name": "Kukuro",
           "is_self": false,
-          "civilization": "Bengalis"
+          "civilization": "Bengalis",
+          "rating_before": 1000
         }
       ],
       "analysis_status": "pending",
@@ -776260,13 +776373,15 @@
           "profile_id": 3959103,
           "name": "FOREVER",
           "is_self": false,
-          "civilization": "Japanese"
+          "civilization": "Japanese",
+          "rating_before": 1704
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Cumans"
+          "civilization": "Cumans",
+          "rating_before": 1784
         }
       ],
       "analysis_status": "pending",
@@ -776290,13 +776405,15 @@
           "profile_id": 4191047,
           "name": "spaincalel",
           "is_self": false,
-          "civilization": "Chinese"
+          "civilization": "Chinese",
+          "rating_before": 1563
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Cumans"
+          "civilization": "Cumans",
+          "rating_before": 1777
         }
       ],
       "analysis_status": "pending",
@@ -776320,13 +776437,15 @@
           "profile_id": 295922,
           "name": "DOOF",
           "is_self": false,
-          "civilization": "Chinese"
+          "civilization": "Chinese",
+          "rating_before": 1601
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Bengalis"
+          "civilization": "Bengalis",
+          "rating_before": 1815
         }
       ],
       "analysis_status": "pending",
@@ -776350,13 +776469,15 @@
           "profile_id": 473462,
           "name": "Maldhar",
           "is_self": false,
-          "civilization": "Incas"
+          "civilization": "Incas",
+          "rating_before": 1772
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Incas"
+          "civilization": "Incas",
+          "rating_before": 1818
         }
       ],
       "analysis_status": "pending",
@@ -776380,13 +776501,15 @@
           "profile_id": 1900284,
           "name": "Raul_House",
           "is_self": false,
-          "civilization": "Malians"
+          "civilization": "Malians",
+          "rating_before": 1602
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Malians"
+          "civilization": "Malians",
+          "rating_before": 1811
         }
       ],
       "analysis_status": "pending",
@@ -776410,13 +776533,15 @@
           "profile_id": 3861402,
           "name": "Paul 2.0",
           "is_self": false,
-          "civilization": "Burmese"
+          "civilization": "Burmese",
+          "rating_before": 1000
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Burmese"
+          "civilization": "Burmese",
+          "rating_before": 1811
         }
       ],
       "analysis_status": "pending",
@@ -776440,13 +776565,15 @@
           "profile_id": 4449592,
           "name": "DedlyLeiti",
           "is_self": false,
-          "civilization": "Hindustanis"
+          "civilization": "Hindustanis",
+          "rating_before": 1749
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Hindustanis"
+          "civilization": "Hindustanis",
+          "rating_before": 1798
         }
       ],
       "analysis_status": "pending",
@@ -776470,13 +776597,15 @@
           "profile_id": 4471904,
           "name": "[uniK] HouSe",
           "is_self": false,
-          "civilization": "Chinese"
+          "civilization": "Chinese",
+          "rating_before": 1730
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Chinese"
+          "civilization": "Chinese",
+          "rating_before": 1785
         }
       ],
       "analysis_status": "pending",
@@ -776500,13 +776629,15 @@
           "profile_id": 1423393,
           "name": "Zodiac",
           "is_self": false,
-          "civilization": "Dravidians"
+          "civilization": "Dravidians",
+          "rating_before": 1716
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Lithuanians"
+          "civilization": "Lithuanians",
+          "rating_before": 1805
         }
       ],
       "analysis_status": "pending",
@@ -776530,13 +776661,15 @@
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Malay"
+          "civilization": "Malay",
+          "rating_before": 1817
         },
         {
           "profile_id": 5186718,
           "name": "Zaryab",
           "is_self": false,
-          "civilization": "Malay"
+          "civilization": "Malay",
+          "rating_before": 1905
         }
       ],
       "analysis_status": "pending",
@@ -776560,13 +776693,15 @@
           "profile_id": 3908799,
           "name": "Tiger",
           "is_self": false,
-          "civilization": "Celts"
+          "civilization": "Celts",
+          "rating_before": 1822
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Persians"
+          "civilization": "Persians",
+          "rating_before": 1934
         }
       ],
       "analysis_status": "pending",
@@ -776590,13 +776725,15 @@
           "profile_id": 3975647,
           "name": "ryan.asbra",
           "is_self": false,
-          "civilization": "Huns"
+          "civilization": "Huns",
+          "rating_before": 960
         },
         {
           "profile_id": 1224481,
           "name": "KASVA",
           "is_self": true,
-          "civilization": "Italians"
+          "civilization": "Italians",
+          "rating_before": 1000
         }
       ],
       "analysis_status": "pending",
