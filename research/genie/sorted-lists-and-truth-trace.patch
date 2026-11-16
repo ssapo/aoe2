@@ -6495,6 +6495,32 @@ index d65b2d84..ecf8ab20 100644
          let Some((target, master, owner, place)) = back else {
              return Ok(());
          };
+diff --git a/crates/engine/genie-core/src/orders/follow.rs b/crates/engine/genie-core/src/orders/follow.rs
+index dd70f0f4..fb1d1f2b 100644
+--- a/crates/engine/genie-core/src/orders/follow.rs
++++ b/crates/engine/genie-core/src/orders/follow.rs
+@@ -77,6 +77,9 @@ impl World {
+             id: target,
+             place: t.position().ground(),
+             class: (0.0 < tm.radius.x() || 0.0 < tm.radius.y()).then_some(tm.class),
++            reach: Distance::new(crate::math::fmath::sqrt(
++                tm.radius.y() * tm.radius.y() + tm.radius.x() * tm.radius.x(),
++            )),
+         };
+         let cap = if self.players.player(player)?.kind.is_computer() {
+             500
+@@ -277,6 +280,11 @@ impl World {
+                 .class
+                 .map_or((None, None), |c| (Some(followed.id), c.or_none()));
+             ai.set_target(t, class, Position::new(x, y, 0.0));
++            // 188329 (the loop of 0x16ea47d.., findings 125): the follow order 0x2c8 goes to the
++            // unit AI's slot 0x30 with the range sqrtf(ry² + rx²) of the target's master, which
++            // becomes the unit AI's desired distance (+0x5c) that its follow check (0xd31d50
++            // case 0xb) reads; 158041's left the default 2.0
++            ai.desired_distance = followed.reach;
+         }
+         Ok(())
+     }
 diff --git a/crates/engine/genie-core/src/orders/interact.rs b/crates/engine/genie-core/src/orders/interact.rs
 index 77933740..32fbb3c8 100644
 --- a/crates/engine/genie-core/src/orders/interact.rs
@@ -6511,7 +6537,7 @@ index 77933740..32fbb3c8 100644
                  self.groups.count_command();
                  let loose = loose?;
 diff --git a/crates/engine/genie-core/src/orders/mod.rs b/crates/engine/genie-core/src/orders/mod.rs
-index b97f7d35..cea3c9cd 100644
+index b97f7d35..50d4fa7f 100644
 --- a/crates/engine/genie-core/src/orders/mod.rs
 +++ b/crates/engine/genie-core/src/orders/mod.rs
 @@ -61,9 +61,11 @@ pub use self::order_flags::OrderFlags;
@@ -6559,7 +6585,17 @@ index b97f7d35..cea3c9cd 100644
      pub(crate) loose: Vec<ObjectId>,
      pub(crate) groups: Vec<Vec<ObjectId>>,
      /// The units a path from them did not join (`+0x3a48`, a `std::unordered_set` the splitter
-@@ -299,12 +320,6 @@ type SplitPath<'a> =
+@@ -289,6 +310,9 @@ struct Followed {
+     id: ObjectId,
+     place: Point,
+     class: Option<ClassId>,
++    /// 188329: `sqrtf(radius y² + radius x²)` of its master (`+0x5dc`, `+0x5d8`), the range the
++    /// FOLLOW order (0x2c8) hands the follower's unit AI (findings 125).
++    reach: Distance,
+ }
+ 
+ /// The splitter's path from one unit to another (`FUN_140f7cb30` -> `FUN_140f7c530`): the
+@@ -299,12 +323,6 @@ type SplitPath<'a> =
  /// The action's point on neither axis (`DAT_14330ec20`).
  const NO_POINT: f32 = GARRISON_NO_POINT;
  
@@ -9647,7 +9683,7 @@ index 6f60bbc2..9d9b867f 100644
          }
          at.unit(id)
 diff --git a/crates/engine/genie-core/src/unit_ai/retarget.rs b/crates/engine/genie-core/src/unit_ai/retarget.rs
-index 516e920b..02ac9264 100644
+index 516e920b..93e14d2f 100644
 --- a/crates/engine/genie-core/src/unit_ai/retarget.rs
 +++ b/crates/engine/genie-core/src/unit_ai/retarget.rs
 @@ -521,6 +521,9 @@ impl UnitAi {
@@ -9660,6 +9696,22 @@ index 516e920b..02ac9264 100644
          if !moved {
              return Ok(MiscEnd::GoesOn);
          }
+@@ -528,8 +531,13 @@ impl UnitAi {
+         let gap = footprint_gap_squared(at.position, at.size, target.position, target.radius);
+         let range = self.desired_distance;
+         if range.squared() < gap {
+-            let held = (target.state, target.class, target.position);
+-            self.move_to_object(id, held, range, side, rng)?;
++            // 188329 (0xd31d50 case 0xb, findings 125): not while the unit's top action is a
++            // MoveTo to this target already (unit slots 0x468, 0x470 == 1, 0x1a0 == target); the
++            // check still ends
++            if at.top_move_to != Some(id) {
++                let held = (target.state, target.class, target.position);
++                self.move_to_object(id, held, range, side, rng)?;
++            }
+             return Ok(MiscEnd::Ends);
+         }
+         Ok(MiscEnd::GoesOn)
 diff --git a/crates/engine/genie-core/src/unit_ai/side.rs b/crates/engine/genie-core/src/unit_ai/side.rs
 index 7fd24514..8c7a6bf6 100644
 --- a/crates/engine/genie-core/src/unit_ai/side.rs
@@ -9777,10 +9829,21 @@ index 7fd24514..8c7a6bf6 100644
      /// hold it (`FUN_1415417a0`).
      ///
 diff --git a/crates/engine/genie-core/src/unit_ai/surroundings.rs b/crates/engine/genie-core/src/unit_ai/surroundings.rs
-index 7cc2f5c9..4c63b8e5 100644
+index 7cc2f5c9..171f8944 100644
 --- a/crates/engine/genie-core/src/unit_ai/surroundings.rs
 +++ b/crates/engine/genie-core/src/unit_ai/surroundings.rs
-@@ -299,6 +299,11 @@ pub(super) struct LiveTop {
+@@ -250,6 +250,10 @@ pub struct Surroundings {
+     /// Slot 400 (`FUN_14106d090`): its top action's target (`FUN_140a78450`) as the world holds
+     /// it; None without one.
+     pub top_target: Option<TopTarget>,
++    /// 188329 slots 0x468, 0x470 and 0x1a0 (0x113c020: a head action; 0x113b590: its type;
++    /// 0x113bfd0: its target as the world holds it): the target of its top action when that
++    /// action is a `MoveTo` (type 1); None otherwise (findings 125).
++    pub top_move_to: Option<ObjectId>,
+     /// Slot 0x240 (`FUN_1410863c0`): its master's least range (`+0x850`).
+     pub min_range: Distance,
+     /// Where the unit last moved to (slot 0x520: `+0x824`), as the game's vector (x, height,
+@@ -299,6 +303,11 @@ pub(super) struct LiveTop {
  /// The idle part's group test (`0x140c67e8f`): no group, or one that is idle (`FUN_141017ad0`) of
  /// a unit that does not move (slot 0x5c8).
  pub(super) fn group_lets_idle(group: Option<GroupState>) -> bool {
@@ -9792,7 +9855,7 @@ index 7cc2f5c9..4c63b8e5 100644
      group.is_none_or(|g| g.contains(GroupState::IDLE) && !g.contains(GroupState::MEMBER_MOVING))
  }
  
-@@ -317,6 +322,13 @@ bitflags::bitflags! {
+@@ -317,6 +326,13 @@ bitflags::bitflags! {
          const MOVING = 1 << 3;
          /// The unit itself moves (its slot 0x5c8), which the idle part reads with the group.
          const MEMBER_MOVING = 1 << 4;
@@ -9806,7 +9869,7 @@ index 7cc2f5c9..4c63b8e5 100644
      }
  }
  
-@@ -359,6 +371,9 @@ pub struct UnitSeen {
+@@ -359,6 +375,9 @@ pub struct UnitSeen {
      /// The unit's owner counts its owner as its own or an ally (`FUN_141663d90` with the ally
      /// flag, [`crate::unit_ai::task_finder::allied`]).
      pub allied: bool,
@@ -10000,7 +10063,7 @@ index 4cc9cc71..b603cd5e 100644
      let (r, w) = hear(PlayerKind::Human, Vec::new());
      assert_eq!(r, Ok(GO_ON));
 diff --git a/crates/engine/genie-core/src/unit_ai/unit.rs b/crates/engine/genie-core/src/unit_ai/unit.rs
-index dc286d39..90819b3c 100644
+index dc286d39..121b60c5 100644
 --- a/crates/engine/genie-core/src/unit_ai/unit.rs
 +++ b/crates/engine/genie-core/src/unit_ai/unit.rs
 @@ -89,9 +89,13 @@ impl Unit {
@@ -10019,7 +10082,7 @@ index dc286d39..90819b3c 100644
          }
          if let Some((new, main)) = c.taken_over.take() {
              captured = Some(Captured {
-@@ -257,6 +261,7 @@ impl Unit {
+@@ -257,10 +261,15 @@ impl Unit {
                      GroupState::MEMBER_MOVING,
                      c.w.parts.mover_of(self.id).is_some_and(Mover::is_moving),
                  );
@@ -10027,7 +10090,15 @@ index dc286d39..90819b3c 100644
                  flags
              }),
              top_target: actions
-@@ -471,6 +476,7 @@ impl Unit {
+                 .top_target_seen(c, OthersRef::of(&c.w.players, &c.w.index, c.player)?)?,
++            top_move_to: (actions.top_action_kind() == Some(crate::movement::move_to::MOVE_TO))
++                .then(|| actions.top_target())
++                .flatten()
++                .filter(|&t| c.w.spatial.get(t).is_some()),
+             min_range: master.map_or(Distance::ZERO, |m| m.combat_part().min_range),
+             moved_at: c
+                 .w
+@@ -471,6 +480,7 @@ impl Unit {
          c: &mut Step<'_>,
          captured: Option<&Captured>,
          after: Option<AfterOrder>,
@@ -10035,7 +10106,7 @@ index dc286d39..90819b3c 100644
      ) -> Result<Option<AfterOrder>, GenieError> {
          let busy = actions.top_action_kind().is_some() || c.w.parts.unread.contains(self.id);
          // the unit's master: its own (a captured unit's copy), else its owner's
-@@ -483,7 +489,7 @@ impl Unit {
+@@ -483,7 +493,7 @@ impl Unit {
          let class = master.map(|ms| ms.class);
          // a captured unit's unit AI runs as its new owner's (RGE_Combat_Object::update reads the
          // owner then): on that player's turn, with its time as it stands
@@ -10044,7 +10115,7 @@ index dc286d39..90819b3c 100644
              Some(k) if k.main => (
                  (k.new == c.w.player_turn)
                      .then(|| c.w.player_time.get(k.new.index()).copied())
-@@ -495,13 +501,31 @@ impl Unit {
+@@ -495,13 +505,31 @@ impl Unit {
              ),
              _ => (c.turn, c.player, c.w.players.player(c.player)?.kind),
          };
@@ -10077,7 +10148,7 @@ index dc286d39..90819b3c 100644
          }
          if turn.is_some()
              && after.is_none()
-@@ -549,6 +573,7 @@ impl Unit {
+@@ -549,6 +577,7 @@ impl Unit {
                      .map_or(Speed::ZERO, |m| m.stats.speed),
              ),
          );
@@ -10085,7 +10156,7 @@ index dc286d39..90819b3c 100644
          self.with_side(
              actions,
              c,
-@@ -562,6 +587,10 @@ impl Unit {
+@@ -562,6 +591,10 @@ impl Unit {
                          .after_order(after, world_time, player_kind, &at, ai_stream, side)
                          .map(|()| None),
                      (Some(dt), None) => {
@@ -10096,7 +10167,7 @@ index dc286d39..90819b3c 100644
                          ai.update(dt, world_time, player_kind, &at, ai_stream, side)
                      }
                      (None, _) => ai
-@@ -656,6 +685,7 @@ impl Unit {
+@@ -656,6 +689,7 @@ impl Unit {
                      owner,
                      AllyTest::WithRelation4,
                  ),
@@ -10104,7 +10175,7 @@ index dc286d39..90819b3c 100644
              });
          }
          Ok(seen)
-@@ -691,3 +721,32 @@ impl Unit {
+@@ -691,3 +725,32 @@ impl Unit {
          Ok(())
      }
  }
