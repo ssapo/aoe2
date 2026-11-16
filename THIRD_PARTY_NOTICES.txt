@@ -46,3 +46,12 @@ in the file). Only the needed facts are stored; no game file is copied whole. Ga
 (c) Microsoft Corporation, used under Microsoft's "Game Content Usage Rules"; not endorsed by or
 affiliated with Microsoft. The data-file layout follows genieutils / genie-dat; the reader is an
 independent Python implementation.
+
+Unit and technology icons in site/assets/units/*.png and site/assets/techs/*.png
+Source: https://github.com/SiegeEngineers/aoe2techtree/tree/e56728e76b7d08301fba7b18d5f16bc8554c109a/img
+(commit "Implement DE Update 188329"), fetched by scripts/fetch_icons.py; only the icons the
+civilization matchup section can show. Game Icons (c) Hidden Path Entertainment, Forgotten Empires,
+SkyBox Labs, Ensemble Studios; Age of Empires II (c) Microsoft Corporation. Used under Microsoft's
+Game Content Usage Rules (https://www.xbox.com/en-us/developers/rules), like the civilization emblems
+above. This project is not endorsed by or affiliated with Microsoft. The aoe2techtree code license
+(MIT) does not cover the game artwork.

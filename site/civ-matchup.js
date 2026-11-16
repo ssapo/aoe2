@@ -4,7 +4,6 @@
   'use strict';
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const BUILDING_ORDER=[12,87,101,49,82,104];
-  const BUILDING_KO={12:'병영',87:'궁수 양성소',101:'마구간',49:'공성 무기 제조소',82:'성',104:'수도원'};
   const GROUP_KO={blacksmith:'대장간',university:'대학',monastery:'수도원',economy:'경제',military:'군사 건물',dock:'부두'};
   // lines left out of the attack-bonus comparison: not fighting units, or fighting only buildings
   const NON_COMBAT=new Set([125,440,331,1105]);
@@ -63,11 +62,15 @@
     return rows.sort((x,y)=>siege(x.target)-siege(y.target)||y.hits[0].total-x.hits[0].total);
   }
 
+  // castle unique lines and unique upgrades inside a common line (Imperial Skirmisher, Winged Hussar) only
+  // ever belong to one civ, so they are left out of the side-by-side line comparison
+  const isUniqueLine=(ref,root)=>node(ref,'u',root)?.type==='UniqueUnit'||buildingOf(ref,root)===82;
+  const commonChain=(ref,chain)=>chain.filter(id=>node(ref,'u',id)?.type!=='UniqueUnit');
   function compare(ref,mine,theirs){
     if(!ref?.civs?.[mine]||!ref?.civs?.[theirs])return null;
     const sides=[mine,theirs].map(name=>({name,civ:ref.civs[name],lines:linesOf(ref,name)}));
-    const byRoot=sides.map(s=>new Map(s.lines.map(l=>[l.root,l])));
-    const roots=[...new Set(sides.flatMap(s=>s.lines.map(l=>l.root)))];
+    const byRoot=sides.map(s=>new Map(s.lines.filter(l=>!isUniqueLine(ref,l.root)).map(l=>[l.root,lineStatus(s.civ,commonChain(ref,l.chain))])));
+    const roots=[...new Set(byRoot.flatMap(m=>[...m.keys()]))];
     const lines=sortLines(ref,roots.map(root=>{
       const a=byRoot[0].get(root)||{root,status:'none',final:null,missing:[],chain:[root]};
       const b=byRoot[1].get(root)||{root,status:'none',final:null,missing:[],chain:[root]};
@@ -129,68 +132,63 @@
     const smith=missingTechs(ref,theirs,'blacksmith').filter(t=>!missingKey.includes(t));
     return {threats,avoid,recommend,gaps:{lines:missingLines,tops:missingTops,techs:[...missingKey,...smith]}};
   }
-  // Korean particle by the last syllable's final consonant: josa('미늘창병','이','가') → '이'
-  const josa=(word,withFinal,without)=>{const c=String(word).trim().slice(-1).charCodeAt(0);return c>=0xAC00&&c<=0xD7A3&&(c-0xAC00)%28?withFinal:without;};
   const parts=(ref,h)=>h.parts.map(p=>`${className(ref,p.cls)} ${p.amount}`).join(', ');
-  function cardRow(cls,icon,title,main,reason,evidence){
-    const body=`<span class="mc-main">${main}</span>${reason?`<span class="mc-why">${reason}</span>`:''}`;
-    return `<div class="mc-row ${cls}"><span class="mc-icon" aria-hidden="true">${icon}</span><div class="mc-body"><span class="mc-title">${esc(title)}</span>`
-      +(evidence?`<details class="mc-evidence" title="${esc(evidence.replace(/<[^>]*>/g,''))}"><summary>${body}</summary><p>${evidence}</p></details>`:body)+'</div></div>';
+  const civLabel=(ref,name)=>(global.SSAPOCivNames&&global.SSAPOCivNames[name])||ref?.civs?.[name]?.name_ko||name;
+  const iconSrc=(ref,kind,id)=>{const n=node(ref,kind,id);return n?.icon!=null?`assets/${kind==='u'?'units':'techs'}/${n.icon}.png`:null;};
+  function statsLine(ref,id){
+    const s=ref?.unit_stats?.[String(id)];
+    if(!s)return '';
+    const attack=s.pierce_attack>s.melee_attack?`원거리 공격 ${s.pierce_attack}`:`근접 공격 ${s.melee_attack}`;
+    return `체력 ${s.hp} · ${attack} · 방어 ${s.melee_armour}/${s.pierce_armour}`;
   }
+  // One unit or tech as an icon; its name and evidence are in the tooltip (data-tip, shown on hover or tap).
+  // label: the short name next to the icon (summary card); crossed: the civ lacks it.
+  function icon(ref,kind,id,opts={}){
+    const name=kind==='u'?unitName(ref,id):techName(ref,id),tip=opts.tip||name,src=iconSrc(ref,kind,id);
+    return `<span class="mu${opts.crossed?' mu-x':''}" tabindex="0" role="img" aria-label="${esc(tip)}" data-tip="${esc(tip)}">`
+      +(src?`<img src="${src}" alt="" loading="lazy">`:`<span class="mu-fallback">${esc(name.slice(0,2))}</span>`)
+      +(opts.label?`<span class="mu-label">${esc(name)}</span>`:'')+'</span>';
+  }
+  // "→ [target icon] +18" (or "← [attacker icon] +18"): one attack bonus, its classes in the tooltip
+  function relation(ref,attacker,target,hit,arrow){
+    const tip=`${unitName(ref,attacker)} → ${unitName(ref,target)}\n타격당 보너스 +${hit.total} (${parts(ref,hit)})`;
+    const src=iconSrc(ref,'u',arrow==='←'?attacker:target);
+    return `<span class="mc-rel" tabindex="0" role="img" aria-label="${esc(tip)}" data-tip="${esc(tip)}">${arrow}${src?`<img src="${src}" alt="" loading="lazy">`:''}<b>+${hit.total}</b></span>`;
+  }
+  function unitTip(ref,id,hits){
+    const rows=[unitName(ref,id),statsLine(ref,id)];
+    if(hits?.length)rows.push(...hits.map(h=>`→ ${unitName(ref,h.target)} +${h.total} (${parts(ref,h)})`));
+    return rows.filter(Boolean).join('\n');
+  }
+  function cardRow(cls,mark,title,body){
+    return `<div class="mc-row ${cls}"><span class="mc-icon" aria-hidden="true">${mark}</span><div class="mc-body"><span class="mc-title">${esc(title)}</span>${body}</div></div>`;
+  }
+  const chips=items=>`<div class="mc-chips">${items.join('')}</div>`;
   function cardHtml(ref,mine,theirs){
     const s=summary(ref,mine,theirs);
     if(!s)return '';
-    const u=id=>esc(unitName(ref,id));
-    const threatLines=s.threats.map(t=>t.hits.length
-      ?`<li><b>${u(t.unit)}</b> — 내 ${u(t.hits[0].target)}에 +${t.hits[0].total} <small>(${esc(parts(ref,t.hits[0]))})</small></li>`
-      :`<li><b>${u(t.unit)}</b> — 고유 유닛 <small>(체력 ${ref.unit_stats?.[t.unit]?.hp??'?'}, 근접/원거리 방어 ${ref.unit_stats?.[t.unit]?.melee_armour??'?'}/${ref.unit_stats?.[t.unit]?.pierce_armour??'?'})</small></li>`).join('');
-    const threatEvidence=s.threats.map(t=>`${u(t.unit)}: ${t.hits.length?t.hits.map(h=>`${u(h.target)} +${h.total} (${esc(parts(ref,h))})`).join(', '):'내 주력 계열에 공격 보너스 없음'}`).join('<br>');
-    const avoid=s.avoid.length?cardRow('mc-avoid','!','피해야 할 병력 구성',s.avoid.map(a=>`${u(a.unit)} 단독`).join(' / '),
-      s.avoid.map(a=>`${u(a.by[0].unit)}${josa(unitName(ref,a.by[0].unit),'이','가')} ${u(a.unit)}에 +${a.by[0].total}`).join(', '),
-      s.avoid.map(a=>`${u(a.unit)} ← ${a.by.map(h=>`${u(h.unit)} +${h.total} (${esc(parts(ref,h))})`).join(', ')}`).join('<br>'))
-      :cardRow('mc-avoid','!','피해야 할 병력 구성','뚜렷한 것 없음','상대 위협 병종이 내 주력 계열에 공격 보너스가 없어요',null);
-    const threats=`<div class="mc-row mc-threat"><span class="mc-icon" aria-hidden="true">▲</span><div class="mc-body"><span class="mc-title">상대 핵심 위협</span>`
-      +(s.threats.length?`<details class="mc-evidence" title="${esc(threatEvidence.replace(/<[^>]*>/g,' '))}"><summary><ul class="mc-list">${threatLines}</ul></summary><p>${threatEvidence}</p></details>`:'<span class="mc-main">뚜렷한 것 없음</span>')+'</div></div>';
-    const recommend=s.recommend.length?cardRow('mc-counter','✓','추천 대응',s.recommend.map(r=>u(r.unit)).join(' + '),
-      s.recommend.map(r=>`${u(r.unit)}${josa(unitName(ref,r.unit),'은','는')} ${u(r.vs[0].target)} 상대 +${r.vs[0].total}`).join(', '),
-      s.recommend.map(r=>`${u(r.unit)}${r.full?'':' (최종 업그레이드 아님)'} → ${r.vs.map(h=>`${u(h.target)} +${h.total} (${esc(parts(ref,h))})`).join(', ')}`).join('<br>'))
-      :cardRow('mc-counter','✓','추천 대응','공격 보너스로 맞설 계열 없음','자세히의 상성 표 참고',null);
-    const g=s.gaps,items=[...g.lines.map(r=>`${u(r)} 계열 없음`),...g.tops.map(id=>`${u(id)} 없음`),...g.techs.map(t=>`${esc(techName(ref,t))} 없음`)];
-    const gaps=items.length?cardRow('mc-gap','i','상대 기술적 빈틈',items.slice(0,4).join(' · '),items.length>4?`외 ${items.length-4}개`:'',items.length>4?items.join(' · '):null)
-      :cardRow('mc-gap','i','상대 기술적 빈틈','주요 계열·기술 결손 없음','',null);
-    return `<div class="matchup-card"><div class="mc-head"><span class="mc-kicker">MATCHUP · ${esc(civLabel(ref,mine))}</span><strong class="mc-vs">VS ${esc(civLabel(ref,theirs))}</strong></div>${avoid}${threats}${recommend}${gaps}`
-      +'<p class="mc-note">공격 보너스 = 각 계열 최종 유닛 기본값(대장간·문명 보너스 제외), 타격당. 줄을 누르면 근거 수치.</p></div>';
+    const none=text=>`<span class="mc-none">${esc(text)}</span>`;
+    const avoid=s.avoid.length?chips(s.avoid.map(a=>`<span class="mc-chip">${icon(ref,'u',a.unit,{label:true,tip:[`${unitName(ref,a.unit)} 단독`,...a.by.map(h=>`← ${unitName(ref,h.unit)} +${h.total} (${parts(ref,h)})`)].join('\n')})}${relation(ref,a.by[0].unit,a.unit,a.by[0],'←')}</span>`)):none('뚜렷한 것 없음');
+    const threats=s.threats.length?chips(s.threats.map(t=>`<span class="mc-chip">${icon(ref,'u',t.unit,{label:true,tip:unitTip(ref,t.unit,t.hits)})}${t.hits.length?relation(ref,t.unit,t.hits[0].target,t.hits[0],'→'):'<span class="mc-rel-text">고유 유닛</span>'}</span>`)):none('뚜렷한 것 없음');
+    const recommend=s.recommend.length?chips(s.recommend.map(r=>`<span class="mc-chip">${icon(ref,'u',r.unit,{label:true,tip:unitTip(ref,r.unit,r.vs)+(r.full?'':'\n(최종 업그레이드 아님)')})}${relation(ref,r.unit,r.vs[0].target,r.vs[0],'→')}</span>`)):none('공격 보너스로 맞설 계열 없음');
+    const g=s.gaps;
+    const gapIcons=[...g.lines.map(r=>icon(ref,'u',r,{crossed:true,tip:`${unitName(ref,r)} 계열 없음`})),...g.tops.map(id=>icon(ref,'u',id,{crossed:true,tip:`${unitName(ref,id)} 없음`})),...g.techs.map(t=>icon(ref,'t',t,{crossed:true,tip:`${techName(ref,t)} 없음`}))];
+    return `<div class="matchup-card"><div class="mc-head"><span class="mc-kicker">MATCHUP · ${esc(civLabel(ref,mine))}</span><strong class="mc-vs">VS ${esc(civLabel(ref,theirs))}</strong></div>`
+      +cardRow('mc-avoid','!','피해야 할 단독 병력',avoid)
+      +cardRow('mc-threat','▲','상대 핵심 위협',threats)
+      +cardRow('mc-counter','✓','추천 대응',recommend)
+      +cardRow('mc-gap','i','상대 기술적 빈틈',gapIcons.length?`<div class="mc-icons">${gapIcons.join('')}</div>`:none('주요 계열·기술 결손 없음'))
+      +'<p class="mc-note">+숫자 = 타격당 공격 보너스, 각 계열 최종 유닛 기본값(대장간·문명 보너스 제외). 아이콘에 마우스를 올리거나 누르면 이름·근거.</p></div>';
   }
-
-  const civLabel=(ref,name)=>(global.SSAPOCivNames&&global.SSAPOCivNames[name])||ref?.civs?.[name]?.name_ko||name;
-  const bonusText=(ref,h)=>`${esc(unitName(ref,h.unit))} <b>+${h.total}</b><small>(${h.parts.map(p=>`${esc(className(ref,p.cls))} ${p.amount}`).join(', ')})</small>`;
-  function lineCell(ref,l){
-    if(l.final==null)return '<span class="matchup-none">없음</span>';
-    const missing=l.missing.filter(id=>id!==l.root);
-    return `${esc(unitName(ref,l.final))}${missing.length?` <small>(${missing.map(id=>esc(unitName(ref,id))).join(', ')} 없음)</small>`:''}`;
-  }
-  function edgeItem(ref,e){
-    return e.kind==='only'?`<li><b>${esc(unitName(ref,e.final))}</b> <small>${esc(BUILDING_KO[buildingOf(ref,e.root)]||'')} · 상대 기술표에 없음</small></li>`
-      :`<li><b>${esc(unitName(ref,e.final))}</b>까지 <small>상대는 ${esc(unitName(ref,e.otherFinal))}까지</small></li>`;
-  }
-  function sideHtml(ref,cmp,i,title){
-    const s=cmp.sides[i],own=i===0?'a':'b';
-    const gaps=cmp.lines.filter(l=>l[own].status==='partial'&&!NON_COMBAT.has(l.root)).map(l=>l[own]);
-    const techGaps=cmp.techs.filter(t=>t[own].length&&t.group!=='dock');
-    const unique=(s.civ.unique_techs||[]).map(t=>techName(ref,t));
-    return `<section class="signal-group matchup-side"><h3>${esc(title)} · ${esc(civLabel(ref,s.name))}</h3>`
-      +`<p class="matchup-label">상대에게 없는 병종·더 높은 최종 업그레이드 <span>${cmp.edges[i].length}</span></p>${cmp.edges[i].length?`<ul class="matchup-list">${cmp.edges[i].map(e=>edgeItem(ref,e)).join('')}</ul>`:'<p class="compact-note">없음</p>'}`
-      +`<p class="matchup-label">최종 업그레이드 결손</p>${gaps.length?`<ul class="matchup-list">${gaps.map(l=>`<li>${esc(unitName(ref,l.root))} 계열: ${esc(unitName(ref,l.final))}까지 <small>(${l.missing.map(id=>esc(unitName(ref,id))).join(', ')} 없음)</small></li>`).join('')}</ul>`:'<p class="compact-note">주요 병종 계열 결손 없음</p>'}`
-      +`<p class="matchup-label">기술 결손</p>${techGaps.length?`<ul class="matchup-list">${techGaps.map(t=>`<li>${esc(GROUP_KO[t.group]||t.group)}: ${t[own].map(id=>esc(techName(ref,id))).join(', ')}</li>`).join('')}</ul>`:'<p class="compact-note">대장간·대학·수도원·경제·군사 건물 기술 결손 없음</p>'}`
-      +(unique.length?`<p class="matchup-label">고유 기술</p><p class="matchup-text">${unique.map(esc).join(', ')}</p>`:'')
-      +`<details class="matchup-bonus"><summary>문명 보너스 (게임 문구)</summary>${(s.civ.description||[]).map(r=>r.startsWith('#')?`<b>${esc(r.slice(1))}</b>`:`<span>${esc(r)}</span>`).join('')}</details></section>`;
+  function chainCell(ref,l){
+    if(l.final==null)return '<span class="matchup-none">—</span>';
+    return `<span class="mu-chain">${l.chain.map(id=>icon(ref,'u',id,{crossed:l.missing.includes(id),tip:l.missing.includes(id)?`${unitName(ref,id)} 없음`:unitName(ref,id)})).join('')}</span>`;
   }
   function counterTable(ref,rows,targetTitle,attackerTitle){
     if(!rows.length)return '<p class="compact-note">공격 보너스가 있는 조합 없음</p>';
-    const row=r=>`<tr><th scope="row">${esc(unitName(ref,r.target))}</th><td>${r.hits.slice(0,3).map(h=>bonusText(ref,h)).join('<br>')}</td></tr>`;
-    const head=`<thead><tr><th scope="col">${esc(targetTitle)}</th><th scope="col">${esc(attackerTitle)} (타격당 보너스 피해)</th></tr></thead>`;
-    return `<div class="table-scroll"><table class="timeline comparison matchup-table">${head}<tbody>${rows.slice(0,6).map(row).join('')}</tbody></table></div>`
-      +(rows.length>6?`<details class="more-signals"><summary>${rows.length-6}개 더 보기</summary><div class="table-scroll"><table class="timeline comparison matchup-table">${head}<tbody>${rows.slice(6).map(row).join('')}</tbody></table></div></details>`:'');
+    const cell=(target,h)=>`<span class="mu-hit">${icon(ref,'u',h.unit,{tip:`${unitName(ref,h.unit)} → ${unitName(ref,target)}\n타격당 보너스 +${h.total} (${parts(ref,h)})`})}<b>+${h.total}</b></span>`;
+    return `<div class="table-scroll"><table class="timeline matchup-table matchup-grid"><thead><tr><th scope="col">${esc(targetTitle)}</th><th scope="col">${esc(attackerTitle)}</th></tr></thead><tbody>`
+      +rows.map(r=>`<tr><th scope="row">${icon(ref,'u',r.target,{tip:unitTip(ref,r.target)})}</th><td>${r.hits.map(h=>cell(r.target,h)).join('')}</td></tr>`).join('')+'</tbody></table></div>';
   }
   function html(ref,mine,theirs){
     const title='<div class="summary-label"><span id="civ-matchup-title">문명 매치업 및 전략 복기</span>'+(ref?.game_build?`<small>게임 빌드 ${esc(ref.game_build)} 기술표·유닛 데이터</small>`:'')+'</div>';
@@ -200,17 +198,48 @@
       return `<section class="civ-matchup" aria-labelledby="civ-matchup-title">${title}<p class="compact-note">${ref?`${esc(lacking.join(', '))}: 1v1 랭크 문명 기술표에 없는 문명이라 비교하지 않아요.`:'문명 기술표를 불러오지 못했어요.'}</p></section>`;
     }
     const names=[civLabel(ref,mine),civLabel(ref,theirs)];
-    const allLines=cmp.lines.filter(l=>l.a.final!=null||l.b.final!=null);
-    const diff=allLines.filter(l=>l.differs),same=allLines.filter(l=>!l.differs);
-    const lineRow=l=>`<tr><th scope="row">${esc(unitName(ref,l.root))} 계열</th><td>${lineCell(ref,l.a)}</td><td>${lineCell(ref,l.b)}</td></tr>`;
-    const lineHead=`<thead><tr><th scope="col">병종 계열</th><th scope="col">나 · ${esc(names[0])}</th><th scope="col">상대 · ${esc(names[1])}</th></tr></thead>`;
+    const head=`<thead><tr><th scope="col"></th><th scope="col">나 · ${esc(names[0])}</th><th scope="col">상대 · ${esc(names[1])}</th></tr></thead>`;
+    const diff=cmp.lines.filter(l=>l.differs&&(l.a.final!=null||l.b.final!=null));
+    const lineRows=diff.map(l=>`<tr><td>${chainCell(ref,l.a)}</td><td>${chainCell(ref,l.b)}</td></tr>`).join('');
+    const lineHead=`<thead><tr><th scope="col">나 · ${esc(names[0])}</th><th scope="col">상대 · ${esc(names[1])}</th></tr></thead>`;
+    const techRows=cmp.techs.filter(t=>t.group!=='dock'&&(t.a.length||t.b.length)).map(t=>`<tr><th scope="row">${esc(GROUP_KO[t.group]||t.group)}</th>${[t.a,t.b].map(ids=>`<td>${ids.length?`<span class="mu-chain">${ids.map(id=>icon(ref,'t',id,{crossed:true,tip:`${techName(ref,id)} 없음`})).join('')}</span>`:'<span class="matchup-none">—</span>'}</td>`).join('')}</tr>`).join('');
+    const bonus=cmp.sides.map((s,i)=>`<section class="matchup-bonus-side"><b>${i?'상대':'나'} · ${esc(names[i])}</b>${(s.civ.description||[]).map(r=>r.startsWith('#')?`<b>${esc(r.slice(1))}</b>`:`<span>${esc(r)}</span>`).join('')}</section>`).join('');
     return `<section class="civ-matchup" aria-labelledby="civ-matchup-title">${title}${cardHtml(ref,mine,theirs)}`
-      +`<details class="matchup-more"><summary>자세히 — 양측 결손·상성 표·문명 보너스</summary>`
-      +`<div class="signal-columns">${sideHtml(ref,cmp,0,'나')}${sideHtml(ref,cmp,1,'상대')}</div>`
-      +`<h4 class="matchup-heading">내 병종이 공격 보너스를 갖는 상대 병종</h4>${counterTable(ref,cmp.counters[0],`상대 · ${names[1]}`,`나 · ${names[0]}`)}`
-      +`<h4 class="matchup-heading">상대 병종이 공격 보너스를 갖는 내 병종</h4>${counterTable(ref,cmp.counters[1],`나 · ${names[0]}`,`상대 · ${names[1]}`)}`
-      +`<details class="matchup-lines"><summary>병종 계열 최종 단계 비교 (차이 ${diff.length}개)</summary><div class="table-scroll"><table class="timeline comparison matchup-table">${lineHead}<tbody>${diff.map(lineRow).join('')}</tbody></table></div>${same.length?`<p class="compact-note">양측 같음: ${same.map(l=>esc(unitName(ref,l.final??l.root))).join(', ')}</p>`:''}</details>`
-      +`<p class="compact-note">각 계열의 기술표상 최종 단계 유닛끼리, 게임 데이터의 방어 클래스별 공격 보너스(공격 − 상대 클래스 방어, 0 미만은 0)만 더했어요. 기본 공격·방어·체력·비용, 대장간·문명 보너스는 넣지 않았고, 이 경기에서 실제로 만든 병종(생산 명령이지 완료가 아님)과의 비교는 아직 하지 않아요.</p></details></section>`;
+      +`<details class="matchup-more"><summary>자세히 — 계열·기술 비교, 상성 수치, 문명 보너스</summary>`
+      +`<h4 class="matchup-heading">병종 계열이 다른 곳 <small>흐린 ✕ = 없음</small></h4>${lineRows?`<div class="table-scroll"><table class="timeline matchup-table matchup-grid matchup-lines">${lineHead}<tbody>${lineRows}</tbody></table></div>`:'<p class="compact-note">공통 병종 계열은 양측 같음</p>'}`
+      +`<h4 class="matchup-heading">기술 결손</h4>${techRows?`<div class="table-scroll"><table class="timeline matchup-table matchup-grid">${head}<tbody>${techRows}</tbody></table></div>`:'<p class="compact-note">양측 결손 없음</p>'}`
+      +`<h4 class="matchup-heading">상대 병종 ← 공격 보너스를 갖는 내 병종</h4>${counterTable(ref,cmp.counters[0],`상대 · ${names[1]}`,`나 · ${names[0]} (타격당)`)}`
+      +`<h4 class="matchup-heading">내 병종 ← 공격 보너스를 갖는 상대 병종</h4>${counterTable(ref,cmp.counters[1],`나 · ${names[0]}`,`상대 · ${names[1]} (타격당)`)}`
+      +`<details class="matchup-bonus"><summary>문명 보너스 (게임 문구)</summary><div class="matchup-bonus-grid">${bonus}</div></details>`
+      +`<p class="compact-note">각 계열의 최종 유닛끼리 방어 클래스별 공격 보너스(공격 − 상대 클래스 방어, 0 미만은 0)만 더한 값이에요. 기본 공격·방어·체력·비용, 대장간·문명 보너스는 넣지 않았고, 이 경기에서 실제로 만든 병종(생산 명령이지 완료가 아님)과의 비교는 아직 하지 않아요.</p></details></section>`;
+  }
+
+  // tooltip for [data-tip] inside the section: hover with a mouse, tap on a phone, focus with a keyboard
+  function installTips(){
+    if(typeof document==='undefined')return;
+    let box=null,anchor=null,pinned=false;
+    const hide=()=>{if(box){box.remove();box=null;anchor=null;pinned=false;}};
+    const show=el=>{
+      if(anchor===el)return;
+      hide();
+      box=document.createElement('div');box.className='mu-tip';box.setAttribute('role','tooltip');box.textContent=el.dataset.tip;
+      (el.closest('dialog')||document.body).appendChild(box);
+      const r=el.getBoundingClientRect();
+      box.style.maxWidth=Math.min(260,window.innerWidth-16)+'px';
+      const bw=box.offsetWidth,h=box.offsetHeight,left=Math.max(8,Math.min(r.left+r.width/2-bw/2,window.innerWidth-bw-8));
+      const top=r.bottom+6+h>window.innerHeight-8&&r.top-6-h>8?r.top-6-h:r.bottom+6;
+      box.style.left=left+'px';box.style.top=Math.max(8,top)+'px';anchor=el;
+    };
+    const tipOf=t=>t instanceof Element?t.closest('.civ-matchup [data-tip]'):null;
+    // a click pins the tip (a tap also fires mouseover first); a second click on a pinned tip closes it
+    document.addEventListener('click',e=>{const el=tipOf(e.target);if(el){if(anchor===el&&pinned)hide();else{show(el);pinned=true;}}else if(box)hide();});
+    if(typeof window.matchMedia==='function'&&window.matchMedia('(hover: hover)').matches){
+      document.addEventListener('mouseover',e=>{const el=tipOf(e.target);if(el)show(el);});
+      document.addEventListener('mouseout',e=>{if(anchor&&!pinned&&tipOf(e.target)===anchor&&!anchor.contains(e.relatedTarget))hide();});
+    }
+    document.addEventListener('keydown',e=>{if(e.key==='Escape')hide();});
+    window.addEventListener('scroll',hide,true);
+    window.addEventListener('resize',hide);
   }
 
   function load(fetchImpl){
@@ -235,5 +264,5 @@
     return `<section class="civ-matchup" data-civ-matchup="${esc(JSON.stringify([mine,theirs]))}"><div class="summary-label"><span>문명 매치업 및 전략 복기</span></div><p class="compact-note">문명 기술표를 불러오는 중…</p></section>`;
   }
   const api={lineStatus,bonusVs,compare,summary,html,mount,load};
-  if(typeof module==='object'&&module.exports)module.exports=api;else global.SSAPOCivMatchup=api;
+  if(typeof module==='object'&&module.exports)module.exports=api;else{global.SSAPOCivMatchup=api;installTips();}
 })(typeof window==='undefined'?globalThis:window);

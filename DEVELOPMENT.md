@@ -43,6 +43,11 @@ ssapo의 **AoE2: DE 1v1 경기 복기 웹앱**. 기본 계정 외에 이름 검�
   - **추천 대응**(초록): 내 계열 중 위협 병종들에게 주는 보너스 합이 0보다 큰 것, 완전 승급 먼저·합 큰 순 2~3개.
   - **상대 기술적 빈틈**(파랑): 상대에게 없는 핵심 계열(궁사·척후병·기마 궁사·총통병·민병·창병·정찰·기사·충차·망고넬·스콜피온·사석포), 최종 승급 결손, 핵심 기술(혈통·축산·엄지 반지·파르티아 병법·탄도학·화학·종자·방화·징병·공성 기술자)과 대장간 결손. 앞 4개만 보이고 나머지는 눌러서.
   - 줄마다 이유 한 줄은 수치에서 생성하고(조사 이/가·은/는은 받침으로), 근거 수치(대상별 보너스와 방어 클래스)는 줄을 누르면 펼쳐지고 마우스를 올리면 `title`로 보인다. 휴대폰(375px)에서 카드 높이 약 530px로 한 화면에 들어감.
+- **아이콘 위주로 손보기(11-16, 사용자 반응 "라탄 궁사는 당연히 없지 특수유닛인데… 중복에 중복 정보", "글로만 표현해 알아보기 힘들다")**:
+  - **당연한 정보 삭제**: 성 고유 유닛 계열과 공통 계열 안의 고유 승급(제국 척후병·윙드 후사르 등)은 계열 비교에서 뺀다(`isUniqueLine`, `commonChain`). "상대에게 없는 병종" 목록·고유 기술 목록·양측 결손 글 목록은 없앴다. 문명 보너스 게임 문구만 접어서 남김.
+  - **중복 정리**: 요약 카드가 결론, 「자세히」는 표·수치만 — 병종 계열이 다른 곳(양측 계열 아이콘 사슬, 없는 단계는 흐린 ✕), 기술 결손(대장간·대학·수도원·경제·군사 건물, ✕ 아이콘), 양방향 상성 표(대상 아이콘 | 공격 쪽 아이콘 +N), 문명 보너스.
+  - **아이콘**: 유닛·기술은 아이콘, 이름·체력/공격/방어·보너스 근거는 툴팁(`data-tip`; 마우스 올림, 휴대폰은 탭해서 고정·다시 탭하면 닫힘, `aria-label`에도 같은 글). 카드의 칩은 **PC에서 아이콘+이름**(폭이 넉넉하고 이름이 있어야 빨리 읽힘), **휴대폰 폭(≤600px)에서는 아이콘만**(이름까지 넣으면 칩이 한 줄에 하나씩 쌓여 카드가 641px로 한 화면을 넘음 → 아이콘만이면 약 500px). 「자세히」 표는 어느 폭에서나 아이콘만(행이 짧아짐). 빈틈 줄은 ✕ 아이콘을 다 보여 줘 "외 N개"가 없어짐.
+  - **아이콘 파일**: 기술표 JSON의 `Picture Index`를 `nodes[*].icon`에 저장하고, `scripts/fetch_icons.py`가 SiegeEngineers/aoe2techtree(문명 아이콘과 같은 출처, 빌드 188329 커밋 `e56728e`에 고정)의 `img/Unit|Tech/<번호>.png` 중 표가 쓰는 것만(유닛 205·기술 89, 약 0.75MB) `site/assets/units|techs/`에 받는다. 패치 후 `civ_reference.py` 다음에 다시 돌린다(있는 파일은 건너뜀). 게임 설치본 이미지는 쓰지 않음.
 - **데이터는 게임 파일에서만**: `scripts/civ_reference.py --build 188329`가 설치본(읽기만)의 `civilizations.json`·`CivTechTrees/*.json`·`empires2_x2_p1.dat`·`resources/ko/.../key-value-strings-utf8.txt`에서 필요한 사실만 뽑아 `site/data/civ-reference.json`에 쓴다. 문명은 1v1 랭크에 쓰이는 `era: base` 56개(크로니클 `antiquity` 제외), 키는 사이트 이름(`Maya`, `Hindustanis`). 기술표 `Node Status`가 `NotAvailable`이면 결손, 그 밖(`ResearchedCompleted`, 화학 등이 필요한 `ResearchRequired`)은 보유. 계열은 `Link ID` 사슬. 유닛 수치는 DAT의 문명 블록(문명마다 같음을 확인)에서 체력·기본 공격/방어·사거리·재장전·비용·방어 클래스별 공격/방어.
 - **DAT 읽기**: Python으로 직접 읽는다(새 의존성 없음). 형식은 genieutils / 엔진의 `genie-dat` `de` 모듈(VER 7.1~8.9)을 따랐고, 엔진 소스는 읽기만 했다. 기사 체력 100·공격 10·방어 2/2, 미늘창병 기병 보너스 32 등으로 확인. 형식이 바뀌면 `test_saved_table_matches_the_installed_game`(게임 설치 PC에서만)이 깨지거나 원본 해시가 달라져 건너뛴다 → 스크립트를 다시 돌린다.
 - **빌드 번호**: 실행 파일 버전(101.103.57257)에서 빌드 188329가 나오지 않아 `--build`로 받는다. 원본 세 파일의 SHA-256도 적어 패치 후 다른 파일인지 알 수 있다. 사이트는 `cache: 'no-cache'`로 받아 다시 만든 표를 바로 쓴다.
@@ -277,7 +282,7 @@ ssapo의 **AoE2: DE 1v1 경기 복기 웹앱**. 기본 계정 외에 이름 검�
 | `scripts/build_preview.py` | 보고서·CSS·JS를 포함한 HTML 미리보기 생성. 새 JS 추가 시 이 파일도 확인 |
 | `site/index.html` | 기본 화면·다이얼로그. CSS/JS 캐시 버전과 스크립트 순서 |
 | `site/app.js` | 목록, 문명 배지, 복기 화면, 필터, 타임라인, 재생 시계, 맵 연결 |
-| `site/civ-matchup.js`, `site/data/civ-reference.json`, `scripts/civ_reference.py` | 문명 매치업 섹션과 그 사실표·추출기. 패치마다 `--build`로 다시 만든다 |
+| `site/civ-matchup.js`, `site/data/civ-reference.json`, `scripts/civ_reference.py`, `scripts/fetch_icons.py`, `site/assets/units`·`techs` | 문명 매치업 섹션과 그 사실표·추출기·유닛/기술 아이콘. 패치마다 `--build`로 표를 다시 만든 뒤 아이콘을 받는다 |
 | `site/building-map.js` | 캔버스 지형 캐시·등각 좌표 변환·건설 요청 표시·본진 확대·선택. 브라우저에서는 `window.SSAPOBuildingMap`, Node에서는 모듈 export |
 | `site/collection-watch.js` | 수동 수집 후 상태 감시. 타이머와 네트워크를 주입할 수 있어 단위 검사 가능 |
 | `site/style.css` | 반응형 목록·모달·5탭·양측 비교·맵. 모바일 스타일 우선순위 주의 |

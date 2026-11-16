@@ -332,6 +332,8 @@ def build(game: Path, build_number: int) -> dict:
             meta = nodes_meta.setdefault(f"{'u' if is_unit else 't'}{n['Node ID']}", {
                 "name": n["Name"], "ko": ko(n.get("Name String ID")) or n["Name"],
                 "building": n.get("Building ID"), "age": n.get("Age ID"), "type": kind,
+                # icon file: site/assets/units|techs/<Picture Index>.png (scripts/fetch_icons.py)
+                "icon": n.get("Picture Index"),
             })
             if kind != meta["type"] and kind in ("UniqueUnit", "RegionalUnit"):
                 meta["type"] = kind

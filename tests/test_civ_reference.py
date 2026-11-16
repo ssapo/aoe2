@@ -78,6 +78,11 @@ class SavedReferenceTests(unittest.TestCase):
         self.assertEqual(nodes["t75"]["building"], 103)
         self.assertNotIn("\\n", json.dumps(nodes, ensure_ascii=False))
 
+    def test_every_node_has_an_icon_number(self):
+        nodes = self.data["nodes"]
+        self.assertTrue(all(isinstance(n.get("icon"), int) for n in nodes.values()))
+        self.assertTrue((root / "site" / "assets" / "units" / f"{nodes['u359']['icon']}.png").exists())
+
     def test_descriptions_come_from_game_strings(self):
         viet = self.data["civs"]["Vietnamese"]
         self.assertEqual(viet["description_string_id"], 120180)
