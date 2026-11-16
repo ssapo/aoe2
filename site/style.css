@@ -208,21 +208,24 @@ body.review-open{overflow:hidden}
 .timeline-history h3{font-size:13px;font-weight:600;margin:0 0 10px}
 .timeline-history{border-top:1px solid var(--border);padding-top:16px}
 #timeline-table .event-table thead{position:static}
-@media(max-width:700px){#building-map-host #building-map{max-height:29dvh}}
-/* Wide screens: the map stays beside the records while they scroll, as large as the column and the window allow. */
-@media(min-width:1100px){
- .timeline-workspace{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(360px,1fr);column-gap:20px;align-items:start}
- .timeline-dock,.timeline-workspace>.flow-overview{grid-column:1/-1}
- .timeline-stage{grid-column:1;grid-row:3/span 2;align-self:start;position:sticky;top:96px}
- .timeline-workspace>.flow-statistics{grid-column:2;grid-row:3;margin-top:14px}
- .timeline-history{grid-column:2;grid-row:4;margin-top:14px}
- #building-map-host #building-map{width:min(100%,calc((100dvh - 400px) * 1.7143));max-width:100%;max-height:none}
-}
+@media(max-width:700px){#building-map-host #building-map{width:100%}}
+/* Flow tab (2026-11-16 rework): controls and the field strip stay on top, the map fills what is left of the window,
+   the full order list is folded below. 470px = header, tabs, controls, field strip and the map toolbar. */
+#building-map-host #building-map{width:min(100%,calc(var(--map-room,calc(100dvh - 470px)) * 1.7143));max-width:100%;max-height:none}
+#match-dialog:has(.review-body.timeline-active) .review-header{display:none}
+.timeline-dock .field-time-hint{display:none}
+.timeline-dock .flow-overview .field-time-labels,.timeline-dock .flow-overview .field-time-lanes{grid-template-rows:repeat(3,14px);gap:3px}
+.timeline-dock .flow-overview .field-time-cursor{height:54px}
+.timeline-dock .flow-overview{margin:8px 0 0;padding:6px 10px}
+.timeline-stage{padding-top:12px}
+.field-lane-track{cursor:ew-resize;touch-action:none;user-select:none}
+details.timeline-history>summary{cursor:pointer;font-size:13px;font-weight:600;color:#3c553f;padding:4px 0}
+details.timeline-history[open]>summary{margin-bottom:10px}
 /* Map enlarged: only the replay controls and the map remain. */
-#match-dialog.map-full .review-header,#match-dialog.map-full .review-tabs,#match-dialog.map-full .review-footer,#match-dialog.map-full .timeline-workspace>.flow-overview,#match-dialog.map-full .flow-statistics,#match-dialog.map-full .timeline-history{display:none}
+#match-dialog.map-full .review-header,#match-dialog.map-full .review-tabs,#match-dialog.map-full .review-footer,#match-dialog.map-full .flow-statistics,#match-dialog.map-full .timeline-history{display:none}
 #match-dialog.map-full .timeline-workspace{display:block}
 #match-dialog.map-full .timeline-stage{position:static;padding-bottom:0}
-#match-dialog.map-full #building-map-host #building-map{width:min(100%,calc((100dvh - 230px) * 1.7143));max-width:100%;max-height:none}
+#match-dialog.map-full #building-map-host #building-map{width:min(100%,calc((100dvh - 330px) * 1.7143));max-width:100%;max-height:none}
 #building-map-host .map-expand{margin-left:auto;background:var(--replay-accent);color:#fff;border:1px solid transparent;border-radius:6px}
 #building-map-host .map-expand[aria-pressed=true]{background:#dfe6d9;color:#325039;border-color:#9aa98c}
 @media(max-width:600px){

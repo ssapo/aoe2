@@ -123,11 +123,11 @@
       <div class="timeline-dock" role="group" aria-label="기록 재생 조작">
         <div class="player-controls"><button id="record-play" aria-label="재생" title="재생" aria-pressed="false"><svg class="play-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5 20 12 9 19Z"/></svg><svg class="pause-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h4v14H7zm7 0h4v14h-4z"/></svg></button><button id="record-prev" aria-label="이전 기록으로">이전</button><button id="record-next" aria-label="다음 기록으로">다음</button><label>배속 <select id="record-speed"><option value="1">1×</option><option value="4">4×</option><option value="16" selected>16×</option><option value="64">64×</option></select></label><output id="record-clock" aria-label="현재 시간 / 전체 시간"></output></div>
         <input id="record-seek" type="range" min="0" step="0.01" value="0" aria-label="기록 재생 시간">
+        ${field?.total?renderFieldTimeline(field,analysis.duration_game_seconds):''}
       </div>
-      ${field?.total?renderFieldTimeline(field,analysis.duration_game_seconds):''}
       <div class="timeline-stage"><div id="building-map-host"></div></div>
       ${statistics?`<details class="flow-statistics"><summary>진영별 시간·비율</summary>${statistics}</details>`:''}
-      <section class="timeline-history" aria-labelledby="timeline-history-title"><h3 id="timeline-history-title">전체 기록</h3><div class="panel-toolbar"><div class="segments" role="group" aria-label="기록을 볼 선수"><button data-side="both" aria-pressed="true">양측</button><button data-side="mine" aria-pressed="false">나</button><button data-side="theirs" aria-pressed="false">상대</button></div><label class="select-label">명령<select id="timeline-kind"><option value="all">전체</option><option value="QUEUE">생산</option><option value="BUILD">건설</option><option value="RESEARCH">연구</option><option value="BUY">시장 구매</option><option value="SELL">시장 판매</option></select></label><label class="select-label">시간<select id="timeline-range"></select></label></div><div class="timeline-pagination"><span id="timeline-count" role="status"></span><div><button id="timeline-prev" aria-label="이전 명령 페이지">이전</button><span id="timeline-page"></span><button id="timeline-next" aria-label="다음 명령 페이지">다음</button></div></div><div id="timeline-table"></div></section>
+      <details class="timeline-history"><summary id="timeline-history-title">생산·건설·연구 명령 전체</summary><div class="panel-toolbar"><div class="segments" role="group" aria-label="기록을 볼 선수"><button data-side="both" aria-pressed="true">양측</button><button data-side="mine" aria-pressed="false">나</button><button data-side="theirs" aria-pressed="false">상대</button></div><label class="select-label">명령<select id="timeline-kind"><option value="all">전체</option><option value="QUEUE">생산</option><option value="BUILD">건설</option><option value="RESEARCH">연구</option><option value="BUY">시장 구매</option><option value="SELL">시장 판매</option></select></label><label class="select-label">시간<select id="timeline-range"></select></label></div><div class="timeline-pagination"><span id="timeline-count" role="status"></span><div><button id="timeline-prev" aria-label="이전 명령 페이지">이전</button><span id="timeline-page"></span><button id="timeline-next" aria-label="다음 명령 페이지">다음</button></div></div><div id="timeline-table"></div></details>
     </div>`;
   }
   function renderBasics(mine,theirs,other) {
@@ -215,6 +215,12 @@
       e.currentTarget.setAttribute('aria-pressed',String(on));e.currentTarget.textContent=on?'작게 보기':'크게 보기';
       const body=root.querySelector('.review-body');if(on&&body)body.scrollTop=0;
     });
+    // The map takes the height left under the sticky controls (measured, so it fits whatever the header and strip take).
+    const fitMap=()=>{const body=root.querySelector('.review-body'),dock=root.querySelector('.timeline-dock'),stage=root.querySelector('.timeline-stage');
+      if(!body||!dock||!stage||!body.clientHeight||!stage.style?.setProperty)return;
+      stage.style.setProperty('--map-room',`${Math.max(180,body.clientHeight-dock.offsetHeight-110)}px`);};
+    // the body changes size when the flow tab opens (the match header hides), so the observer also covers tab switches
+    fitMap();if(typeof ResizeObserver==='function'){const b=root.querySelector('.review-body');if(b)new ResizeObserver(fitMap).observe(b);}
     const mapPlayer=mapData?window.SSAPOBuildingMap.mount(root.querySelector('#building-map'),root.querySelector('#building-map-info'),mapData,events,label,fmtTime):null;
     root.querySelectorAll('[data-map-focus]').forEach(b=>b.addEventListener('click',()=>{
       root.querySelectorAll('[data-map-focus]').forEach(t=>t.setAttribute('aria-pressed',String(t===b)));
@@ -259,11 +265,20 @@
         fieldPlot.style.setProperty('--field-cursor',`${maximum?selected/maximum*100:0}%`);
       };
       seek.setAttribute('aria-describedby','field-time-hint');
-      root.querySelectorAll('[data-field-track]').forEach(track=>track.addEventListener('click',event=>{
+      const seekTo=(track,event)=>{
         const bounds=track.getBoundingClientRect();if(!bounds.width)return;
         const time=Math.round(Math.max(0,Math.min(1,(event.clientX-bounds.left)/bounds.width))*maximum);
         stop();cursor=Math.max(start,Math.min(end,time));drawPlayer();
-      }));
+      };
+      // Dragging on the strip moves the time with the pointer (mouse or touch), not only on release.
+      root.querySelectorAll('[data-field-track]').forEach(track=>{
+        let dragging=false;
+        track.addEventListener('click',event=>seekTo(track,event));
+        track.addEventListener('pointerdown',event=>{dragging=true;track.setPointerCapture?.(event.pointerId);seekTo(track,event);event.preventDefault?.();});
+        track.addEventListener('pointermove',event=>{if(dragging)seekTo(track,event);});
+        const release=event=>{dragging=false;track.releasePointerCapture?.(event.pointerId);};
+        track.addEventListener('pointerup',release);track.addEventListener('pointercancel',release);
+      });
       syncFieldClock(cursor);
     }
     const range=root.querySelector('#timeline-range');
