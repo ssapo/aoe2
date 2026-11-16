@@ -184,29 +184,42 @@
   // label: the short name next to the icon (summary card); crossed: the civ lacks it.
   function icon(ref,kind,id,opts={}){
     const name=kind==='u'?unitName(ref,id):techName(ref,id),tip=opts.tip||name,src=iconSrc(ref,kind,id);
-    return `<span class="mu${opts.crossed?' mu-x':''}" tabindex="0" role="img" aria-label="${esc(tip)}" data-tip="${esc(tip)}">`
+    return `<span class="mu${opts.crossed?' mu-x':''}${opts.side?` mu-${opts.side}`:''}" tabindex="0" role="img" aria-label="${esc(tip)}" data-tip="${esc(tip)}">`
       +(src?`<img src="${src}" alt="" loading="lazy">`:`<span class="mu-fallback">${esc(name.slice(0,2))}</span>`)
       +(opts.label?`<span class="mu-label">${esc(name)}</span>`:'')+'</span>';
   }
   const times=edge=>{const r=Math.pow(2,edge);return r>=10?"10+":r.toFixed(1);};
   const pairFigure=p=>`×${times(p.edge)}`;
   const sec=v=>`${Math.round(v*10)/10}초`;
-  function pairTip(ref,a,d,p){
-    return `${unitName(ref,a)} → ${unitName(ref,d)}
-타격당 피해 ${Math.round(p.dealt*10)/10}${p.bonus.parts.length?` (보너스 ${parts(ref,p.bonus)})`:''} · 받는 피해 ${Math.round(p.taken*10)/10}`
-      +`
-1:1 처치 시간 ${sec(p.aKills)} vs ${sec(p.dKills)}${p.approach?` (접근 ${sec(p.approach)} 포함)`:''}
-비용 ${unitCost(ref,a)} vs ${unitCost(ref,d)} → 같은 자원 기준 ×${times(p.edge)}`;
+  const SIDE_KO={mine:'내',theirs:'상대'};
+  const other=side=>side==='mine'?'theirs':'mine';
+  // Korean particle by the last syllable's final consonant: josa('미늘창병','은','는') → '은'
+  const josa=(word,withFinal,without)=>{const c=String(word).trim().slice(-1).charCodeAt(0);return c>=0xAC00&&c<=0xD7A3&&(c-0xAC00)%28?withFinal:without;};
+  const sided=(ref,id,side)=>`${SIDE_KO[side]} ${unitName(ref,id)}`;
+  // one line per bonus class: why the attacker's bonus lands on this target
+  function whyLines(ref,a,d,p,sideA){
+    const D=sided(ref,d,other(sideA)),A=sided(ref,a,sideA);
+    return p.bonus.parts.map(x=>`왜: ${D}${josa(unitName(ref,d),'은','는')} '${className(ref,x.cls)}' 방어 클래스를 가짐 → ${A}의 추가 피해 +${x.amount} 적용`);
   }
-  // "→ [target icon] ×2.6" (or "← [attacker icon] ×2.6"), evidence in the tooltip
-  function relation(ref,attacker,target,p,arrow){
-    const tip=pairTip(ref,attacker,target,p);
-    const src=iconSrc(ref,'u',arrow==='←'?attacker:target);
-    return `<span class="mc-rel" tabindex="0" role="img" aria-label="${esc(tip)}" data-tip="${esc(tip)}">${arrow}${src?`<img src="${src}" alt="" loading="lazy">`:''}<b>${esc(pairFigure(p))}</b></span>`;
+  function pairTip(ref,a,d,p,sideA){
+    return [`${sided(ref,a,sideA)} → ${sided(ref,d,other(sideA))}`,
+      `타격당 피해 ${Math.round(p.dealt*10)/10}${p.bonus.parts.length?` (추가 피해 ${parts(ref,p.bonus)} 포함)`:''} · 받는 피해 ${Math.round(p.taken*10)/10}`,
+      ...whyLines(ref,a,d,p,sideA),
+      `1:1로 잡는 시간: ${unitName(ref,a)} ${sec(p.aKills)} · ${unitName(ref,d)} ${sec(p.dKills)}${p.approach?` (근접 쪽 접근 ${sec(p.approach)} 포함)`:''}`,
+      `비용 ${unitCost(ref,a)} · ${unitCost(ref,d)} → 같은 자원이면 ${SIDE_KO[sideA]} 쪽이 ×${times(p.edge)} 유리`].join('\n');
   }
-  function unitTip(ref,id,rows,extra){
-    const out=[unitName(ref,id),statsLine(ref,id)];
-    for(const r of rows||[])if(r.edge>0)out.push(`→ ${unitName(ref,r.target)} ${pairFigure(r)}`);
+  const sideTag=side=>`<span class="mc-side mc-side-${side}">${SIDE_KO[side]}</span>`;
+  // "상대 [attacker] → 내 [target] ×2.4 기병": who beats whom, the side shown by tag and icon ring;
+  // labelled: which of the two icons carries its name (the unit the row is about)
+  function matchChip(ref,a,d,p,sideA,labelled,note){
+    const tip=pairTip(ref,a,d,p,sideA),top=p.bonus.parts[0];
+    const unit=(id,side,label)=>`${sideTag(side)}${icon(ref,'u',id,{side,label,tip:[sided(ref,id,side),statsLine(ref,id),label?note:''].filter(Boolean).join('\n')})}`;
+    return `<span class="mc-chip">${unit(a,sideA,labelled==='a')}<span class="mc-rel" tabindex="0" role="img" aria-label="${esc(tip)}" data-tip="${esc(tip)}">→</span>${unit(d,other(sideA),labelled==='d')}`
+      +`<span class="mc-rel" tabindex="0" role="img" aria-label="${esc(tip)}" data-tip="${esc(tip)}"><b>${esc(pairFigure(p))}</b>${top?`<small>${esc(className(ref,top.cls))}+${top.amount}</small>`:''}</span></span>`;
+  }
+  function unitTip(ref,id,side,rows,extra){
+    const out=[sided(ref,id,side),statsLine(ref,id)];
+    for(const r of rows||[])if(r.edge>0)out.push(`→ ${sided(ref,r.target,other(side))} ${pairFigure(r)}`);
     return out.concat(extra||[]).filter(Boolean).join('\n');
   }
   const boostText=b=>b?`문명 보너스: ${[...new Set(b.attrs.map(a=>ATTR_KO[a]).filter(Boolean))].join('·')}${b.sources.includes('unique')?' (고유 기술 포함)':''}`:'';
@@ -223,31 +236,40 @@
     const s=summary(ref,mine,theirs);
     if(!s)return '';
     const none=text=>`<span class="mc-none">${esc(text)}</span>`;
-    const avoid=s.avoid.length?chips(s.avoid.map(a=>`<span class="mc-chip">${icon(ref,'u',a.unit,{label:true,tip:[`${unitName(ref,a.unit)} 단독`,...a.by.map(p=>`← ${unitName(ref,p.unit)} ${pairFigure(p)}`),answerText(ref,a.answer)].join('\n')})}${relation(ref,a.by[0].unit,a.unit,a.by[0],'←')}</span>`)):none('상대 핵심 병종이 함께 앞서는 내 계열 없음');
+    // avoid: their threat → my line (named)
+    const avoid=s.avoid.length?chips(s.avoid.map(a=>matchChip(ref,a.by[0].unit,a.unit,a.by[0],'theirs','d'))):none('상대 핵심 병종이 함께 앞서는 내 계열 없음');
+    // threats: their unit (named) → my line it beats most
     const threats=s.threats.length?chips(s.threats.map(t=>{
-      const best=t.vs[0],tip=unitTip(ref,t.unit,t.vs,[t.unique?'고유 유닛':'',boostText(t.boost)]);
-      const tail=best&&best.edge>0?relation(ref,t.unit,best.target,best,'→'):`<span class="mc-rel-text">${esc(t.unique?'고유 유닛':boostText(t.boost))}</span>`;
-      return `<span class="mc-chip">${icon(ref,'u',t.unit,{label:true,tip})}${tail}</span>`;
+      const best=t.vs[0];
+      if(best&&best.edge>0)return matchChip(ref,t.unit,best.target,best,'theirs','a',[t.unique?'고유 유닛':'',boostText(t.boost)].filter(Boolean).join('\n'));
+      return `<span class="mc-chip">${sideTag('theirs')}${icon(ref,'u',t.unit,{side:'theirs',label:true,tip:unitTip(ref,t.unit,'theirs',t.vs,[t.unique?'고유 유닛':'',boostText(t.boost)])})}<span class="mc-rel-text">${esc(t.unique?'고유 유닛':boostText(t.boost))}</span></span>`;
     })):none('뚜렷한 것 없음');
-    const recommend=s.recommend.length?chips(s.recommend.map(r=>`<span class="mc-chip">${icon(ref,'u',r.unit,{label:true,tip:unitTip(ref,r.unit,r.vs,[r.full?'':'(최종 업그레이드 아님)',answerText(ref,r.answer)])})}${relation(ref,r.unit,r.vs[0].target,r.vs[0],'→')}</span>`)):none('상대 핵심 병종에 앞서는 계열 없음');
+    // recommend: my line (named) → their threat it beats most
+    const recommend=s.recommend.length?chips(s.recommend.map(r=>matchChip(ref,r.unit,r.vs[0].target,r.vs[0],'mine','a'))):none('상대 핵심 병종에 앞서는 계열 없음');
     const g=s.gaps;
-    const gapIcons=[...g.lines.map(r=>icon(ref,'u',r,{crossed:true,tip:`${unitName(ref,r)} 계열 없음`})),...g.tops.map(id=>icon(ref,'u',id,{crossed:true,tip:`${unitName(ref,id)} 없음`})),...g.techs.map(t=>icon(ref,'t',t,{crossed:true,tip:`${techName(ref,t)} 없음`}))];
-    return `<div class="matchup-card"><div class="mc-head"><span class="mc-kicker">MATCHUP · ${esc(civLabel(ref,mine))}</span><strong class="mc-vs">VS ${esc(civLabel(ref,theirs))}</strong></div>`
-      +cardRow('mc-avoid','!','피해야 할 단독 병력',avoid)
-      +cardRow('mc-threat','▲','상대 핵심 위협',threats)
-      +cardRow('mc-counter','✓','추천 대응',recommend)
+    const gapIcons=[...g.lines.map(r=>icon(ref,'u',r,{side:'theirs',crossed:true,tip:`상대: ${unitName(ref,r)} 계열 없음`})),...g.tops.map(id=>icon(ref,'u',id,{side:'theirs',crossed:true,tip:`상대: ${unitName(ref,id)} 없음`})),...g.techs.map(t=>icon(ref,'t',t,{side:'theirs',crossed:true,tip:`상대: ${techName(ref,t)} 없음`}))];
+    return `<div class="matchup-card"><div class="mc-head"><span class="mc-kicker">MATCHUP · ${esc(civLabel(ref,mine))}</span><strong class="mc-vs">VS ${esc(civLabel(ref,theirs))}</strong>`
+      +`<span class="mc-legend"><span class="mc-key mc-key-mine"></span>내 ${esc(civLabel(ref,mine))} <span class="mc-key mc-key-theirs"></span>상대 ${esc(civLabel(ref,theirs))}</span></div>`
+      +cardRow('mc-avoid','!','피해야 할 단독 병력 — 상대 → 내 계열',avoid)
+      +cardRow('mc-threat','▲','상대 핵심 위협 — 상대 → 내 계열',threats)
+      +cardRow('mc-counter','✓','추천 대응 — 내 → 상대 위협',recommend)
       +cardRow('mc-gap','i','상대 기술적 빈틈',gapIcons.length?`<div class="mc-icons">${gapIcons.join('')}</div>`:none('주요 계열·기술 결손 없음'))
-      +'<p class="mc-note">×숫자 = 같은 자원으로 싸울 때 기본 수치상 유리한 정도(1:1 처치 시간 × 비용, 원거리 상대는 다가가는 시간 포함). 각 계열 최종 유닛 기본값 — 대장간·문명 보너스 수치·컨트롤 제외. 아이콘을 누르면 근거.</p></div>';
+      +'<p class="mc-note">화살표는 이기는 쪽 → 지는 쪽. ×숫자 = 같은 자원으로 싸울 때 기본 수치상 유리한 정도(1:1 처치 시간 × 비용, 원거리 상대는 다가가는 시간 포함), 옆 글자는 가장 큰 추가 피해 클래스. 각 계열 최종 유닛 기본값 — 대장간·문명 보너스 수치·컨트롤 제외. 아이콘을 누르면 근거.</p></div>';
   }
-  function chainCell(ref,l){
+  function chainCell(ref,l,side){
     if(l.final==null)return '<span class="matchup-none">—</span>';
-    return `<span class="mu-chain">${l.chain.map(id=>icon(ref,'u',id,{crossed:l.missing.includes(id),tip:l.missing.includes(id)?`${unitName(ref,id)} 없음`:unitName(ref,id)})).join('')}</span>`;
+    return `<span class="mu-chain">${l.chain.map(id=>icon(ref,'u',id,{side,crossed:l.missing.includes(id),tip:`${SIDE_KO[side]} ${unitName(ref,id)}${l.missing.includes(id)?' 없음':''}`})).join('')}</span>`;
   }
-  function counterTable(ref,rows,targetTitle,attackerTitle){
+  // targetSide: whose units the rows are; the attackers are the other side
+  function counterTable(ref,rows,targetTitle,attackerTitle,targetSide){
     if(!rows.length)return '<p class="compact-note">공격 보너스가 있는 조합 없음</p>';
-    const cell=(target,h)=>`<span class="mu-hit">${icon(ref,'u',h.unit,{tip:`${unitName(ref,h.unit)} → ${unitName(ref,target)}\n타격당 보너스 +${h.total} (${parts(ref,h)})`})}<b>+${h.total}</b></span>`;
+    const attackerSide=other(targetSide);
+    const cell=(target,h)=>{
+      const why=h.parts.map(x=>`왜: ${sided(ref,target,targetSide)}${josa(unitName(ref,target),'은','는')} '${className(ref,x.cls)}' 방어 클래스를 가짐 → 추가 피해 +${x.amount}`);
+      return `<span class="mu-hit">${icon(ref,'u',h.unit,{side:attackerSide,tip:[`${sided(ref,h.unit,attackerSide)} → ${sided(ref,target,targetSide)}`,`타격당 추가 피해 +${h.total} (${parts(ref,h)})`,...why].join('\n')})}<b>+${h.total}</b></span>`;
+    };
     return `<div class="table-scroll"><table class="timeline matchup-table matchup-grid"><thead><tr><th scope="col">${esc(targetTitle)}</th><th scope="col">${esc(attackerTitle)}</th></tr></thead><tbody>`
-      +rows.map(r=>`<tr><th scope="row">${icon(ref,'u',r.target,{tip:unitTip(ref,r.target)})}</th><td>${r.hits.map(h=>cell(r.target,h)).join('')}</td></tr>`).join('')+'</tbody></table></div>';
+      +rows.map(r=>`<tr><th scope="row">${icon(ref,'u',r.target,{side:targetSide,tip:unitTip(ref,r.target,targetSide)})}</th><td>${r.hits.map(h=>cell(r.target,h)).join('')}</td></tr>`).join('')+'</tbody></table></div>';
   }
   function html(ref,mine,theirs){
     const title='<div class="summary-label"><span id="civ-matchup-title">문명 매치업 및 전략 복기</span>'+(ref?.game_build?`<small>게임 빌드 ${esc(ref.game_build)} 기술표·유닛 데이터</small>`:'')+'</div>';
@@ -259,16 +281,16 @@
     const names=[civLabel(ref,mine),civLabel(ref,theirs)];
     const head=`<thead><tr><th scope="col"></th><th scope="col">나 · ${esc(names[0])}</th><th scope="col">상대 · ${esc(names[1])}</th></tr></thead>`;
     const diff=cmp.lines.filter(l=>l.differs&&(l.a.final!=null||l.b.final!=null));
-    const lineRows=diff.map(l=>`<tr><td>${chainCell(ref,l.a)}</td><td>${chainCell(ref,l.b)}</td></tr>`).join('');
+    const lineRows=diff.map(l=>`<tr><td>${chainCell(ref,l.a,'mine')}</td><td>${chainCell(ref,l.b,'theirs')}</td></tr>`).join('');
     const lineHead=`<thead><tr><th scope="col">나 · ${esc(names[0])}</th><th scope="col">상대 · ${esc(names[1])}</th></tr></thead>`;
-    const techRows=cmp.techs.filter(t=>t.group!=='dock'&&(t.a.length||t.b.length)).map(t=>`<tr><th scope="row">${esc(GROUP_KO[t.group]||t.group)}</th>${[t.a,t.b].map(ids=>`<td>${ids.length?`<span class="mu-chain">${ids.map(id=>icon(ref,'t',id,{crossed:true,tip:`${techName(ref,id)} 없음`})).join('')}</span>`:'<span class="matchup-none">—</span>'}</td>`).join('')}</tr>`).join('');
+    const techRows=cmp.techs.filter(t=>t.group!=='dock'&&(t.a.length||t.b.length)).map(t=>`<tr><th scope="row">${esc(GROUP_KO[t.group]||t.group)}</th>${[t.a,t.b].map((ids,i)=>`<td>${ids.length?`<span class="mu-chain">${ids.map(id=>icon(ref,'t',id,{side:i?'theirs':'mine',crossed:true,tip:`${i?'상대':'나'}: ${techName(ref,id)} 없음`})).join('')}</span>`:'<span class="matchup-none">—</span>'}</td>`).join('')}</tr>`).join('');
     const bonus=cmp.sides.map((s,i)=>`<section class="matchup-bonus-side"><b>${i?'상대':'나'} · ${esc(names[i])}</b>${(s.civ.description||[]).map(r=>r.startsWith('#')?`<b>${esc(r.slice(1))}</b>`:`<span>${esc(r)}</span>`).join('')}</section>`).join('');
     return `<section class="civ-matchup" aria-labelledby="civ-matchup-title">${title}${cardHtml(ref,mine,theirs)}`
       +`<details class="matchup-more"><summary>자세히 — 계열·기술 비교, 상성 수치, 문명 보너스</summary>`
       +`<h4 class="matchup-heading">병종 계열이 다른 곳 <small>흐린 ✕ = 없음</small></h4>${lineRows?`<div class="table-scroll"><table class="timeline matchup-table matchup-grid matchup-lines">${lineHead}<tbody>${lineRows}</tbody></table></div>`:'<p class="compact-note">공통 병종 계열은 양측 같음</p>'}`
       +`<h4 class="matchup-heading">기술 결손</h4>${techRows?`<div class="table-scroll"><table class="timeline matchup-table matchup-grid">${head}<tbody>${techRows}</tbody></table></div>`:'<p class="compact-note">양측 결손 없음</p>'}`
-      +`<h4 class="matchup-heading">상대 병종 ← 공격 보너스를 갖는 내 병종</h4>${counterTable(ref,cmp.counters[0],`상대 · ${names[1]}`,`나 · ${names[0]} (타격당)`)}`
-      +`<h4 class="matchup-heading">내 병종 ← 공격 보너스를 갖는 상대 병종</h4>${counterTable(ref,cmp.counters[1],`나 · ${names[0]}`,`상대 · ${names[1]} (타격당)`)}`
+      +`<h4 class="matchup-heading">상대 병종 ← 공격 보너스를 갖는 내 병종</h4>${counterTable(ref,cmp.counters[0],`상대 · ${names[1]}`,`나 · ${names[0]} (타격당)`,'theirs')}`
+      +`<h4 class="matchup-heading">내 병종 ← 공격 보너스를 갖는 상대 병종</h4>${counterTable(ref,cmp.counters[1],`나 · ${names[0]}`,`상대 · ${names[1]} (타격당)`,'mine')}`
       +`<details class="matchup-bonus"><summary>문명 보너스 (게임 문구)</summary><div class="matchup-bonus-grid">${bonus}</div></details>`
       +`<p class="compact-note">각 계열의 최종 유닛끼리 방어 클래스별 공격 보너스(공격 − 상대 클래스 방어, 0 미만은 0)만 더한 값이에요. 기본 공격·방어·체력·비용, 대장간·문명 보너스는 넣지 않았고, 이 경기에서 실제로 만든 병종(생산 명령이지 완료가 아님)과의 비교는 아직 하지 않아요.</p></details></section>`;
   }

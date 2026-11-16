@@ -151,12 +151,18 @@ test('summary card html: four rows of icons, names and numbers in tooltips',()=>
   // halberdier chip: icon from the table's picture index, name next to it, the ×ratio with its evidence in the tooltip
   assert.ok(html.includes(`src="assets/units/${ref.nodes.u359.icon}.png"`));
   assert.ok(html.includes('<span class="mu-label">미늘창병</span>'));
-  assert.ok(html.includes('data-tip="미늘창병 → 후사르\n타격당 피해 38 (보너스 기병 32) · 받는 피해 7\n1:1 처치 시간 5.9초 vs 16.3초\n비용 60 vs 80 → 같은 자원 기준 ×3.7"'));
+  // the tooltip says whose unit is whose, why the bonus applies, and the 1-on-1 numbers
+  assert.ok(html.includes("data-tip=\"내 미늘창병 → 상대 후사르\n타격당 피해 38 (추가 피해 기병 32 포함) · 받는 피해 7\n왜: 상대 후사르는 &#39;기병&#39; 방어 클래스를 가짐 → 내 미늘창병의 추가 피해 +32 적용\n1:1로 잡는 시간: 미늘창병 5.9초 · 후사르 16.3초\n비용 60 · 80 → 같은 자원이면 내 쪽이 ×3.7 유리\""));
+  // every unit icon on the card carries its side (ring colour) and a side tag
+  const card=html.slice(html.indexOf('matchup-card'),html.indexOf('matchup-more'));
+  assert.ok(!/class="mu"/.test(card.replace(/class="mu mu-x mu-theirs"/g,'')));
+  assert.ok(card.includes('<span class="mc-side mc-side-theirs">상대</span>')&&card.includes('<span class="mc-side mc-side-mine">내</span>'));
+  assert.ok(card.includes('mc-legend'));
   // threats without a winning pair say why they are there (civ bonus from the game data)
   assert.ok(html.includes('문명 보너스: 공격 속도'));
   // gaps are crossed icons with the fact in the tooltip
-  assert.ok(html.includes('data-tip="총통병 계열 없음"'));
-  assert.ok(html.includes(`class="mu mu-x"`));
+  assert.ok(html.includes('data-tip="상대: 총통병 계열 없음"'));
+  assert.ok(html.includes(`class="mu mu-x mu-theirs"`));
   assert.ok(html.includes('대장간·문명 보너스 수치·컨트롤 제외'));
   assert.strictEqual(cm.summary(ref,'Spartans','Mongols'),null);
 });
@@ -179,4 +185,13 @@ test('every icon the section can show is in site/assets',()=>{
   for(const [k,n] of Object.entries(ref.nodes))if(k[0]==='t')used.add(`techs/${n.icon}.png`);
   const missing=[...used].filter(f=>!fs.existsSync(path.join(__dirname,'../site/assets',f)));
   assert.deepStrictEqual(missing,[]);
+});
+
+test('the camel case the user misread: their camel → my cavalry archer, and why it applies',()=>{
+  // Mongol Heavy Camel against Vietnamese Heavy Cavalry Archer: the cavalry archer has the cavalry armour class
+  const html=cm.html(ref,'Vietnamese','Mongols');
+  const tip="상대 중형 낙타 기병 → 내 중형 기마 궁사\n타격당 추가 피해 +18 (기병 18)\n왜: 내 중형 기마 궁사는 &#39;기병&#39; 방어 클래스를 가짐 → 추가 피해 +18";
+  assert.ok(html.includes(`data-tip="${tip}"`));
+  const i=html.indexOf(`data-tip="${tip}"`);
+  assert.ok(html.slice(html.lastIndexOf('<span class="mu',i),i).includes('mu-theirs'));
 });
