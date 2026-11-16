@@ -364,3 +364,77 @@ test('no timeline: no actual-army block, no "전체" tab',()=>{
   const html=cm.html(ref,'Franks','Bulgarians',ctx);
   assert.ok(!html.includes('data-age="all"')&&!html.includes('mc-army')&&!html.includes('mc-flow'));
 });
+// ── APP-19: one side had (almost) no army in an age ──
+const repeat=(from,step,n,label,amount=1)=>Array.from({length:n},(_,i)=>Q(from+i*step,label,amount));
+// Franks (me) vs Mongols, Castle Age from ~10 min to 25 min; Feudal from 0 to ~10 min
+const noArmy=(myArmy,theirArmy,extra={})=>{
+  const mine={...reached(400,600),full_timeline:[...repeat(20,25,20,'Villager'),...repeat(610,20,30,'Villager'),
+    {seconds:700,kind:'BUILD',label:'House'},{seconds:720,kind:'BUILD',label:'University'},R(800,'Wheelbarrow'),...myArmy].sort((a,b)=>a.seconds-b.seconds)};
+  const theirs={...reached(390,620),full_timeline:[...repeat(20,25,20,'Villager'),...theirArmy].sort((a,b)=>a.seconds-b.seconds)};
+  return {duration:1500,mine,theirs,...extra};
+};
+const castleKnights=[...repeat(700,30,11,'Knight'),...repeat(1210,20,4,'Light Cavalry')];
+test('APP-19 thresholds: me none, opponent none, both little, and two real armies are not a gap',()=>{
+  const view=(m,age=3)=>{const ctx=cm.context(m);const M=cm.armyModel(ref,['Franks','Mongols'],ctx.army);return cm.ageView(ref,M,age);};
+  const me=cm.armyGap(view(noArmy([],castleKnights)));
+  assert.strictEqual(me.kind,'mine');assert.deepStrictEqual(me.n,[0,15]);assert.ok(me.few);
+  assert.strictEqual(me.share[0],0);assert.ok(me.perMin[1]>0.9&&me.perMin[1]<1.1,String(me.perMin[1]));
+  // 2 commands is still "none"; 6 against 30 (under a quarter, 10 or fewer) is "short"; 8 against 30 is not
+  assert.strictEqual(cm.armyGap(view(noArmy(repeat(800,10,2,'Archer'),castleKnights))).kind,'mine');
+  const short=cm.armyGap(view(noArmy(repeat(800,10,6,'Archer'),[...castleKnights,...castleKnights.map(e=>({...e,seconds:e.seconds+5}))])));
+  assert.strictEqual(short.kind,'mine');assert.ok(!short.few);
+  assert.strictEqual(cm.armyGap(view(noArmy(repeat(800,10,8,'Archer'),[...castleKnights,...castleKnights.map(e=>({...e,seconds:e.seconds+5}))]))),null);
+  // a big army against a bigger one is two armies (pairs stay)
+  assert.strictEqual(cm.armyGap(view(noArmy(repeat(700,2,40,'Archer'),repeat(700,1,170,'Knight')))),null);
+  const them=cm.armyGap(view(noArmy(castleKnights.map(e=>({...e})),[Q(900,'Mangudai')])));
+  assert.strictEqual(them.kind,'theirs');assert.deepStrictEqual(them.n,[15,1]);
+  const both=cm.armyGap(view(noArmy([Q(900,'Archer')],[Q(950,'Mangudai'),Q(960,'Monk',3)])));
+  assert.strictEqual(both.kind,'both');assert.deepStrictEqual(both.n,[1,1]); // monks are not counted as army
+  // villagers, trade carts, fishing ships do not count; siege does
+  assert.strictEqual(cm.armyGap(view(noArmy([Q(900,'Trade Cart',4),Q(910,'Fishing Ship',5)],[...castleKnights,Q(900,'Battering Ram',2)]))).n.join(),'0,17');
+});
+test('APP-19 sentence and card: me none in the decided age leads the block and the flow; softened for a win',()=>{
+  const ctx=cm.context(noArmy([],castleKnights,{result:'loss'}));
+  assert.strictEqual(ctx.result,'loss');assert.strictEqual(ctx.open,3);
+  const M=cm.armyModel(ref,['Franks','Mongols'],ctx.army),V=cm.ageView(ref,M,3),g=cm.armyGap(V);
+  assert.strictEqual(cm.gapSentence(ref,V,g,true,'loss'),'성주시대(이 경기를 가른 시대)에 내 군사 생산 명령은 0, 상대는 기사 11·경기병 4 — 병력이 없던 게 가장 큰 패인으로 보여요');
+  assert.ok(cm.gapSentence(ref,V,g,true,'win').endsWith('병력이 거의 없었는데도 이긴 경기예요'));
+  assert.ok(!/패인/.test(cm.gapSentence(ref,V,g,true,'win'))&&!/패인/.test(cm.gapSentence(ref,V,g,true,undefined)));
+  assert.ok(cm.gapSentence(ref,V,g,false,'loss').endsWith('이 시대엔 상대만 병력을 모았어요'));
+  assert.strictEqual(cm.flowSentence(ref,M,3,'loss'),'성주시대 군사 생산 명령은 나 0 · 상대 15 — 내 생산은 주민 30·건물 2개 명령에 갔고, 병력이 없던 게 가장 큰 패인으로 보여요.');
+  assert.strictEqual(cm.flowSentence(ref,M,3,'win'),'성주시대 군사 생산 명령은 나 0 · 상대 15 — 병력이 거의 없었는데도 이긴 경기예요.');
+  assert.strictEqual(cm.flowSentence(ref,M,3),'성주시대 군사 생산 명령은 나 0 · 상대 15 — 내 생산은 주민 30·건물 2개 명령에 갔어요.');
+  const html=cm.html(ref,'Franks','Mongols',ctx);
+  const castle=html.slice(html.indexOf('data-age="3" aria-label'),html.indexOf('data-age="4" aria-label'));
+  assert.ok(castle.includes('mc-gapbox mc-gapbox-mine'));
+  assert.ok(castle.indexOf('mc-gapbox')<castle.indexOf('mc-prod-mine'),'the headline comes before the (folded) production rows');
+  assert.ok(castle.includes('첫 명령 11:40')&&castle.includes('주민 30')&&castle.includes('건물 2')&&castle.includes('연구 1'),castle.replace(/<[^>]+>/g,' ').slice(0,900));
+  assert.ok(castle.includes('이때 이걸 뽑았어야'));
+  assert.ok(!castle.includes('맞대어 봐요')&&!castle.includes('주력끼리 1:1'));
+  // the recommended units are mine and exist for Franks in Castle Age
+  const rec=cm.summary(ref,'Franks','Mongols',3,cm.madeByRoot(ref,'Mongols',ctx.made[3])).recommend;
+  assert.ok(rec.length>0);
+  const avail=new Set(cm.linesAt(ref,'Franks',3).map(l=>l.final));
+  for(const r of rec)assert.ok(avail.has(r.unit),String(r.unit));
+  assert.ok(html.includes('<p class="mc-flow"><b>흐름</b>성주시대 군사 생산 명령은 나 0 · 상대 15 — '));
+});
+test('APP-19 mirror and both: a short line, no empty pair section; two armies keep the pairs',()=>{
+  const ctx=cm.context(noArmy(castleKnights.map(e=>({...e})),[Q(900,'Mangudai')],{result:'win'}));
+  const html=cm.html(ref,'Franks','Mongols',ctx);
+  const castle=html.slice(html.indexOf('data-age="3" aria-label'),html.indexOf('data-age="4" aria-label'));
+  assert.ok(castle.includes('mc-gapbox mc-gapbox-theirs')&&castle.includes('상대는 병력이 거의 없었어요(군사 생산 명령 1, 내 쪽은 기사 11·경기병 4)'));
+  assert.ok(castle.includes('mc-prod-mine')&&!castle.includes('맞대어 봐요')&&!castle.includes('이때 이걸 뽑았어야'));
+  assert.ok(html.includes('<b>흐름</b>성주시대 군사 생산 명령은 나 15 · 상대 1 — 상대 병력이 거의 없던 시대예요.'));
+  const both=cm.html(ref,'Franks','Mongols',cm.context(noArmy([Q(900,'Archer')],[Q(950,'Mangudai')])));
+  assert.ok(both.includes('<b>흐름</b>성주시대엔 양쪽 모두 병력이 거의 없었어요(군사 생산 명령 나 1 · 상대 1).'));
+  // the APP-17 example keeps its pairs and its flow (no gap)
+  const fb=cm.context(franksBulgarians()),M=cm.armyModel(ref,['Franks','Bulgarians'],fb.army);
+  assert.strictEqual(cm.armyGap(cm.ageView(ref,M,3)),null);
+  assert.ok(cm.html(ref,'Franks','Bulgarians',fb).includes('주력끼리 1:1'));
+});
+test('APP-19 the match result reaches the card through context()',()=>{
+  assert.strictEqual(cm.context({duration:100,mine:{},theirs:{},result:'win'}).result,'win');
+  assert.strictEqual(cm.context({duration:100,mine:{},theirs:{},result:'unknown'})?.result,undefined);
+  const app=fs.readFileSync(path.join(__dirname,'../site/app.js'),'utf8');
+  assert.ok(app.includes('theirs:other?.metrics,result:m.result}'));
+});
