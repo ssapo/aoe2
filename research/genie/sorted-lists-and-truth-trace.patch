@@ -6495,8 +6495,23 @@ index d65b2d84..ecf8ab20 100644
          let Some((target, master, owner, place)) = back else {
              return Ok(());
          };
+diff --git a/crates/engine/genie-core/src/orders/interact.rs b/crates/engine/genie-core/src/orders/interact.rs
+index 77933740..32fbb3c8 100644
+--- a/crates/engine/genie-core/src/orders/interact.rs
++++ b/crates/engine/genie-core/src/orders/interact.rs
+@@ -328,8 +328,9 @@ impl World {
+                 return self.move_unit(player, id, &[], None, order);
+             }
+             _ => {
++                let queued = order.flags.contains(OrderFlags::QUEUED);
+                 let loose = self
+-                    .split(units, &|_| true, order.control)
++                    .split_aimed(units, &|_| true, order.control, None, queued)
+                     .and_then(|mut s| self.move_groups(&mut s, order).map(|()| s.loose));
+                 self.groups.count_command();
+                 let loose = loose?;
 diff --git a/crates/engine/genie-core/src/orders/mod.rs b/crates/engine/genie-core/src/orders/mod.rs
-index b97f7d35..2b4aa61d 100644
+index b97f7d35..cea3c9cd 100644
 --- a/crates/engine/genie-core/src/orders/mod.rs
 +++ b/crates/engine/genie-core/src/orders/mod.rs
 @@ -61,9 +61,11 @@ pub use self::order_flags::OrderFlags;
@@ -6531,17 +6546,20 @@ index b97f7d35..2b4aa61d 100644
  /// What a unit's slot 0x7e8 (`FUN_141227190`) is given through slot 0x128: the target, the point
  /// (x, y, z), the work command's carried-resource test and task filter, and the unit's `+0xa14`
  /// while it runs ([`OrderSource`]): only a direct order's new action's notify clears the unit
-@@ -263,6 +278,9 @@ pub(crate) struct Split {
+@@ -263,6 +278,12 @@ pub(crate) struct Split {
      /// The owner of the list's first unit (`DAT_143f11960`), whose groups a new group of the
      /// split joins; None for a list whose first unit is gone (the game's −1).
      pub(crate) owner: Option<PlayerId>,
 +    /// 188329: the order's target and whether it is queued, which the run splitter
 +    /// (0x10b4480) reads (`GENIE_EXPERIMENT_SPLITTARGET_188329`); None for an order without.
 +    pub(crate) aim: Option<(ObjectId, bool)>,
++    /// 188329: whether the order is queued, which the run splitter (0x10b4480's `param_6`)
++    /// reads to keep a lone member's group (MOVE's `+0x13`; false for the other callers).
++    pub(crate) queued: bool,
      pub(crate) loose: Vec<ObjectId>,
      pub(crate) groups: Vec<Vec<ObjectId>>,
      /// The units a path from them did not join (`+0x3a48`, a `std::unordered_set` the splitter
-@@ -299,12 +317,6 @@ type SplitPath<'a> =
+@@ -299,12 +320,6 @@ type SplitPath<'a> =
  /// The action's point on neither axis (`DAT_14330ec20`).
  const NO_POINT: f32 = GARRISON_NO_POINT;
  
@@ -6625,7 +6643,7 @@ index 29f5d776..5e243a42 100644
              ai.orders.clear();
          }
 diff --git a/crates/engine/genie-core/src/orders/split.rs b/crates/engine/genie-core/src/orders/split.rs
-index b8bda6ff..e0c5d943 100644
+index b8bda6ff..71c767ab 100644
 --- a/crates/engine/genie-core/src/orders/split.rs
 +++ b/crates/engine/genie-core/src/orders/split.rs
 @@ -3,6 +3,7 @@
@@ -6645,38 +6663,48 @@ index b8bda6ff..e0c5d943 100644
 +            .map(|t| (t, order.flags.contains(OrderFlags::QUEUED)));
          let loose = self
 -            .split(units, &|_| true, ControlKey::Up)
-+            .split_aimed(units, &|_| true, ControlKey::Up, aim)
++            .split_aimed(units, &|_| true, ControlKey::Up, aim, false)
              .and_then(|mut s| self.interact_groups(&mut s, order).map(|()| s.loose));
          self.groups.count_command();
          let loose = loose?;
-@@ -123,6 +127,18 @@ impl World {
+@@ -123,6 +127,20 @@ impl World {
          units: &[Option<ObjectId>],
          kept: &dyn Fn(ObjectId) -> bool,
          control: ControlKey,
 +    ) -> Result<Split, GenieError> {
-+        self.split_aimed(units, kept, control, None)
++        self.split_aimed(units, kept, control, None, false)
 +    }
 +
 +    /// [`World::split`] for an order with a target (`aim`: its id and whether it is queued),
-+    /// which 188329's run splitter reads ([`Split::aim`]).
++    /// which 188329's run splitter reads ([`Split::aim`]), and for a queued order (`queued`,
++    /// [`Split::queued`]).
 +    pub(crate) fn split_aimed(
 +        &mut self,
 +        units: &[Option<ObjectId>],
 +        kept: &dyn Fn(ObjectId) -> bool,
 +        control: ControlKey,
 +        aim: Option<(ObjectId, bool)>,
++        queued: bool,
      ) -> Result<Split, GenieError> {
          // FUN_140fd9ae0 splits only when the list's first unit exists (its owner): else no unit
          // takes the order
-@@ -141,6 +157,7 @@ impl World {
+@@ -141,6 +159,8 @@ impl World {
          }
          let mut split = Split {
              owner: Some(owner),
 +            aim,
++            queued,
              ..Split::default()
          };
          for run in sorted.chunks(60) {
-@@ -165,6 +182,48 @@ impl World {
+@@ -159,12 +179,54 @@ impl World {
+         split: &mut Split,
+     ) -> Result<(), GenieError> {
+         let left = self.splittables(run)?;
+-        let mut left = self.keep_world_groups(left, split)?;
++        let mut left = self.keep_world_groups(left, split, control)?;
+         let formations = self.players.player(owner)?.formations;
+         if !formations.auto {
              split.loose.extend(left.iter().map(|u| u.id));
              return Ok(());
          }
@@ -6725,7 +6753,35 @@ index b8bda6ff..e0c5d943 100644
          // units above type 69 of formation category 0 stay loose (the dock test FUN_141158210 is
          // 1 only on an `E` tile in game type 12)
          let (loose, rest): (Vec<Splittable>, Vec<Splittable>) = left
-@@ -438,3 +497,10 @@ pub(super) fn splits_together(
+@@ -293,11 +355,18 @@ impl World {
+ 
+     /// The units of `left` in a group the world holds go into `split` with the run's other
+     /// members of their group (`FUN_140fd76d0`: one alone is loose); the others are returned.
++    ///
++    /// 188329 (0x10b4480, 0x10b4690..0x10b4706; findings 124): a lone member keeps its group
++    /// when the splitter's `param_4` (MOVE's byte `+0x12`, the Ctrl key, `control`) is not 0, or
++    /// when the order is queued (`param_6`, [`Split::queued`]) and the unit is in a group
++    /// (`+0x210` not −1, so always here); only else it moves loose.
+     fn keep_world_groups(
+         &self,
+         left: Vec<Splittable>,
+         split: &mut Split,
++        control: ControlKey,
+     ) -> Result<Vec<Splittable>, GenieError> {
++        let keep_alone = control.is_held() || split.queued;
+         // the units in a group the world holds, with the order's other members of their group
+         let mut taken = vec![false; left.len()];
+         for (i, first) in left.iter().enumerate() {
+@@ -316,7 +385,7 @@ impl World {
+                 }
+             }
+             match members[..] {
+-                [alone] => split.loose.push(alone),
++                [alone] if !keep_alone => split.loose.push(alone),
+                 _ => split.keep(members),
+             }
+         }
+@@ -438,3 +507,10 @@ pub(super) fn splits_together(
      }
      Ok(at_most_or_unordered(d, f.influence.get()))
  }
