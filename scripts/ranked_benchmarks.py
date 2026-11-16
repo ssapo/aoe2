@@ -142,21 +142,36 @@ def observation(match, analysis, side, player, rating):
             'ages': ages, 'checkpoints': checkpoints, **({'food': food} if food else {})}
 
 
+def rating_for(match, player, current):
+    """Rating going into the match, and where it came from: 'match' (the API's `oldrating` kept on the
+    row: `rating_before` for the recording player, `players[].rating_before` for anyone) or, when the
+    row holds none, 'current' (the ranking file's rating when it was built). Never mixed within a value."""
+    before = match.get('rating_before') if player.get('is_self') else player.get('rating_before')
+    if finite(before) and before > 0:
+        return before, 'match'
+    now = current.get(player['profile_id'])
+    return (now, 'current') if finite(now) else (None, None)
+
+
 def build(reports, index, now=None, existing=None):
     now = now or datetime.now(timezone.utc)
     cutoff = now-timedelta(days=30)
-    ranked = {p['id']: p for p in index.get('players', []) if finite(p.get('rating')) and p['rating'] >= MIN_RATING}
+    current = {p['id']: p['rating'] for p in index.get('players', []) if finite(p.get('rating'))}
     samples = {}
     # Keep compact observations when a source report rolls out of its history.
     # Recheck eligibility and age on every build; newly parsed rows replace old ones.
-    if (existing or {}).get('method_revision') in (1, 2, 3):
+    if (existing or {}).get('method_revision') in (1, 2, 3, 4):
         for row in existing.get('samples', []):
             try:
                 started = datetime.fromisoformat(row['started_at'])
-                if row['profile_id'] in ranked and cutoff <= started <= now:
+                # A rating taken from the match itself stays as stored; older rows only know the
+                # ranking file's rating of the day they were built, so they follow the current one.
+                matched = row.get('rating_basis') == 'match'
+                rating = row['rating'] if matched else current.get(row['profile_id'])
+                if finite(rating) and rating >= MIN_RATING and cutoff <= started <= now:
                     # v1 resource/age calculations are unchanged; only discard the old first-unit classification.
                     # v2 rows simply lack `food` (engine food by source, added in v3).
-                    kept = {**row, 'rating': ranked[row['profile_id']]['rating']}
+                    kept = {**row, 'rating': rating, 'rating_basis': 'match' if matched else 'current'}
                     if existing.get('method_revision') == 1:
                         kept.update(opening=None, opening_label=None)
                     samples[(row['match_id'], row['profile_id'])] = kept
@@ -180,14 +195,16 @@ def build(reports, index, now=None, existing=None):
                 continue
             for side, player in enumerate((own[0], other[0])):
                 pid = player['profile_id']
-                if pid not in ranked:
+                rating, basis = rating_for(match, player, current)
+                if rating is None or rating < MIN_RATING:
                     continue
-                row = observation(match, analysis, side, player, ranked[pid]['rating'])
+                row = observation(match, analysis, side, player, rating)
                 if row:
+                    row['rating_basis'] = basis
                     row['started_at'] = started.isoformat()
                     row['recording_profile_id'] = report['profile']['id']
                     samples[(match['id'], pid)] = row
-    return {'schema_version': 1, 'method_revision': 3, 'generated_at': now.isoformat(), 'ranking_updated_at': index.get('updated_at'),
+    return {'schema_version': 1, 'method_revision': 4, 'generated_at': now.isoformat(), 'ranking_updated_at': index.get('updated_at'),
             'min_rating': MIN_RATING, 'days': 30,
             'samples': sorted(samples.values(), key=lambda r: (r['started_at'], r['match_id'], r['profile_id']), reverse=True)}
 

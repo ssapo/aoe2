@@ -105,6 +105,7 @@ class CollectorTests(unittest.TestCase):
         row=collect.metadata(match,222,{})
         self.assertEqual(row['civilization'],'Britons')
         self.assertEqual([(p['is_self'],p['civilization']) for p in row['players']],[(False,'Hindustanis'),(True,'Britons')])
+        self.assertEqual([p.get('rating_before') for p in row['players']],[None,1000])
         del match['matchhistorymember']
         self.assertEqual(collect.metadata(match,222,{})['civilization'],'Armenians')
 

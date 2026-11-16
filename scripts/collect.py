@@ -434,6 +434,8 @@ def metadata(match, own_id, aliases):
     rating = next((p for p in members if int(p['profile_id']) == own_id), {})
     result = {1: 'win', 0: 'loss'}.get(own.get('resulttype'), 'unknown')
     civs = api_civilizations(match)
+    start = {int(p['profile_id']): p['oldrating'] for p in members
+             if isinstance(p.get('oldrating'), (int, float)) and not isinstance(p['oldrating'], bool) and p['oldrating'] > 0}
     return {
         'id': int(match['id']), 'started_at': match.get('startgametime'),
         'finished_at': match.get('completiontime'),
@@ -442,7 +444,9 @@ def metadata(match, own_id, aliases):
         'result': result, 'rating_before': rating.get('oldrating'), 'rating_after': rating.get('newrating'),
         'match_type_id': match.get('matchtype_id'), 'players_count': len(results),
         'players': [{'profile_id': p['profile_id'], 'name': aliases.get(p['profile_id'], str(p['profile_id'])),
-                     'is_self': int(p['profile_id']) == own_id, 'civilization': civilization_name(civs.get(int(p['profile_id'])))} for p in results],
+                     'is_self': int(p['profile_id']) == own_id, 'civilization': civilization_name(civs.get(int(p['profile_id'])))}
+                    # Rating going into this match (API `oldrating`), only when the API gave one.
+                    | ({'rating_before': start[int(p['profile_id'])]} if int(p['profile_id']) in start else {}) for p in results],
         'analysis_status': 'pending', 'analysis': None, 'attempts': 0,
         'source_url': f'https://www.aoe2insights.com/match/{int(match["id"])}/',
     }

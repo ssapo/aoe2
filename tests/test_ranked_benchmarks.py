@@ -90,7 +90,7 @@ class FoodSampleTests(unittest.TestCase):
                               'engine_income': self.engine(130, [5, 0, 0, 0, 0, 0, 0, 0, 0], [7, 0, 0, 0, 0, 0, 0, 0, 0])}}
         index = {'players': [{'id': 1, 'rating': 2500}, {'id': 2, 'rating': 2400}]}
         result = build([{'profile': {'id': 1}, 'matches': [match]}], index, now)
-        self.assertEqual(result['method_revision'], 3)
+        self.assertEqual(result['method_revision'], 4)
         rows = {r['profile_id']: r for r in result['samples']}
         self.assertEqual(rows[1]['food']['at']['120'], [5, 0, 0, 0, 0])
         self.assertEqual(rows[2]['food']['at']['120'], [7, 0, 0, 0, 0])
@@ -101,3 +101,26 @@ class FoodSampleTests(unittest.TestCase):
         self.assertEqual(len(build([], index, now, existing=older)['samples']), 2)
         no_engine = copy.deepcopy(match); no_engine['analysis'].pop('engine_income')
         self.assertTrue(all('food' not in r for r in build([{'profile': {'id': 1}, 'matches': [no_engine]}], index, now)['samples']))
+
+    def test_rating_at_match_time_decides_eligibility(self):
+        now = datetime(2026, 11, 7, tzinfo=timezone.utc)
+        metrics = {'full_timeline': [], 'age_checkpoints': {'봉건': {'reached_seconds': 500}}}
+        summary = {'available': True, 'opening': 'scouts', 'opening_label': '스카웃', 'checkpoints': []}
+        def match(**own):
+            return {'id': 1, 'started_at': now.timestamp(), 'match_type_id': 6, 'players_count': 2, 'map': 'Arabia', **own,
+                    'players': [{'profile_id': 1, 'name': 'A', 'is_self': True}, {'profile_id': 2, 'name': 'B', 'is_self': False, 'rating_before': 2100}],
+                    'analysis': {'metrics': metrics, 'civilization': 'Franks', 'opponents': [{'metrics': metrics, 'civilization': 'Celts'}],
+                                 'review': {'own': summary, 'opponent': summary}, 'duration_game_seconds': 900}}
+        # Now above 2000 but only 1900 in the match: out. Now below 2000 but 2100 then: in. Opponent's own rating_before is used.
+        index = {'players': [{'id': 1, 'rating': 2500}, {'id': 2, 'rating': 1500}]}
+        rows = {r['profile_id']: r for r in build([{'profile': {'id': 1}, 'matches': [match(rating_before=1900)]}], index, now)['samples']}
+        self.assertEqual(list(rows), [2])
+        self.assertEqual((rows[2]['rating'], rows[2]['rating_basis']), (2100, 'match'))
+        # A row without rating_before falls back to the ranking file and says so.
+        rows = {r['profile_id']: r for r in build([{'profile': {'id': 1}, 'matches': [match()]}], index, now)['samples']}
+        self.assertEqual((rows[1]['rating'], rows[1]['rating_basis']), (2500, 'current'))
+        # Kept observations: a match rating stays; a current-basis one follows the ranking file.
+        first = build([{'profile': {'id': 1}, 'matches': [match()]}], index, now)
+        kept = {r['profile_id']: r for r in build([], {'players': [{'id': 1, 'rating': 1800}, {'id': 2, 'rating': 1500}]}, now, existing=first)['samples']}
+        self.assertEqual(list(kept), [2])
+        self.assertEqual(kept[2]['rating_basis'], 'match')
