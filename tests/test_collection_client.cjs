@@ -14,3 +14,8 @@ test('account mismatch is never applied',async()=>{
 test('cancelled collection ignores an outstanding result',async()=>{
  let resolve;const h=harness(async url=>url.endsWith('/health')?response({status:'ok'}):url.endsWith('/collect')?response({job_id:key,profile_id:id}):new Promise(r=>{resolve=r;}));const task=h.client.start('https://example.onrender.com',id);while(!resolve)await new Promise(r=>setImmediate(r));h.client.stop();resolve(response({profile_id:id,state:'complete',report:{profile:{id},matches:[]}}));await task;assert.equal(h.reports.length,0);
 });
+test('the server answer about publishing (DEC-01) reaches the page with the complete state',async()=>{
+ const seen=[];const client=create({fetch:async url=>url.endsWith('/health')?response({status:'ok'}):url.endsWith('/collect')?response({job_id:key,profile_id:id}):response({state:'complete',profile_id:id,shared:'requested',report:{profile:{id},matches:[]}}),
+  onState:(s,shared)=>seen.push([s,shared]),applyReport:async()=>{},wait:async()=>{},now:()=>0});
+ await client.start('https://example.onrender.com',id);assert.deepEqual(seen.at(-1),['complete','requested']);
+});

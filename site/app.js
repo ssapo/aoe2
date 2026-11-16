@@ -91,7 +91,7 @@
   function renderAgePanel(mine,theirs,other,ranked,housing) {
     const available=agesIn(mine,theirs);
     if(!available.length)return '<p class="panel-empty">시대 전환 기록 없음</p>';
-    return `<div class="panel-toolbar"><div class="segments" role="group" aria-label="비교할 시대">${available.map((age,i)=>`<button data-age="${age}" aria-pressed="${i===0}">${age}</button>`).join('')}</div><span class="toolbar-note">나 / 상대 비교</span></div>`+available.map((age,i)=>{
+    return `<div class="panel-toolbar"><div class="segments" role="group" aria-label="비교할 시대">${available.map((age,i)=>`<button data-ageup="${age}" aria-pressed="${i===0}">${age}</button>`).join('')}</div><span class="toolbar-note">나 / 상대 비교</span></div>`+available.map((age,i)=>{
       const left=checkpoint(mine,age),right=checkpoint(theirs,age),diff=ageDifference(mine,theirs,age);
       const reference=ranked?.ages?.find(r=>r.age===age);
       const rankedLine=reference?`<p class="ranked-age-reference">${ranked.minRating}+ 기준 ${fmtTime(reference.reference.median)} · ${Math.round(Math.abs(reference.delta))}초 ${reference.delta>0?'늦음':reference.delta<0?'빠름':'차이 없음'}${window.SSAPORankedBenchmarks?.basis(reference.reference)?` · ${esc(window.SSAPORankedBenchmarks.basis(reference.reference))}`:''}</p>`:(window.SSAPORankedBenchmarks?.shortageText(ranked)?`<p class="ranked-age-reference">${esc(window.SSAPORankedBenchmarks.shortageText(ranked))}</p>`:'');
@@ -153,6 +153,15 @@
       body.classList.toggle('timeline-active',id==='timeline');
       body.scrollTop=0;
     };
+    // Sub-tabs inside an analysis tab keep the reader's place: the pressed bar stays where it was on screen
+    // (APP-18). When the new panel is shorter the page can only scroll up to its end; the bar then stays in view.
+    const keepPlace=(button,change)=>{
+      const bar=button.closest?.('.segments,[role="group"]')||button,before=bar.getBoundingClientRect?.().top;
+      change();
+      if(!Number.isFinite(before))return;
+      const moved=bar.getBoundingClientRect().top-before;
+      if(moved)body.scrollTop+=moved;
+    };
     tabs.forEach((tab,i)=>{
       tab.addEventListener('click',()=>activate(tab.dataset.panel));
       tab.addEventListener('keydown',e=>{
@@ -166,24 +175,25 @@
     });
     root.querySelectorAll('[data-open-panel]').forEach(b=>b.addEventListener('click',()=>{
       activate(b.dataset.openPanel);
-      if(b.dataset.openAge)root.querySelector(`[data-age="${b.dataset.openAge}"]`)?.click();
+      if(b.dataset.openAge)root.querySelector(`[data-ageup="${b.dataset.openAge}"]`)?.click();
       tabs.find(t=>t.dataset.panel===b.dataset.openPanel)?.focus();
     }));
-    root.querySelectorAll('[data-review-stage]').forEach(b=>b.addEventListener('click',()=>{
+    root.querySelectorAll('[data-review-stage]').forEach(b=>b.addEventListener('click',()=>keepPlace(b,()=>{
       root.querySelectorAll('[data-review-stage]').forEach(t=>t.setAttribute('aria-pressed',String(t===b)));
       const select=items=>items.filter(f=>b.dataset.reviewStage==='전체'||f.stage===b.dataset.reviewStage);
       root.querySelector('#own-findings').innerHTML=findingSide('나',select(review.own_findings));
-      root.querySelector('#opponent-findings').innerHTML=findingSide('상대',select(review.opponent_findings));body.scrollTop=0;
-    }));
-    root.querySelectorAll('[data-numbers]').forEach(b=>b.addEventListener('click',()=>{
+      root.querySelector('#opponent-findings').innerHTML=findingSide('상대',select(review.opponent_findings));
+    })));
+    root.querySelectorAll('[data-numbers]').forEach(b=>b.addEventListener('click',()=>keepPlace(b,()=>{
       root.querySelectorAll('[data-numbers]').forEach(t=>t.setAttribute('aria-pressed',String(t===b)));
       root.querySelectorAll('[data-number-panel]').forEach(p=>p.hidden=p.dataset.numberPanel!==b.dataset.numbers);
-    }));
-    root.querySelectorAll('[data-age]').forEach(b=>b.addEventListener('click',()=>{
-      root.querySelectorAll('[data-age]').forEach(t=>t.setAttribute('aria-pressed',String(t===b)));
-      root.querySelectorAll('[data-age-panel]').forEach(p=>p.hidden=p.dataset.agePanel!==b.dataset.age);
-      body.scrollTop=0;
-    }));
+    })));
+    // 시대업 segments use data-ageup: the matchup card's age tabs and panels carry data-age (numbers), and a
+    // [data-age] binding here used to catch them — every press or click in the card scrolled to the top and hid all 시대업 panels
+    root.querySelectorAll('[data-ageup]').forEach(b=>b.addEventListener('click',()=>keepPlace(b,()=>{
+      root.querySelectorAll('[data-ageup]').forEach(t=>t.setAttribute('aria-pressed',String(t===b)));
+      root.querySelectorAll('[data-age-panel]').forEach(p=>p.hidden=p.dataset.agePanel!==b.dataset.ageup);
+    })));
     let category='unit_orders';
     const search=root.querySelector('#production-search');
     const renderProduction=()=>{
@@ -200,11 +210,11 @@
       root.querySelector('#production-count').textContent=`${keys.length}종`;
       root.querySelector('#production-table').innerHTML=keys.length?`<table class="timeline comparison data-table"><thead><tr><th scope="col">항목</th><th scope="col">나</th><th scope="col">상대</th></tr></thead><tbody>${keys.map(k=>`<tr><th scope="row">${esc(label(k))}</th><td>${cell(mine[category]?.[k])}</td><td>${cell(theirs[category]?.[k])}</td></tr>`).join('')}</tbody></table>`:'<p class="panel-empty">'+(query?'검색 결과 없음':'분석된 기록 없음')+'</p>';
     };
-    root.querySelectorAll('[data-category]').forEach(b=>b.addEventListener('click',()=>{
+    root.querySelectorAll('[data-category]').forEach(b=>b.addEventListener('click',()=>keepPlace(b,()=>{
       category=b.dataset.category;search.value='';
       root.querySelectorAll('[data-category]').forEach(t=>t.setAttribute('aria-pressed',String(t===b)));
-      renderProduction();body.scrollTop=0;
-    }));
+      renderProduction();
+    })));
     search.addEventListener('input',renderProduction);
     renderProduction();
     const events=[...[mine,theirs].flatMap((metrics,side)=>(metrics.full_timeline||metrics.timeline||[]).map(e=>({...e,side:side?'theirs':'mine'})))].sort((a,b)=>a.seconds-b.seconds);
@@ -568,21 +578,22 @@
       const savedJob=reportStore.get(id);
       const response=await fetch(`${dataPath(id,'report.json')}?t=${Date.now()}`,{cache:'no-store'});
       if(id!==selectedProfile)return false;
-      if(response.status===404&&id!==26260702){const saved=await savedJob;if(id!==selectedProfile)return false;report=Stored.newest(id,liveReports.get(id),saved)||{schema_version:1,profile:{id,name:selectedName},matches:[],pending_profile:true};render();return true;}
+      if(response.status===404&&id!==26260702){const saved=await savedJob;if(id!==selectedProfile)return false;report=Stored.merge(id,liveReports.get(id),saved)||{schema_version:1,profile:{id,name:selectedName},matches:[],pending_profile:true};render();return true;}
       if(!response.ok)throw Error(`HTTP ${response.status}`);
       const incoming=await response.json();
       const saved=await savedJob;
       await rankedJob;
       if(id!==selectedProfile)return false;
       if(!Stored.valid(incoming,id))throw Error('Profile report mismatch');
-      // A direct collection's result (this tab or saved in this browser) wins until a newer one is published.
-      report=Stored.newest(id,incoming,liveReports.get(id),saved);selectedName=report.profile.name||selectedName;render();
-      if(report===incoming&&Stored.time(incoming)>Stored.time(saved))reportStore.put(incoming);
+      // Published, this tab's direct collection and the copy saved in this browser are combined match by match
+      // (APP-18): a newer published report no longer drops the matches only a direct collection had or analysed.
+      report=Stored.merge(id,incoming,liveReports.get(id),saved);selectedName=report.profile.name||selectedName;render();
+      if(Stored.signature(report)!==Stored.signature(saved))reportStore.put(report);
       return true;
     } catch(error) {
       if(id!==selectedProfile)return false;
       // Keep what was shown or saved: a failed fetch (e.g. during a Pages deploy) must not empty the list.
-      const kept=Stored.newest(id,report,liveReports.get(id),await reportStore.get(id));
+      const kept=Stored.merge(id,report,liveReports.get(id),await reportStore.get(id));
       if(id!==selectedProfile)return false;
       report={...(kept||report),sync_error:'결과 파일을 읽지 못했어요. 잠시 후 다시 확인해 주세요.'};render();console.warn('Report loading failed:',error.message);return false;
     } finally {if(id===selectedProfile)$('#refresh').disabled=false;}
@@ -633,14 +644,20 @@
     const box=$('#collection-feedback');box.hidden=false;$('#collection-title').textContent=title;$('#collection-hint').textContent=hint;
   }
   const directCollection=window.createCollectionClient({
-    onState:state=>{
-      const messages={waking:['수집 서버를 준비하고 있어요','서버가 쉬고 있었다면 시작까지 약 1분 걸릴 수 있어요.'],requesting:['수집을 요청하고 있어요','잠시만 기다려 주세요.'],running:['경기와 리플을 분석하고 있어요','완료되면 이 화면에 결과를 표시해요.'],complete:['수집 결과를 불러왔어요','새 결과는 이 브라우저에 저장돼서 새로고침해도 남아요. 다음 예약 수집이 끝나면 그 결과로 바뀌어요.']};
+    onState:(state,shared)=>{
+      const messages={waking:['수집 서버를 준비하고 있어요','서버가 쉬고 있었다면 시작까지 약 1분 걸릴 수 있어요.'],requesting:['수집을 요청하고 있어요','잠시만 기다려 주세요.'],running:['경기와 리플을 분석하고 있어요','완료되면 이 화면에 결과를 표시해요.'],complete:['수집 결과를 불러왔어요','새 결과는 이 브라우저에 저장되고 공개 기록과 경기별로 합쳐져요. 다른 기기에서는 공개 수집에 들어간 경기만 보여요.']};
+      // DEC-01: the server asked GitHub to collect this profile publicly too
+      if(state==='complete'&&shared==='requested')messages.complete=['수집 결과를 불러왔어요','다른 기기에도 보이도록 공개 수집을 요청했어요. 보통 10~20분 뒤 공개 기록에 들어가요.'];
       collectionMessage(...messages[state]);
     },
     applyReport:async incoming=>{
       if(incoming.profile.id!==selectedProfile)return;
-      liveReports.set(selectedProfile,incoming);report=incoming;selectedName=incoming.profile.name||selectedName;render();
-      await reportStore.put(incoming);
+      const id=selectedProfile,saved=await reportStore.get(id);
+      if(id!==selectedProfile)return;
+      // keep every match already shown or saved; the direct collection only adds or upgrades matches (APP-18)
+      const merged=Stored.merge(id,incoming,liveReports.get(id),report,saved)||incoming;
+      liveReports.set(id,merged);report=merged;selectedName=merged.profile.name||selectedName;render();
+      await reportStore.put(merged);
     }
   });
   async function requestCollection(){

@@ -27,7 +27,7 @@
     if(data.state==='failed')throw Error(data.message||'수집하지 못했어요.');
     if(data.state==='complete'){
      if(data.report?.profile?.id!==profileId||!Array.isArray(data.report.matches)||data.report.sync_error)throw Error('결과 파일의 계정이 맞지 않아요.');
-     await applyReport(data.report);if(active())onState('complete');return;
+     await applyReport(data.report);if(active())onState('complete',data.shared);return;
     }
    }
    if(active())throw Error('수집 결과를 기다리는 시간이 길어졌어요. 잠시 후 다시 확인해 주세요.');

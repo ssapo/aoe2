@@ -86,6 +86,18 @@ ssapo의 **AoE2: DE 1v1 경기 복기 웹앱**. 기본 계정 외에 이름 검�
 - **검사**: `tests/test_civ_matchup.cjs`에 유닛 명령 중복 규칙, 연구 명령 묶기·마지막 묶음, 실제 업그레이드만 넣은 수치(등자 유무, 단조술+철 거푸집, 프랑크 기병 체력), 520592057 모양의 작은 경기(시대별 생산·장창병 단계·쌍·흐름 문장·HTML·이스케이프·"생존" 같은 말 없음), 타임라인 없을 때 숨김.
 - **남은 한계**: 명령이지 생산·생존이 아님(취소·자원 부족·대기열·전투 결과 없음), 연구는 명령 시각(완료 아님), 무료 기술·무료 승급은 빠짐(불가리아 민병 계열은 봉건에도 "민병"으로 계산), 병력 수·컨트롤·진형은 1:1 비율에 없음, 여러 건물을 고른 한 번의 명령이 게임에서 몇 기를 예약하는지는 리플만으로 확인 못 함(수량 1로 셈).
 
+## 탭 스크롤·수집한 경기 합치기 (2026-11-17, `APP-18`)
+
+- **탭을 누를 때 스크롤이 맨 위로 튐(원인)**: `bindWorkspace`의 시대업 탭 묶기가 `root.querySelectorAll('[data-age]')`였는데, 복기 탭 매치업 카드(APP-16)의 시대 탭·패널도 `data-age`(2·3·4·all)를 갖는다. 카드가 이미 그려진 상태로 경기 창이 열리면(두 번째로 연 경기부터 — 첫 경기는 카드가 늦게 그려져 안 걸림) 카드의 탭을 누르거나 **패널 안 아무 곳이나** 눌러도 `body.scrollTop=0`이 돌고, 시대업 패널이 모두 숨겨졌다. 공개 사이트 실측(11-17): 1280px 890 → 0, 390px 893 → 0.
+- **고침**: 시대업 버튼은 `data-ageup`(패널은 그대로 `data-age-panel`, 요약의 `data-open-age`도 이것을 누름). 분석 창 안의 하위 탭(시대업·수치 구분·생산·연구 종류·복기 시대 필터)은 `keepPlace`로 누른 탭 줄이 화면의 같은 자리에 남고, 매치업 카드 시대 탭도 같은 방식(`civ-matchup.js`). 새 패널이 짧아 페이지 끝에 닿으면 브라우저가 줄이는 만큼만 올라가고 탭 줄은 화면 안에 남는다. 큰 분석 탭(복기·수치·…)은 전처럼 맨 위에서 시작.
+- **브라우저 검사** `tests/browser/tabs_scroll.mjs`: `site/`를 로컬 서버로 띄우고 헤드리스 Chromium에서 1280×900·390×844로 매치업 카드가 있는 경기 3개를 차례로 열어(두 번째부터가 예전 버그 경로) 카드 시대 탭·카드 안 클릭·복기 시대 필터·수치 구분·시대업·생산·연구 버튼을 모두 누르고, 탭 줄이 4px 넘게 움직이지 않는지(짧은 패널로 페이지 끝에 닿은 경우만 예외, 탭 줄은 화면 안)와 분석 패널·카드 패널·시대업 패널이 각각 하나씩 보이는지 본다. 바깥 주소 요청은 모두 막는다. 실행: `node tests/browser/tabs_scroll.mjs [site 경로]`(`playwright` 패키지와 Chromium 필요). Actions에는 넣지 않았다(Chromium 설치에 매 실행 1~2분). 결과(11-17): 고치기 전 96건 실패(튐 40), 고친 뒤 118번 누름 모두 통과.
+- **수집한 경기가 사라짐(원인, 이 브라우저)**: `report-store.js`의 `newest()`가 공개 보고서·탭 결과·저장본 중 `last_checked_at`이 가장 늦은 **보고서 하나를 통째로** 골랐다. 직접 수집 결과(이 브라우저 IndexedDB에만 있음)는 다음 예약 수집이 끝나 공개본이 더 새로워지는 순간 통째로 밀려나, 직접 수집만 목록에 넣었거나 분석한 경기가 사라졌다. 직접 수집 서버(Render)는 `/health`의 `analysis_revision`이 15(11-17 확인, main은 31)라 그 분석도 옛 개정이다.
+- **고침**: `SSAPOReportStore.merge(id, 공개본, 탭 결과, 저장본)` — 경기 ID로 합집합, 경기마다 `analysis.analysis_revision`이 높은 것 → 분석된 것 → 더 새 보고서의 것 → 먼저 넘긴 것(공개본) 순. 프로필 정보는 공개본 우선, `last_checked_at`·`updated_at`은 가장 늦은 값, 시작 시각 최신순 200경기. 합친 결과를 저장본으로 둔다(`signature`가 같으면 다시 쓰지 않음). 직접 수집 완료도 지금 보이는 목록·저장본과 합친다. Node 검사 4개.
+- **공개 보고서에서 빠지는가**: 아니다. main `report.json`의 최근 8개 보고서 커밋과 11-02~11-16 표본 7개, 대표 선수 다섯(1224481·198035·199325·251265·506898)의 11-15 커밋과 지금을 비교해 빠진 경기도, 분석이 없어진 경기도 없었다. 수집기는 프로필당 최신 200경기만 두므로 그보다 오래된 경기는 의도대로 빠진다.
+- **다른 기기(`DEC-01`)**: 한 브라우저의 저장본은 다른 기기로 가지 않는다. 다른 기기에 보이려면 공개 수집에 들어가야 한다. `server/collect_service.py`의 `Dispatcher`가 직접 수집을 마친 뒤 GitHub `workflow_dispatch`(`update.yml`, 입력 `profile_id` → `REQUESTED_PROFILE_ID`, 그 프로필은 `--limit 5`)를 요청한다. 토큰은 Render 환경 변수 `GITHUB_DISPATCH_TOKEN`에서만 읽고, 없으면 아무것도 안 한다(`shared: 'off'`). 프로필마다 30분에 한 번, 실패하면 다음 수집 때 다시. 토큰은 로그·응답·repr에 나오지 않는다. `/health`의 `publish`가 켜짐 여부(true/false)만 알려 준다. 작업 결과의 `shared`가 `requested`면 화면에 "다른 기기에도 보이도록 공개 수집을 요청했어요"를 띄운다. Python 검사 5개(가짜 HTTP).
+  - 사용자가 할 일: ① GitHub → Settings → Developer settings → Fine-grained tokens → Generate: Repository access = Only select repositories → `ssapo/aoe2`, Permissions → Repository → **Actions: Read and write**(나머지 없음), 만료일 지정. ② Render 대시보드 → `ssapo-aoe2-collect` → Environment → `GITHUB_DISPATCH_TOKEN` = 그 토큰 → Save. ③ 같은 서비스 Settings에서 Branch가 `main`인지 보고 Manual Deploy → Deploy latest commit(지금 서버는 옛 코드). ④ https://ssapo-aoe2-collect.onrender.com/health 에서 `"publish": true`, `analysis_revision`이 main과 같은지 확인.
+  - 제한: GitHub는 같은 동시 실행 그룹에 대기 실행을 하나만 둬서, 요청한 실행이 대기 중일 때 예약 실행이 줄을 서면 요청한 쪽이 취소될 수 있다(ssapo·대표 선수는 예약 실행이 어차피 수집, 검색한 다른 선수는 다음 직접 수집 때 다시 요청). Actions 실행은 공개 저장소라 무료.
+
 ## eAPM 중앙값 (2026-11-16, 프런트만)
 
 - 첫 화면 요약 카드 다섯째와 수치 탭 핵심 표의 "eAPM 중앙값 · 분석 N경기" 줄. 선택한 선수의 **분석된 경기 전부**에서 내 eAPM과 상대들 eAPM의 중앙값이다(같은 맵·문명으로 좁히지 않고, 현재 경기도 포함). 수치 탭 줄은 분석된 경기가 3판 이상일 때만 보인다. eAPM은 mgz 값 그대로다.
@@ -364,7 +376,7 @@ node --check site/building-map.js
 node --check site/collection-watch.js
 ```
 
-2026-11-03 맵 기능 추가 시 **Python 32개 + Node 12개 = 44개** 통과. 2026-11-14 기준 **Python 119개 + Node 69개**이며 Windows(cp949)에서도 `-X utf8` 없이 통과한다(파일 읽기·쓰기에 `encoding='utf-8'`을 명시한다. 빠뜨리면 Windows에서만 깨진다). 테스트가 늘면 총개수도 갱신한다. Python 검사 전에 고정 의존성과 호환 패치를 준비한다. UI 문구 변경마다 불필요한 새 검사를 만들 필요는 없지만, 좌표·시간·수량 의미가 바뀌면 관련 검사를 추가한다.
+2026-11-03 맵 기능 추가 시 **Python 32개 + Node 12개 = 44개** 통과. 2026-11-17(APP-18) **Python 151개(건너뜀 1) + Node 107개**. 브라우저 검사는 따로: `node tests/browser/tabs_scroll.mjs`(playwright·Chromium 필요, Actions 밖). 2026-11-14 기준 **Python 119개 + Node 69개**이며 Windows(cp949)에서도 `-X utf8` 없이 통과한다(파일 읽기·쓰기에 `encoding='utf-8'`을 명시한다. 빠뜨리면 Windows에서만 깨진다). 테스트가 늘면 총개수도 갱신한다. Python 검사 전에 고정 의존성과 호환 패치를 준비한다. UI 문구 변경마다 불필요한 새 검사를 만들 필요는 없지만, 좌표·시간·수량 의미가 바뀌면 관련 검사를 추가한다.
 
 ### 수집 및 특정 리플 분석
 
@@ -712,7 +724,7 @@ python scripts/build_preview.py /tmp/SSAPO_AoE2_preview.html
 
 - 문제: 직접 수집 결과가 탭 메모리(`liveReports`)에만 있어서 새로고침하면 Pages의 예전 `report.json`(검색한 프로필은 404 → 빈 목록)으로 돌아갔다. 또 Pages 배포 중 등 결과 파일을 못 읽으면 목록이 빈 채로 오류만 보였다.
 - `site/report-store.js`: 프로필별 최신 보고서를 이 브라우저의 IndexedDB(`ssapo-aoe2`/`reports`)에 저장한다. 15MB급 보고서도 저장된다(실제 Chromium에서 확인). IndexedDB가 없거나 실패하면 조용히 건너뛴다.
-- `loadReport`: 공개 보고서·탭 결과·저장본 중 `last_checked_at`이 가장 늦은 것을 보여준다(같으면 공개본). 공개본이 저장본보다 새로우면 저장본을 공개본으로 바꾼다. 404면 탭 결과나 저장본, 읽기 실패면 보이던 목록이나 저장본을 유지하고 오류 문구만 붙인다.
+- `loadReport`: 공개 보고서·탭 결과·저장본 중 `last_checked_at`이 가장 늦은 것을 보여준다(같으면 공개본). **2026-11-17부터는 하나를 고르지 않고 경기 단위로 합친다(아래 「탭 스크롤·수집한 경기 합치기」, `APP-18`).** 공개본이 저장본보다 새로우면 저장본을 공개본으로 바꾼다. 404면 탭 결과나 저장본, 읽기 실패면 보이던 목록이나 저장본을 유지하고 오류 문구만 붙인다.
 - 직접 수집 완료 시 결과를 저장한다. 안내 문구도 "이 브라우저에 저장돼서 새로고침해도 남아요"로 바꿨다. 다른 기기·브라우저에는 공유되지 않는다(서버 저장 아님).
 
 ### 2026-11-03 직접 수집 서버 연결

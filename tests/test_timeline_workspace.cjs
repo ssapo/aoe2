@@ -69,3 +69,34 @@ test('numbers separate observed age timings from production requests',()=>{
  assert.match(html,/data-number-panel="requests" hidden/);
  assert.match(html,/5분별/);assert.match(html,/시대별/);
 });
+
+test('sub-tabs keep the scroll place and the matchup card age tabs are left to the card (APP-18)',()=>{
+  const nodes=new Map();
+  const node=extra=>({value:'all',hidden:false,textContent:'',innerHTML:'',scrollTop:0,dataset:{},
+    listeners:{},attributes:{},style:{values:{},setProperty(k,v){this.values[k]=v;}},classList:{toggle(){}},setAttribute(key,value){this.attributes[key]=value;},focus(){},
+    addEventListener(type,fn){this.listeners[type]=fn;},...extra});
+  const get=selector=>{if(!nodes.has(selector))nodes.set(selector,node());return nodes.get(selector);};
+  const tabs=['summary','ages'].map(id=>node({dataset:{panel:id}}));
+  const panels=['summary','ages'].map(id=>node({id:`panel-${id}`}));
+  const ageTabs=['봉건','성주'].map(age=>node({dataset:{ageup:age}}));
+  const agePanels=['봉건','성주'].map((age,i)=>node({dataset:{agePanel:age},hidden:i>0}));
+  // the matchup card (APP-16) carries data-age="2|3|4|all" on its tabs and panels
+  const cardNodes=['2','3','all'].map(age=>node({dataset:{age}}));
+  const stageTabs=['전체','봉건'].map(stage=>node({dataset:{reviewStage:stage}}));
+  const body=get('.review-body');
+  get('#production-search').value='';
+  const lists={'.review-tabs [role="tab"]':tabs,'[role="tabpanel"][id^="panel-"]':panels,'[data-ageup]':ageTabs,'[data-age-panel]':agePanels,'[data-age]':cardNodes,'[data-review-stage]':stageTabs};
+  const root={querySelector:get,querySelectorAll:selector=>lists[selector]||[]};
+  const code=fs.readFileSync(path.join(__dirname,'../site/app.js'),'utf8');
+  const ctx=vm.createContext({root,window:{},document:{querySelector:()=>({open:true})},
+    label:String,esc:String,number:String,fmtTime:String,performance:{now:()=>0},findingSide:()=>'',
+    splitTimeline:rows=>JSON.stringify(rows),timelineRows:events=>events,setInterval(){return 1;},clearInterval(){}});
+  vm.runInContext(code.slice(code.indexOf('  function bindWorkspace('),code.indexOf('  function toast(')),ctx);
+  vm.runInContext('bindWorkspace(root,{},{},null,{own_findings:[],opponent_findings:[]},null,{})',ctx);
+  assert.ok(cardNodes.every(n=>!n.listeners.click),'the workspace must not bind the matchup card age tabs/panels');
+  body.scrollTop=480;ageTabs[1].listeners.click();
+  assert.equal(body.scrollTop,480);
+  assert.deepEqual(agePanels.map(p=>p.hidden),[true,false]);
+  body.scrollTop=480;stageTabs[1].listeners.click();assert.equal(body.scrollTop,480);
+  tabs[1].listeners.click();assert.equal(body.scrollTop,0,'the big analysis tabs still start at the top');
+});

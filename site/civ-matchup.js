@@ -786,8 +786,12 @@
       const tab=e.target instanceof Element?e.target.closest('.civ-matchup .mc-agetab'):null;
       if(!tab)return;
       const card=tab.closest('.matchup-card'),age=tab.dataset.age;
+      // keep the tab bar where it was on screen (APP-18): panels differ in height
+      const bar=tab.closest('.mc-ages')||tab,before=bar.getBoundingClientRect().top;
       card.querySelectorAll('.mc-agetab').forEach(b=>b.setAttribute('aria-selected',String(b===tab)));
       card.querySelectorAll('.mc-agepanel').forEach(p=>{p.hidden=p.dataset.age!==age;});
+      const moved=bar.getBoundingClientRect().top-before,scroller=tab.closest('.review-body')||document.scrollingElement;
+      if(moved&&scroller)scroller.scrollTop+=moved;
     });
     window.addEventListener('scroll',hide,true);
     window.addEventListener('resize',hide);
