@@ -756,7 +756,7 @@ index 41187161..2752cfa1 100644
          building: (kind == MasterKind::BUILDING).then(|| DamageBuilding {
              main: building.annex_of,
 diff --git a/crates/engine/genie-core/src/combat/victims.rs b/crates/engine/genie-core/src/combat/victims.rs
-index d29be68b..7442157f 100644
+index d29be68b..deebd8c3 100644
 --- a/crates/engine/genie-core/src/combat/victims.rs
 +++ b/crates/engine/genie-core/src/combat/victims.rs
 @@ -2,7 +2,7 @@
@@ -849,7 +849,7 @@ index d29be68b..7442157f 100644
  }
  
  /// A strike's write-back where it ran ([`write_back`]), each object's kill and razings right
-@@ -520,7 +554,163 @@ impl World {
+@@ -520,7 +554,179 @@ impl World {
                      .add_attribute(kind, Amount::new(1.0))?;
              }
          }
@@ -908,6 +908,22 @@ index d29be68b..7442157f 100644
 +            if pays {
 +                return Err(GenieError::unsupported(
 +                    "a kill reward task that pays (action type 0xa1, 0x12c00e0)",
++                )
++                .with("killed master", format!("{:?}", master.id))
++                .with("payee", format!("{payee:?}"))
++                .with(
++                    "task",
++                    format!(
++                        "id {:?} owner {:?} flag {:#x} val1 {} range {} work_flag {} attr2 {:?} attr3 {:?}",
++                        t.id,
++                        t.owner_kind,
++                        t.combat_level_flag.bits(),
++                        t.work_val1.get(),
++                        t.work_range.get(),
++                        t.work_flag,
++                        t.attribute_kind2,
++                        t.attribute_kind3
++                    ),
 +                ));
 +            }
 +        }
@@ -1014,7 +1030,7 @@ index d29be68b..7442157f 100644
      }
  
      /// `FUN_1412005b0` on the object `id` killed for player `killer` (a movement damage's,
-@@ -587,6 +777,33 @@ impl World {
+@@ -587,6 +793,33 @@ impl World {
      }
  }
  
@@ -1405,6 +1421,81 @@ index c7a0cf8b..367cd5c4 100644
          };
          let found = {
              let planner = c.w.pathing.planner(restriction, spatial.tiles()).ok_or(
+diff --git a/crates/engine/genie-core/src/construction/build/placing.rs b/crates/engine/genie-core/src/construction/build/placing.rs
+index 89344b09..a4628c11 100644
+--- a/crates/engine/genie-core/src/construction/build/placing.rs
++++ b/crates/engine/genie-core/src/construction/build/placing.rs
+@@ -143,12 +143,12 @@ impl BuildAction {
+         let (sx, sy) = (placed.position.x(), placed.position.y());
+         let inside = (bx - sx).abs() <= placed.radius.x() && (by - sy).abs() <= placed.radius.y();
+         if inside {
+-            return self.clear(c, builder, site.id(), roles);
++            return self.clear(c, builder, site.id(), roles, reads);
+         }
+         if let Some(annex) = self.annex_beneath(c, builder, placed.radius)? {
+             // set_state(223) with the annex as the target, which the foundation replaces again
+             // after it: the walk off the annex's footprint
+-            return self.clear(c, builder, annex, roles);
++            return self.clear(c, builder, annex, roles, reads);
+         }
+         self.wait_or_halt(c, builder, reads)
+     }
+@@ -393,18 +393,23 @@ impl BuildAction {
+     /// state 3, as a `MoveTo` to a point is far from it (`FUN_140aa2100`), in 13 for a unit
+     /// without speed.
+     ///
++    /// With no free tile (188329 `0xb9fae0` case `0xdf`: `0x1217950`, or `0x1216c40`, returns 0)
++    /// the interface hears of it (`0xd6e0f0` 0x88, not held) and `set_state(2)` halts the Build
++    /// ([`BuildAction::halt_placing`]; ENG-30, findings 120).
++    ///
+     /// # Errors
+     ///
+-    /// A builder without movement state or its master, a foundation gone from the map, no free
+-    /// tile beside it, and a sprite the table lacks.
++    /// A builder without movement state or its master, a foundation gone from the map, the
++    /// halt's, and a sprite the table lacks.
+     ///
+     /// [`MoveToReads::to_point`]: crate::movement::move_to::MoveToReads::to_point
+     pub(super) fn clear(
+         &mut self,
+         c: &mut Step<'_>,
+-        builder: &Unit,
++        builder: &mut Unit,
+         footprint: ObjectId,
+         roles: &Roles,
++        reads: &BuildReads,
+     ) -> Result<(), GenieError> {
+         let by_id = ObjectsRef::new(
+             &c.w.players,
+@@ -418,18 +423,16 @@ impl BuildAction {
+         let site = c.w.spatial.get(footprint).ok_or(SITE_GONE)?;
+         let site = (site.position, site.radius);
+         let at = builder.position();
+-        let spot =
+-            c.w.spatial
+-                .spot_beside(
+-                    at,
+-                    (builder.id, mover.stats.radius.x()),
+-                    mover.stats.restriction_mask,
+-                    site,
+-                    by_id,
+-                )?
+-                .ok_or(GenieError::unsupported(
+-                    "no free tile beside the footprint (set_state 2)",
+-                ))?;
++        let Some(spot) = c.w.spatial.spot_beside(
++            at,
++            (builder.id, mover.stats.radius.x()),
++            mover.stats.restriction_mask,
++            site,
++            by_id,
++        )?
++        else {
++            return self.halt_placing(c, builder, reads);
++        };
+         self.state = BuildState::Clear { move_to: None };
+         let move_reads = builder.move_to_reads(
+             c.w.parts.motion.mover(builder.id),
 diff --git a/crates/engine/genie-core/src/construction/build/states.rs b/crates/engine/genie-core/src/construction/build/states.rs
 index 76304cf8..e8c11eda 100644
 --- a/crates/engine/genie-core/src/construction/build/states.rs
