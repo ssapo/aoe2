@@ -5,7 +5,9 @@
 
 /* Compact review workspace: header and tabs stay outside the only scroll area. */
 body.review-open{overflow:hidden}
-#match-dialog{width:min(1000px,calc(100vw - 40px));height:min(850px,92dvh);max-height:92dvh;padding:0;overflow:hidden;border-radius:12px}
+/* The analysis window fills the screen on every width (2026-11-16): the map and records got too little room in a box. */
+#match-dialog{width:100vw;height:100dvh;max-width:none;max-height:100dvh;margin:0;border:0;padding:0;overflow:hidden;border-radius:0}
+.review-body [role=tabpanel]:not(#panel-timeline){max-width:1080px;margin-inline:auto}
 #match-dialog[open]{display:flex;flex-direction:column}
 #match-dialog>.dialog-head{flex:none;margin:0;padding:8px 20px;border-bottom:1px solid var(--border);background:#edf0e7}
 #match-dialog .dialog-head>span{font-size:11px;color:#566a54}
@@ -207,6 +209,22 @@ body.review-open{overflow:hidden}
 .timeline-history{border-top:1px solid var(--border);padding-top:16px}
 #timeline-table .event-table thead{position:static}
 @media(max-width:700px){#building-map-host #building-map{max-height:29dvh}}
+/* Wide screens: the map stays beside the records while they scroll, as large as the column and the window allow. */
+@media(min-width:1100px){
+ .timeline-workspace{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(360px,1fr);column-gap:20px;align-items:start}
+ .timeline-dock,.timeline-workspace>.flow-overview{grid-column:1/-1}
+ .timeline-stage{grid-column:1;grid-row:3/span 2;align-self:start;position:sticky;top:96px}
+ .timeline-workspace>.flow-statistics{grid-column:2;grid-row:3;margin-top:14px}
+ .timeline-history{grid-column:2;grid-row:4;margin-top:14px}
+ #building-map-host #building-map{width:min(100%,calc((100dvh - 400px) * 1.7143));max-width:100%;max-height:none}
+}
+/* Map enlarged: only the replay controls and the map remain. */
+#match-dialog.map-full .review-header,#match-dialog.map-full .review-tabs,#match-dialog.map-full .review-footer,#match-dialog.map-full .timeline-workspace>.flow-overview,#match-dialog.map-full .flow-statistics,#match-dialog.map-full .timeline-history{display:none}
+#match-dialog.map-full .timeline-workspace{display:block}
+#match-dialog.map-full .timeline-stage{position:static;padding-bottom:0}
+#match-dialog.map-full #building-map-host #building-map{width:min(100%,calc((100dvh - 230px) * 1.7143));max-width:100%;max-height:none}
+#building-map-host .map-expand{margin-left:auto;background:var(--replay-accent);color:#fff;border:1px solid transparent;border-radius:6px}
+#building-map-host .map-expand[aria-pressed=true]{background:#dfe6d9;color:#325039;border-color:#9aa98c}
 @media(max-width:600px){
  .timeline-dock{margin:0 -14px;padding:8px 14px 5px}
  .player-controls{gap:6px}

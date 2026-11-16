@@ -205,7 +205,16 @@
     const civs=[match.analysis?.civilization||match.civilization,other?.civilization];
     const choice=match.civ_choice||{},pids=[(match.players||[]).find(p=>p.is_self)?.profile_id,(match.players||[]).find(p=>!p.is_self)?.profile_id],fromChoice=Number(match.analysis?.analysis_revision)>=30,civRandoms=[0,1].map(i=>Object.hasOwn(choice,String(pids[i]))?choice[String(pids[i])]===true:fromChoice&&[match.analysis?.random_civ,other?.random_civ][i]===true);
     const mapHost=root.querySelector('#building-map-host');
-    mapHost.innerHTML=mapData?`<div class="map-toolbar"><div class="map-legend">${civBadge(civs[0],'나',civRandoms[0])}${civBadge(civs[1],'상대',civRandoms[1])}</div><div class="map-focus"><button data-map-focus="all" aria-pressed="true">전체 맵</button><button data-map-focus="mine" aria-pressed="false">내 본진</button><button data-map-focus="theirs" aria-pressed="false">상대 본진</button>${Array.isArray(mapData.command_activity)?'<button id="map-activity" aria-pressed="true">유닛 지시</button>':''}</div></div><canvas id="building-map" width="720" height="420" role="img" aria-label="실제 지형과 양측 건설·이동 지시 위치"></canvas><p id="building-map-info" class="compact-note" aria-live="polite">${Array.isArray(mapData.command_activity)?'원은 최근 30초의 지시 지점, 숫자는 선택 수예요.':'유닛 지시는 이 경기 재분석 후 표시돼요.'}</p>`:'<p class="compact-note">이 경기의 맵 자료는 다음 재분석 후 표시돼요.</p>';
+    mapHost.innerHTML=mapData?`<div class="map-toolbar"><div class="map-legend">${civBadge(civs[0],'나',civRandoms[0])}${civBadge(civs[1],'상대',civRandoms[1])}</div><div class="map-focus"><button data-map-focus="all" aria-pressed="true">전체 맵</button><button data-map-focus="mine" aria-pressed="false">내 본진</button><button data-map-focus="theirs" aria-pressed="false">상대 본진</button>${Array.isArray(mapData.command_activity)?'<button id="map-activity" aria-pressed="true">유닛 지시</button>':''}<button class="map-expand" data-map-expand aria-pressed="false">크게 보기</button></div></div><canvas id="building-map" width="720" height="420" role="img" aria-label="실제 지형과 양측 건설·이동 지시 위치"></canvas><p id="building-map-info" class="compact-note" aria-live="polite">${Array.isArray(mapData.command_activity)?'원은 최근 30초의 지시 지점, 숫자는 선택 수예요.':'유닛 지시는 이 경기 재분석 후 표시돼요.'}</p>`:'<p class="compact-note">이 경기의 맵 자료는 다음 재분석 후 표시돼요.</p>';
+    // Enlarged map: hide everything but the replay controls and the map; Esc or the button returns.
+    const dialog=document.querySelector('#match-dialog');
+    dialog?.classList?.remove('map-full');
+    root.querySelector('[data-map-expand]')?.addEventListener('click',e=>{
+      const on=!dialog?.classList?.contains('map-full');
+      dialog?.classList?.toggle('map-full',on);
+      e.currentTarget.setAttribute('aria-pressed',String(on));e.currentTarget.textContent=on?'작게 보기':'크게 보기';
+      const body=root.querySelector('.review-body');if(on&&body)body.scrollTop=0;
+    });
     const mapPlayer=mapData?window.SSAPOBuildingMap.mount(root.querySelector('#building-map'),root.querySelector('#building-map-info'),mapData,events,label,fmtTime):null;
     root.querySelectorAll('[data-map-focus]').forEach(b=>b.addEventListener('click',()=>{
       root.querySelectorAll('[data-map-focus]').forEach(t=>t.setAttribute('aria-pressed',String(t===b)));
@@ -641,7 +650,13 @@
     }
   });
   $('#collection-dismiss').addEventListener('click',()=>{collectionWatch.stop();directCollection.stop();collectionRequestSerial++;collectBusy=false;render();$('#collection-feedback').hidden=true;});
-  $('#match-dialog').addEventListener('close',()=>document.body.classList.remove('review-open'));
+  $('#match-dialog').addEventListener('close',()=>{document.body.classList.remove('review-open');$('#match-dialog').classList.remove('map-full');});
+  $('#match-dialog').addEventListener('cancel',e=>{
+    // Esc first leaves the enlarged map, a second Esc closes the window.
+    if(!e.currentTarget.classList.contains('map-full'))return;
+    e.preventDefault();e.currentTarget.classList.remove('map-full');
+    const b=e.currentTarget.querySelector('[data-map-expand]');if(b){b.setAttribute('aria-pressed','false');b.textContent='크게 보기';}
+  });
   $('#open-settings').addEventListener('click',openSettings);
   $('#refresh').addEventListener('click',()=>window.location.reload());
   document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>document.getElementById(b.dataset.close).close()));
