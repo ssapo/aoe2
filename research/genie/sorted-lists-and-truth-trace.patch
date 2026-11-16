@@ -6496,7 +6496,7 @@ index d65b2d84..ecf8ab20 100644
              return Ok(());
          };
 diff --git a/crates/engine/genie-core/src/orders/follow.rs b/crates/engine/genie-core/src/orders/follow.rs
-index dd70f0f4..fb1d1f2b 100644
+index dd70f0f4..d877a874 100644
 --- a/crates/engine/genie-core/src/orders/follow.rs
 +++ b/crates/engine/genie-core/src/orders/follow.rs
 @@ -77,6 +77,9 @@ impl World {
@@ -6509,7 +6509,22 @@ index dd70f0f4..fb1d1f2b 100644
          };
          let cap = if self.players.player(player)?.kind.is_computer() {
              500
-@@ -277,6 +280,11 @@ impl World {
+@@ -260,12 +263,13 @@ impl World {
+         }
+         let (p, idx) = self.follower_start(loose, i)?;
+         let (x, y) = (followed.place.x(), followed.place.y());
+-        let taken = self.move_to_object_with(
++        let taken = self.move_to_object_within(
+             p,
+             idx,
+             followed.id,
+             Position::new(x, y, 0.0),
+             OrderSource::Direct,
++            followed.reach,
+         )?;
+         let rng = self.streams.get(Stream::Ai);
+         if let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(p, idx)?.id) {
+@@ -277,6 +281,11 @@ impl World {
                  .class
                  .map_or((None, None), |c| (Some(followed.id), c.or_none()));
              ai.set_target(t, class, Position::new(x, y, 0.0));
@@ -6521,6 +6536,52 @@ index dd70f0f4..fb1d1f2b 100644
          }
          Ok(())
      }
+@@ -366,6 +375,21 @@ impl World {
+         target: ObjectId,
+         point: Position,
+         source: OrderSource,
++    ) -> Result<Answer, GenieError> {
++        self.move_to_object_within(player, idx, target, point, source, Distance::ZERO)
++    }
++
++    /// [`World::move_to_object_with`] within `range` of the target (0: the MoveTo's own range,
++    /// [`object_range`]). 188329's FOLLOW reaches slot 0x138 through the unit AI's follow
++    /// (0xd27210) with the order's range (findings 126).
++    pub(crate) fn move_to_object_within(
++        &mut self,
++        player: PlayerId,
++        idx: ListIndex,
++        target: ObjectId,
++        point: Position,
++        source: OrderSource,
++        range: Distance,
+     ) -> Result<Answer, GenieError> {
+         let world_time = self.world_time;
+         let class = self
+@@ -436,7 +460,7 @@ impl World {
+             self.take(target, self.releaser(player, idx)?)?;
+         }
+         self.clear_actions(player, idx)?;
+-        self.start_object_move(player, idx, (target, target_state), livestock)?;
++        self.start_object_move(player, idx, (target, target_state), livestock, range)?;
+         Ok(Answer::NotTaken)
+     }
+ 
+@@ -453,12 +477,13 @@ impl World {
+         idx: ListIndex,
+         (target, target_state): (ObjectId, ObjectState),
+         livestock: bool,
++        range: Distance,
+     ) -> Result<(), GenieError> {
+         let master = self
+             .players
+             .live(player, idx)?
+             .master(self.master_tables(), player)?;
+-        let range = object_range(Distance::ZERO, Some(master), &self.model.tuning.order);
++        let range = object_range(range, Some(master), &self.model.tuning.order);
+         let sprite = object_sprite(master).and_then(|id| self.model.graphics.get(id).copied());
+         let unit = self.players.live_mut(player, idx)?;
+         let here = unit.position();
 diff --git a/crates/engine/genie-core/src/orders/interact.rs b/crates/engine/genie-core/src/orders/interact.rs
 index 77933740..32fbb3c8 100644
 --- a/crates/engine/genie-core/src/orders/interact.rs
