@@ -6595,6 +6595,33 @@ index dd70f0f4..d877a874 100644
          let sprite = object_sprite(master).and_then(|id| self.model.graphics.get(id).copied());
          let unit = self.players.live_mut(player, idx)?;
          let here = unit.position();
+diff --git a/crates/engine/genie-core/src/orders/form.rs b/crates/engine/genie-core/src/orders/form.rs
+index 01ff8670..102d95db 100644
+--- a/crates/engine/genie-core/src/orders/form.rs
++++ b/crates/engine/genie-core/src/orders/form.rs
+@@ -21,8 +21,9 @@ impl World {
+     /// ids pass the check STOP's twin makes ([`World::command_check`]: refused for a human when
+     /// all went). Each unit with a unit AI whose order is a defend (`0x2bd`) or a follow
+     /// (`0x2c8`) first has its ignore list emptied (`FUN_141197da0`), stops (slot 0x148,
+-    /// [`World::object_stop`]) and stands (slot 0x560). The order splitter ([`World::split`],
+-    /// no Ctrl, no filter) splits them; each of its groups with units (60 at most listed) is:
++    /// [`World::object_stop`]) and stands (slot 0x560). The order splitter ([`World::split_aimed`],
++    /// no Ctrl, no filter, no target, queued: 188329's `0x16eb5b0` passes `param_6` 1) splits
++    /// them; each of its groups with units (60 at most listed) is:
+     /// - the group all its units are in (`FUN_14152ece0`), when the world holds it and it has
+     ///   just them, kept by the splitter ([`World::keep_group`], no target); one the world does
+     ///   not hold takes nothing;
+@@ -51,7 +52,9 @@ impl World {
+         for &id in units.iter().flatten() {
+             self.stop_marcher(id)?;
+         }
+-        let mut split = self.split(&units, &|_| true, ControlKey::Up)?;
++        // 188329 (0x16eb5b0, findings 130): the splitter 0x10b6b40 runs as a queued order
++        // (`param_6` 1, no target, no Ctrl), so a lone listed unit keeps the group it is in
++        let mut split = self.split_aimed(&units, &|_| true, ControlKey::Up, None, true)?;
+         let mut listed: Vec<GroupId> = Vec::new();
+         for (number, group_units) in split.groups.clone().iter().enumerate() {
+             if group_units.is_empty() {
 diff --git a/crates/engine/genie-core/src/orders/interact.rs b/crates/engine/genie-core/src/orders/interact.rs
 index 77933740..32fbb3c8 100644
 --- a/crates/engine/genie-core/src/orders/interact.rs
