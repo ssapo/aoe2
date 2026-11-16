@@ -95,35 +95,74 @@
   // ── summary card: four rows computed from the table by fixed rules (no hand-written advice) ──
   const CORE_LINES=[4,7,39,5,74,93,448,38,1258,280,279,36]; // lines most civs have; a missing one is a gap
   const KEY_TECHS=[435,39,437,436,93,47,215,602,315,377]; // Bloodlines, Husbandry, Thumb Ring, Parthian Tactics, Ballistics, Chemistry, Squires, Arson, Conscription, Siege Engineers
-  const SPECIAL_ROOTS=new Set([5]); // gunpowder line counts as a special force
+  const ATTR_KO={0:'체력',5:'이동 속도',8:'방어',9:'공격',10:'공격 속도',12:'사거리',100:'비용',101:'생산 속도',103:'비용',104:'비용',105:'비용',106:'비용'};
   function armyLines(ref,lines){return lines.filter(l=>l.final!=null&&!NON_COMBAT.has(l.root)&&buildingOf(ref,l.root)!==49);}
-  function isSpecial(ref,l){const t=node(ref,'u',l.root)?.type;return t==='UniqueUnit'||t==='RegionalUnit'||buildingOf(ref,l.root)===82||SPECIAL_ROOTS.has(l.root);}
+  const stat=(ref,id)=>ref?.unit_stats?.[String(id)]||null;
+  const unitCost=(ref,id)=>Object.values(stat(ref,id)?.cost||{}).reduce((a,b)=>a+b,0)||1;
+  const isRanged=(ref,id)=>(stat(ref,id)?.range||0)>=2;
+  // damage per hit after armour (base melee/pierce plus class bonuses), at least 1 as in the game
+  function hitDamage(ref,a,d){
+    const A=stat(ref,a),D=stat(ref,d);
+    if(!A||!D)return 1;
+    const base=Math.max(0,(A.melee_attack||0)-(D.melee_armour||0))+Math.max(0,(A.pierce_attack||0)-(D.pierce_armour||0));
+    return Math.max(1,base+bonusVs(ref,a,d).total);
+  }
+  // How a beats d in a 1-on-1 from the final units' base values (no blacksmith, civ bonus amounts or micro):
+  // each side's time to kill the other = HP ÷ (damage per hit ÷ reload); a melee unit facing a ranged one first
+  // walks across its range (range ÷ speed). ratio = (d's time to kill a) ÷ (a's time to kill d) × d's cost ÷ a's
+  // cost, i.e. resource for resource; edge = log2(ratio), > 0 when a wins.
+  function pair(ref,a,d){
+    const A=stat(ref,a),D=stat(ref,d);
+    if(!A||!D)return {edge:0,ratio:1,approach:0};
+    const dealt=hitDamage(ref,a,d),taken=hitDamage(ref,d,a);
+    let aKills=D.hp/(dealt/(A.reload||2)),dKills=A.hp/(taken/(D.reload||2)),approach=0;
+    if(isRanged(ref,a)&&!isRanged(ref,d)){approach=A.range/(D.speed||1);dKills+=approach;}
+    else if(isRanged(ref,d)&&!isRanged(ref,a)){approach=D.range/(A.speed||1);aKills+=approach;}
+    const ratio=dKills/aKills*(unitCost(ref,d)/unitCost(ref,a));
+    return {edge:Math.log2(ratio),ratio,dealt,taken,approach,aKills,dKills,bonus:bonusVs(ref,a,d)};
+  }
+  const isUniqueUnit=(ref,l)=>node(ref,'u',l.root)?.type==='UniqueUnit'||buildingOf(ref,l.root)===82;
+  const boostOf=(ref,civ,id)=>ref?.civs?.[civ]?.boosts?.[String(id)]||null;
+  // keep the first line of each unit class (DAT class: archer, cavalry, cavalry archer, …), then fill up
+  function diverse(ref,rows,count){
+    const out=[],seen=new Set();
+    for(const r of rows){const c=stat(ref,r.unit)?.class;if(out.length<count&&!seen.has(c)){out.push(r);seen.add(c);}}
+    for(const r of rows)if(out.length<count&&!out.includes(r))out.push(r);
+    return out;
+  }
+  const sumPositive=values=>values.filter(v=>v>0).reduce((a,b)=>a+b,0);
   function summary(ref,mine,theirs){
     if(!ref?.civs?.[mine]||!ref?.civs?.[theirs])return null;
     const myArmy=armyLines(ref,linesOf(ref,mine)),theirArmy=armyLines(ref,linesOf(ref,theirs));
-    const full=myArmy.filter(l=>l.status==='full'),main=full.length?full:myArmy;
-    // threats: their unique/special/fully upgraded lines, by the biggest bonus against one of my main lines
-    const threats=theirArmy.filter(l=>isSpecial(ref,l)||l.status==='full').map(l=>{
-      const hits=main.map(m=>({target:m.final,...bonusVs(ref,l.final,m.final)})).filter(h=>h.total>0).sort((x,y)=>y.total-x.total);
-      return {unit:l.final,root:l.root,special:isSpecial(ref,l),hits};
-    }).filter(t=>t.hits.length).sort((x,y)=>y.hits[0].total-x.hits[0].total||Number(y.special)-Number(x.special)).slice(0,3);
-    // fewer than three: add their castle unique units by their base stats
-    for(const l of theirArmy){
-      if(threats.length>=3)break;
-      if(buildingOf(ref,l.root)===82&&!threats.some(t=>t.root===l.root))threats.push({unit:l.final,root:l.root,special:true,hits:[]});
-    }
-    const threatUnits=threats.map(t=>t.unit);
-    // avoid: my main lines the threats hit harder than those lines hit back
-    const avoid=main.map(m=>{
-      const by=threatUnits.map(u=>({unit:u,...bonusVs(ref,u,m.final)})).filter(h=>h.total>0).sort((x,y)=>y.total-x.total);
-      const dealt=Math.max(0,...threatUnits.map(u=>bonusVs(ref,m.final,u).total));
-      return {unit:m.final,root:m.root,by,worst:by[0]?.total||0,dealt};
-    }).filter(a=>a.worst>a.dealt).sort((x,y)=>y.worst-x.worst).slice(0,2);
-    // recommend: my lines with the biggest bonus against the threats, fully upgraded first
-    const recommend=myArmy.map(m=>{
-      const vs=threatUnits.map(u=>({target:u,...bonusVs(ref,m.final,u)})).filter(h=>h.total>0).sort((x,y)=>y.total-x.total);
-      return {unit:m.final,root:m.root,full:m.status==='full',vs,score:vs.reduce((s,h)=>s+h.total,0)};
-    }).filter(r=>r.score>0).sort((x,y)=>Number(y.full)-Number(x.full)||y.score-x.score).slice(0,3);
+    // my main lines: unique, fully upgraded or boosted by my civ
+    const mainLines=myArmy.filter(l=>isUniqueUnit(ref,l)||l.status==='full'||boostOf(ref,mine,l.final));
+    const main=mainLines.length?mainLines:myArmy;
+    // threat candidates: their unique units and lines their civ boosts; fully upgraded lines only if fewer than three
+    let pool=theirArmy.filter(l=>isUniqueUnit(ref,l)||boostOf(ref,theirs,l.final));
+    if(pool.length<3)pool=pool.concat(theirArmy.filter(l=>l.status==='full'&&!pool.includes(l)));
+    const threatRows=pool.map(l=>{
+      const vs=main.map(m=>({target:m.final,...pair(ref,l.final,m.final)})).sort((x,y)=>y.edge-x.edge);
+      return {unit:l.final,root:l.root,unique:isUniqueUnit(ref,l),boost:boostOf(ref,theirs,l.final),vs,score:sumPositive(vs.map(v=>v.edge))};
+    }).sort((x,y)=>Number(y.score>=0.5)-Number(x.score>=0.5)||(y.score>=0.5?y.score-x.score:0)||Number(y.unique)-Number(x.unique)||(y.boost?.attrs.length||0)-(x.boost?.attrs.length||0));
+    const threats=diverse(ref,threatRows,3);
+    const T=threats.map(t=>t.unit);
+    // the opponent's strongest answer to one of my units, over all their army lines
+    const answer=id=>theirArmy.map(o=>({line:o,...pair(ref,o.final,id)})).sort((x,y)=>y.edge-x.edge)[0]||null;
+    // avoid: my main lines the threats beat together, that beat none of them and that the opponent can answer
+    const avoidRows=main.map(m=>{
+      const by=T.map(u=>({unit:u,...pair(ref,u,m.final)})).filter(p=>p.edge>0).sort((x,y)=>y.edge-x.edge);
+      const hitsBack=T.some(u=>pair(ref,m.final,u).edge>0.5);
+      return {unit:m.final,root:m.root,by,score:sumPositive(by.map(p=>p.edge)),hitsBack,answer:answer(m.final)};
+    }).filter(a=>a.score>=1&&!a.hitsBack&&a.answer&&a.answer.edge>=0.5).sort((x,y)=>y.score-x.score);
+    const avoid=diverse(ref,avoidRows,2);
+    const avoided=new Set(avoid.map(a=>a.root));
+    // recommend: my lines that beat at least one threat, fully upgraded first, then how well they beat the threats
+    // minus how well the opponent can answer them (a missing counter upgrade on their side helps)
+    const recommend=myArmy.filter(m=>!avoided.has(m.root)).map(m=>{
+      const vs=T.map(u=>({target:u,...pair(ref,m.final,u)})).sort((x,y)=>y.edge-x.edge);
+      const neg=vs.filter(v=>v.edge<0).reduce((a,v)=>a+v.edge,0),ans=answer(m.final);
+      return {unit:m.final,root:m.root,full:m.status==='full',vs,beats:sumPositive(vs.map(v=>v.edge)),answer:ans,score:sumPositive(vs.map(v=>v.edge))+neg/2-Math.max(0,ans?.edge||0)/2};
+    }).filter(r=>r.beats>=0.5).sort((x,y)=>Number(y.full)-Number(x.full)||y.score-x.score).slice(0,3);
     // gaps: their missing core lines, missing final upgrades, missing key techs
     const theirLines=new Map(linesOf(ref,theirs).map(l=>[l.root,l]));
     const missingLines=CORE_LINES.filter(r=>!theirLines.has(r)||theirLines.get(r).status==='none');
@@ -149,16 +188,32 @@
       +(src?`<img src="${src}" alt="" loading="lazy">`:`<span class="mu-fallback">${esc(name.slice(0,2))}</span>`)
       +(opts.label?`<span class="mu-label">${esc(name)}</span>`:'')+'</span>';
   }
-  // "→ [target icon] +18" (or "← [attacker icon] +18"): one attack bonus, its classes in the tooltip
-  function relation(ref,attacker,target,hit,arrow){
-    const tip=`${unitName(ref,attacker)} → ${unitName(ref,target)}\n타격당 보너스 +${hit.total} (${parts(ref,hit)})`;
-    const src=iconSrc(ref,'u',arrow==='←'?attacker:target);
-    return `<span class="mc-rel" tabindex="0" role="img" aria-label="${esc(tip)}" data-tip="${esc(tip)}">${arrow}${src?`<img src="${src}" alt="" loading="lazy">`:''}<b>+${hit.total}</b></span>`;
+  const times=edge=>{const r=Math.pow(2,edge);return r>=10?"10+":r.toFixed(1);};
+  const pairFigure=p=>`×${times(p.edge)}`;
+  const sec=v=>`${Math.round(v*10)/10}초`;
+  function pairTip(ref,a,d,p){
+    return `${unitName(ref,a)} → ${unitName(ref,d)}
+타격당 피해 ${Math.round(p.dealt*10)/10}${p.bonus.parts.length?` (보너스 ${parts(ref,p.bonus)})`:''} · 받는 피해 ${Math.round(p.taken*10)/10}`
+      +`
+1:1 처치 시간 ${sec(p.aKills)} vs ${sec(p.dKills)}${p.approach?` (접근 ${sec(p.approach)} 포함)`:''}
+비용 ${unitCost(ref,a)} vs ${unitCost(ref,d)} → 같은 자원 기준 ×${times(p.edge)}`;
   }
-  function unitTip(ref,id,hits){
-    const rows=[unitName(ref,id),statsLine(ref,id)];
-    if(hits?.length)rows.push(...hits.map(h=>`→ ${unitName(ref,h.target)} +${h.total} (${parts(ref,h)})`));
-    return rows.filter(Boolean).join('\n');
+  // "→ [target icon] ×2.6" (or "← [attacker icon] ×2.6"), evidence in the tooltip
+  function relation(ref,attacker,target,p,arrow){
+    const tip=pairTip(ref,attacker,target,p);
+    const src=iconSrc(ref,'u',arrow==='←'?attacker:target);
+    return `<span class="mc-rel" tabindex="0" role="img" aria-label="${esc(tip)}" data-tip="${esc(tip)}">${arrow}${src?`<img src="${src}" alt="" loading="lazy">`:''}<b>${esc(pairFigure(p))}</b></span>`;
+  }
+  function unitTip(ref,id,rows,extra){
+    const out=[unitName(ref,id),statsLine(ref,id)];
+    for(const r of rows||[])if(r.edge>0)out.push(`→ ${unitName(ref,r.target)} ${pairFigure(r)}`);
+    return out.concat(extra||[]).filter(Boolean).join('\n');
+  }
+  const boostText=b=>b?`문명 보너스: ${[...new Set(b.attrs.map(a=>ATTR_KO[a]).filter(Boolean))].join('·')}${b.sources.includes('unique')?' (고유 기술 포함)':''}`:'';
+  function answerText(ref,ans){
+    if(!ans)return '';
+    const line=ans.line,missing=line.status==='partial'?` — 상대 ${unitName(ref,line.top)} 없음`:'';
+    return `상대의 가장 강한 대응: ${unitName(ref,line.final)} ${ans.edge>0?pairFigure(ans):'(불리)'}${missing}`;
   }
   function cardRow(cls,mark,title,body){
     return `<div class="mc-row ${cls}"><span class="mc-icon" aria-hidden="true">${mark}</span><div class="mc-body"><span class="mc-title">${esc(title)}</span>${body}</div></div>`;
@@ -168,9 +223,13 @@
     const s=summary(ref,mine,theirs);
     if(!s)return '';
     const none=text=>`<span class="mc-none">${esc(text)}</span>`;
-    const avoid=s.avoid.length?chips(s.avoid.map(a=>`<span class="mc-chip">${icon(ref,'u',a.unit,{label:true,tip:[`${unitName(ref,a.unit)} 단독`,...a.by.map(h=>`← ${unitName(ref,h.unit)} +${h.total} (${parts(ref,h)})`)].join('\n')})}${relation(ref,a.by[0].unit,a.unit,a.by[0],'←')}</span>`)):none('뚜렷한 것 없음');
-    const threats=s.threats.length?chips(s.threats.map(t=>`<span class="mc-chip">${icon(ref,'u',t.unit,{label:true,tip:unitTip(ref,t.unit,t.hits)})}${t.hits.length?relation(ref,t.unit,t.hits[0].target,t.hits[0],'→'):'<span class="mc-rel-text">고유 유닛</span>'}</span>`)):none('뚜렷한 것 없음');
-    const recommend=s.recommend.length?chips(s.recommend.map(r=>`<span class="mc-chip">${icon(ref,'u',r.unit,{label:true,tip:unitTip(ref,r.unit,r.vs)+(r.full?'':'\n(최종 업그레이드 아님)')})}${relation(ref,r.unit,r.vs[0].target,r.vs[0],'→')}</span>`)):none('공격 보너스로 맞설 계열 없음');
+    const avoid=s.avoid.length?chips(s.avoid.map(a=>`<span class="mc-chip">${icon(ref,'u',a.unit,{label:true,tip:[`${unitName(ref,a.unit)} 단독`,...a.by.map(p=>`← ${unitName(ref,p.unit)} ${pairFigure(p)}`),answerText(ref,a.answer)].join('\n')})}${relation(ref,a.by[0].unit,a.unit,a.by[0],'←')}</span>`)):none('상대 핵심 병종이 함께 앞서는 내 계열 없음');
+    const threats=s.threats.length?chips(s.threats.map(t=>{
+      const best=t.vs[0],tip=unitTip(ref,t.unit,t.vs,[t.unique?'고유 유닛':'',boostText(t.boost)]);
+      const tail=best&&best.edge>0?relation(ref,t.unit,best.target,best,'→'):`<span class="mc-rel-text">${esc(t.unique?'고유 유닛':boostText(t.boost))}</span>`;
+      return `<span class="mc-chip">${icon(ref,'u',t.unit,{label:true,tip})}${tail}</span>`;
+    })):none('뚜렷한 것 없음');
+    const recommend=s.recommend.length?chips(s.recommend.map(r=>`<span class="mc-chip">${icon(ref,'u',r.unit,{label:true,tip:unitTip(ref,r.unit,r.vs,[r.full?'':'(최종 업그레이드 아님)',answerText(ref,r.answer)])})}${relation(ref,r.unit,r.vs[0].target,r.vs[0],'→')}</span>`)):none('상대 핵심 병종에 앞서는 계열 없음');
     const g=s.gaps;
     const gapIcons=[...g.lines.map(r=>icon(ref,'u',r,{crossed:true,tip:`${unitName(ref,r)} 계열 없음`})),...g.tops.map(id=>icon(ref,'u',id,{crossed:true,tip:`${unitName(ref,id)} 없음`})),...g.techs.map(t=>icon(ref,'t',t,{crossed:true,tip:`${techName(ref,t)} 없음`}))];
     return `<div class="matchup-card"><div class="mc-head"><span class="mc-kicker">MATCHUP · ${esc(civLabel(ref,mine))}</span><strong class="mc-vs">VS ${esc(civLabel(ref,theirs))}</strong></div>`
@@ -178,7 +237,7 @@
       +cardRow('mc-threat','▲','상대 핵심 위협',threats)
       +cardRow('mc-counter','✓','추천 대응',recommend)
       +cardRow('mc-gap','i','상대 기술적 빈틈',gapIcons.length?`<div class="mc-icons">${gapIcons.join('')}</div>`:none('주요 계열·기술 결손 없음'))
-      +'<p class="mc-note">+숫자 = 타격당 공격 보너스, 각 계열 최종 유닛 기본값(대장간·문명 보너스 제외). 아이콘에 마우스를 올리거나 누르면 이름·근거.</p></div>';
+      +'<p class="mc-note">×숫자 = 같은 자원으로 싸울 때 기본 수치상 유리한 정도(1:1 처치 시간 × 비용, 원거리 상대는 다가가는 시간 포함). 각 계열 최종 유닛 기본값 — 대장간·문명 보너스 수치·컨트롤 제외. 아이콘을 누르면 근거.</p></div>';
   }
   function chainCell(ref,l){
     if(l.final==null)return '<span class="matchup-none">—</span>';
@@ -263,6 +322,6 @@
     });
     return `<section class="civ-matchup" data-civ-matchup="${esc(JSON.stringify([mine,theirs]))}"><div class="summary-label"><span>문명 매치업 및 전략 복기</span></div><p class="compact-note">문명 기술표를 불러오는 중…</p></section>`;
   }
-  const api={lineStatus,bonusVs,compare,summary,html,mount,load};
+  const api={lineStatus,bonusVs,pair,compare,summary,html,mount,load};
   if(typeof module==='object'&&module.exports)module.exports=api;else{global.SSAPOCivMatchup=api;installTips();}
 })(typeof window==='undefined'?globalThis:window);

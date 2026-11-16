@@ -56,6 +56,38 @@ ARMOR_CLASS_KO = {
     37: "공성 무기(대형)", 38: "척후병", 39: "기병 저항",
 }
 BASE_CLASSES = {3, 4}
+# Effect attributes that change how a unit fights or what it costs (genieutils attribute ids):
+# 0 hit points, 5 speed, 8 armour, 9 attack, 10 reload time, 12 range, 100/103-106 costs, 101 train time.
+COMBAT_ATTRS = {0, 5, 8, 9, 10, 12, 100, 101, 103, 104, 105, 106}
+MODIFY_KINDS = {0, 4, 5, 10, 14, 15}  # set / add / multiply attribute, and their team versions
+
+
+def civ_boosts(dat: dict, civ_id: int, line_units: set[int]) -> dict[str, dict]:
+    """Units of this civ's lines that its own effects change, with the attributes changed.
+
+    Sources: the civ's tech-tree effect, its team bonus effect (it applies to the player too) and
+    every tech tagged with this civ (hidden civ-bonus techs cost nothing; unique techs cost
+    resources). Only which unit and which attribute are kept: some bonus techs are staged by age or
+    are inactive variants, so the amounts are not applied to the stats.
+    """
+    civ = dat["civs"][civ_id]
+    classes = {uid: u["class"] for uid, u in civ["units"].items()}
+    sources = [(civ["tech_tree"], "civ"), (civ["team_bonus"], "civ")]
+    sources += [(t["effect"], "unique" if t["cost"] else "civ") for t in dat["techs"] if t["civ"] == civ_id]
+    boosts: dict[str, dict] = {}
+    for effect_id, source in sources:
+        if not 0 <= effect_id < len(dat["effects"]):
+            continue
+        for kind, unit, cls, attr, _amount in dat["effects"][effect_id]["commands"]:
+            if kind not in MODIFY_KINDS or attr not in COMBAT_ATTRS:
+                continue
+            hit = [unit] if unit >= 0 else [u for u in line_units if cls >= 0 and classes.get(u) == cls]
+            for uid in hit:
+                if uid in line_units:
+                    entry = boosts.setdefault(str(uid), {"attrs": set(), "sources": set()})
+                    entry["attrs"].add(attr)
+                    entry["sources"].add(source)
+    return {k: {"attrs": sorted(v["attrs"]), "sources": sorted(v["sources"])} for k, v in sorted(boosts.items(), key=lambda kv: int(kv[0]))}
 
 
 class Reader:
@@ -210,9 +242,10 @@ def read_dat(path: Path) -> dict:
         for size in (44, 24, 44, 24):
             n = r.one("I")
             r.skip(4 + n * size)
+    effects = []
     for _ in range(r.one("i")):
-        r.debug_string()
-        r.skip(r.one("h") * 11)
+        name = r.debug_string()
+        effects.append({"name": name, "commands": [r.read("Bhhhf") for _ in range(r.one("h"))]})
     for _ in range(r.one("i")):
         if r.one("B"):
             _skip_tasks(r, r.one("h"), v)
@@ -220,8 +253,8 @@ def read_dat(path: Path) -> dict:
     for _ in range(r.one("h")):
         r.skip(1)
         name = r.debug_string()
-        resources = r.one("h")
-        r.skip(4 + resources * 4 + 1)
+        resources, tech_tree, team_bonus = r.read("hhh")
+        r.skip(resources * 4 + 1)
         count = r.one("h")
         present = r.read(f"{count}i")
         units = {}
@@ -229,8 +262,27 @@ def read_dat(path: Path) -> dict:
             if p:
                 u = _read_unit(r, v)
                 units[u["id"]] = u
-        civs.append({"name": name, "units": units})
-    return {"version": v, "civs": civs}
+        civs.append({"name": name, "units": units, "tech_tree": tech_tree, "team_bonus": team_bonus})
+    techs = []
+    for _ in range(r.one("h")):
+        r.skip(12)
+        costs = [r.read("hhB") for _ in range(3)]
+        r.skip(2)
+        civ, _mode = r.read("hh")
+        if v < 31:
+            r.skip(2)
+        r.skip(8 if v >= 18 else 4)
+        if v < 31:
+            r.skip(2)
+        effect, _kind, _icon = r.read("hhh")
+        r.skip((1 if v < 31 else 0) + 8 + (4 if v < 31 else 0))
+        name = r.debug_string()
+        if v >= 15:
+            r.skip(1)
+        if v >= 31:
+            r.skip(r.one("h") * 9)
+        techs.append({"civ": civ, "effect": effect, "name": name, "cost": sum(a for k, a, f in costs if k >= 0 and f)})
+    return {"version": v, "civs": civs, "effects": effects, "techs": techs}
 
 
 def read_strings(path: Path) -> dict[int, str]:
@@ -285,6 +337,8 @@ def sha256(path: Path) -> str:
 
 def unit_facts(u: dict) -> dict:
     facts = {"hp": u["hp"], "class": u["class"]}
+    if u.get("speed"):
+        facts["speed"] = round(u["speed"], 3)
     if "attacks" in u:
         facts["melee_attack"] = u["attacks"].get(4, 0)
         facts["pierce_attack"] = u["attacks"].get(3, 0)
@@ -358,6 +412,7 @@ def build(game: Path, build_number: int) -> dict:
             "missing_units": sorted(set(missing_units)),
             "missing_techs": sorted(set(missing_techs)),
             "lines": lines,
+            "boosts": civ_boosts(dat, civ_id, {u for chain in lines for u in chain}),
         }
     return {
         "schema_version": SCHEMA_VERSION,

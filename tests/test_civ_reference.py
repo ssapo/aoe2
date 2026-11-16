@@ -78,6 +78,16 @@ class SavedReferenceTests(unittest.TestCase):
         self.assertEqual(nodes["t75"]["building"], 103)
         self.assertNotIn("\\n", json.dumps(nodes, ensure_ascii=False))
 
+    def test_civ_boosts_come_from_the_civs_own_effects(self):
+        civs = self.data["civs"]
+        self.assertIn(0, civs["Mongols"]["boosts"]["441"]["attrs"])  # Hussar HP (civ bonus)
+        self.assertIn(10, civs["Mongols"]["boosts"]["474"]["attrs"])  # Heavy Cavalry Archer attack speed
+        self.assertEqual(civs["Mongols"]["boosts"]["474"]["sources"], ["civ"])
+        self.assertIn(9, civs["Hindustanis"]["boosts"]["207"]["attrs"])  # Imperial Camel attack
+        self.assertIn("unique", civs["Hindustanis"]["boosts"]["5"]["sources"])  # Shatagni: hand cannoneer range
+        self.assertNotIn("38", civs["Vietnamese"]["boosts"])
+        self.assertEqual(self.data["unit_stats"]["38"]["speed"], 1.35)
+
     def test_every_node_has_an_icon_number(self):
         nodes = self.data["nodes"]
         self.assertTrue(all(isinstance(n.get("icon"), int) for n in nodes.values()))

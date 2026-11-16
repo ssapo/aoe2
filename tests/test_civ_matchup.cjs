@@ -77,24 +77,70 @@ test('mount gives a placeholder until the table loads, then html',async()=>{
   assert.ok(!cm.mount('Vietnamese','Mongols').includes('data-civ-matchup'));
 });
 
-test('summary card rows come from bonus numbers in the table',()=>{
+const ids=rows=>rows.map(r=>r.unit);
+
+test('pair: 1-on-1 kill times, resource for resource, melee walks across the range first',()=>{
+  // halberdier against knight: 38 per hit (6 melee + 32 cavalry bonus − 2 armour) against 8 taken
+  const p=cm.pair(ref,359,38);
+  assert.ok(p.edge>0&&p.approach===0);
+  assert.strictEqual(p.bonus.total,32);
+  // archer against knight: the knight first walks 4 tiles at 1.35 tiles/s
+  const q=cm.pair(ref,4,38);
+  assert.ok(Math.abs(q.approach-4/1.35)<0.01);
+  assert.ok(Math.abs(cm.pair(ref,38,4).edge+q.edge)<1e-9); // the same fight seen from the other side
+});
+
+// Reference matchups the user gave (screens from another site), compared with what the rules compute.
+test('Vietnamese vs Mongols: threats are the boosted/unique Mongol lines, gaps favour the elephant',()=>{
   const s=cm.summary(ref,'Vietnamese','Mongols');
-  // threats: at most three, each with its biggest bonus against one of my fully upgraded army lines
-  assert.ok(s.threats.length>0&&s.threats.length<=3);
-  assert.strictEqual(s.threats[0].unit,330); // Heavy Camel Rider
-  assert.strictEqual(s.threats[0].hits[0].total,cm.bonusVs(ref,330,s.threats[0].hits[0].target).total);
-  for(const t of s.threats)assert.notStrictEqual(ref.nodes['u'+t.unit].building,49);
-  // avoid: hit harder by a threat than it hits back
-  for(const a of s.avoid){assert.ok(a.worst>a.dealt);assert.ok(a.by.some(h=>s.threats.some(t=>t.unit===h.unit)));}
-  // recommend: halberdier first (full line, +26 against the camel)
-  assert.strictEqual(s.recommend[0].unit,359);
-  assert.strictEqual(s.recommend[0].vs[0].total,26);
-  assert.ok(s.recommend.length<=3&&s.recommend.every(r=>r.score>0));
-  assert.ok(!s.avoid.some(a=>s.recommend.some(r=>r.root===a.root)));
-  // gaps: Mongols lack hand cannoneer and bombard lines, halberdier and paladin, plate barding
+  // user: Mangudai, Hussar, Steppe Lancer are the Mongol core — not Heavy Camel or Elite Skirmisher
+  assert.deepStrictEqual(new Set(ids(s.threats)),new Set([1372,441,561]));
+  assert.ok(!ids(s.threats).includes(330)&&!ids(s.threats).includes(6));
+  // Mongols have no Halberdier, so the elephant is not something to avoid; it is recommended
+  assert.ok(!ids(s.avoid).includes(1134));
+  assert.ok(ids(s.recommend).includes(1134));
+  assert.ok(ids(s.recommend).includes(359));
+  // avoid: lines the Steppe Lancer beats that beat none of the threats
+  for(const a of s.avoid){assert.ok(a.score>=1&&!a.hitsBack);assert.ok(a.answer.edge>=0.5);}
   assert.deepStrictEqual(s.gaps.lines,[5,36]);
   assert.ok(s.gaps.tops.includes(359)&&s.gaps.tops.includes(569));
   assert.ok(s.gaps.techs.includes(80));
+});
+
+test('Britons vs Hindustanis: matches the reference threats, counters and gaps',()=>{
+  const s=cm.summary(ref,'Britons','Hindustanis');
+  // user: Ghulam / Imperial Camel / Hand Cannoneer
+  assert.deepStrictEqual(new Set(ids(s.threats)),new Set([1749,207,5]));
+  // user: Champion + Halberdier (+ archer support)
+  assert.ok(ids(s.recommend).includes(567)&&ids(s.recommend).includes(359));
+  // user: no Knight line, no Halberdier
+  assert.ok(s.gaps.lines.includes(38));
+  assert.ok(s.gaps.tops.includes(359));
+  // user said "Longbowman alone / Knight alone"; the rules pick the ranged lines the Ghulam beats hardest
+  // (Elite Skirmisher, Heavy Mounted Crossbowman) — same reason (Ghulam against archers), different unit
+  for(const a of s.avoid)assert.strictEqual(a.by[0].unit,1749);
+});
+
+test('Britons vs Dravidians: matches the reference threats, avoid and knight pressure',()=>{
+  const s=cm.summary(ref,'Britons','Dravidians');
+  // user: Elite Skirmisher (fast firing) / Elephant Archer / Urumi
+  assert.deepStrictEqual(new Set(ids(s.threats)),new Set([875,1737,6]));
+  // user: careful with archers alone
+  assert.ok(ids(s.avoid).includes(492));
+  // user: knights against skirmishers (Britons stop at Cavalier)
+  const cav=s.recommend.find(r=>r.unit===283);
+  assert.ok(cav&&cav.vs[0].target===6);
+  assert.ok(s.gaps.lines.includes(38));
+});
+
+test('summary rows are consistent with each other',()=>{
+  for(const [a,b] of [['Vietnamese','Mongols'],['Britons','Hindustanis'],['Mongols','Vietnamese'],['Franks','Mongols']]){
+    const s=cm.summary(ref,a,b);
+    assert.ok(s.threats.length<=3&&s.avoid.length<=2&&s.recommend.length<=3);
+    for(const t of s.threats)assert.notStrictEqual(ref.nodes['u'+t.unit].building,49);
+    assert.ok(!s.avoid.some(x=>s.recommend.some(r=>r.root===x.root)));
+    for(const r of s.recommend)assert.ok(r.beats>=0.5);
+  }
 });
 
 test('summary card html: four rows of icons, names and numbers in tooltips',()=>{
@@ -102,14 +148,16 @@ test('summary card html: four rows of icons, names and numbers in tooltips',()=>
   for(const title of ['피해야 할 단독 병력','상대 핵심 위협','추천 대응','상대 기술적 빈틈'])assert.ok(html.includes(title));
   assert.ok(html.indexOf('matchup-card')<html.indexOf('matchup-more'));
   assert.ok(html.includes('<details class="matchup-more">'));
-  // halberdier chip: icon from the table's picture index, name next to it, the +26 relation with its class in the tooltip
+  // halberdier chip: icon from the table's picture index, name next to it, the ×ratio with its evidence in the tooltip
   assert.ok(html.includes(`src="assets/units/${ref.nodes.u359.icon}.png"`));
   assert.ok(html.includes('<span class="mu-label">미늘창병</span>'));
-  assert.ok(html.includes('data-tip="미늘창병 → 중형 낙타 기병\n타격당 보너스 +26 (낙타 26)"'));
+  assert.ok(html.includes('data-tip="미늘창병 → 후사르\n타격당 피해 38 (보너스 기병 32) · 받는 피해 7\n1:1 처치 시간 5.9초 vs 16.3초\n비용 60 vs 80 → 같은 자원 기준 ×3.7"'));
+  // threats without a winning pair say why they are there (civ bonus from the game data)
+  assert.ok(html.includes('문명 보너스: 공격 속도'));
   // gaps are crossed icons with the fact in the tooltip
   assert.ok(html.includes('data-tip="총통병 계열 없음"'));
   assert.ok(html.includes(`class="mu mu-x"`));
-  assert.ok(html.includes('대장간·문명 보너스 제외'));
+  assert.ok(html.includes('대장간·문명 보너스 수치·컨트롤 제외'));
   assert.strictEqual(cm.summary(ref,'Spartans','Mongols'),null);
 });
 
