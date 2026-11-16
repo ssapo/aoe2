@@ -426,18 +426,295 @@
     }
     return out;
   }
+  // ── actual armies (APP-17): both sides' production and research commands (full_timeline), side by side ──
+  // Commands, not units: a queue command may be cancelled or fail for resources; deaths and survivors are not
+  // in the replay. One click on a train button queues one unit, so quick repeated clicks (0.2–0.4 s apart on the
+  // same buildings in the raw replay) are kept; only exact repeats (same name and amount within 0.05 s) count once.
+  // A tech is researched once, so research clicks of the same tech within 5 s are one command; a later repeat
+  // means the earlier one was cancelled, and the start of the last burst counts.
+  const ATTACK_TECHS=new Set([67,68,75,199,200,201]); // Forging, Iron Casting, Blast Furnace, Fletching, Bodkin Arrow, Bracer
+  const ARMOUR_TECHS=new Set([74,76,77,80,81,82,211,212,219]);
+  const AGE_LABELS=new Set(['Feudal Age','Castle Age','Imperial Age']);
+  const UP_GROUPS=[['smith','대장간'],['line','계열 업그레이드'],['mil','군사 기술'],['eco','경제·기타']];
+  const mmss=s=>{s=Math.max(0,Math.round(s));return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;};
+  const minute=s=>`${Math.floor(s/60)}분`;
+  const nameCache=new WeakMap();
+  function nameIndex(ref){
+    if(nameCache.has(ref))return nameCache.get(ref);
+    const by=new Map();
+    for(const [k,n] of Object.entries(ref?.nodes||{})){if(!by.has(n.name))by.set(n.name,[]);by.get(n.name).push(k);}
+    // queue commands name the packed trebuchet "Trebuchet"
+    for(const [alias,name] of [['Trebuchet','Trebuchet (Packed)']])if(!by.has(alias)&&by.has(name))by.set(alias,by.get(name));
+    nameCache.set(ref,by);
+    return by;
+  }
+  function cleanQueue(ev){
+    const out=[];let dup=0,cancel=0;
+    for(const e of ev||[]){
+      if(e[1]!=='Q')continue;
+      if(!(e[3]>0)){if(e[3]<0)cancel+=-e[3];continue;}
+      let seen=false;
+      for(let i=out.length-1;i>=0&&e[0]-out[i][0]<=0.05;i--)if(out[i][2]===e[2]&&out[i][3]===e[3])seen=true;
+      if(seen){dup++;continue;}
+      out.push(e);
+    }
+    return {list:out,dup,cancel};
+  }
+  function cleanResearch(ref,civName,ev){
+    const by=new Map(),idx=nameIndex(ref),lines=ref?.civs?.[civName]?.lines||[];
+    for(const e of ev||[]){
+      if(e[1]!=='R'||AGE_LABELS.has(e[2]))continue;
+      const r=by.get(e[2]);
+      if(!r){by.set(e[2],{label:e[2],at:e[0],first:e[0],last:e[0],commands:1,bursts:1});continue;}
+      r.commands++;
+      if(e[0]-r.last>5){r.bursts++;r.at=e[0];}
+      r.last=e[0];
+    }
+    const inLines=id=>lines.some(c=>c.indexOf(id)>0);
+    return [...by.values()].map(r=>{
+      const keys=idx.get(r.label)||[];
+      const u=keys.filter(k=>k[0]==='u').map(k=>Number(k.slice(1))).find(inLines);
+      if(u!=null)return {...r,kind:'u',id:u,group:'line'};
+      const t=keys.find(k=>k[0]==='t'),id=t?Number(t.slice(1)):null,n=t?ref.nodes[t]:null;
+      const group=!n?'eco':n.building===103?'smith':ref.tech_effects?.[String(id)]||KEY_TECHS.includes(id)||n.type==='UniqueTech'?'mil':'eco';
+      return {...r,kind:t?'t':null,id,group};
+    }).sort((x,y)=>x.at-y.at);
+  }
+  // a side's state at T: age reached, techs and line upgrades commanded by then, unique techs by their age
+  function sideState(ref,res,reach,T){
+    const age=[4,3,2].find(a=>reach?.[a]!=null&&reach[a]<=T)||1;
+    const done=res.filter(r=>r.at<=T);
+    const techs=new Set(done.filter(r=>r.kind==='t').map(r=>r.id));
+    const uniqueAges=new Set(done.filter(r=>r.kind==='t'&&node(ref,'t',r.id)?.type==='UniqueTech').map(r=>Math.max(3,node(ref,'t',r.id).age||3)));
+    return {T,age,techs,uniqueAges,ups:new Set(done.filter(r=>r.kind==='u').map(r=>r.id))};
+  }
+  const unitAt=(chain,st)=>{let u=chain[0];for(const id of chain.slice(1))if(st.ups.has(id))u=id;return u;};
+  // stats with only what the side actually commanded: generic techs it researched, its civ bonus steps by the
+  // age it had reached, and unique-tech steps only when it researched its unique tech of that age
+  function statActual(ref,civName,id,st){
+    const base=stat(ref,id);
+    if(!base)return null;
+    const s=JSON.parse(JSON.stringify(base));
+    s.bonus=s.bonus||{};s.armour_classes=s.armour_classes||{};
+    const applied=[];
+    for(const [tid,t] of Object.entries(ref.tech_effects||{})){
+      if(!st.techs.has(Number(tid)))continue;
+      let hit=false;
+      for(const [kind,unit,cls,attr,amount] of t.commands||[])
+        if(unit===id||unit===-1&&cls>=0&&cls===base.class){applyCmd(s,kind,attr,amount);hit=true;}
+      if(hit)applied.push(Number(tid));
+    }
+    const steps=cleanSteps(ref,civName,id).filter(x=>x[4]==='unique'?st.uniqueAges.has(stepAge(x)):x[0]<=st.age);
+    for(const [,attr,kind,amount] of steps)applyCmd(s,kind,attr,amount);
+    s.techs=applied;s.civSteps=steps.length;
+    return s;
+  }
+  // production commands in [from, to): army lines (root → count) and villagers
+  function produced(ref,civName,list,from,to){
+    const idx=nameIndex(ref),lines=ref?.civs?.[civName]?.lines||[],rows=new Map();
+    let vill=0;
+    for(const e of list){
+      if(e[0]<from||e[0]>=to)continue;
+      if(e[2]==='Villager'){vill+=e[3];continue;}
+      const ids=(idx.get(e[2])||[]).filter(k=>k[0]==='u').map(k=>Number(k.slice(1)));
+      const chain=lines.find(c=>ids.some(id=>c.includes(id)))||null,key=chain?chain[0]:e[2];
+      const r=rows.get(key)||{root:chain?chain[0]:null,chain,label:e[2],n:0,first:e[0]};
+      r.n+=e[3];rows.set(key,r);
+    }
+    return {rows:[...rows.values()].sort((a,b)=>b.n-a.n||a.first-b.first),vill};
+  }
+  const isArmyRow=(ref,r)=>r.root!=null&&!NON_COMBAT.has(r.root)&&buildingOf(ref,r.root)!==49;
+  // a side's main army lines: at least 3 commands and at least a quarter of its biggest line, two at most
+  const mainRows=(ref,p)=>{const army=p.rows.filter(r=>isArmyRow(ref,r)),top=army[0]?.n||0;return army.filter(r=>r.n>=3&&r.n>=top/4).slice(0,2);};
+  const armyCount=(ref,p)=>p.rows.filter(r=>isArmyRow(ref,r)).reduce((a,r)=>a+r.n,0);
+  // each side's own window for an age (Dark Age orders count with Feudal); 'all' = the whole match
+  function windowOf(reach,dur,age){
+    if(age==='all')return [0,dur];
+    const from=age===2?0:reach?.[age];
+    if(from==null||from>=dur)return null;
+    const next=[3,4,5].filter(a=>a>age).map(a=>reach?.[a]).find(v=>v!=null);
+    return [from,Math.min(dur,next??dur)];
+  }
+  // everything the card needs from both timelines (null when the match has no usable timeline)
+  function armyModel(ref,civs,army){
+    if(!army||!ref?.civs?.[civs[0]]||!ref?.civs?.[civs[1]])return null;
+    const dur=Number(army.dur);
+    if(!(dur>0))return null;
+    const sides=['mine','theirs'].map((k,i)=>{
+      const q=cleanQueue(army.ev?.[k]);
+      return {key:k,civ:civs[i],reach:army.reach?.[k]||{},queue:q.list,dup:q.dup,cancel:q.cancel,res:cleanResearch(ref,civs[i],army.ev?.[k])};
+    });
+    if(!sides.some(s=>s.queue.length||s.res.length))return null;
+    return {dur,sides};
+  }
+  // one line pair: my line against theirs at each side's own time, with what each had commanded by then
+  function linePair(ref,M,mine,theirs,tm,tt){
+    const [a,b]=M.sides,sa=sideState(ref,a.res,a.reach,tm),sb=sideState(ref,b.res,b.reach,tt);
+    const u=unitAt(mine.chain,sa),v=unitAt(theirs.chain,sb),SU=statActual(ref,a.civ,u,sa),SV=statActual(ref,b.civ,v,sb);
+    const p=pair(ref,u,v,SU,SV),q=pair(ref,v,u,SV,SU);
+    return {u,v,SU,SV,p,q,mine,theirs,tm,tt};
+  }
+  function ageView(ref,M,age){
+    const [a,b]=M.sides,wa=windowOf(a.reach,M.dur,age),wb=windowOf(b.reach,M.dur,age);
+    const pa=wa?produced(ref,a.civ,a.queue,wa[0],wa[1]):null,pb=wb?produced(ref,b.civ,b.queue,wb[0],wb[1]):null;
+    const ra=wa?a.res.filter(r=>r.at>=wa[0]&&r.at<wa[1]):[],rb=wb?b.res.filter(r=>r.at>=wb[0]&&r.at<wb[1]):[];
+    const pairs=[];
+    if(pa&&pb){
+      const ma=mainRows(ref,pa),mb=mainRows(ref,pb);
+      for(const x of ma)for(const y of mb)pairs.push(linePair(ref,M,x,y,wa[1],wb[1]));
+      pairs.sort((x,y)=>y.mine.n*y.theirs.n-x.mine.n*x.theirs.n);
+    }
+    return {age,wa,wb,pa,pb,ra,rb,pairs:pairs.slice(0,4)};
+  }
+  // "흐름": one modest sentence from the decisive age's facts only (command counts, the opponent's line upgrades
+  // and new main lines, attack/armour upgrade levels on the main lines)
+  function flowSentence(ref,M,openAge){
+    const age=AGES.includes(openAge)?openAge:3,[a,b]=M.sides;
+    const first=g=>{const v=[a.reach?.[g],b.reach?.[g]].filter(x=>x!=null);return v.length?Math.min(...v):null;};
+    const start=first(age);
+    if(start==null||start>=M.dur)return '';
+    const end=Math.min(M.dur,[age+1,age+2].map(first).find(v=>v!=null)??M.dur),mid=Math.min(end,start+300);
+    const P=(s,f,t)=>produced(ref,s.civ,s.queue,f,t);
+    const all=[P(a,start,end),P(b,start,end)],early=[P(a,start,mid),P(b,start,mid)],late=[P(a,mid,end),P(b,mid,end)];
+    const n=all.map(p=>armyCount(ref,p)),n0=early.map(p=>armyCount(ref,p)),n1=late.map(p=>armyCount(ref,p));
+    if(n[0]+n[1]<3)return '';
+    const lead=x=>{const r=mainRows(ref,x).concat(x.rows.filter(r=>isArmyRow(ref,r)))[0];return r?unitName(ref,r.root):'';};
+    const ageKo=AGE_KO[age],clauses=[];
+    let countClause='';
+    if(end-mid>=180&&n0[0]+n0[1]>=3&&n1[0]+n1[1]>=3&&(n0[0]-n0[1])*(n1[0]-n1[1])<0&&Math.abs(n0[0]-n0[1])>=3&&Math.abs(n1[0]-n1[1])>=3){
+      const meFirst=n0[0]>n0[1];
+      countClause=`${ageKo} 초반(${minute(start)}~${minute(mid)})엔 ${meFirst?'내':'상대'} 군사 생산 명령이 더 많았지만(${lead(early[meFirst?0:1])} 위주), 뒤로 갈수록 ${meFirst?'상대':'내'} 쪽이 더 많았고`;
+    }else if(Math.abs(n[0]-n[1])<Math.max(5,0.2*Math.max(n[0],n[1])))countClause=`${ageKo}시대 군사 생산 명령은 비슷했고(${n[0]} 대 ${n[1]})`;
+    else{
+      const meMore=n[0]>n[1];
+      countClause=`${ageKo}시대 군사 생산 명령은 ${meMore?'내':'상대'} 쪽이 더 많았{BUT}(${n[0]} 대 ${n[1]}, ${lead(all[meMore?0:1])} 위주)`;
+    }
+    clauses.push(countClause);
+    // the opponent's line upgrades and new main lines in that age
+    const events=[];
+    const armyUnit=id=>{const c=(ref.civs[b.civ].lines||[]).find(l=>l.includes(id));return c&&!NON_COMBAT.has(c[0])&&buildingOf(ref,c[0])!==49;};
+    for(const r of b.res)if(r.kind==='u'&&armyUnit(r.id)&&r.at>=start&&r.at<end)events.push([r.at,`${minute(r.at)} ${unitName(ref,r.id)} 업그레이드`]);
+    // a line is new in the age when it had fewer than 3 commands before it
+    const before=produced(ref,b.civ,b.queue,0,start).rows;
+    for(const r of mainRows(ref,all[1]))if(r.first>=start+60&&(before.find(x=>x.root===r.root)?.n||0)<3)events.push([r.first,`${minute(r.first)}부터 ${unitName(ref,r.root)} 생산`]);
+    events.sort((x,y)=>x[0]-y[0]);
+    if(events.length)clauses.push(`상대 쪽엔 ${events.slice(0,3).map(e=>e[1]).join(', ')} 명령이 있었고`);
+    // attack / armour upgrade levels on each side's main lines by the end of the age
+    const mains=[mainRows(ref,all[0]),mainRows(ref,all[1])];
+    const st=[sideState(ref,a.res,a.reach,end),sideState(ref,b.res,b.reach,end)];
+    // per main unit, the attack (armour) upgrades that apply to it; a side's level = its best-upgraded main unit
+    const applied=i=>mains[i].map(r=>statActual(ref,M.sides[i].civ,unitAt(r.chain,st[i]),st[i])?.techs||[]);
+    const ap=[applied(0),applied(1)],ups=[];
+    for(const [kind,set] of [['공격',ATTACK_TECHS],['방어',ARMOUR_TECHS]]){
+      if(!mains[0].length||!mains[1].length)continue;
+      const best=ap.map(list=>list.map(t=>t.filter(x=>set.has(x))).sort((x,y)=>y.length-x.length)[0]||[]);
+      if(best[0].length===best[1].length)continue;
+      const hi=best[0].length>best[1].length?0:1,lo=1-hi,extra=best[hi].filter(t=>!best[lo].includes(t)).slice(-(best[hi].length-best[lo].length)).map(t=>techName(ref,t));
+      ups.push(best[lo].length===0?`${kind} 업그레이드(${extra.join('·')})는 ${hi?'상대':'나'}만`:`${kind} 업그레이드는 ${hi?'상대':'내'}가 ${best[hi].length-best[lo].length}단계 더(${extra.join('·')})`);
+    }
+    const more=n[0]>n[1]?0:1,ahead=[];
+    for(const [,set] of [['공격',ATTACK_TECHS],['방어',ARMOUR_TECHS]]){
+      const best=ap.map(list=>Math.max(0,...list.map(t=>t.filter(x=>set.has(x)).length)));
+      if(best[0]!==best[1])ahead.push(best[0]>best[1]?0:1);
+    }
+    const big=mains[0][0]&&mains[1][0]?linePair(ref,M,mains[0][0],mains[1][0],end,end):null;
+    const behind=ahead.includes(1-more)||big&&(more===0?big.p.edge<0:big.p.edge>0);
+    clauses[0]=clauses[0].replace('{BUT}',behind?'지만':'고');
+    if(ups.length)clauses.push(ups.join(' 했고, ')+' 했어요');
+    if(!clauses.length)return '';
+    // the last clause closes the sentence: 많았지만/많았고/있었고 → 많았어요/있었어요
+    return clauses.join(', ').replace(/(았|었)(?:지만|고)(\([^)]*\))?$/,'$1어요$2')+'.';
+  }
+  // ── actual armies: rendering ──
+  const WHO={mine:'나',theirs:'상대'};
+  const QUEUE_NOTE='명령 기준: 생산 버튼을 누른 수(한 번에 5기 예약은 5) — 취소·자원 부족·죽은 수·남은 수는 리플에 없음';
+  // one side's production in a window: line icons with ×N (the unit the line stood at by the window's end) and
+  // villagers as a small number; the row's left border is the side colour
+  function prodRow(ref,side,prod,win,st){
+    if(!prod)return `<div class="mc-prod mc-prod-${side}"><span class="mc-who">${WHO[side]}</span><span class="mc-none">이 시대 도달 안 함</span></div>`;
+    const chips=prod.rows.map(r=>{
+      if(r.root==null)return `<span class="mc-cnt mc-cnt-text" tabindex="0" data-tip="${esc(`${SIDE_KO[side]} 생산 명령 ${r.n}: ${r.label} (기술표에 없는 이름)`)}">${esc(r.label)} ×${r.n}</span>`;
+      const u=st?unitAt(r.chain,st):r.root;
+      const tip=[`${SIDE_KO[side]} ${unitName(ref,r.root)} 계열${u!==r.root?` (그때 ${unitName(ref,u)})`:''}`,`생산 명령 ${r.n} · ${mmss(win[0])}~${mmss(win[1])}`,QUEUE_NOTE].join('\n');
+      return `<span class="mc-cnt" tabindex="0" data-tip="${esc(tip)}">${icon(ref,'u',u,{side,noTip:true})}<b>×${r.n}</b></span>`;
+    }).join('');
+    const vill=prod.vill?`<span class="mc-vill" tabindex="0" data-tip="${esc(`${SIDE_KO[side]} 주민 생산 명령 ${prod.vill} (명령 기준)`)}">주민 ${prod.vill}</span>`:'';
+    return `<div class="mc-prod mc-prod-${side}"><span class="mc-who">${WHO[side]}</span><span class="mc-cnts">${chips||'<span class="mc-none">군사 생산 명령 없음</span>'}${vill}</span></div>`;
+  }
+  // my main line against theirs: the winner holds the sword, ×N = how much the same resources favour it
+  function pairLine(ref,x){
+    const mineWins=x.p.edge>=0,p=mineWins?x.p:x.q,U=unitName(ref,x.u),V=unitName(ref,x.v),e=Math.abs(x.p.edge);
+    const who=mineWins?`내 ${U}`:`상대 ${V}`,whoWord=mineWins?U:V;
+    const bonus=bonusOf(p)>0?` · 한 대당 +${bonusOf(p)} 추가 피해(${className(ref,p.bonus.parts[0].cls)})`:'';
+    const why=Math.pow(2,e)<1.15?'같은 자원 1:1이면 거의 비슷':`같은 자원 1:1이면 ${who}${josa(whoWord,'이','가')} ${times(e)}배 유리${bonus}`;
+    const ups=s=>(s?.techs||[]).map(t=>techName(ref,t));
+    const side=(label,id,s)=>`${label}: ${statsLine(ref,id,s)}${ups(s).length?` — ${ups(s).join('·')}`:' — 업그레이드 없음'}${s?.civSteps?' (문명 보너스 포함)':''}`;
+    const tip=[mineWins?pairTip(ref,x.u,x.v,p,'mine'):pairTip(ref,x.v,x.u,p,'theirs'),
+      `기준: 나 ${mmss(x.tm)} · 상대 ${mmss(x.tt)}까지 낸 연구 명령`,side(`내 ${U}`,x.u,x.SU),side(`상대 ${V}`,x.v,x.SV),
+      `생산 명령 나 ${x.mine.n} · 상대 ${x.theirs.n}`,'연구는 명령 시각 기준(완료 시각은 리플에 없음), 컨트롤·진형·병력 수는 제외'].join('\n');
+    return line(mineWins?'mc-win':'mc-lose',pairVisual(ref,x.u,'mine',x.v,p,!mineWins),`${U} vs ${V}`,why,tip);
+  }
+  function upgradeTable(ref,ra,rb){
+    if(!ra.length&&!rb.length)return '<p class="compact-note">이 구간 연구 명령 없음</p>';
+    const chip=(r,side)=>{
+      const nm=r.kind==='u'?unitName(ref,r.id):r.kind==='t'?techName(ref,r.id):r.label;
+      const tip=[`${SIDE_KO[side]} ${nm}${r.kind==='u'?' 업그레이드':''} — 연구 명령 ${mmss(r.at)}`,
+        r.commands>1?`같은 연구 명령 ${r.commands}번(첫 ${mmss(r.first)}) — ${r.bursts>1?'몇 초 넘게 떨어진 반복은 앞 명령이 취소된 것으로 보고 마지막 것':'몇 초 안의 반복은 한 번'}`:'',
+        '명령 시각이지 완료 시각이 아님'].filter(Boolean).join('\n');
+      const ic=r.kind?icon(ref,r.kind,r.id,{side,noTip:true}):`<span class="mu mu-${side}"><span class="mu-fallback">${esc(nm.slice(0,2))}</span></span>`;
+      return `<span class="mc-up" tabindex="0" data-tip="${esc(tip)}">${ic}<small>${mmss(r.at)}</small></span>`;
+    };
+    const cell=(xs,side)=>xs.length?`<span class="mu-chain">${xs.map(r=>chip(r,side)).join('')}</span>`:'<span class="matchup-none">—</span>';
+    const rows=UP_GROUPS.map(([g,label])=>{
+      const a=ra.filter(r=>r.group===g),b=rb.filter(r=>r.group===g);
+      return a.length||b.length?`<tr><th scope="row">${esc(label)}</th><td>${cell(a,'mine')}</td><td>${cell(b,'theirs')}</td></tr>`:'';
+    }).join('');
+    return `<div class="table-scroll"><table class="timeline matchup-table matchup-grid mc-uptable"><thead><tr><th scope="col"></th><th scope="col">나</th><th scope="col">상대</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  }
+  function bandTable(ref,M){
+    const rows=[];
+    for(let f=0;f<M.dur;f+=300){
+      const t=Math.min(M.dur,f+300);
+      const cell=s=>{
+        const p=produced(ref,s.civ,s.queue,f,t),st=sideState(ref,s.res,s.reach,t);
+        const chips=p.rows.filter(r=>r.root!=null).map(r=>`<span class="mc-cnt mc-cnt-sm" tabindex="0" data-tip="${esc(`${SIDE_KO[s.key]} ${unitName(ref,r.root)} 계열 생산 명령 ${r.n} (${mmss(f)}~${mmss(t)})\n${QUEUE_NOTE}`)}">${icon(ref,'u',unitAt(r.chain,st),{side:s.key,noTip:true})}<b>×${r.n}</b></span>`).join('');
+        return `<span class="mc-cnts">${chips}${p.vill?`<span class="mc-vill">주민 ${p.vill}</span>`:''}${!chips&&!p.vill?'<span class="matchup-none">—</span>':''}</span>`;
+      };
+      rows.push(`<tr><th scope="row">${Math.floor(f/60)}~${Math.ceil(t/60)}분</th><td>${cell(M.sides[0])}</td><td>${cell(M.sides[1])}</td></tr>`);
+    }
+    return `<div class="table-scroll"><table class="timeline matchup-table matchup-grid mc-bands"><thead><tr><th scope="col"></th><th scope="col">나</th><th scope="col">상대</th></tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+  }
+  // the "실제 병력" block of a tab: both sides' production, main-line pairs, folded upgrades (and 5-minute bands)
+  function armySection(ref,M,age){
+    const V=ageView(ref,M,age),[a,b]=M.sides,span=age==='all'?'경기 전체':`${AGE_KO[age]}시대`;
+    const title=`실제 생산 명령 — ${span}`;
+    if(!V.wa&&!V.wb)return section('mc-army','⚔',title,`<p class="mc-none">이 경기에서 ${AGE_KO[age]}시대에 들어간 쪽이 없어요</p>`);
+    const sa=V.wa?sideState(ref,a.res,a.reach,V.wa[1]):null,sb=V.wb?sideState(ref,b.res,b.reach,V.wb[1]):null;
+    const when=[V.wa?`나 ${mmss(V.wa[0])}~${mmss(V.wa[1])}`:'',V.wb?`상대 ${mmss(V.wb[0])}~${mmss(V.wb[1])}`:''].filter(Boolean).join(' · ');
+    const pairs=V.pairs.length?`<h5 class="mc-subhead">주력끼리 1:1 — 그때까지 실제로 낸 업그레이드로</h5><div class="mc-lines">${V.pairs.map(x=>pairLine(ref,x)).join('')}</div>`
+      :'<p class="mc-none mc-subhead">양쪽 다 3기 이상 명령한 군사 계열이 있어야 맞대어 봐요</p>';
+    const details=`<details class="matchup-more mc-agemore"><summary>업그레이드 연구 명령${age==='all'?' · 5분 단위 생산':''} — ${span}</summary>${upgradeTable(ref,V.ra,V.rb)}`
+      +(age==='all'?`<h4 class="matchup-heading">5분 단위 생산 명령</h4>${bandTable(ref,M)}`:'')
+      +'<p class="compact-note">아이콘 아래 = 연구 명령 시각(완료 아님). 같은 연구를 몇 초 안에 다시 누른 것은 한 번으로, 한참 뒤 다시 누른 것은 앞 명령이 취소된 것으로 보고 마지막 시각을 써요. 무료로 받는 기술은 명령이 없어 빠져요.</p></details>';
+    return section('mc-army','⚔',title,`<p class="mc-when">${esc(when)} · 명령 기준</p>`+prodRow(ref,'mine',V.pa,V.wa,sa)+prodRow(ref,'theirs',V.pb,V.wb,sb)+pairs+details);
+  }
   // ctx (from context()): open = the age this match spent longest in, spent = seconds, made = orders per age
   function cardHtml(ref,mine,theirs,ctx){
     if(!ref?.civs?.[mine]||!ref?.civs?.[theirs])return '';
     const me=civLabel(ref,mine),them=civLabel(ref,theirs);
     const open=AGES.includes(ctx?.open)?ctx.open:3,decided=AGES.includes(ctx?.open)&&ctx.spent>0;
-    const tabs=AGES.map(a=>`<button type="button" role="tab" class="mc-agetab" data-age="${a}" aria-selected="${a===open}">${AGE_KO[a]}${decided&&a===ctx.open?'<small>이 경기</small>':''}</button>`).join('');
-    const panels=AGES.map(a=>`<div class="mc-agepanel" role="tabpanel" data-age="${a}" aria-label="${AGE_KO[a]}시대"${a===open?'':' hidden'}>${agePanel(ref,mine,theirs,a,madeByRoot(ref,theirs,ctx?.made?.[a]))}</div>`).join('');
+    // APP-17: both sides' actual production and research commands, on top of each age tab and in an "전체" tab
+    const M=armyModel(ref,[mine,theirs],ctx?.army),flow=M?flowSentence(ref,M,ctx?.open):'';
+    const tabs=AGES.map(a=>`<button type="button" role="tab" class="mc-agetab" data-age="${a}" aria-selected="${a===open}">${AGE_KO[a]}${decided&&a===ctx.open?'<small>이 경기</small>':''}</button>`).join('')
+      +(M?'<button type="button" role="tab" class="mc-agetab" data-age="all" aria-selected="false">전체<small>실제 명령</small></button>':'');
+    const panels=AGES.map(a=>`<div class="mc-agepanel" role="tabpanel" data-age="${a}" aria-label="${AGE_KO[a]}시대"${a===open?'':' hidden'}>${M?armySection(ref,M,a):''}${agePanel(ref,mine,theirs,a,madeByRoot(ref,theirs,ctx?.made?.[a]))}</div>`).join('')
+      +(M?`<div class="mc-agepanel" role="tabpanel" data-age="all" aria-label="경기 전체" hidden>${armySection(ref,M,'all')}</div>`:'');
     const minutes=decided?Math.max(1,Math.round(ctx.spent/60)):0;
     return `<div class="matchup-card"><div class="mc-head"><span class="mc-kicker">MATCHUP · ${esc(me)}</span><strong class="mc-vs">VS ${esc(them)}</strong>`
       +`<span class="mc-legend"><span><span class="mc-key mc-key-mine"></span>초록 = 내 ${esc(me)}</span><span><span class="mc-key mc-key-theirs"></span>빨강 = 상대 ${esc(them)}</span><span>칼끝 = 맞는 쪽</span></span></div>`
       +`<div class="mc-ages" role="tablist" aria-label="시대별 매치업">${tabs}</div>`
       +(decided?`<p class="mc-decided">이 경기는 ${AGE_KO[ctx.open]}시대에서 갈렸어요 — 가장 오래 이어진 시대(약 ${minutes}분)</p>`:'')
+      +(flow?`<p class="mc-flow"><b>흐름</b>${esc(flow)}</p>`:'')
       +panels
       +'<p class="mc-note">칼 위 ×N = 칼을 든 쪽이 같은 자원으로 싸울 때 유리한 정도(1:1 처치 시간 × 비용, 원거리 상대는 다가가는 시간 포함). 그 시대에 만들 수 있는 유닛만, 그때까지 할 수 있는 대장간·계열 업그레이드·문명 보너스는 모두 했다고 보고 계산(성에서 하는 연구는 성주시대부터) — 컨트롤·진형·병력 수는 제외. 줄을 누르면 근거 수치.</p></div>';
   }
@@ -551,6 +828,14 @@
       }
       out.made=made;
     }
+    // APP-17: both sides' production and research commands, compact (also goes into the placeholder's data attribute)
+    const ev=m=>Array.isArray(m?.full_timeline)?m.full_timeline.filter(e=>(e?.kind==='QUEUE'||e?.kind==='TRAIN'||e?.kind==='RESEARCH')&&e.label&&Number.isFinite(e.seconds))
+      .map(e=>e.kind==='RESEARCH'?[e.seconds,'R',e.label]:[e.seconds,'Q',e.label,Number(e.amount)||0]).sort((x,y)=>x[0]-y[0]):null;
+    const em=ev(match.mine),et=ev(match.theirs);
+    if(Number.isFinite(dur)&&dur>0&&(em||et)){
+      const R=m=>({2:reach(m,2),3:reach(m,3),4:reach(m,4)});
+      out.army={dur,reach:{mine:R(match.mine),theirs:R(match.theirs)},ev:{mine:em||[],theirs:et||[]}};
+    }
     return Object.keys(out).length?out:null;
   }
   // HTML now if the table is loaded; otherwise a placeholder that is filled once it loads.
@@ -567,6 +852,7 @@
     });
     return `<section class="civ-matchup" data-civ-matchup="${esc(JSON.stringify([mine,theirs,ctx]))}"><div class="summary-label"><span>문명 매치업 및 전략 복기</span></div><p class="compact-note">문명 기술표를 불러오는 중…</p></section>`;
   }
-  const api={lineStatus,bonusVs,pair,compare,summary,html,mount,load,linesAt,statAt,boostAt,context,cardHtml,madeByRoot};
+  const api={lineStatus,bonusVs,pair,compare,summary,html,mount,load,linesAt,statAt,boostAt,context,cardHtml,madeByRoot,
+    cleanQueue,cleanResearch,sideState,statActual,produced,armyModel,ageView,flowSentence};
   if(typeof module==='object'&&module.exports)module.exports=api;else{global.SSAPOCivMatchup=api;installTips();}
 })(typeof window==='undefined'?globalThis:window);

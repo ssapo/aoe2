@@ -297,3 +297,70 @@ test('lines the opponent made are all kept, even two of one class, and names map
   // a name used by two unit ids (Konnik from the castle and from the Krepost) still finds the line
   assert.ok(Object.keys(cm.madeByRoot(ref,'Bulgarians',{Konnik:20})).length===1);
 });
+
+// ── APP-17: both sides' actual production and research commands ──
+const Q=(s,label,amount=1)=>({seconds:s,kind:'QUEUE',label,amount});
+const R=(s,label)=>({seconds:s,kind:'RESEARCH',label});
+const reached=(f,c,i)=>({age_checkpoints:{봉건:{reached_seconds:f},성주:{reached_seconds:c},...(i?{왕정:{reached_seconds:i}}:{})}});
+test('production commands: repeated clicks are kept, exact repeats and cancels are not counted',()=>{
+  const q=cm.cleanQueue([[10,'Q','Knight',1],[10.4,'Q','Knight',1],[10.42,'Q','Knight',1],[11,'Q','Knight',-1],[12,'R','Forging']]);
+  assert.deepStrictEqual(q.list.map(e=>e[0]),[10,10.4]); // 0.4 s apart = a second click, queues one more
+  assert.strictEqual(q.dup,1);assert.strictEqual(q.cancel,1);
+});
+test('research commands: one per tech, a burst of clicks is one, a later repeat replaces a cancelled one',()=>{
+  const r=cm.cleanResearch(ref,'Franks',[[441.7,'R','Feudal Age'],[1207.7,'R','Forging'],[1374,'R','Forging'],[1374.2,'R','Forging'],[1895.5,'R','Light Cavalry'],[1895.7,'R','Light Cavalry'],[300,'R','Loom']]);
+  const by=Object.fromEntries(r.map(x=>[x.label,x]));
+  assert.ok(!by['Feudal Age']);
+  assert.strictEqual(by.Forging.at,1374);assert.strictEqual(by.Forging.commands,3);assert.strictEqual(by.Forging.bursts,2);assert.strictEqual(by.Forging.group,'smith');
+  assert.deepStrictEqual([by['Light Cavalry'].kind,by['Light Cavalry'].id,by['Light Cavalry'].group,by['Light Cavalry'].commands],['u',546,'line',2]);
+  assert.strictEqual(by.Loom.group,'eco');
+});
+test('actual stats use only the upgrades a side commanded',()=>{
+  const st=(res,T,reach={2:500,3:1300})=>cm.sideState(ref,cm.cleanResearch(ref,'Bulgarians',res),reach,T);
+  // Konnik without Stirrups keeps its base attack speed; with Stirrups researched it gets the bonus
+  assert.strictEqual(cm.statActual(ref,'Bulgarians',1225,st([],2000)).reload,2.4);
+  assert.ok(cm.statActual(ref,'Bulgarians',1225,st([[1500,'R','Stirrups']],2000)).reload<2.4);
+  const k=cm.statActual(ref,'Bulgarians',1225,st([[1349,'R','Forging'],[2390,'R','Iron Casting']],2500));
+  assert.strictEqual(k.melee_attack,14);assert.deepStrictEqual(k.techs.sort(),[67,68]);
+  // Franks cavalry hit points from their civ bonus by the age reached, no blacksmith without a command
+  const f=cm.statActual(ref,'Franks',38,cm.sideState(ref,[],{2:500,3:1300},1400));
+  assert.strictEqual(f.hp,120);assert.strictEqual(f.melee_attack,10);
+});
+// a small match shaped like 520592057 (Franks knights vs Bulgarian pikemen and Konniks)
+const franksBulgarians=()=>{
+  const mine={...reached(570,1427),full_timeline:[Q(100,'Villager'),Q(630,'Scout Cavalry'),Q(640,'Scout Cavalry'),Q(650,'Scout Cavalry'),R(1374,'Forging'),R(1374.2,'Forging'),
+    ...[1442,1442.4,1456,1456.4,1491,1491.4,1501,1501.4,1551,1551.4,1642,1642.4,1712,1712.4,1755,1755.4,1799,1799.4].map(s=>Q(s,'Knight')),R(1862,'Chain Barding Armor')]};
+  const theirs={...reached(575,1381),full_timeline:[Q(627,'Spearman'),Q(762,'Spearman'),Q(846,'Spearman'),R(1349,'Forging'),R(1384,'Pikeman'),Q(1765,'Spearman',5),
+    Q(1703,'Konnik'),Q(1703.2,'Konnik'),Q(1771,'Konnik'),Q(1805,'Konnik'),Q(1842,'Konnik'),R(2390,'Iron Casting'),Q(2400,'<b>x',1)]};
+  return {duration:2519,mine,theirs};
+};
+test('actual armies per age: both sides, main-line pairs at the upgrades each had, and the flow sentence',()=>{
+  const ctx=cm.context(franksBulgarians());
+  const M=cm.armyModel(ref,['Franks','Bulgarians'],ctx.army);
+  const castle=cm.ageView(ref,M,3);
+  assert.strictEqual(castle.pa.rows[0].root,38);assert.strictEqual(castle.pa.rows[0].n,18);
+  assert.deepStrictEqual(castle.pb.rows.slice(0,2).map(r=>[r.root,r.n]),[[1225,5],[93,5]]); // a tie keeps the earlier line first
+  const pike=castle.pairs.find(p=>p.v===358);
+  assert.ok(pike&&pike.u===38&&pike.p.edge<0,'knight vs pikeman favours the pikeman'); // Pikeman research → the line stands at Pikeman
+  const kon=castle.pairs.find(p=>p.v===1225);
+  assert.strictEqual(kon.SV.melee_attack,14);assert.strictEqual(kon.SV.reload,2.4);assert.strictEqual(kon.SU.hp,120);
+  const feudal=cm.ageView(ref,M,2);
+  assert.deepStrictEqual(feudal.pa.rows.map(r=>r.root),[448]);assert.strictEqual(feudal.pa.vill,1);
+  assert.strictEqual(cm.ageView(ref,M,4).wa,null);
+  const flow=cm.flowSentence(ref,M,3);
+  // the first five minutes are mine (knights), the rest theirs (pikemen ×5, Konniks)
+  assert.ok(flow.startsWith('성주 초반(23분~28분)엔 내 군사 생산 명령이 더 많았지만(기사 위주), 뒤로 갈수록 상대 쪽이 더 많았고, '),flow);
+  assert.ok(flow.includes('23분 장창병 업그레이드')&&flow.includes('28분부터 콘니크 생산'),flow);
+  assert.ok(flow.endsWith('공격 업그레이드는 상대가 1단계 더(철 거푸집) 했고, 방어 업그레이드(체인 마갑)는 나만 했어요.'),flow);
+  const html=cm.html(ref,'Franks','Bulgarians',ctx);
+  assert.ok(html.includes('data-age="all"')&&html.includes('mc-prod-mine')&&html.includes('mc-prod-theirs')&&html.includes('명령 기준'));
+  assert.ok(html.includes('<p class="mc-flow"><b>흐름</b>'));
+  assert.ok(!html.includes('<b>x')&&html.includes('&lt;b&gt;x ×1'));
+  assert.ok(!/생존 병력|생산한 유닛|뽑은 유닛 수/.test(html));
+});
+test('no timeline: no actual-army block, no "전체" tab',()=>{
+  const ctx=cm.context({duration:2000,mine:reached(500,1300),theirs:reached(510,1290)});
+  assert.ok(!ctx?.army);
+  const html=cm.html(ref,'Franks','Bulgarians',ctx);
+  assert.ok(!html.includes('data-age="all"')&&!html.includes('mc-army')&&!html.includes('mc-flow'));
+});
