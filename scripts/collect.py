@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MAX_DOWNLOAD = 64 * 1024 * 1024
 MAX_REPLAY = 256 * 1024 * 1024
 AGE_IDS = {101: '봉건', 102: '성주', 103: '왕정'}
-ANALYSIS_REVISION = 30
+ANALYSIS_REVISION = 31
 
 
 def now():
@@ -309,7 +309,7 @@ def analyze_replay(raw, own_id):
     map_view = building_map(match, own)
     if map_view is not None:
         from movement import command_activity
-        map_view['command_activity'] = command_activity(decoded, match, own)
+        map_view['command_activity'] = command_activity(decoded, match, own, keep_ids=True)
     own_metrics = command_metrics(match, own)
     from details import detailed_metrics
     own_metrics.update(detailed_metrics(match, own))
@@ -327,10 +327,27 @@ def analyze_replay(raw, own_id):
     except Exception:
         housed = None
     try:
+        from engine_income import engine_lines
+        lines = engine_lines(decoded, match, own)
+    except Exception:
+        lines = None
+    try:
         from engine_income import engine_income
-        earned = engine_income(decoded, match, own)
+        earned = engine_income(decoded, match, own, lines=lines) if lines else None
     except Exception:
         earned = None
+    if map_view is not None:
+        # Which units each command moved: engine object ids, inside the verified span only.
+        try:
+            from unit_kinds import label
+            opponent = next(p for p in match.players if p.number != own.number)
+            until = label(map_view['command_activity'], lines or [], own.number, opponent.number)
+        except Exception:
+            until = None
+        for e in map_view['command_activity']:
+            e.pop('ids', None)
+        if until is not None:
+            map_view['command_units_until'] = until
     opponents = [{'name': p.name, 'civilization': p.civilization, 'random_civ': randoms.get(p.profile_id), 'metrics': dict(command_metrics(match, p), **detailed_metrics(match, p), food_evidence=food.get(p.number), berry_switches=berry.get(p.number))}
                  for p in match.players if p.number != own.number and p not in (own.team or [])]
     return {

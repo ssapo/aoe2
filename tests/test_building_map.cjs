@@ -125,3 +125,15 @@ test('map key lists only what the match shows and touch reach grows on small scr
  assert.equal(hitRadius(1.3),18);assert.ok(Math.abs(hitRadius(310/720)-51.1)<.1);assert.equal(hitRadius(0),22);
  assert.equal(stackRadius(1),8);assert.ok(stackRadius(310/720)>11&&stackRadius(310/720)<12);
 });
+
+const api=require('../site/building-map.js');
+test('unit names next to an order: the largest kind, "외" when mixed or partly unknown', () => {
+  const ko = x => ({Knight: '기사', Villager: '주민'}[x] || x);
+  assert.equal(api.unitsShort({units: {Knight: 5}}, ko), '기사 5');
+  assert.equal(api.unitsShort({units: {Villager: 2, Knight: 3}}, ko), '기사 3 외');
+  assert.equal(api.unitsShort({units: {Knight: 1}, units_unknown: 2}, ko), '기사 1 외');
+  assert.equal(api.unitsShort({selected_count: 4}, ko), '');
+  assert.equal(api.unitsShort({units: {Knight: 0, '': 2}}, ko), '');
+  assert.equal(api.unitsLong({units: {Villager: 2, Knight: 3}, units_unknown: 1}, ko), '기사 3, 주민 2, 확인 못 함 1');
+  assert.equal(api.unitsLong({}, ko), '');
+});

@@ -57,6 +57,11 @@
     'Konnik':'콘니크','Leitis':'레이티스','Ratha':'라타 전차','Rocket Cart':'로켓 수레','Samurai':'사무라이',
     'Shotel Warrior':'쇼텔 전사','Throwing Axeman':'도끼투척병','Trade Cart':'교역 마차','Varangian Guard':'바랑인 친위대',
     'Imperial Skirmisher':'제국 척후병',
+    'Livestock':'가축','King':'왕',
+    'Eagle Scout':'독수리 정찰병','Eagle Warrior':'독수리 전사','Elite Eagle Warrior':'정예 독수리 전사',
+    'Camel Rider':'낙타 기수','Heavy Camel Rider':'중낙타 기수','Steppe Lancer':'초원 창기병',
+    'Capped Ram':'중형 공성추','Siege Ram':'대형 공성추',
+    'Fishing Ship':'어선','Transport Ship':'수송선','Trade Cog':'무역선','Galley':'갤리선','Fire Galley':'화공 갤리선','Demolition Ship':'폭파선',
     'Watch Tower':'망루','Outpost':'감시 초소','Gate':'성문','Palisade Gate':'나무 성문','Krepost':'크레포스트',
     'Fortified Wall':'대형 성벽',
     'Padded Archer Armor':'패드 궁사 갑옷','Leather Archer Armor':'가죽 궁사 갑옷','Ring Archer Armor':'링 궁사 갑옷',
@@ -205,7 +210,7 @@
     const civs=[match.analysis?.civilization||match.civilization,other?.civilization];
     const choice=match.civ_choice||{},pids=[(match.players||[]).find(p=>p.is_self)?.profile_id,(match.players||[]).find(p=>!p.is_self)?.profile_id],fromChoice=Number(match.analysis?.analysis_revision)>=30,civRandoms=[0,1].map(i=>Object.hasOwn(choice,String(pids[i]))?choice[String(pids[i])]===true:fromChoice&&[match.analysis?.random_civ,other?.random_civ][i]===true);
     const mapHost=root.querySelector('#building-map-host');
-    mapHost.innerHTML=mapData?`<div class="map-toolbar"><div class="map-legend">${civBadge(civs[0],'나',civRandoms[0])}${civBadge(civs[1],'상대',civRandoms[1])}</div><div class="map-focus"><button data-map-focus="all" aria-pressed="true">전체 맵</button><button data-map-focus="mine" aria-pressed="false">내 본진</button><button data-map-focus="theirs" aria-pressed="false">상대 본진</button>${Array.isArray(mapData.command_activity)?'<button id="map-activity" aria-pressed="true">유닛 지시</button>':''}<button class="map-expand" data-map-expand aria-pressed="false">크게 보기</button></div></div><canvas id="building-map" width="720" height="420" role="img" aria-label="실제 지형과 양측 건설·이동 지시 위치"></canvas><p id="building-map-info" class="compact-note" aria-live="polite">${Array.isArray(mapData.command_activity)?'원은 최근 30초의 지시 지점, 숫자는 선택 수예요.':'유닛 지시는 이 경기 재분석 후 표시돼요.'}</p>`:'<p class="compact-note">이 경기의 맵 자료는 다음 재분석 후 표시돼요.</p>';
+    mapHost.innerHTML=mapData?`<div class="map-toolbar"><div class="map-legend">${civBadge(civs[0],'나',civRandoms[0])}${civBadge(civs[1],'상대',civRandoms[1])}</div><div class="map-focus"><button data-map-focus="all" aria-pressed="true">전체 맵</button><button data-map-focus="mine" aria-pressed="false">내 본진</button><button data-map-focus="theirs" aria-pressed="false">상대 본진</button>${Array.isArray(mapData.command_activity)?'<button id="map-activity" aria-pressed="true">유닛 지시</button>':''}<button class="map-expand" data-map-expand aria-pressed="false">크게 보기</button></div></div><canvas id="building-map" width="720" height="420" role="img" aria-label="실제 지형과 양측 건설·이동 지시 위치"></canvas><p id="building-map-info" class="compact-note" aria-live="polite">${Array.isArray(mapData.command_activity)?'원은 최근 30초의 지시 지점, 숫자는 선택 수예요.'+(Number.isFinite(mapData.command_units_until)?` 옆 글자는 움직인 유닛이에요(재시뮬레이션이 원본과 맞는 ${fmtTime(mapData.command_units_until)}까지만).`:''):'유닛 지시는 이 경기 재분석 후 표시돼요.'}</p>`:'<p class="compact-note">이 경기의 맵 자료는 다음 재분석 후 표시돼요.</p>';
     // Enlarged map: hide everything but the replay controls and the map; Esc or the button returns.
     const dialog=document.querySelector('#match-dialog');
     dialog?.classList?.remove('map-full');

@@ -376,7 +376,7 @@ python scripts/build_preview.py /tmp/SSAPO_AoE2_preview.html
 | `metrics.unit_orders`, `building_orders`, `research_orders` | 종류별 최초/마지막 요청·횟수·생산 요청량 등 |
 | `metrics.market.events[]` | `BUY`/`SELL`, 자원 한글명, 시각, 자원 단위 수량. mgz가 정규화한 `amount`에 **100을 다시 곱하지 않는다** |
 | `metrics.berry_switches.windows[]` | 열매 군락에 명시적으로 배치됐던 주민의 다른 작업 요청 구간·확인 인원 |
-| `analysis.map_view` | `size`, `terrain_runs`, `terrain_names`, `initial_buildings`, `resources`, `basis` |
+| `analysis.map_view` | `size`, `terrain_runs`, `terrain_names`, `initial_buildings`, `resources`, `basis`, `command_activity[]`(이동·공격 명령 지점; 개정 31부터 확인 구간 안의 항목에 `units`·`units_unknown`), `command_units_until` |
 | `analysis.review` | 양측 요약·발견 카드·개인 과거 중앙값·연습 목표. 저장된 명령에서 재계산할 수 있는 파생값 |
 
 - 게임 시각은 **초**, 리플의 재개 오프셋은 `restored_at`을 더한다. 날짜 타임스탬프와 게임 초를 섞지 않는다.
@@ -398,6 +398,7 @@ python scripts/build_preview.py /tmp/SSAPO_AoE2_preview.html
 | 직접 조작한 가축 ID 수 | 현재 소유·본진 도착·섭취 개체 수·먹은 식량량 |
 | 같은 조건의 과거 내 기록 중앙값 | 전체 유저 백분위, A/C 등급, 절대적인 빌드 정답 |
 | 초기 지형 + 건설 요청 지도 | 게임 엔진 재생, 실제 이동·경로·교전·자동 행동 |
+| 명령이 움직인 유닛 종류(`command_activity[].units`, 엔진 확인 구간 안) | 확인 구간 뒤의 유닛 종류, 실제 도착·교전 결과 |
 
 ### 복기 카드의 현재 기준
 
@@ -419,6 +420,14 @@ python scripts/build_preview.py /tmp/SSAPO_AoE2_preview.html
 - 맵의 금·돌·열매는 **초기 위치**다. 자원량·고갈·소유 변화는 계산하지 않는다.
 - 2026-11-16 화면 크기: 분석 창은 모든 폭에서 전체 화면이다. 경기 흐름 탭은 1100px 이상에서 두 칸(왼쪽 지도는 `position:sticky`로 기록을 스크롤해도 따라오고, 폭은 `min(칸 폭, (100dvh − 400px) × 720/420)`, 오른쪽 기록). 지도 도구줄의 "크게 보기"는 창에 `map-full`을 붙여 머리말·탭·진영 활동·기록을 숨기고 재생 조작과 지도만 남긴다(지도 폭 `min(100%, (100dvh − 230px) × 720/420)`); Esc는 먼저 크게 보기를 끄고, 한 번 더 누르면 창을 닫는다. 다른 탭의 내용은 가운데 최대 1080px. 휴대폰 세로 화면은 지도가 폭에 막혀 크게 보기로도 커지지 않는다.
 - **같은 날 다시 고침 (사용자 요청: "미니맵을 제일 먼저 크게, 생산 기록은 덜 중요, 전장 막대는 끌 때 따라오게")**: 경기 흐름 탭은 한 칸이다. 위에 고정되는 조작부 안에 재생 조작·시간 막대·진영별 활동 막대(전장 막대)가 들어가고, 그 아래 지도가 남은 높이를 채운다(`fitMap()`이 `.review-body` 높이 − 조작부 높이 − 110px을 재서 `--map-room`에 넣고, 창 크기가 바뀌면 다시 잰다). 이 탭에서는 경기 머리말(`.review-header`)을 숨긴다. 생산·건설·연구 명령 전체 표는 접힌 `<details>`로 맨 아래. 전장 막대는 `pointerdown`/`pointermove`/`pointerup`과 포인터 캡처로 끄는 동안 시간이 따라온다(마우스·터치). 1280×900에서 지도 737×431, 넘침 없음.
+- **명령이 움직인 유닛 (개정 31, 2026-11-16, 사용자 요청: "맵에서 움직이는 유닛이 뭔지 작게나마")**. 리플의 명령은 선택한 개체 ID만 담는다. 재시뮬레이션 엔진은 체크포인트가 맞는 동안 원본과 개체 ID까지 같으므로, 그 구간의 ID를 엔진의 개체 목록에서 찾는다(`scripts/unit_kinds.py`).
+  - 엔진 출력: 엔진 소스는 고치지 않았다. 이미 있는 진단 `GENIE_DUMP_MS=<ms,…>` + `GENIE_DUMP_UNITS=1`이 그 시각마다 선수 개체 전부를 `UNIT mark_ms=… player=… id=… master=…` 줄로 낸다. `engine_income.run_engine`이 5초 간격, 20분까지 켠다(`unit_kinds.dump_env`). 518239882에서 엔진 실행 약 2분, 출력 18.7MB(대부분 원래 있던 `RES` 줄), `UNIT` 줄 13.6천. 엔진 실행은 수입 곡선과 한 번만 한다(`engine_lines`).
+  - 명령 시각 t의 ID는 t 이전 마지막 목록, 없으면 t 다음 첫 목록에서 찾는다(방금 나온 유닛). 둘 다 없으면 `units_unknown`. `master`는 aocref 데이터셋 100 `objects`로 이름을 붙이고, 주민 작업 종류(농부·나무꾼·건축가 …)는 `Villager`, 가축(양·돼지·칠면조 등, aocref에 없는 2590 포함 — 엔진 `GAINA`가 클래스 58로 낸다)은 `Livestock`으로 묶는다.
+  - **확인 구간**: 두 선수 모두 체크포인트 단어 1(보유 자원)·6(개체 수)·10(개체 ID 합)이 기록과 같은 마지막 체크포인트까지(`unit_kinds.verified_ms`, `command_units_until`). 그 뒤의 명령에는 `units`를 붙이지 않는다. 엔진이 안 도는 경기(다른 빌드·재개·팀전)는 필드가 없다.
+  - 빈 선택(개수 0xffff)은 원본 규칙대로 그 선수의 "마지막으로 명령한 유닛"이다: ORDER·WORK·MOVE·RETREAT가 정한다(엔진 `commands/order.rs`, `World::last_commanded`). mgz가 WORK·RETREAT의 목록을 읽지 않으므로 그 뒤의 빈 선택은 모름으로 둔다(`movement.command_activity(keep_ids=True)`). 저장 항목의 `selected_count`는 그대로 기록에 적힌 수다(빈 선택은 null).
+  - 저장: `command_activity` 항목에 `units: {"Knight": 5, "Villager": 1}`(많은 순), 모르는 ID가 있으면 `units_unknown`. ID 자체는 저장하지 않는다.
+  - 화면(`building-map.js` `unitsShort`·`unitsLong`): 원 오른쪽에 가장 많은 종류와 수(`기사 5`, 섞였거나 모르는 것이 있으면 `기사 3 외`), 한글 이름은 `app.js`의 `names`(`Livestock` → 가축). 글자 겹침은 `placeLabels`로 건물 이름과 서로를 피하고 최근 명령이 먼저. 원을 누르면 정보 줄에 전체 구성과 "재시뮬레이션, 확인 구간 안"; 확인 구간 뒤 명령은 "유닛 종류는 확인 구간(m:ss)까지만". 지도 아래 안내에 확인 구간 시각. 필드가 없는 옛 분석은 숫자만.
+  - 확인(로컬, 엔진 `census_A32a.exe`): 518239882 확인 738.5초 안 명령 605개 모두 이름 붙음(모름 0), 519925669 730.4초 안 630개 모두, 프로 520176967 691.2초 안 1,095개 모두(창병 포함). 세 판의 확인 구간은 수입 곡선의 확인 시각과 같다. 1280px·390px 미리보기에서 글자와 정보 줄 확인, 가로 넘침 없음.
 - 2026-11-13: 성벽·성문은 글자 없는 작은 표식, 그 밖의 건물은 크기에 맞춘 마름모 표식이고 글자가 겹치면 글자만 생략한다(표식과 선택은 유지). 캔버스 아래 범례 한 줄(`.map-key`)에 건설 요청·성벽·자원 시작 위치를 적는다. 겹침 판정·표식 크기는 `building-map.js`의 순수 함수와 `tests/test_building_map.cjs`가 기준이다.
 - 재생을 닫거나 탭 전환·페이지 숨김·다이얼로그 닫기 시 타이머가 중지되는지 확인한다. 뒤로 탐색한 화면에 미래 건물이 남아서는 안 된다.
 - 이전 분석에 `map_view`가 없으면 갱신 대기 안내를 표시한다. 무작위 지형·임의 좌표·다른 경기 맵으로 대신 채우지 않는다.

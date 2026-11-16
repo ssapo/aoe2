@@ -253,8 +253,9 @@ def run_engine(recording):
     if not binary or not data or not Path(binary).is_file() or not Path(data).is_file():
         return None
     switches = Path(__file__).resolve().parent.parent / 'engine' / 'switches.env'
+    from unit_kinds import dump_env
     env = dict(os.environ, **_switches(switches), GENIE_TRACE_RES='1', GENIE_TRACE_GAIN='1', GENIE_TRACE_GAIN_ANIMALS='1',
-               GENIE_PRINT_CHECKPOINTS='1')
+               GENIE_PRINT_CHECKPOINTS='1', **dump_env())
     with tempfile.TemporaryDirectory() as folder:
         rec, err = Path(folder) / 'replay.aoe2record', Path(folder) / 'engine.err'
         rec.write_bytes(recording)
@@ -270,14 +271,21 @@ def run_engine(recording):
 ENGINE_BUILD = 188329
 
 
-def engine_income(recording, match, own):
-    """`analysis.engine_income` of `own` and its 1v1 opponent, or None."""
+def engine_lines(recording, match, own):
+    """The engine's output for a 1v1 recording of the engine's build, or None."""
     opponents = [p for p in match.players if p.number != own.number]
     if len(opponents) != 1 or match.restored_at.total_seconds() > 0:
         return None
     if getattr(match, 'build_version', None) not in (None, ENGINE_BUILD):
         return None  # the engine and its data mirror one game build only
-    lines = run_engine(recording)
+    return run_engine(recording) or None
+
+
+def engine_income(recording, match, own, lines=None):
+    """`analysis.engine_income` of `own` and its 1v1 opponent, or None. `lines`: the output of
+    engine_lines when the caller already has it."""
+    lines = lines if lines is not None else engine_lines(recording, match, own)
     if not lines:
         return None
-    return income(lines, own.number, opponents[0].number)
+    opponent = next(p for p in match.players if p.number != own.number)
+    return income(lines, own.number, opponent.number)

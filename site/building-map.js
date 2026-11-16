@@ -21,6 +21,22 @@
     }
     return [...groups.values()].sort((a,b)=>a.seconds-b.seconds);
   }
+  // Units a command moved, as the engine identified them (`units`: {kind: count}, most first).
+  // Short form for the map: the largest kind and its count, "외" when there is more.
+  function unitParts(e){
+    if(!e||!e.units||typeof e.units!=='object')return [];
+    return Object.entries(e.units).filter(([k,n])=>k&&Number.isInteger(n)&&n>0).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]));
+  }
+  function unitsShort(e,label=x=>x){
+    const parts=unitParts(e);if(!parts.length)return '';
+    const more=parts.length>1||(Number.isInteger(e.units_unknown)&&e.units_unknown>0);
+    return `${label(parts[0][0])} ${parts[0][1]}${more?' 외':''}`;
+  }
+  function unitsLong(e,label=x=>x){
+    const parts=unitParts(e).map(([k,n])=>`${label(k)} ${n}`);
+    if(Number.isInteger(e?.units_unknown)&&e.units_unknown>0)parts.push(`확인 못 함 ${e.units_unknown}`);
+    return parts.join(', ');
+  }
   // Wall and gate pieces come in long runs, so they get a small mark and no text.
   const isWallPiece=name=>/\b(wall|gate)\b/i.test(String(name||''));
   const boxesOverlap=(a,b,gap=0)=>a.x<b.x+b.w+gap&&b.x<a.x+a.w+gap&&a.y<b.y+b.h+gap&&b.y<a.y+a.h+gap;
@@ -181,6 +197,7 @@
       ctx.lineJoin='round';ctx.lineWidth=Math.max(2,font/6)/zoom;ctx.strokeStyle='#102117';ctx.fillStyle='#fff';
       for(const [i,l] of labels.entries())if(shown[i]){ctx.strokeText(l.text,l.x,l.y);ctx.fillText(l.text,l.x,l.y);}
       ctx.textBaseline='alphabetic';
+      const kept=labels.filter((_,i)=>shown[i]).map(l=>({box:l.box})),unitLabels=[];
       if(showActivity)for(const e of recentActivity(data,time)){
         const p=pos(e.x,e.y),count=e.selected_count;
         const radius=(6+(Number.isInteger(count)&&count>0?Math.log2(count+1)*2:0))/zoom;
@@ -195,11 +212,34 @@
         }
         const s=screen(p);
         hits.push({...p,sx:s.x,sy:s.y,reach:radius+2/zoom,key:`a:${e.side}:${e.group}:${e.seconds}:${e.x}:${e.y}`,event:{...e,marker:'activity'}});
+        const text=unitsShort(e,label);
+        if(text){
+          const uf=font*.9,measured=(ctx.font=`bold ${uf/zoom}px sans-serif`,ctx.measureText(text)?.width*zoom),w=measured>0?measured:labelWidth(text,uf);
+          const left=s.x+radius*zoom+2;
+          unitLabels.push({text,event:e,x:p.x+radius+2/zoom,y:p.y,font:uf,alpha:.95*(1-(time-e.seconds)/30),box:{x:left,y:s.y-uf/2,w,h:uf}});
+        }
       }
+      // Unit names next to the circles: the newest first, never over a building name or each other.
+      unitLabels.sort((a,b)=>b.event.seconds-a.event.seconds);
+      const unitShown=placeLabels([...kept,...unitLabels],[],1).slice(kept.length);
+      ctx.textAlign='left';ctx.textBaseline='middle';ctx.lineJoin='round';
+      for(const [i,l] of unitLabels.entries())if(unitShown[i]){
+        ctx.globalAlpha=Math.max(.35,l.alpha);ctx.font=`bold ${l.font/zoom}px sans-serif`;
+        ctx.lineWidth=Math.max(2,l.font/6)/zoom;ctx.strokeStyle='#102117';ctx.fillStyle='#fff';
+        ctx.strokeText(l.text,l.x,l.y);ctx.fillText(l.text,l.x,l.y);
+      }
+      ctx.textAlign='center';ctx.textBaseline='alphabetic';
       ctx.globalAlpha=1;
       ring(hits.length-activityFrom);
       ctx.restore();
     }
+    // The info line's unit list: only inside the engine's verified span, and said so.
+    const unitsUntil=Number.isFinite(data.command_units_until)?data.command_units_until:null;
+    const activityUnits=e=>{
+      const long=unitsLong(e,label);
+      if(long)return ` · 움직인 유닛 ${long}(재시뮬레이션, 확인 구간 안)`;
+      return unitsUntil!==null&&e.seconds>unitsUntil?` · 유닛 종류는 확인 구간(${format(unitsUntil)})까지만`:'';
+    };
     canvas.addEventListener('click',e=>{
       const r=canvas.getBoundingClientRect(),x=(e.clientX-r.left)*720/r.width,y=(e.clientY-r.top)*420/r.height;
       const k=r.width/720,pick=pickHit(hits,x,y,selectedKey,hitRadius(k),stackRadius(k)),selected=pick?pick.hit.event:null;
@@ -207,7 +247,7 @@
       const more=pick&&pick.count>1?` · 겹친 표시 ${pick.index+1}/${pick.count}, 다시 누르면 다음`:'';
       info.textContent=selected?(selected.marker==='resource'?
         `${RESOURCE_NAME[selected.kind]} ${selected.count}칸 · 경기 시작 때 위치 · 좌표 ${selected.x}, ${selected.y}`:selected.marker==='activity'?
-        `${selected.side==='mine'?'나':'상대'} · ${activityNames[selected.kind]||'유닛 지시'} · ${format(selected.seconds)}${Number.isInteger(selected.selected_count)?' · 선택 '+selected.selected_count+'대상':''} · 명령 지점 ${selected.x}, ${selected.y}`:
+        `${selected.side==='mine'?'나':'상대'} · ${activityNames[selected.kind]||'유닛 지시'} · ${format(selected.seconds)}${Number.isInteger(selected.selected_count)?' · 선택 '+selected.selected_count+'대상':''}${activityUnits(selected)} · 명령 지점 ${selected.x}, ${selected.y}`:
         `${selected.side==='mine'?'나':'상대'} · ${label(selected.label)} · ${selected.initial?'시작 배치':format(selected.seconds)+' 건설 요청'} · 좌표 ${selected.x}, ${selected.y}`)+more:'표식을 누르면 요청 시각·좌표가 나와요.';
       draw(lastTime);
     });
@@ -215,5 +255,5 @@
     if(typeof ResizeObserver==='function')new ResizeObserver(()=>draw(lastTime)).observe(canvas);
     return {draw,activity(show){showActivity=show;draw(lastTime);},focus(side){const e=data.initial_buildings.find(e=>e.side===side&&e.label==='Town Center');focus=e?pos(e.x,e.y):null;zoom=e?2.6:1;draw(lastTime);}};
   }
-  const api={project,visibleBuildings,recentActivity,isWallPiece,boxesOverlap,labelWidth,placeLabels,pickHit,footprint,markerShape,resourcePatches,legendItems,hitRadius,stackRadius,mount};if(typeof module==='object'&&module.exports)module.exports=api;else global.SSAPOBuildingMap=api;
+  const api={project,visibleBuildings,recentActivity,unitsShort,unitsLong,isWallPiece,boxesOverlap,labelWidth,placeLabels,pickHit,footprint,markerShape,resourcePatches,legendItems,hitRadius,stackRadius,mount};if(typeof module==='object'&&module.exports)module.exports=api;else global.SSAPOBuildingMap=api;
 })(typeof window==='undefined'?globalThis:window);

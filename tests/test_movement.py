@@ -38,3 +38,25 @@ class MovementTests(TestCase):
         self.assertNotEqual(result[0]['group'], result[4]['group'])
         self.assertNotIn('group', result[1])
         self.assertNotIn('object_ids', result[0])
+
+    def test_kept_ids_follow_the_games_last_commanded_units(self):
+        own = O(number=1, team=[])
+        match = O(players=[own, O(number=2)], map=O(dimension=120), restored_at=timedelta(0))
+        def action(kind, pid, ids, **extra):
+            payload = dict(player_id=pid, x=20, y=30, **extra)
+            if ids is not None:
+                payload['object_ids'] = ids
+            return fast.Operation.ACTION, (kind, payload)
+        ops = [action(fast.Action.MOVE, 1, [11, 12]),
+               action(fast.Action.MOVE, 2, [30]),
+               action(fast.Action.PATROL, 1, [40]),          # a patrol does not set the last units
+               action(fast.Action.MOVE, 1, []),              # count 0xffff: 11 and 12 again
+               action(fast.Action.ORDER, 2, []),             # player 2's own last units
+               action(fast.Action.WORK, 1, None),            # a list mgz does not read
+               action(fast.Action.MOVE, 1, []), EOFError()]
+        with patch('mgz.fast.header.parse'), patch('mgz.fast.meta'), patch('mgz.fast.operation', side_effect=ops):
+            result = command_activity(b'', match, own, keep_ids=True)
+        self.assertEqual([e.get('ids') for e in result], [(11, 12), (30,), (40,), (11, 12), (30,), None])
+        self.assertEqual([e['selected_count'] for e in result], [2, 1, 1, None, None, None])
+        with patch('mgz.fast.header.parse'), patch('mgz.fast.meta'), patch('mgz.fast.operation', side_effect=ops[:-1] + [EOFError()]):
+            self.assertFalse(any('ids' in e for e in command_activity(b'', match, own)))
