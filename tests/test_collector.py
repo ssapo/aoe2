@@ -219,23 +219,25 @@ class CollectorTests(unittest.TestCase):
 if __name__=='__main__': unittest.main()
 
 
-def test_random_civ_flags_reads_prefer_random(monkeypatch):
-    import types, sys as _sys
-    fake = types.ModuleType('mgz.fast.header')
-    fake.parse = lambda _h: {'de': {'players': [
-        {'profile_id': 199325, 'prefer_random': True},
-        {'profile_id': 26260702, 'prefer_random': False},
-        {'profile_id': -1, 'prefer_random': True},
-        {'profile_id': 5, 'prefer_random': None},
-    ]}}
-    monkeypatch.setitem(_sys.modules, 'mgz.fast.header', fake)
-    assert collect.random_civ_flags(b'x') == {199325: True, 26260702: False}
+def _de_entry(profile, civ, choice, kind=2, pool=()):
+    import struct
+    s = lambda b: b'\x60\x0a' + struct.pack('<H', len(b)) + b
+    return (struct.pack('<Ii', 15, 1) + b'\xff\x02\x02' + bytes.fromhex('97948273') + bytes([74])
+            + struct.pack('<I', choice)[:3] + b'\x00' + struct.pack('<II', civ, len(pool))
+            + b''.join(struct.pack('<I', c) for c in pool) + s(b'') + b'\x00' + s(b'') + s(b'name')
+            + struct.pack('<Ii', kind, profile) + b'\x00' * 16)
+
+
+def test_random_civ_flags_reads_the_civ_choice(monkeypatch):
+    import io as _io
+    blob = (b'\x00' * 40 + _de_entry(26260702, 6, 1) + _de_entry(5744571, 2, 0, pool=(2,))
+            + _de_entry(77, 9, 2) + _de_entry(-1, 1, 1, kind=1))
+    monkeypatch.setattr('mgz.fast.header.decompress', lambda _h: _io.BytesIO(blob))
+    # 1 = Random, 0 = picked; an unknown value and an empty slot are left out
+    assert collect.random_civ_flags(b'x') == {26260702: True, 5744571: False}
 
 
 def test_random_civ_flags_unreadable_header_is_empty(monkeypatch):
-    import types, sys as _sys
-    fake = types.ModuleType('mgz.fast.header')
     def boom(_h): raise RuntimeError('bad')
-    fake.parse = boom
-    monkeypatch.setitem(_sys.modules, 'mgz.fast.header', fake)
+    monkeypatch.setattr('mgz.fast.header.decompress', boom)
     assert collect.random_civ_flags(b'x') == {}

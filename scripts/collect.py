@@ -6,6 +6,7 @@ from collections import Counter
 from datetime import datetime, timezone
 import gzip
 import io
+import struct
 import json
 import os
 from pathlib import Path
@@ -20,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MAX_DOWNLOAD = 64 * 1024 * 1024
 MAX_REPLAY = 256 * 1024 * 1024
 AGE_IDS = {101: '봉건', 102: '성주', 103: '왕정'}
-ANALYSIS_REVISION = 29
+ANALYSIS_REVISION = 30
 
 
 def now():
@@ -252,20 +253,45 @@ def food_order_evidence(raw, match):
 
 
 def random_civ_flags(decoded):
-    """Map profile_id -> True/False from the DE lobby flag `prefer_random`.
+    """Map profile_id -> True/False: was this player's civilization drawn at random.
 
-    The match-history API does not carry this, so it is only known for replays we
-    parse. Missing or unreadable values are left out instead of guessed."""
+    Read from the DE header's player entry: the four bytes right before civ_id (mgz reads
+    them as the end of `dat_crc` and the `mp_game_version` byte and skips them):
+    0 = picked a civilization, 1 = Random. Checked on 2026-11-16 against the user's own
+    games: 520848973 (Arena, Chinese drawn at random with mutual random on) is 1, and his
+    games with a picked civilization are 0, while `prefer_random` (the lobby setting) is
+    on in some of those. Other values (2, 3 were seen) are not known and are left out,
+    as is anything unreadable. The match-history API does not carry this."""
     try:
-        from mgz.fast.header import parse
-        players = parse(io.BytesIO(decoded)).get('de', {}).get('players', [])
+        from mgz.fast.header import decompress
+        blob = decompress(io.BytesIO(decoded)).read()
     except Exception:
         return {}
-    flags = {}
-    for p in players:
-        pid, flag = p.get('profile_id'), p.get('prefer_random')
-        if isinstance(pid, int) and pid > 0 and isinstance(flag, bool):
-            flags[pid] = flag
+    flags, at = {}, 0
+    while len(flags) < 8:
+        string = blob.find(b'\x60\x0a', at)       # the entry's ai_type string
+        if string < 0:
+            break
+        at = string + 2
+        for count in range(0, 81):                 # civ_id, custom civ count, that many civ ids
+            civ_at = string - 4 * count - 8
+            if civ_at < 13:
+                break
+            civ, listed = struct.unpack_from('<II', blob, civ_at)
+            if listed != count or not 0 < civ < 100:
+                continue
+            p = string + 4 + struct.unpack_from('<H', blob, string + 2)[0] + 1
+            names = 0
+            while blob[p:p + 2] == b'\x60\x0a' and names < 3:   # ai_name, (censored name), name
+                p += 4 + struct.unpack_from('<H', blob, p + 2)[0]
+                names += 1
+            if names < 2 or p + 8 > len(blob):
+                break
+            kind, profile = struct.unpack_from('<Ii', blob, p)
+            choice = struct.unpack_from('<I', blob, civ_at - 4)[0]   # the four bytes right before civ_id
+            if kind == 2 and profile > 0 and choice in (0, 1):
+                flags[profile] = choice == 1
+            break
     return flags
 
 
