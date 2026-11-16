@@ -76,3 +76,35 @@ test('mount gives a placeholder until the table loads, then html',async()=>{
   assert.strictEqual(loaded.game_build,188329);
   assert.ok(!cm.mount('Vietnamese','Mongols').includes('data-civ-matchup'));
 });
+
+test('summary card rows come from bonus numbers in the table',()=>{
+  const s=cm.summary(ref,'Vietnamese','Mongols');
+  // threats: at most three, each with its biggest bonus against one of my fully upgraded army lines
+  assert.ok(s.threats.length>0&&s.threats.length<=3);
+  assert.strictEqual(s.threats[0].unit,330); // Heavy Camel Rider
+  assert.strictEqual(s.threats[0].hits[0].total,cm.bonusVs(ref,330,s.threats[0].hits[0].target).total);
+  for(const t of s.threats)assert.notStrictEqual(ref.nodes['u'+t.unit].building,49);
+  // avoid: hit harder by a threat than it hits back
+  for(const a of s.avoid){assert.ok(a.worst>a.dealt);assert.ok(a.by.some(h=>s.threats.some(t=>t.unit===h.unit)));}
+  // recommend: halberdier first (full line, +26 against the camel)
+  assert.strictEqual(s.recommend[0].unit,359);
+  assert.strictEqual(s.recommend[0].vs[0].total,26);
+  assert.ok(s.recommend.length<=3&&s.recommend.every(r=>r.score>0));
+  assert.ok(!s.avoid.some(a=>s.recommend.some(r=>r.root===a.root)));
+  // gaps: Mongols lack hand cannoneer and bombard lines, halberdier and paladin, plate barding
+  assert.deepStrictEqual(s.gaps.lines,[5,36]);
+  assert.ok(s.gaps.tops.includes(359)&&s.gaps.tops.includes(569));
+  assert.ok(s.gaps.techs.includes(80));
+});
+
+test('summary card html: four rows, evidence on tap, particles follow the final consonant',()=>{
+  const html=cm.html(ref,'Vietnamese','Mongols');
+  for(const title of ['피해야 할 병력 구성','상대 핵심 위협','추천 대응','상대 기술적 빈틈'])assert.ok(html.includes(title));
+  assert.ok(html.indexOf('matchup-card')<html.indexOf('matchup-more'));
+  assert.ok(html.includes('<details class="matchup-more">'));
+  assert.ok(html.includes('미늘창병은 중형 낙타 기병 상대 +26'));
+  assert.ok(html.includes('중형 낙타 기병이 '));
+  assert.ok(/class="mc-evidence" title="[^"]+"/.test(html));
+  assert.ok(html.includes('대장간·문명 보너스 제외'));
+  assert.strictEqual(cm.summary(ref,'Spartans','Mongols'),null);
+});
