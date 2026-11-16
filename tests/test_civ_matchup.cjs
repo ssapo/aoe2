@@ -143,27 +143,33 @@ test('summary rows are consistent with each other',()=>{
   }
 });
 
-test('summary card html: four rows of icons, names and numbers in tooltips',()=>{
+test('summary card html: rows read as sentences, sword between same-size icons, sides by ring colour',()=>{
   const html=cm.html(ref,'Vietnamese','Mongols');
-  for(const title of ['피해야 할 단독 병력','상대 핵심 위협','추천 대응','상대 기술적 빈틈'])assert.ok(html.includes(title));
-  assert.ok(html.indexOf('matchup-card')<html.indexOf('matchup-more'));
-  assert.ok(html.includes('<details class="matchup-more">'));
-  // halberdier chip: icon from the table's picture index, name next to it, the ×ratio with its evidence in the tooltip
-  assert.ok(html.includes(`src="assets/units/${ref.nodes.u359.icon}.png"`));
-  assert.ok(html.includes('<span class="mu-label">미늘창병</span>'));
-  // the tooltip says whose unit is whose, why the bonus applies, and the 1-on-1 numbers
-  assert.ok(html.includes("data-tip=\"내 미늘창병 → 상대 후사르\n타격당 피해 38 (추가 피해 기병 32 포함) · 받는 피해 7\n왜: 상대 후사르는 &#39;기병&#39; 방어 클래스를 가짐 → 내 미늘창병의 추가 피해 +32 적용\n1:1로 잡는 시간: 미늘창병 5.9초 · 후사르 16.3초\n비용 60 · 80 → 같은 자원이면 내 쪽이 ×3.7 유리\""));
-  // every unit icon on the card carries its side (ring colour) and a side tag
   const card=html.slice(html.indexOf('matchup-card'),html.indexOf('matchup-more'));
-  assert.ok(!/class="mu"/.test(card.replace(/class="mu mu-x mu-theirs"/g,'')));
-  assert.ok(card.includes('<span class="mc-side mc-side-theirs">상대</span>')&&card.includes('<span class="mc-side mc-side-mine">내</span>'));
+  for(const title of ['피해야 할 병력 구성','상대 핵심 위협','추천 대응','상대 기술적 빈틈'])assert.ok(card.includes(title));
+  assert.ok(html.includes('<details class="matchup-more">'));
+  const text=card.replace(/<svg[\s\S]*?<\/svg>/g,'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ');
+  // every row: bold name + one plain sentence, readable without the mouse
+  assert.ok(text.includes('아바레스트병만 모으기 몽골인 정예 초원 창기병이 같은 자원이면 2.4배 유리'));
+  assert.ok(text.includes('미늘창병 후사르에 한 대당 +32 추가 피해(기병)'));
+  assert.ok(text.includes('정예 전투 코끼리 정예 만구다이에 같은 자원이면 6.5배 유리 · 몽골인에는 미늘창병이 없음'));
+  assert.ok(text.includes('정예 만구다이 몽골인 보너스로 공격 속도 강화'));
+  // gaps: icon + words, four at most, the rest behind one chip
+  assert.ok(text.includes('총통병 계열 없음')&&text.includes('미늘창병 없음')&&text.includes('외 2개'));
+  assert.strictEqual((card.match(/class="mc-gapchip"/g)||[]).length,4);
+  // pairs: both unit icons, a sword (inline SVG) whose point faces the unit being hit
+  assert.ok(card.includes('<svg class="mc-sword"'));
+  const avoidRow=card.slice(card.indexOf('mc-avoid'),card.indexOf('mc-threat'));
+  assert.ok(avoidRow.includes('mc-hit mc-hit-left'));        // their lancer hits my arbalester on the left
+  assert.ok(avoidRow.indexOf('mu mu-mine')<avoidRow.indexOf('mu mu-theirs'));
+  const threatRow=card.slice(card.indexOf('mc-threat'),card.indexOf('mc-counter'));
+  assert.ok(!threatRow.includes('mc-hit-left')&&threatRow.indexOf('mu mu-theirs')<threatRow.indexOf('mu mu-mine'));
+  assert.ok(!card.includes('mc-chip'));                      // no arrow-and-number chips left
+  assert.ok(card.includes(`src="assets/units/${ref.nodes.u359.icon}.png"`));
+  // the row's tooltip: whose unit is whose, why the bonus applies, the 1-on-1 numbers
+  assert.ok(card.includes("data-tip=\"내 미늘창병 → 상대 후사르\n타격당 피해 38 (추가 피해 기병 32 포함) · 받는 피해 7\n왜: 상대 후사르는 &#39;기병&#39; 방어 클래스를 가짐 → 내 미늘창병의 추가 피해 +32 적용\n1:1로 잡는 시간: 미늘창병 5.9초 · 후사르 16.3초\n비용 60 · 80 → 같은 자원이면 내 쪽이 ×3.7 유리"));
   assert.ok(card.includes('mc-legend'));
-  // threats without a winning pair say why they are there (civ bonus from the game data)
-  assert.ok(html.includes('문명 보너스: 공격 속도'));
-  // gaps are crossed icons with the fact in the tooltip
-  assert.ok(html.includes('data-tip="상대: 총통병 계열 없음"'));
-  assert.ok(html.includes(`class="mu mu-x mu-theirs"`));
-  assert.ok(html.includes('대장간·문명 보너스 수치·컨트롤 제외'));
+  assert.ok(card.includes('대장간·문명 보너스 수치·컨트롤 제외'));
   assert.strictEqual(cm.summary(ref,'Spartans','Mongols'),null);
 });
 

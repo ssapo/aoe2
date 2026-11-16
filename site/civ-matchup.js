@@ -184,7 +184,9 @@
   // label: the short name next to the icon (summary card); crossed: the civ lacks it.
   function icon(ref,kind,id,opts={}){
     const name=kind==='u'?unitName(ref,id):techName(ref,id),tip=opts.tip||name,src=iconSrc(ref,kind,id);
-    return `<span class="mu${opts.crossed?' mu-x':''}${opts.side?` mu-${opts.side}`:''}" tabindex="0" role="img" aria-label="${esc(tip)}" data-tip="${esc(tip)}">`
+    const cls=`mu${opts.crossed?' mu-x':''}${opts.side?` mu-${opts.side}`:''}`;
+    // noTip: the icon sits inside a row that carries the tooltip, so it is not focusable on its own
+    return (opts.noTip?`<span class="${cls}" aria-hidden="true">`:`<span class="${cls}" tabindex="0" role="img" aria-label="${esc(tip)}" data-tip="${esc(tip)}">`)
       +(src?`<img src="${src}" alt="" loading="lazy">`:`<span class="mu-fallback">${esc(name.slice(0,2))}</span>`)
       +(opts.label?`<span class="mu-label">${esc(name)}</span>`:'')+'</span>';
   }
@@ -208,14 +210,25 @@
       `1:1로 잡는 시간: ${unitName(ref,a)} ${sec(p.aKills)} · ${unitName(ref,d)} ${sec(p.dKills)}${p.approach?` (근접 쪽 접근 ${sec(p.approach)} 포함)`:''}`,
       `비용 ${unitCost(ref,a)} · ${unitCost(ref,d)} → 같은 자원이면 ${SIDE_KO[sideA]} 쪽이 ×${times(p.edge)} 유리`].join('\n');
   }
-  const sideTag=side=>`<span class="mc-side mc-side-${side}">${SIDE_KO[side]}</span>`;
-  // "상대 [attacker] → 내 [target] ×2.4 기병": who beats whom, the side shown by tag and icon ring;
-  // labelled: which of the two icons carries its name (the unit the row is about)
-  function matchChip(ref,a,d,p,sideA,labelled,note){
-    const tip=pairTip(ref,a,d,p,sideA),top=p.bonus.parts[0];
-    const unit=(id,side,label)=>`${sideTag(side)}${icon(ref,'u',id,{side,label,tip:[sided(ref,id,side),statsLine(ref,id),label?note:''].filter(Boolean).join('\n')})}`;
-    return `<span class="mc-chip">${unit(a,sideA,labelled==='a')}<span class="mc-rel" tabindex="0" role="img" aria-label="${esc(tip)}" data-tip="${esc(tip)}">→</span>${unit(d,other(sideA),labelled==='d')}`
-      +`<span class="mc-rel" tabindex="0" role="img" aria-label="${esc(tip)}" data-tip="${esc(tip)}"><b>${esc(pairFigure(p))}</b>${top?`<small>${esc(className(ref,top.cls))}+${top.amount}</small>`:''}</span></span>`;
+  // a horizontal sword, point to the right; .mc-sword-left mirrors it so the point faces the unit being hit
+  const SWORD='<svg class="mc-sword" viewBox="0 0 52 16" aria-hidden="true"><rect x="1" y="6.4" width="7" height="3.2" rx="1" fill="#6b4f2e"/><circle cx="2" cy="8" r="2.3" fill="#b8913f"/><rect x="8" y="2" width="3.2" height="12" rx="1" fill="#b8913f"/><path d="M11.2 5.9H42L50.5 8 42 10.1H11.2Z" fill="#dfe5ea" stroke="#5f6b76" stroke-width=".9" stroke-linejoin="round"/><path d="M12 8H43" stroke="#9aa6b1" stroke-width=".7"/></svg>';
+  const bonusOf=p=>Math.round((p.bonus?.total||0)*10)/10;
+  // the figure on the sword: how much the same resources favour the attacker (the per-hit bonus alone
+  // understates units that win on base stats, e.g. Ghulam +6 against archers yet ×10+)
+  const swordFigure=p=>`×${times(p.edge)}`;
+  // [subject icon] sword [other icon]; pointLeft: the other unit hits the subject
+  function pairVisual(ref,subject,subjectSide,otherUnit,p,pointLeft){
+    const big=(id,side)=>icon(ref,'u',id,{side,noTip:true});
+    return `<span class="mc-pair">${big(subject,subjectSide)}<span class="mc-hit${pointLeft?' mc-hit-left':''}"><b>${esc(swordFigure(p))}</b>${SWORD}</span>${big(otherUnit,other(subjectSide))}</span>`;
+  }
+  // one plain sentence for a pair: the bonus when there is one, otherwise how much the same resources favour it
+  function pairSentence(ref,p){
+    const top=p.bonus.parts[0];
+    return bonusOf(p)>0?`한 대당 +${bonusOf(p)} 추가 피해(${className(ref,top.cls)})`:`같은 자원이면 ${times(p.edge)}배 유리`;
+  }
+  const boostPhrase=(b,civ)=>b?`${civ} 보너스로 ${[...new Set(b.attrs.map(a=>ATTR_KO[a]).filter(Boolean))].join('·')} 강화${b.sources.includes('unique')?'(고유 기술 포함)':''}`:'';
+  function line(cls,visual,name,why,tip){
+    return `<div class="mc-line ${cls}" tabindex="0" role="button" aria-label="${esc(name+' — '+why)}" data-tip="${esc(tip)}">${visual}<span class="mc-text"><b class="mc-name">${esc(name)}</b><span class="mc-why">${esc(why)}</span></span></div>`;
   }
   function unitTip(ref,id,side,rows,extra){
     const out=[sided(ref,id,side),statsLine(ref,id)];
@@ -225,36 +238,55 @@
   const boostText=b=>b?`문명 보너스: ${[...new Set(b.attrs.map(a=>ATTR_KO[a]).filter(Boolean))].join('·')}${b.sources.includes('unique')?' (고유 기술 포함)':''}`:'';
   function answerText(ref,ans){
     if(!ans)return '';
-    const line=ans.line,missing=line.status==='partial'?` — 상대 ${unitName(ref,line.top)} 없음`:'';
-    return `상대의 가장 강한 대응: ${unitName(ref,line.final)} ${ans.edge>0?pairFigure(ans):'(불리)'}${missing}`;
+    const l=ans.line,missing=l.status==='partial'?` — 상대 ${unitName(ref,l.top)} 없음`:'';
+    return `상대의 가장 강한 대응: ${unitName(ref,l.final)} ${ans.edge>0?pairFigure(ans):'(불리)'}${missing}`;
   }
-  function cardRow(cls,mark,title,body){
-    return `<div class="mc-row ${cls}"><span class="mc-icon" aria-hidden="true">${mark}</span><div class="mc-body"><span class="mc-title">${esc(title)}</span>${body}</div></div>`;
+  function section(cls,mark,title,body){
+    return `<section class="mc-sec ${cls}"><h4 class="mc-title"><span class="mc-icon" aria-hidden="true">${mark}</span>${esc(title)}</h4>${body}</section>`;
   }
-  const chips=items=>`<div class="mc-chips">${items.join('')}</div>`;
   function cardHtml(ref,mine,theirs){
     const s=summary(ref,mine,theirs);
     if(!s)return '';
-    const none=text=>`<span class="mc-none">${esc(text)}</span>`;
-    // avoid: their threat → my line (named)
-    const avoid=s.avoid.length?chips(s.avoid.map(a=>matchChip(ref,a.by[0].unit,a.unit,a.by[0],'theirs','d'))):none('상대 핵심 병종이 함께 앞서는 내 계열 없음');
-    // threats: their unit (named) → my line it beats most
-    const threats=s.threats.length?chips(s.threats.map(t=>{
-      const best=t.vs[0];
-      if(best&&best.edge>0)return matchChip(ref,t.unit,best.target,best,'theirs','a',[t.unique?'고유 유닛':'',boostText(t.boost)].filter(Boolean).join('\n'));
-      return `<span class="mc-chip">${sideTag('theirs')}${icon(ref,'u',t.unit,{side:'theirs',label:true,tip:unitTip(ref,t.unit,'theirs',t.vs,[t.unique?'고유 유닛':'',boostText(t.boost)])})}<span class="mc-rel-text">${esc(t.unique?'고유 유닛':boostText(t.boost))}</span></span>`;
+    const me=civLabel(ref,mine),them=civLabel(ref,theirs);
+    const none=text=>`<p class="mc-none">${esc(text)}</p>`;
+    const list=rows=>`<div class="mc-lines">${rows.join('')}</div>`;
+    // avoid: my line, hit by their threat (the sword points at my unit)
+    const avoid=s.avoid.length?list(s.avoid.map(a=>{
+      const p=a.by[0],t=unitName(ref,p.unit);
+      const why=`${them} ${t}${josa(t,'이','가')} ${pairSentence(ref,p)}`;
+      return line('',pairVisual(ref,a.unit,'mine',p.unit,p,true),`${unitName(ref,a.unit)}만 모으기`,why,
+        [pairTip(ref,p.unit,a.unit,p,'theirs'),...a.by.slice(1).map(q=>`또: 상대 ${unitName(ref,q.unit)} ${pairFigure(q)}`),answerText(ref,a.answer)].filter(Boolean).join('\n'));
+    })):none('상대 핵심 병종이 함께 앞서는 내 계열 없음');
+    // threats: their unit hitting the line of mine it beats most
+    const threats=s.threats.length?list(s.threats.map(t=>{
+      const best=t.vs[0],won=best&&best.edge>0,name=unitName(ref,t.unit);
+      const why=[t.boost?boostPhrase(t.boost,them):t.unique?`${them} 고유 유닛`:'',won?`내 ${unitName(ref,best.target)}에 ${pairSentence(ref,best)}`:''].filter(Boolean).join(' · ');
+      const visual=won?pairVisual(ref,t.unit,'theirs',best.target,best,false):`<span class="mc-pair">${icon(ref,'u',t.unit,{side:'theirs',noTip:true})}</span>`;
+      return line('',visual,name,why||'완전 승급 계열',[won?pairTip(ref,t.unit,best.target,best,'theirs'):unitTip(ref,t.unit,'theirs',[]),t.unique?'고유 유닛':'',boostText(t.boost)].filter(Boolean).join('\n'));
     })):none('뚜렷한 것 없음');
-    // recommend: my line (named) → their threat it beats most
-    const recommend=s.recommend.length?chips(s.recommend.map(r=>matchChip(ref,r.unit,r.vs[0].target,r.vs[0],'mine','a'))):none('상대 핵심 병종에 앞서는 계열 없음');
+    // recommend: my line hitting their threat; a missing counter upgrade on their side is said too
+    const recommend=s.recommend.length?list(s.recommend.map(r=>{
+      const p=r.vs[0],ans=r.answer,gap=ans&&ans.line.status==='partial'?`${them}에는 ${unitName(ref,ans.line.top)}${josa(unitName(ref,ans.line.top),'이','가')} 없음`:'';
+      const why=[`${unitName(ref,p.target)}에 ${pairSentence(ref,p)}`,gap].filter(Boolean).join(' · ');
+      return line('',pairVisual(ref,r.unit,'mine',p.target,p,false),unitName(ref,r.unit),why,
+        [pairTip(ref,r.unit,p.target,p,'mine'),r.full?'':'(최종 업그레이드 아님)',answerText(ref,ans)].filter(Boolean).join('\n'));
+    })):none('상대 핵심 병종에 앞서는 계열 없음');
+    // gaps: icon + words, at most four; the rest behind one more chip
     const g=s.gaps;
-    const gapIcons=[...g.lines.map(r=>icon(ref,'u',r,{side:'theirs',crossed:true,tip:`상대: ${unitName(ref,r)} 계열 없음`})),...g.tops.map(id=>icon(ref,'u',id,{side:'theirs',crossed:true,tip:`상대: ${unitName(ref,id)} 없음`})),...g.techs.map(t=>icon(ref,'t',t,{side:'theirs',crossed:true,tip:`상대: ${techName(ref,t)} 없음`}))];
-    return `<div class="matchup-card"><div class="mc-head"><span class="mc-kicker">MATCHUP · ${esc(civLabel(ref,mine))}</span><strong class="mc-vs">VS ${esc(civLabel(ref,theirs))}</strong>`
-      +`<span class="mc-legend"><span class="mc-key mc-key-mine"></span>내 ${esc(civLabel(ref,mine))} <span class="mc-key mc-key-theirs"></span>상대 ${esc(civLabel(ref,theirs))}</span></div>`
-      +cardRow('mc-avoid','!','피해야 할 단독 병력 — 상대 → 내 계열',avoid)
-      +cardRow('mc-threat','▲','상대 핵심 위협 — 상대 → 내 계열',threats)
-      +cardRow('mc-counter','✓','추천 대응 — 내 → 상대 위협',recommend)
-      +cardRow('mc-gap','i','상대 기술적 빈틈',gapIcons.length?`<div class="mc-icons">${gapIcons.join('')}</div>`:none('주요 계열·기술 결손 없음'))
-      +'<p class="mc-note">화살표는 이기는 쪽 → 지는 쪽. ×숫자 = 같은 자원으로 싸울 때 기본 수치상 유리한 정도(1:1 처치 시간 × 비용, 원거리 상대는 다가가는 시간 포함), 옆 글자는 가장 큰 추가 피해 클래스. 각 계열 최종 유닛 기본값 — 대장간·문명 보너스 수치·컨트롤 제외. 아이콘을 누르면 근거.</p></div>';
+    // army lines first, then key techs, siege last
+    const siege=id=>buildingOf(ref,id)===49;
+    const lineItems=[...g.lines.map(r=>['u',r,`${unitName(ref,r)} 계열 없음`]),...g.tops.map(id=>['u',id,`${unitName(ref,id)} 없음`])];
+    const items=[...lineItems.filter(x=>!siege(x[1])),...g.techs.map(t=>['t',t,`${techName(ref,t)} 없음`]),...lineItems.filter(x=>siege(x[1]))];
+    const chip=([kind,id,text])=>`<span class="mc-gapchip" tabindex="0" data-tip="${esc(`${them}: ${text}`)}">${icon(ref,kind,id,{side:'theirs',noTip:true})}<span>${esc(text)}</span></span>`;
+    const rest=items.slice(4);
+    const gaps=items.length?`<div class="mc-gaps">${items.slice(0,4).map(chip).join('')}${rest.length?`<span class="mc-gapchip mc-more" tabindex="0" data-tip="${esc(rest.map(x=>x[2]).join('\n'))}">외 ${rest.length}개</span>`:''}</div>`:none('주요 계열·기술 결손 없음');
+    return `<div class="matchup-card"><div class="mc-head"><span class="mc-kicker">MATCHUP · ${esc(me)}</span><strong class="mc-vs">VS ${esc(them)}</strong>`
+      +`<span class="mc-legend"><span><span class="mc-key mc-key-mine"></span>초록 = 내 ${esc(me)}</span><span><span class="mc-key mc-key-theirs"></span>빨강 = 상대 ${esc(them)}</span><span>칼끝 = 맞는 쪽</span></span></div>`
+      +section('mc-avoid','!','피해야 할 병력 구성',avoid)
+      +section('mc-threat','▲','상대 핵심 위협',threats)
+      +section('mc-counter','✓','추천 대응',recommend)
+      +section('mc-gap','i','상대 기술적 빈틈',gaps)
+      +'<p class="mc-note">칼 위 ×N = 칼을 든 쪽이 같은 자원으로 싸울 때 유리한 정도(1:1 처치 시간 × 비용, 원거리 상대는 다가가는 시간 포함). 각 계열 최종 유닛 기본값 — 대장간·문명 보너스 수치·컨트롤 제외. 줄을 누르면 근거 수치.</p></div>';
   }
   function chainCell(ref,l,side){
     if(l.final==null)return '<span class="matchup-none">—</span>';
