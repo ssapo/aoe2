@@ -165,7 +165,7 @@ class CollectorTests(unittest.TestCase):
                 raise OSError('expired replay')
             return b'replay'
         def run(limit):
-            with patch.object(sys,'argv',['collect','--profile-id','1234','--limit',str(limit),'--output',str(path)]),patch.object(collect,'fetch',side_effect=fetch),patch.object(collect,'analyze_replay',return_value=newer),patch('review.enrich_report'):
+            with patch.object(sys,'argv',['collect','--profile-id','1234','--limit',str(limit),'--header-limit','0','--output',str(path)]),patch.object(collect,'fetch',side_effect=fetch),patch.object(collect,'analyze_replay',return_value=newer),patch('review.enrich_report'):
                 collect.main()
             return {m['id']:m for m in json.loads(path.read_text(encoding='utf-8'))['matches']}
         with tempfile.TemporaryDirectory() as folder:
@@ -235,6 +235,39 @@ def test_random_civ_flags_reads_the_civ_choice(monkeypatch):
     monkeypatch.setattr('mgz.fast.header.decompress', lambda _h: _io.BytesIO(blob))
     # 1 = Random, 0 = picked; an unknown value and an empty slot are left out
     assert collect.random_civ_flags(b'x') == {26260702: True, 5744571: False}
+
+
+def test_civ_choices_fill_from_analysis_or_header_within_the_budget(monkeypatch):
+    players = lambda: [{'profile_id': 1, 'is_self': True}, {'profile_id': 2, 'is_self': False}]
+    rows = [
+        {'id': 10, 'started_at': 5, 'players': players(), 'analysis': {'analysis_revision': 30, 'random_civ': True, 'opponents': [{'random_civ': False}]}},
+        {'id': 11, 'started_at': 4, 'players': players(), 'analysis': None},
+        {'id': 12, 'started_at': 3, 'players': players(), 'analysis': {'analysis_revision': 29, 'random_civ': True, 'opponents': [{}]}},
+        {'id': 13, 'started_at': 2, 'players': players(), 'civ_choice': {'1': False}},
+        {'id': 14, 'started_at': 1, 'players': players(), 'civ_choice_tries': 2},
+    ]
+    asked = []
+    def fetch(url, limit=None):
+        asked.append(url.split('gameId=')[1].split('&')[0])
+        if '=12&' in url:
+            raise OSError('expired')
+        return b'replay'
+    monkeypatch.setattr(collect, 'fetch', fetch)
+    monkeypatch.setattr(collect, 'decode_replay', lambda raw: raw)
+    monkeypatch.setattr(collect, 'random_civ_flags', lambda decoded: {1: False, 2: True})
+    collect.civ_choices(rows, 1, 5)
+    assert asked == ['11', '12']                       # 10 from its analysis, 13 and 14 left alone
+    assert rows[0]['civ_choice'] == {'1': True, '2': False}
+    assert rows[1]['civ_choice'] == {'1': False, '2': True}
+    assert 'civ_choice' not in rows[2] and rows[2]['civ_choice_tries'] == 1
+    asked.clear()
+    collect.civ_choices(rows, 1, 0)
+    assert asked == []
+    collect.civ_choices(rows, 1, 5)
+    assert asked == ['12'] and rows[2]['civ_choice_tries'] == 2
+    asked.clear()
+    collect.civ_choices(rows, 1, 5)
+    assert asked == []
 
 
 def test_random_civ_flags_unreadable_header_is_empty(monkeypatch):

@@ -392,6 +392,39 @@ def replay_civilizations(row):
             p['civilization'] = name
 
 
+def civ_choices(rows, own_id, budget):
+    """Fill `civ_choice` ({profile id: drawn at random}) on stored rows, newest first.
+
+    An analysis of revision 30 or later already holds the answer for a 1v1; any other row
+    (an older analysis, or a featured player's match that is only listed) reads it from the
+    replay header alone, which is cheap next to a full analysis. A replay that cannot be
+    fetched or read is tried twice in all, then left without the field."""
+    for row in sorted(rows, key=lambda m: m.get('started_at') or 0, reverse=True):
+        if 'civ_choice' in row or row.get('civ_choice_tries', 0) >= 2:
+            continue
+        analysis = row.get('analysis') or {}
+        players = row.get('players') or []
+        own = next((p for p in players if p.get('is_self')), None)
+        others = [p for p in players if not p.get('is_self')]
+        opponents = analysis.get('opponents') or []
+        if analysis.get('analysis_revision', 0) >= 30 and own and len(others) == 1 and len(opponents) == 1:
+            pairs = [(own['profile_id'], analysis.get('random_civ')), (others[0]['profile_id'], opponents[0].get('random_civ'))]
+            row['civ_choice'] = {str(int(pid)): flag for pid, flag in pairs if isinstance(flag, bool)}
+            continue
+        if not budget:
+            continue
+        budget -= 1
+        try:
+            flags = random_civ_flags(decode_replay(fetch(replay_urls({'id': row['id']}, own_id)[0])))
+        except Exception:
+            flags = None
+        if flags:
+            row['civ_choice'] = {str(pid): flag for pid, flag in flags.items()}
+            row.pop('civ_choice_tries', None)
+        else:
+            row['civ_choice_tries'] = row.get('civ_choice_tries', 0) + 1
+
+
 def metadata(match, own_id, aliases):
     results = match.get('matchhistoryreportresults', [])
     own = next((p for p in results if int(p['profile_id']) == own_id), None)
@@ -437,6 +470,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--profile-id', default='')
     parser.add_argument('--limit', type=int, default=5)
+    parser.add_argument('--header-limit', type=int, default=4,
+                        help='stored matches per run whose replay header is read for the civ choice (0-60)')
     parser.add_argument('--replay', help='개발·검증용 로컬 리플 경로')
     parser.add_argument('--output', type=Path, default=ROOT / 'site/data/report.json')
     args = parser.parse_args()
@@ -478,6 +513,9 @@ def main():
         if row is None:
             continue
         existing = old.get(row['id'], {})
+        for key in ('civ_choice', 'civ_choice_tries'):
+            if key in existing:
+                row[key] = existing[key]
         if existing.get('analysis_status') == 'complete':
             # Keep analysis, but refresh finalized outcome and rating.
             row.update({k: existing[k] for k in ('analysis', 'analysis_status', 'attempts', 'analysis_upgrade') if k in existing})
@@ -520,6 +558,7 @@ def main():
             budget -= 1
             if row.get('analysis'):
                 row['map'] = row['analysis'].get('map', row.get('map'))
+    civ_choices(old.values(), own_id, max(0, min(args.header_limit, 60)))
     for row in old.values():
         # Also repairs kept rows that the API no longer lists.
         replay_civilizations(row)

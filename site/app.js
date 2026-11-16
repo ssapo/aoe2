@@ -203,7 +203,7 @@
     const events=[...[mine,theirs].flatMap((metrics,side)=>(metrics.full_timeline||metrics.timeline||[]).map(e=>({...e,side:side?'theirs':'mine'})))].sort((a,b)=>a.seconds-b.seconds);
     const seek=root.querySelector('#record-seek'),play=root.querySelector('#record-play');
     const civs=[match.analysis?.civilization||match.civilization,other?.civilization];
-    const fromChoice=Number(match.analysis?.analysis_revision)>=30,civRandoms=[fromChoice&&match.analysis?.random_civ===true,fromChoice&&other?.random_civ===true];
+    const choice=match.civ_choice||{},pids=[(match.players||[]).find(p=>p.is_self)?.profile_id,(match.players||[]).find(p=>!p.is_self)?.profile_id],fromChoice=Number(match.analysis?.analysis_revision)>=30,civRandoms=[0,1].map(i=>Object.hasOwn(choice,String(pids[i]))?choice[String(pids[i])]===true:fromChoice&&[match.analysis?.random_civ,other?.random_civ][i]===true);
     const mapHost=root.querySelector('#building-map-host');
     mapHost.innerHTML=mapData?`<div class="map-toolbar"><div class="map-legend">${civBadge(civs[0],'나',civRandoms[0])}${civBadge(civs[1],'상대',civRandoms[1])}</div><div class="map-focus"><button data-map-focus="all" aria-pressed="true">전체 맵</button><button data-map-focus="mine" aria-pressed="false">내 본진</button><button data-map-focus="theirs" aria-pressed="false">상대 본진</button>${Array.isArray(mapData.command_activity)?'<button id="map-activity" aria-pressed="true">유닛 지시</button>':''}</div></div><canvas id="building-map" width="720" height="420" role="img" aria-label="실제 지형과 양측 건설·이동 지시 위치"></canvas><p id="building-map-info" class="compact-note" aria-live="polite">${Array.isArray(mapData.command_activity)?'원은 최근 30초의 지시 지점, 숫자는 선택 수예요.':'유닛 지시는 이 경기 재분석 후 표시돼요.'}</p>`:'<p class="compact-note">이 경기의 맵 자료는 다음 재분석 후 표시돼요.</p>';
     const mapPlayer=mapData?window.SSAPOBuildingMap.mount(root.querySelector('#building-map'),root.querySelector('#building-map-info'),mapData,events,label,fmtTime):null;
@@ -318,7 +318,9 @@
   // random_civ before analysis revision 30 was the lobby's random-preference setting (prefer_random),
   // not whether the civ was drawn at random; from 30 it is the header's civ choice (1 = Random).
   const randomMark='<span class="civ-random" title="랜덤으로 정해진 문명"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="13" rx="3"/><circle cx="5.2" cy="5.2" r="1.25"/><circle cx="10.8" cy="10.8" r="1.25"/><circle cx="8" cy="8" r="1.25"/></svg>랜덤</span>';
-  const drawnAtRandom=(a,value)=>Number(a?.analysis_revision)>=30&&value===true;
+  // civ_choice ({profile id: drawn at random}) is read from the replay header for every stored match;
+  // an analysis of revision 30+ holds the same for a 1v1. Older values were the lobby preference.
+  const drawnAtRandom=(m,pid,value)=>{const c=m?.civ_choice;if(c&&pid!=null&&Object.hasOwn(c,String(pid)))return c[String(pid)]===true;return Number(m?.analysis?.analysis_revision)>=30&&value===true;};
   function missingNotes(a){
     // why a part of the numbers tab is empty, in one short line each
     const rev=Number(a.analysis_revision)||0,notes=[];
@@ -336,7 +338,8 @@
     const own=m.analysis?.civilization||m.civilization;
     const opponents=m.analysis?.opponents||[];
     const fallback=(m.players||[]).filter(p=>!p.is_self);
-    return `<span class="match-civs">${civBadge(own,'나',drawnAtRandom(m.analysis,m.analysis?.random_civ))}${opponents.length?opponents.map(p=>civBadge(p.civilization,'상대',drawnAtRandom(m.analysis,p.random_civ))).join(''):fallback.map(p=>civBadge(p.civilization,'상대')).join('')}</span>`;
+    const self=(m.players||[]).find(p=>p.is_self)?.profile_id;
+    return `<span class="match-civs">${civBadge(own,'나',drawnAtRandom(m,self,m.analysis?.random_civ))}${opponents.length?opponents.map((p,i)=>civBadge(p.civilization,'상대',drawnAtRandom(m,fallback[i]?.profile_id,p.random_civ))).join(''):fallback.map(p=>civBadge(p.civilization,'상대',drawnAtRandom(m,p.profile_id))).join('')}</span>`;
   }
   function renderMatches() {
     const matches=(report.matches||[]).filter(m=>filter==='all'||m.result===filter);
