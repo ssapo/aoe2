@@ -11,7 +11,7 @@ ssapo의 **AoE2: DE 1v1 경기 복기 웹앱**. 기본 계정 외에 이름 검�
 - 고정 게임 서버 프로필 ID: **26260702**
 - AoE2 Insights 사용자 ID: **13810994** · https://www.aoe2insights.com/user/13810994/
 - 두 ID는 다르다. 리플 다운로드와 경기 API에는 게임 서버 프로필 ID를 사용한다.
-- 문서 기준: **2026-11-16**. 현재 파싱 개정은 `ANALYSIS_REVISION = 29`, 파생 복기 개정은 `review.revision = 2`. 실제 값은 코드에서 재확인한다.
+- 문서 기준: **2026-11-16**. 현재 파싱 개정은 `ANALYSIS_REVISION = 30`, 파생 복기 개정은 `review.revision = 2`. 실제 값은 코드에서 재확인한다.
 
 ## 분석기 작업의 기본 순서
 

@@ -10,7 +10,7 @@
 
 ### 지금 한눈에 (2026-11-16)
 
-**엔진 상태**: 연구 브랜치 `research/genie-188329`의 마지막 엔진 커밋 `74e8353`(ENG-29, findings 1~119), 문서 정리 `6ae30eb`. 기본 스위치 39개(`engine/switches.env`), Engine check 기대값 57 / 54(no stop), 분석 개정 29, 대표 선수 14명(실행마다 4명씩 리플 분석). 원본 기록이 있는 연구 리플 셋은 11~13분까지 맞고, 사이트 확인 구간은 운영·연구 판 3~14분, 프로 14판 1:53~5:27. 숫자 표는 [연구 인계서](https://github.com/ssapo/aoe2/blob/research/genie-188329/research/genie/CONTINUE.md) 2.1, 지금 할 일·도구·규칙은 13.4, 미해결은 12.5. 아래 표에 `진행 중`인 행은 없다.
+**엔진 상태**: 연구 브랜치 `research/genie-188329`의 마지막 엔진 커밋 `74e8353`(ENG-29, findings 1~119), 문서 정리 `6ae30eb`. 기본 스위치 39개(`engine/switches.env`), Engine check 기대값 57 / 54(no stop), 분석 개정 30(11-16: 문명 랜덤 여부를 리플 헤더의 실제 선택값으로; 모든 저장 경기에 `civ_choice`를 실행마다 프로필당 4판씩 채움 — DEVELOPMENT 「랜덤」 항목), 대표 선수 14명(실행마다 4명씩 리플 분석). 원본 기록이 있는 연구 리플 셋은 11~13분까지 맞고, 사이트 확인 구간은 운영·연구 판 3~14분, 프로 14판 1:53~5:27. 숫자 표는 [연구 인계서](https://github.com/ssapo/aoe2/blob/research/genie-188329/research/genie/CONTINUE.md) 2.1, 지금 할 일·도구·규칙은 13.4, 미해결은 12.5. 아래 표에 `진행 중`인 행은 없다.
 
 **열린 일 (우선순위 순)**
 
