@@ -19,7 +19,7 @@
 | `ENG-26` 묶음 A — 프로 5판이 약 9초부터 단어 9만 다름(findings 106) | **기록 있음(11-16)**: PC `genie-replays	ruth	ruth8.jsonl`(0~12.1초, 493표본, 9초까지 매 틱) | 기록과 엔진 추적(`GENIE_TRACE_OBJECTS_RANGE=0-520;GENIE_TRACE_DRAWS_RANGE=0-520`)을 대조 |
 | `ENG-26` 묶음 B — 사냥 입금 직후 자원 ±1(ENG-27~29에서 좁힘, findings 108·110·116) | **기록 있음(11-16)**: `truth	ruth9.jsonl`(36.3~160초, 151~158.5초 매 틱 525표본) | 108번 사양대로 대조 |
 | `ENG-01` 정찰병이 사슴을 따라가며 미는 판(519925669·520386901·520394236, findings 74) | **기록 있음(11-16)**: `truth	ruth7.jsonl`(0~300초, 235~265초 촘촘, 중앙 간격 13ms; 60ms 넘는 빈틈 28곳) | 사슴·정찰병 개체를 엔진 추적과 대조 |
-| `ENG-06` 연구 리플 셋의 첫 어긋남(518239882 696.6초, 518470161 776.5초, 517426097 796.0초) | 자료 대기: 새 원본 기록(사양 findings 87·83·98 끝) | 같은 기록기로 그 구간을 뜬다(인계서 12.5 4번) |
+| `ENG-06` 연구 리플 셋의 첫 어긋남(518239882 696.6초, 518470161 776.5초, 517426097 796.0초) | 기록기 준비됨(2026-11-16): `runs\truthlog8.ps1`이 그룹 개체(+0xb0 길·+0xf8·+0x128 칸·+0x144/+0x14c 등)와 채집 행동(+0x6c~+0x74)을 촘촘한 구간에서 적는다. 자료 대기: 사용자가 아래 「게임 켤 때」 ④⑤⑥으로 뜬다 | 뜬 뒤 `truth10~12`를 findings 87·83·98 끝 사양대로 대조(인계서 12.5 4번·12.6) |
 | `ENG-05` 계열 — 남은 엔진 멈춤(ENG-30 뒤 다섯: 수도사 할 일 없음, 투사체 높이, 남의 농장, 성벽 분배, 효과 붙는 공격; 전부 첫 어긋남 뒤라 사이트 구간과 무관) | 열림, 기록 없이 가능 | 인계서 13.4 5번(520596921 P1 58,406 수도사부터) |
 | `ENG-10` 운영 리플의 이른 어긋남(520592057 619.7초 민병대 묶음 등) | 열림, 원본 기록 없음 | 인계서 12.5 6번 |
 | `ENG-02`·`ENG-03`·`ENG-04` | Codex 정적 조사만, 실행 검증 안 함 | ENG-02 520596921 update 400~1,000 유닛 9479, ENG-03 519686090 update 28,700~29,050, ENG-04 54번 뒤에도 남았는지 추적부터 |
@@ -39,7 +39,11 @@
 - ① A (짧음, 먼저): `powershell -ExecutionPolicy Bypass -File C:\Users\ssapo\genie-replays\truth\truthlog7.ps1 -Out C:\Users\ssapo\genie-replays\truth\truth8.jsonl -MaxSeconds 3600 -MaxWorldMs 12000 -DenseFromMs 0 -DenseUntilMs 9000` → 517429796(Nicov, Wei 대 Saxons, Arabian Desert)를 1배속으로 12초까지.
 - ② B: `powershell -ExecutionPolicy Bypass -File C:\Users\ssapo\genie-replays\truth\truthlog7.ps1 -Out C:\Users\ssapo\genie-replays\truth\truth9.jsonl -MaxSeconds 3600 -MaxWorldMs 160000 -DenseFromMs 151000 -DenseUntilMs 158500` → 같은 리플을 처음부터(2:31 전은 8배속까지 괜찮다), 2:31부터 1배속.
 - ③ 519925669: `powershell -ExecutionPolicy Bypass -File C:\Users\ssapo\genie-replays\truth\truthlog7.ps1 -Out C:\Users\ssapo\genie-replays\truth\truth7.jsonl -MaxSeconds 7200 -MaxWorldMs 300000 -DenseFromMs 235000 -DenseUntilMs 265000` → 리플(Arabian Desert, ssapo 프랑크 대 Inhapropiado 마자르)을 3:55~4:25만 1배속.
-- 하나 끝나면(`truth\truthlog7.status`가 생김) status를 `truth\truthN.status`로 복사하고 다음 것을 띄운다.
+- ④⑤⑥ (`ENG-06` 연구 리플 셋, 새 기록기 `runs\truthlog8.ps1`): 셋 다 저장 폴더에 있다. 촘촘한 구간(아래 "느리게" 구간)만 매 틱 적고, 그 앞은 `-FromMs` 전이라 아무것도 안 적으니 **그때까지는 16배속도 괜찮다**. 촘촘한 구간 20초쯤 전에 일시정지 → **가장 느린 배속**으로 바꾸고 → 해제(오늘 ③을 1배속으로 떴을 때 촘촘한 구간에서 틱이 꽤 빠졌다). `-MaxWorldMs`에서 기록기가 스스로 끝나고 status는 `truth\truth10.status`처럼 jsonl 옆에 바로 생긴다(복사 필요 없음). status의 `dense_gaps_missed`가 0이 아니면 틱이 빠진 것이니 더 느리게 다시 뜬다. `groups=0`이면 그룹 쪽 읽기가 틀린 것이니 알려 준다(게임에서 처음 확인하는 값).
+- ④ 518239882 (Arabian Desert, ssapo 프랑크 대 Maerlin_the_Mighty325 프랑크, 2026-11-03 00:34 KST 경기): `powershell -ExecutionPolicy Bypass -File C:\Users\ssapo\genie-replays\runs\truthlog8.ps1 -Out C:\Users\ssapo\genie-replays\truth\truth10.jsonl -MaxSeconds 7200 -FromMs 680000 -MaxWorldMs 705000 -DenseFromMs 693500 -DenseUntilMs 704000 -Units 3430,4464,4472` → 11:13까지 빠르게, **11:33~11:44 느리게**(상대 정찰병 셋의 묶음 형성부터 그룹이 설 때까지), 11:45에 끝.
+- ⑤ 518470161 (Glade, ssapo 중국 대 John Doorie 투르크, 2026-11-03 23:58 KST 경기): `powershell -ExecutionPolicy Bypass -File C:\Users\ssapo\genie-replays\runs\truthlog8.ps1 -Out C:\Users\ssapo\genie-replays\truth\truth11.jsonl -MaxSeconds 7200 -FromMs 760000 -MaxWorldMs 778000 -DenseFromMs 773000 -DenseUntilMs 777000 -Units 9387,10525` → 12:33까지 빠르게, **12:53~12:57 느리게**(농부 9387과 옆 건축가 10525), 12:58에 끝.
+- ⑥ 517426097 (Arabia, ssapo 프랑크 대 EazySwayzee 타타르, 2026-10-31 00:26 KST 경기): `powershell -ExecutionPolicy Bypass -File C:\Users\ssapo\genie-replays\runs\truthlog8.ps1 -Out C:\Users\ssapo\genie-replays\truth\truth12.jsonl -MaxSeconds 7200 -FromMs 780000 -MaxWorldMs 798000 -DenseFromMs 793000 -DenseUntilMs 797500 -Units 3997,4007,4022,3999,4014` → 12:53까지 빠르게, **13:13~13:17.5 느리게**(두 선수 정찰병 묶음), 13:18에 끝.
+- 하나 끝나면(`truth\truthlog7.status`가 생김; ④⑤⑥은 `truth\truthN.status`가 바로 생김) status를 `truth\truthN.status`로 복사하고 다음 것을 띄운다.
 
 **지금 규칙 요약** (자세한 것은 4절과 DEVELOPMENT 「커밋·검증 원칙」):
 
