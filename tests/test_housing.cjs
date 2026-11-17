@@ -19,10 +19,10 @@ test('short blocks name a share of one villager and escape population text',()=>
  assert.match(html,/상대도 0:20 막혔어요/);
  assert.doesNotMatch(html,/<b>/);
 });
-test('match list badge only for own blocks',()=>{
+test('match list badge in every card, coloured only for own blocks (APP-20)',()=>{
  assert.equal(H.badge(h),'<span class="housing-badge" title="봉건 전 인구 막힘 · 추정">인구 막힘 0:49</span>');
- assert.equal(H.badge(none),'');assert.equal(H.badge(undefined),'');
- assert.equal(H.badge({own:none.own,opponent:h.own}),'');
+ assert.match(H.badge(none),/housing-badge-none[^>]*>인구 막힘 없음</);assert.match(H.badge(undefined),/housing-badge-none[^>]*>인구 막힘 —</);
+ assert.match(H.badge({own:none.own,opponent:h.own}),/인구 막힘 없음/);
 });
 test('summary card is left for an opponent-only block',()=>{
  assert.equal(H.highlight(h),'');
@@ -31,9 +31,13 @@ test('summary card is left for an opponent-only block',()=>{
  assert.equal(H.highlight(none),'');
 });
 test('feudal rows list intervals and missing sides',()=>{
- assert.deepEqual(H.rows(h),[['봉건 전 인구 막힘 · 추정','0:49 (4:42~5:31 14/15)','없음']]);
- assert.deepEqual(H.rows({own:null,opponent:h.opponent}),[['봉건 전 인구 막힘 · 추정','—','없음']]);
- assert.deepEqual(H.rows({}),[]);
+ assert.deepEqual(H.rows(h),[['누르기 전까지 나온 주민 · 시작 포함','—','—'],['봉건 전 인구 막힘 · 추정','0:49 (4:42~5:31 14/15)','없음']]);
+ assert.deepEqual(H.rows({own:null,opponent:h.opponent}),[['누르기 전까지 나온 주민 · 시작 포함','—','—'],['봉건 전 인구 막힘 · 추정','—','없음']]);
+ assert.deepEqual(H.rows({}),[['누르기 전까지 나온 주민 · 시작 포함','—','—'],['봉건 전 인구 막힘 · 추정','—','—']]);
+ assert.match(H.note({},'예전 분석(개정 9)이라 추정하지 않았어요.'),/section-why">인구 막힘 추정 없음 · 예전 분석\(개정 9\)/);
+ assert.match(H.section(none),/data-section="housing"[\s\S]*나 <b>없음<\/b> · 상대 <b>없음<\/b>/);
+ assert.match(H.section(h),/housing-alert" data-section="housing"/);
+ assert.match(H.section(null,'<x>'),/&lt;x&gt;/);
  assert.match(H.note(h),/10초보다 짧은/);
  assert.match(H.note(h),/<summary>인구 막힘은<\/summary><p>리플의/);
 });
@@ -50,7 +54,7 @@ test('villagers out by the Feudal click: counted, a range at the click, or an es
  assert.deepEqual(H.rows({own:withV(none.own,counted),opponent:null})[0],[label,'19명','—']);
  assert.deepEqual(H.rows({own:withV(none.own,counted,{feudal_clicked:false}),opponent:withV(none.opponent,counted)})[0],[label,'—','19명']);
  for(const bad of [null,{},{start:3},{start:'3',trained:16},{start:3,trained:-1},{start:3,trained:1.5}])
-  assert.deepEqual(H.rows({own:withV(none.own,bad),opponent:none.opponent}),[['봉건 전 인구 막힘 · 추정','없음','없음']]);
+  assert.deepEqual(H.rows({own:withV(none.own,bad),opponent:none.opponent}),[['누르기 전까지 나온 주민 · 시작 포함','—','—'],['봉건 전 인구 막힘 · 추정','없음','없음']]);
  assert.match(H.note(both),/<summary>나온 주민·인구 막힘은<\/summary><p>‘나온 주민’은 요청 횟수가 아니라/);
  assert.match(H.note(both),/죽은 주민은 빼지 못해요/);
  assert.match(H.note(both),/<p>인구 막힘은 리플의/);

@@ -59,7 +59,8 @@
     if(sum(own.food)+sum(opponent.food)<=0)return null;
     const setUp=started(timelines,last[0]);
     return {seconds:last[0],own,opponent,
-      foodShown:FOOD.map((name,i)=>[name,i]).filter(([,i])=>own.food[i]>0||opponent.food[i]>0||setUp.has(i)),
+      // APP-20: every source row in every match (zeros included); setUp is kept for callers that ask
+      foodShown:FOOD.map((name,i)=>[name,i]),setUp,
       goldSplit:own.gold[1]>0||opponent.gold[1]>0};
   }
   function sourceRows(names,values,side){
@@ -91,24 +92,36 @@
   }
   function renderAnimals(d){
     const s=animals(d);
-    if(!s)return '';
+    if(!s){
+      const part=d&&d.animals,until=part&&Number.isFinite(part.until_seconds)?part.until_seconds:Number.isFinite(d&&d.verified_until_seconds)?d.verified_until_seconds:null;
+      const why=part?`확인된 구간(${until===null?'—':clock(until)}) 안에 일꾼이 식량을 가져온 동물이 없어요.`:'동물별 기록이 없는 예전 분석이에요. 다시 분석되면 나와요.';
+      return `<div class="source-block animal-block" data-section="animals"><h4>동물별 먹은 양</h4><p class="section-why">${esc(why)}</p></div>`;
+    }
     const kinds=list=>list.length?list.map(k=>`<p class="animal-kind"><b>${esc(k.name)} ${k.rows.length}마리</b> · ${esc(num(k.eaten))}${k.full!==null?` / ${esc(num(k.full))}`:''}</p><ul class="animal-chips">${k.rows.map(r=>`<li${r.wasted?' class="left"':''}>${esc(num(r.eaten))}${r.wasted?`<small>남김 ${esc(num(r.left))}</small>`:''}</li>`).join('')}</ul>`).join(''):'<p class="animal-kind">먹은 동물 없음</p>';
     const count=list=>list.reduce((a,k)=>a+k.rows.length,0);
-    return `<div class="source-block animal-block"><h4>동물별 먹은 양 <small>${clock(s.seconds)}까지 · 한 마리마다 일꾼이 가져온 식량</small></h4><div class="source-sides">${[['mine','나',s.own],['theirs','상대',s.opponent]].map(([side,who,list])=>`<div class="source-side"><strong class="${side}">${esc(who)} · ${count(list)}마리</strong>${kinds(list)}</div>`).join('')}</div><p class="source-note">확인된 시각까지만 센 값이에요. 그때 먹고 있던 동물은 적게 나와요.</p></div>`;
+    return `<div class="source-block animal-block" data-section="animals"><h4>동물별 먹은 양 <small>${clock(s.seconds)}까지 · 한 마리마다 일꾼이 가져온 식량</small></h4><div class="source-sides">${[['mine','나',s.own],['theirs','상대',s.opponent]].map(([side,who,list])=>`<div class="source-side"><strong class="${side}">${esc(who)} · ${count(list)}마리</strong>${kinds(list)}</div>`).join('')}</div><p class="source-note">확인된 시각까지만 센 값이에요. 그때 먹고 있던 동물은 적게 나와요.</p></div>`;
   }
   function renderSources(d,timelines){
     const s=sources(d,timelines);
-    if(!s)return '';
+    if(!s){
+      const why='<p class="section-why">이 경기는 출처별 기록이 없어요. 예전 분석이면 다시 분석될 때 나와요.</p>';
+      return `<div class="income-sources"><div class="source-block" data-section="food-sources"><h4>식량 출처</h4>${why}</div>${renderAnimals(d)}<div class="source-block" data-section="gold-sources"><h4>금 출처</h4>${why}</div></div>`;
+    }
     const sum=list=>list.reduce((a,b)=>a+b,0);
-    const block=(title,names,pick)=>`<div class="source-block"><h4>${esc(title)} <small>${clock(s.seconds)}까지 일꾼이 가져온 양</small></h4><div class="source-sides">${[['mine','나',s.own],['theirs','상대',s.opponent]].map(([side,who,data])=>`<div class="source-side"><strong class="${side}">${esc(who)} · ${esc(num(sum(pick(data))))}</strong>${sourceRows(names,pick(data),side)}</div>`).join('')}</div></div>`;
-    return `<div class="income-sources">${block('식량 출처',s.foodShown,x=>x.food)}${renderAnimals(d)}${s.goldSplit?block('금 출처',GOLD.map((name,i)=>[name,i]),x=>x.gold):''}<p class="source-note">생산을 취소해 돌려받은 자원은 여기에 넣지 않았어요. 그래서 위 그래프의 숫자보다 적을 수 있어요.</p></div>`;
+    const block=(title,names,pick,id)=>`<div class="source-block" data-section="${id}"><h4>${esc(title)} <small>${clock(s.seconds)}까지 일꾼이 가져온 양</small></h4><div class="source-sides">${[['mine','나',s.own],['theirs','상대',s.opponent]].map(([side,who,data])=>`<div class="source-side"><strong class="${side}">${esc(who)} · ${esc(num(sum(pick(data))))}</strong>${sourceRows(names,pick(data),side)}</div>`).join('')}</div></div>`;
+    return `<div class="income-sources">${block('식량 출처',s.foodShown,x=>x.food,'food-sources')}${renderAnimals(d)}${block('금 출처',GOLD.map((name,i)=>[name,i]),x=>x.gold,'gold-sources')}<p class="source-note">생산을 취소해 돌려받은 자원은 여기에 넣지 않았어요. 그래서 위 그래프의 숫자보다 적을 수 있어요.</p></div>`;
   }
   function render(d,timelines){
     const s=summary(d);
     if(!s||!s.shown.length)return '';
     const lines=[`${clock(s.at)}까지 모은 자원: 나 ${num(s.own)} · 상대 ${num(s.opponent)}`];
     if(s.widest&&s.widest.gap!==0)lines.push(`가장 크게 벌어진 때: ${clock(s.widest.seconds)}, ${s.widest.gap>0?'내가':'상대가'} ${num(Math.abs(s.widest.gap))} 더 모음`);
-    return `<section class="state-curve engine-income"><h3 class="detail-heading">자원별 누적 수입 <small>경기 재현 · ${clock(s.until)}까지 확인됨</small></h3><ul class="state-lines">${lines.map(l=>`<li>${esc(l)}</li>`).join('')}</ul><div class="state-charts">${s.shown.map(([name,a,b])=>chart(d.points,a,b,name)).join('')}</div>${renderSources(d,timelines)}</section>`;
+    return `<section class="state-curve engine-income" data-section="engine-income"><h3 class="detail-heading">자원별 누적 수입 <small>경기 재현 · ${clock(s.until)}까지 확인됨</small></h3><ul class="state-lines">${lines.map(l=>`<li>${esc(l)}</li>`).join('')}</ul><div class="state-charts">${s.shown.map(([name,a,b])=>chart(d.points,a,b,name)).join('')}</div>${renderSources(d,timelines)}</section>`;
   }
-  const api={summary,render,valid,sources,renderSources,started,animals,renderAnimals};if(typeof module==='object'&&module.exports)module.exports=api;else global.SSAPOEngineIncome=api;
+  // APP-20: the section in a match without the engine data — the same blocks, each pointing at the reason above
+  function renderEmpty(reason){
+    const block=(id,title)=>`<div class="source-block${id==='animals'?' animal-block':''}" data-section="${id}"><h4>${esc(title)}</h4><p class="section-why">위와 같은 이유로 없어요.</p></div>`;
+    return `<section class="state-curve engine-income" data-section="engine-income"><h3 class="detail-heading">자원별 누적 수입</h3><p class="section-why">${esc(reason)}</p><div class="income-sources">${block('food-sources','식량 출처')}${block('animals','동물별 먹은 양')}${block('gold-sources','금 출처')}</div></section>`;
+  }
+  const api={summary,render,renderEmpty,valid,sources,renderSources,started,animals,renderAnimals};if(typeof module==='object'&&module.exports)module.exports=api;else global.SSAPOEngineIncome=api;
 })(typeof window==='undefined'?globalThis:window);

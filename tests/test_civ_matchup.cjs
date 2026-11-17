@@ -145,12 +145,13 @@ test('summary rows are consistent with each other',()=>{
 
 test('summary card html: rows read as sentences, sword between same-size icons, sides by ring colour',()=>{
   const html=cm.html(ref,'Vietnamese','Mongols');
-  const card=html.slice(html.indexOf('matchup-card'),html.indexOf('<details class="matchup-more">'));
-  assert.ok(html.includes('<details class="matchup-more">'));
+  const card=html.slice(html.indexOf('matchup-card'),html.indexOf('<details class="matchup-more" data-section="mc-more">'));
+  assert.ok(html.includes('<details class="matchup-more" data-section="mc-more">'));
   // without match data the Castle Age panel is open and no "decided" sentence is shown
   const p4=card.slice(card.indexOf('data-age="4" aria-label'));
   assert.ok(card.includes('data-age="3" aria-label="성주시대">')&&card.includes('data-age="4" aria-label="왕정시대" hidden>'));
-  assert.ok(!card.includes('mc-decided'));
+  // APP-20: the line is always there; without match data it says why
+  assert.ok(card.includes('이 경기를 가른 시대를 정할 수 없어요')&&!card.includes('시대에서 갈렸어요'));
   for(const title of ['피해야 할 병력 구성','상대 핵심 위협','추천 대응','상대 기술적 빈틈'])assert.ok(p4.includes(title));
   const text=p4.replace(/<svg[\s\S]*?<\/svg>/g,'').replace(/<details[\s\S]*?<\/details>/g,'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ');
   // every row: bold name + one plain sentence, readable without the mouse (Imperial Age values)
@@ -160,7 +161,7 @@ test('summary card html: rows read as sentences, sword between same-size icons, 
   assert.ok(text.includes('정예 만구다이 몽골인 보너스로 공격 속도 강화'));
   // gaps: icon + words, four at most, the rest behind one chip
   assert.ok(text.includes('총통병 계열 없음')&&text.includes('미늘창병 없음')&&text.includes('외 2개'));
-  const p4card=p4.slice(0,p4.indexOf('mc-agemore'));
+  const p4card=p4.slice(0,p4.indexOf('data-section="mc-calc"'));
   assert.strictEqual((p4card.match(/class="mc-gapchip"/g)||[]).length,4);
   // pairs: both unit icons, a sword (inline SVG) whose point faces the unit being hit
   assert.ok(card.includes('<svg class="mc-sword"'));
@@ -282,9 +283,9 @@ test('match context: the age played longest opens, production orders per age, no
   const threats=castle.slice(castle.indexOf('mc-threat'),castle.indexOf('mc-counter'));
   assert.ok(threats.indexOf('만구다이 <span class="mc-made">상대가 실제로 뽑음 ×5</span>')>0);
   assert.strictEqual(cm.summary(ref,'Vietnamese','Mongols',3,{11:5}).threats[0].unit,11);
-  // no match data: no sentence, no badge
+  // no match data: the reason line instead of the sentence, no badge
   const bare=cm.html(ref,'Vietnamese','Mongols');
-  assert.ok(!bare.includes('mc-decided')&&!bare.includes('mc-made'));
+  assert.ok(bare.includes('이 경기를 가른 시대를 정할 수 없어요')&&!bare.includes('mc-made'));
   // the placeholder keeps the context for when the table arrives, escaped
   const evil=cm.context({duration:100,mine:cp(10,null,null),theirs:{...cp(10,null,null),full_timeline:[{seconds:20,kind:'QUEUE',label:'<b>x',amount:1}]}});
   assert.ok(!cm.html(ref,'Vietnamese','Mongols',evil).includes('<b>x'));
@@ -354,15 +355,16 @@ test('actual armies per age: both sides, main-line pairs at the upgrades each ha
   assert.ok(flow.endsWith('공격 업그레이드는 상대가 1단계 더(철 거푸집) 했고, 방어 업그레이드(체인 마갑)는 나만 했어요.'),flow);
   const html=cm.html(ref,'Franks','Bulgarians',ctx);
   assert.ok(html.includes('data-age="all"')&&html.includes('mc-prod-mine')&&html.includes('mc-prod-theirs')&&html.includes('명령 기준'));
-  assert.ok(html.includes('<p class="mc-flow"><b>흐름</b>'));
+  assert.ok(html.includes('<p class="mc-flow" data-section="mc-flow"><b>흐름</b>'));
   assert.ok(!html.includes('<b>x')&&html.includes('&lt;b&gt;x ×1'));
   assert.ok(!/생존 병력|생산한 유닛|뽑은 유닛 수/.test(html));
 });
-test('no timeline: no actual-army block, no "전체" tab',()=>{
+test('no timeline: the actual-army block, the "전체" tab and the flow line stay with the reason (APP-20)',()=>{
   const ctx=cm.context({duration:2000,mine:reached(500,1300),theirs:reached(510,1290)});
   assert.ok(!ctx?.army);
   const html=cm.html(ref,'Franks','Bulgarians',ctx);
-  assert.ok(!html.includes('data-age="all"')&&!html.includes('mc-army')&&!html.includes('mc-flow'));
+  assert.ok(html.includes('data-age="all"')&&html.includes('data-section="mc-army"')&&html.includes('data-section="mc-flow"'));
+  assert.ok(html.includes('생산 명령 기록이 없어 병력을 비교할 수 없어요')&&html.includes('생산 명령 기록이 없어 흐름 문장을 만들 수 없어요'));
 });
 // ── APP-19: one side had (almost) no army in an age ──
 const repeat=(from,step,n,label,amount=1)=>Array.from({length:n},(_,i)=>Q(from+i*step,label,amount));
@@ -410,20 +412,21 @@ test('APP-19 sentence and card: me none in the decided age leads the block and t
   assert.ok(castle.indexOf('mc-gapbox')<castle.indexOf('mc-prod-mine'),'the headline comes before the (folded) production rows');
   assert.ok(castle.includes('첫 명령 11:40')&&castle.includes('주민 30')&&castle.includes('건물 2')&&castle.includes('연구 1'),castle.replace(/<[^>]+>/g,' ').slice(0,900));
   assert.ok(castle.includes('이때 이걸 뽑았어야'));
-  assert.ok(!castle.includes('맞대어 봐요')&&!castle.includes('주력끼리 1:1'));
+  // APP-20: the pair section stays, with why it is empty
+  assert.ok(castle.includes('주력끼리 1:1')&&castle.includes('내 군사 계열이 3기 미만이라 맞대어 볼 주력이 없어요'));
   // the recommended units are mine and exist for Franks in Castle Age
   const rec=cm.summary(ref,'Franks','Mongols',3,cm.madeByRoot(ref,'Mongols',ctx.made[3])).recommend;
   assert.ok(rec.length>0);
   const avail=new Set(cm.linesAt(ref,'Franks',3).map(l=>l.final));
   for(const r of rec)assert.ok(avail.has(r.unit),String(r.unit));
-  assert.ok(html.includes('<p class="mc-flow"><b>흐름</b>성주시대 군사 생산 명령은 나 0 · 상대 15 — '));
+  assert.ok(html.includes('<p class="mc-flow" data-section="mc-flow"><b>흐름</b>성주시대 군사 생산 명령은 나 0 · 상대 15 — '));
 });
 test('APP-19 mirror and both: a short line, no empty pair section; two armies keep the pairs',()=>{
   const ctx=cm.context(noArmy(castleKnights.map(e=>({...e})),[Q(900,'Mangudai')],{result:'win'}));
   const html=cm.html(ref,'Franks','Mongols',ctx);
   const castle=html.slice(html.indexOf('data-age="3" aria-label'),html.indexOf('data-age="4" aria-label'));
   assert.ok(castle.includes('mc-gapbox mc-gapbox-theirs')&&castle.includes('상대는 병력이 거의 없었어요(군사 생산 명령 1, 내 쪽은 기사 11·경기병 4)'));
-  assert.ok(castle.includes('mc-prod-mine')&&!castle.includes('맞대어 봐요')&&!castle.includes('이때 이걸 뽑았어야'));
+  assert.ok(castle.includes('mc-prod-mine')&&castle.includes('주력끼리 1:1')&&!castle.includes('이때 이걸 뽑았어야'));
   assert.ok(html.includes('<b>흐름</b>성주시대 군사 생산 명령은 나 15 · 상대 1 — 상대 병력이 거의 없던 시대예요.'));
   const both=cm.html(ref,'Franks','Mongols',cm.context(noArmy([Q(900,'Archer')],[Q(950,'Mangudai')])));
   assert.ok(both.includes('<b>흐름</b>성주시대엔 양쪽 모두 병력이 거의 없었어요(군사 생산 명령 나 1 · 상대 1).'));

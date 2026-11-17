@@ -156,7 +156,12 @@
   function compare(match,profileId,source,state){
     const a=match?.analysis,m=a?.metrics,own=a?.review?.own;
     const result={resources:[],ages:[],villagers:[],food:null,ownResources:ownWindows(a?.state_curve,a?.duration_game_seconds,state),minRating:source?.min_rating||2000};
-    if(!a||!own?.available||m?.recording_restored||source?.schema_version!==1)return result;
+    // APP-20: the section stays in every match, so say why there is nothing to compare
+    const rating=result.minRating;
+    if(!a){result.why='분석이 없어 비교할 수 없어요.';return result;}
+    if(!own?.available){result.why='예전 분석이라 비교할 기록이 없어요. 다시 분석되면 나와요.';return result;}
+    if(m?.recording_restored){result.why=`재개한 경기라 ${rating}점 이상 기준과 비교하지 않아요.`;return result;}
+    if(source?.schema_version!==1){result.why=`${rating}점 이상 기준 자료를 불러오지 못했어요.`;return result;}
     const context={matchId:match.id,profileId,map:match.map,civilization:a.civilization,opening:own.opening};
     result.food=foodRows(a,context,source);
     const pickFrom=picker=>{
@@ -199,11 +204,17 @@
       return [widest,left].filter(Boolean).map(r=>`<p><span>${clock(f.seconds)} ${esc(r.label)} <b>${value(r,r.value)}</b></span><small>${rating}+ ${value(r,r.reference.median)} · ${foodGap(r)} · ${esc(basis(r.reference))}</small></p>`).join('');
     }
     const rows=f.rows.map(r=>`<tr><th scope="row">${esc(r.label)}</th><td>${value(r,r.value)}</td><td>${value(r,r.reference.median)}</td><td>${foodGap(r)}</td></tr>`).join('');
-    return `<details class="ranked-details"><summary>식량 출처 비교 <small>${clock(f.seconds)} 시점</small></summary><div class="table-scroll"><table class="timeline comparison ranked-table"><thead><tr><th>항목</th><th>나</th><th>${rating}+</th><th>차이</th></tr></thead><tbody>${rows}</tbody></table></div>${basisNote(f.rows)}<p class="ranked-basis"><span>경기 재현으로 확인된 구간 안에서 ${clock(f.seconds)}까지 일꾼이 가져온 식량의 비율이에요. 남긴 식량은 다 먹고 떠난 양·사냥감에 남은 양이에요.</span></p></details>`;
+    return `<details class="ranked-details" data-section="ranked-food"><summary>식량 출처 비교 <small>${clock(f.seconds)} 시점</small></summary><div class="table-scroll"><table class="timeline comparison ranked-table"><thead><tr><th>항목</th><th>나</th><th>${rating}+</th><th>차이</th></tr></thead><tbody>${rows}</tbody></table></div>${basisNote(f.rows)}<p class="ranked-basis"><span>경기 재현으로 확인된 구간 안에서 ${clock(f.seconds)}까지 일꾼이 가져온 식량의 비율이에요. 남긴 식량은 다 먹고 떠난 양·사냥감에 남은 양이에요.</span></p></details>`;
   }
-  function render(result,compact=false){
-    const short=shortageText(result);
-    if(!result||(!short&&!result.food&&!['resources','ages','villagers','ownResources'].some(k=>result[k]?.length)))return '';
+  // APP-20: the section (and each of its rows) is drawn in every match; a missing part says why
+  const FOOD_WHY='경기 재현이 원본과 맞는 구간이 4분 이상이고 같은 조건의 기준 경기가 있어야 비교해요.';
+  function render(result,compact=false,reason=''){
+    const short=shortageText(result),rating=result?.minRating||2000;
+    const head=`<div class="panel-toolbar"><h3 class="detail-heading">내 자원 흐름</h3>${compact?'<button class="subtle" data-open-panel="numbers">자세히 →</button>':''}</div>`;
+    const open=`<section class="ranked-benchmarks" data-section="${compact?'ranked-quick':'ranked'}">${head}`;
+    if(!result||(!short&&!result.food&&!['resources','ages','villagers','ownResources'].some(k=>result[k]?.length)))
+      return `${open}<p class="section-why">${esc(reason||result?.why||`이 경기는 ${rating}점 이상 기준과 비교할 항목이 없어요.`)}</p>${compact?'':[['ages','시대업'],['villagers','시간대별 주민'],['resources','시간대별 자원'],['food','식량 출처']].map(([key,title])=>`<details class="ranked-details" data-section="ranked-${key}"><summary>${title} 비교</summary><p class="ranked-basis">위와 같은 이유로 비교할 항목이 없어요.</p></details>`).join('')}</section>`;
+    const lack=short||(result.shortage?`같은 조건의 ${rating}점 이상 기준 경기가 부족해요.`:`이 항목은 ${rating}점 이상 기준과 비교할 기록이 없어요.`);
     const based=r=>{const text=basis(r.reference);return text?` · ${esc(text)}`:'';};
     const gap=(r,time=false)=>{
       if(r.delta===0)return '같음';
@@ -214,7 +225,7 @@
     const ownHero=[...(result.ownResources||[])].sort((a,b)=>b.value-a.value||a.start-b.start)[0];
     const hero=ownHero||[...result.resources].sort((a,b)=>b.value-a.value||a.start-b.start)[0];
     const reference=hero&&result.resources.find(r=>r.start===hero.start&&r.end===hero.end);
-    const heroHtml=hero?`<article class="ranked-resource resource-window"><header><div>${global.SSAPOStateCurve?.resourceIcons||''}<span>보유 자원 합계</span></div><time>${clock(hero.start)}–${clock(hero.end)}</time></header><dl class="resource-metrics"><div class="resource-primary"><dt>내 평균</dt><dd>${num(hero.value)}</dd></div><div><dt>최대 보유</dt><dd>${num(hero.peak)}</dd></div></dl>${finite(hero.opponent)?`<div class="resource-opponent-line"><span>같은 시간 상대 평균</span><strong>${num(hero.opponent)}</strong></div>`:''}${reference?`<p class="ranked-inline">${result.minRating}+ 중앙값 ${num(reference.reference.median)} · ${gap(reference)}${based(reference)}</p>`:''}</article>`:'';
+    const heroHtml=!hero?'<p class="section-why">보유 자원 구간을 계산할 자원 기록이 없어요.</p>':`<article class="ranked-resource resource-window"><header><div>${global.SSAPOStateCurve?.resourceIcons||''}<span>보유 자원 합계</span></div><time>${clock(hero.start)}–${clock(hero.end)}</time></header><dl class="resource-metrics"><div class="resource-primary"><dt>내 평균</dt><dd>${num(hero.value)}</dd></div><div><dt>최대 보유</dt><dd>${num(hero.peak)}</dd></div></dl>${finite(hero.opponent)?`<div class="resource-opponent-line"><span>같은 시간 상대 평균</span><strong>${num(hero.opponent)}</strong></div>`:''}${reference?`<p class="ranked-inline">${result.minRating}+ 중앙값 ${num(reference.reference.median)} · ${gap(reference)}${based(reference)}</p>`:''}</article>`;
     const row=(r,time=false)=>`<tr><th scope="row">${esc(r.label)}</th><td>${time?clock(r.value):num(r.value)}</td><td>${time?clock(r.reference.median):num(r.reference.median)}</td><td>${gap(r,time)}</td></tr>`;
     const basisNote=rows=>{
       const used=rows.filter(r=>basis(r.reference));
@@ -225,13 +236,15 @@
     };
     const table=(rows,time)=>`<div class="table-scroll"><table class="timeline comparison ranked-table"><thead><tr><th>항목</th><th>나</th><th>${result.minRating}+</th><th>차이</th></tr></thead><tbody>${rows.map(r=>row(r,time)).join('')}</tbody></table></div>${basisNote(rows)}`;
     const age=result.ages.find(r=>r.age==='성주')||result.ages[0],villager=result.villagers.find(r=>r.at===900)||result.villagers[0];
-    const quick=[age,villager].filter(Boolean).map(r=>{
+    const quick=[[age,'성주 도달'],[villager,'15분 주민 요청']].map(([r,name])=>{
+      if(!r)return `<p><span>${name}</span><small>${result.shortage?'같은 조건의 기준 경기 부족':'비교할 기록 없음'}</small></p>`;
       const time=result.ages.includes(r);
       return `<p><span>${esc(r.label)} <b>${time?clock(r.value):num(r.value)}</b></span><small>${result.minRating}+ ${time?clock(r.reference.median):num(r.reference.median)} · ${gap(r,time)}${based(r)}</small></p>`;
     }).join('');
     const food=renderFood(result,compact,basisNote);
-    const details=compact?(quick||food?`<div class="ranked-quick">${quick}${food}</div>`:''):[['ages','시대업',true],['villagers','시간대별 주민',false],['resources','시간대별 자원',false]].filter(([key])=>result[key].length).map(([key,title,time])=>`<details class="ranked-details"><summary>${title} 비교</summary>${table(result[key],time)}</details>`).join('')+food;
-    return `<section class="ranked-benchmarks"><div class="panel-toolbar"><h3 class="detail-heading">내 자원 흐름</h3>${compact?'<button class="subtle" data-open-panel="numbers">자세히 →</button>':''}</div>${heroHtml}${details}${short?`<p class="ranked-basis ranked-shortage">${esc(short)}</p>`:''}</section>`;
+    const foodWhy=compact?'<p><span>식량 비율</span><small>경기 재현 구간이 짧거나 기준 경기 부족</small></p>':`<details class="ranked-details" data-section="ranked-food"><summary>식량 출처 비교</summary><p class="ranked-basis">${esc(FOOD_WHY)}</p></details>`;
+    const details=compact?`<div class="ranked-quick">${quick}${food||foodWhy}</div>`:[['ages','시대업',true],['villagers','시간대별 주민',false],['resources','시간대별 자원',false]].map(([key,title,time])=>`<details class="ranked-details" data-section="ranked-${key}"><summary>${title} 비교</summary>${result[key].length?table(result[key],time):`<p class="ranked-basis">${esc(lack)}</p>`}</details>`).join('')+(food||foodWhy);
+    return `${open}${heroHtml}${details}${short?`<p class="ranked-basis ranked-shortage">${esc(short)}</p>`:''}</section>`;
   }
   const api={select,choose,compare,render,stageAt,tcBand,basis,where,shortageText,groupOf,kindLabel,MAP_GROUPS,foodAt,foodRows,renderFood};
   if(typeof module==='object'&&module.exports)module.exports=api;else global.SSAPORankedBenchmarks=api;

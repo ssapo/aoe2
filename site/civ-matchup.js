@@ -358,13 +358,21 @@
     const l=ans.line,missing=l.status==='partial'?` — 상대 ${unitName(ref,l.top)} 없음`:'';
     return `상대의 가장 강한 대응: ${unitName(ref,l.final)} ${ans.edge>0?pairFigure(ans):'(불리)'}${missing}`;
   }
+  // APP-20: every card section carries a stable id and is drawn in every match (a reason line when empty)
   function section(cls,mark,title,body){
-    return `<section class="mc-sec ${cls}"><h4 class="mc-title"><span class="mc-icon" aria-hidden="true">${mark}</span>${esc(title)}</h4>${body}</section>`;
+    return `<section class="mc-sec ${cls}" data-section="${cls}"><h4 class="mc-title"><span class="mc-icon" aria-hidden="true">${mark}</span>${esc(title)}</h4>${body}</section>`;
   }
   // one age's four rows (avoid, threats, answers, gaps) and its folded details
+  const noneP=text=>`<p class="mc-none">${esc(text)}</p>`;
+  // the four rows and the folded details of one age with one reason line each (no table, unknown civ …)
+  function emptyAgeRows(age,text){
+    return section('mc-avoid','!','피해야 할 병력 구성',noneP(text))+section('mc-threat','▲','상대 핵심 위협',noneP(text))
+      +section('mc-counter','✓','추천 대응',noneP(text))+section('mc-gap','i','상대 기술적 빈틈',noneP(text))
+      +`<details class="matchup-more mc-agemore" data-section="mc-calc"><summary>자세히 — ${AGE_KO[age]}시대 계산에 넣은 것</summary>${noneP(text)}</details>`;
+  }
   function agePanel(ref,mine,theirs,age,made){
     const s=summary(ref,mine,theirs,age,made);
-    if(!s)return '';
+    if(!s)return emptyAgeRows(age,'이 시대 계산에 필요한 기술표가 없어요');
     const them=civLabel(ref,theirs),me=civLabel(ref,mine);
     const S=(civ,id)=>statAt(ref,civ,id,age);
     const none=text=>`<p class="mc-none">${esc(text)}</p>`;
@@ -407,7 +415,7 @@
       return `<span class="mu-chain">${have.map(id=>icon(ref,'t',id,{side,tip:`${SIDE_KO[side]}: ${techName(ref,id)} (계산에 넣음)`})).join('')}${lack.map(id=>icon(ref,'t',id,{side,crossed:true,tip:`${SIDE_KO[side]}: ${techName(ref,id)} 없음`})).join('')}</span>`;
     };
     const row=(label,a,b)=>`<tr><th scope="row">${esc(label)}</th><td>${a}</td><td>${b}</td></tr>`;
-    const details=`<details class="matchup-more mc-agemore"><summary>자세히 — ${AGE_KO[age]}시대 계산에 넣은 것</summary><div class="table-scroll"><table class="timeline matchup-table matchup-grid"><thead><tr><th scope="col"></th><th scope="col">나 · ${esc(me)}</th><th scope="col">상대 · ${esc(them)}</th></tr></thead><tbody>`
+    const details=`<details class="matchup-more mc-agemore" data-section="mc-calc"><summary>자세히 — ${AGE_KO[age]}시대 계산에 넣은 것</summary><div class="table-scroll"><table class="timeline matchup-table matchup-grid"><thead><tr><th scope="col"></th><th scope="col">나 · ${esc(me)}</th><th scope="col">상대 · ${esc(them)}</th></tr></thead><tbody>`
       +row('유닛',units(mine,'mine',s.myArmy),units(theirs,'theirs',s.theirArmy))+row('업그레이드',techs(mine,'mine'),techs(theirs,'theirs'))+'</tbody></table></div>'
       +'<p class="compact-note">유닛 = 이 시대에 만들 수 있는 계열의 가장 높은 단계(공성·수도사 제외). 업그레이드 = 이 시대까지 연구할 수 있는 대장간·혈통·사육술·엄지 반지·파르티아 병법·종자·화학 중 그 문명에 있는 것, 모두 했다고 봄. 아이콘을 누르면 그 시대 수치.</p></details>';
     return section('mc-avoid','!','피해야 할 병력 구성',avoid)+section('mc-threat','▲','상대 핵심 위협',threats)
@@ -693,8 +701,8 @@
   const QUEUE_NOTE='명령 기준: 생산 버튼을 누른 수(한 번에 5기 예약은 5) — 취소·자원 부족·죽은 수·남은 수는 리플에 없음';
   // one side's production in a window: line icons with ×N (the unit the line stood at by the window's end) and
   // villagers as a small number; the row's left border is the side colour
-  function prodRow(ref,side,prod,win,st){
-    if(!prod)return `<div class="mc-prod mc-prod-${side}"><span class="mc-who">${WHO[side]}</span><span class="mc-none">이 시대 도달 안 함</span></div>`;
+  function prodRow(ref,side,prod,win,st,reason){
+    if(!prod)return `<div class="mc-prod mc-prod-${side}"><span class="mc-who">${WHO[side]}</span><span class="mc-none">${esc(reason||'이 시대 도달 안 함')}</span></div>`;
     const chips=prod.rows.map(r=>{
       if(r.root==null)return `<span class="mc-cnt mc-cnt-text" tabindex="0" data-tip="${esc(`${SIDE_KO[side]} 생산 명령 ${r.n}: ${r.label} (기술표에 없는 이름)`)}">${esc(r.label)} ×${r.n}</span>`;
       const u=st?unitAt(r.chain,st):r.root;
@@ -718,7 +726,7 @@
     return line(mineWins?'mc-win':'mc-lose',pairVisual(ref,x.u,'mine',x.v,p,!mineWins),`${U} vs ${V}`,why,tip);
   }
   function upgradeTable(ref,ra,rb){
-    if(!ra.length&&!rb.length)return '<p class="compact-note">이 구간 연구 명령 없음</p>';
+    const empty=!ra.length&&!rb.length?'<p class="compact-note">이 구간 연구 명령 없음</p>':'';
     const chip=(r,side)=>{
       const nm=r.kind==='u'?unitName(ref,r.id):r.kind==='t'?techName(ref,r.id):r.label;
       const tip=[`${SIDE_KO[side]} ${nm}${r.kind==='u'?' 업그레이드':''} — 연구 명령 ${mmss(r.at)}`,
@@ -728,11 +736,12 @@
       return `<span class="mc-up" tabindex="0" data-tip="${esc(tip)}">${ic}<small>${mmss(r.at)}</small></span>`;
     };
     const cell=(xs,side)=>xs.length?`<span class="mu-chain">${xs.map(r=>chip(r,side)).join('')}</span>`:'<span class="matchup-none">—</span>';
+    // every group row in every match (APP-20); an empty side shows a dash
     const rows=UP_GROUPS.map(([g,label])=>{
       const a=ra.filter(r=>r.group===g),b=rb.filter(r=>r.group===g);
-      return a.length||b.length?`<tr><th scope="row">${esc(label)}</th><td>${cell(a,'mine')}</td><td>${cell(b,'theirs')}</td></tr>`:'';
+      return `<tr><th scope="row">${esc(label)}</th><td>${cell(a,'mine')}</td><td>${cell(b,'theirs')}</td></tr>`;
     }).join('');
-    return `<div class="table-scroll"><table class="timeline matchup-table matchup-grid mc-uptable"><thead><tr><th scope="col"></th><th scope="col">나</th><th scope="col">상대</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    return `${empty}<div class="table-scroll"><table class="timeline matchup-table matchup-grid mc-uptable"><thead><tr><th scope="col"></th><th scope="col">나</th><th scope="col">상대</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   }
   function bandTable(ref,M){
     const rows=[];
@@ -753,14 +762,12 @@
     const [a,b]=M.sides,decided=opt?.decided===V.age,result=opt?.result;
     const head=`<p class="mc-gaphead">${esc(gapSentence(ref,V,g,decided,result))}</p>`;
     const stat=`군사 비중(주민 대비) 나 ${Math.round(g.share[0]*100)}% · 상대 ${Math.round(g.share[1]*100)}% · 분당 군사 명령 나 ${g.perMin[0].toFixed(1)} · 상대 ${g.perMin[1].toFixed(1)}`;
-    if(g.kind!=='mine')return `<div class="mc-gapbox mc-gapbox-${g.kind}" tabindex="0" data-tip="${esc(stat+'\n'+QUEUE_NOTE)}">${head}</div>`;
+    if(g.kind!=='mine')return armyBox(g.kind,head,null,` tabindex="0" data-tip="${esc(stat+'\n'+QUEUE_NOTE)}"`);
     const sa=sideState(ref,a.res,a.reach,V.wa[1]),sb=sideState(ref,b.res,b.reach,V.wb[1]);
     const row=(label,body)=>`<div class="mc-gaprow"><span class="mc-gaplabel">${esc(label)}</span><span class="mc-cnts">${body}</span></div>`;
-    // their army: line icons ×N, when it started and its busiest 5 minutes
+    // their army: when it started and its busiest 5 minutes (the line icons ×N are in the 상대 row right below)
     const T=milTiming(b.queue,V.wb);
-    const chips=milRows(V.pb).map(r=>r.root==null?`<span class="mc-cnt mc-cnt-text">${esc(r.label)} ×${r.n}</span>`
-      :`<span class="mc-cnt" tabindex="0" data-tip="${esc(`상대 ${unitName(ref,r.root)} 계열 생산 명령 ${r.n} · 첫 명령 ${mmss(r.first)}\n${QUEUE_NOTE}`)}">${icon(ref,'u',unitAt(r.chain,sb),{side:'theirs',noTip:true})}<b>×${r.n}</b></span>`).join('');
-    const when=T?`<span class="mc-gapwhen">첫 명령 ${mmss(T.first)}${T.bands>1&&T.peak.n>=3?` · 가장 많던 때 ${Math.floor(T.peak.from/60)}~${Math.ceil(T.peak.to/60)}분(${T.peak.n})`:''}</span>`:'';
+    const when=T?`<span class="mc-gapwhen">첫 명령 ${mmss(T.first)}${T.bands>1&&T.peak.n>=3?` · 가장 많던 때 ${Math.floor(T.peak.from/60)}~${Math.ceil(T.peak.to/60)}분(${T.peak.n})`:''}</span>`:'<span class="mc-none">군사 생산 명령 없음</span>';
     // where my production went instead
     const builds=(a.builds||[]).filter(t=>t>=V.wa[0]&&t<V.wa[1]).length;
     const mineChips=milRows(V.pa).map(r=>`<span class="mc-vill">${esc(rowName(ref,r))} ${r.n}</span>`).join('');
@@ -770,46 +777,79 @@
     // what to make then: this age's recommended answers (my lines available then) against what they actually made
     const s=summary(ref,a.civ,b.civ,V.age,madeByRoot(ref,b.civ,opt?.made?.[V.age]));
     const rec=(s?.recommend||[]).map(r=>{const p=r.vs[0];return icon(ref,'u',r.unit,{side:'mine',label:true,tip:pairTip(ref,r.unit,p.target,p,'mine')});}).join('');
-    return `<div class="mc-gapbox mc-gapbox-mine">${head}`
-      +row('상대 병력',chips+when)+row('내 생산',went||'<span class="mc-none">명령 없음</span>')
-      +(rec?row('이때 이걸 뽑았어야',rec):'')
-      +`<p class="mc-gapnote" tabindex="0" data-tip="${esc(QUEUE_NOTE)}">${esc(stat)}</p></div>`;
+    return armyBox('mine',head
+      +row('상대 병력',when)+row('내 생산',went||'<span class="mc-none">명령 없음</span>')
+      +row('이때 이걸 뽑았어야',rec||'<span class="mc-none">이 시대 추천 대응 없음</span>')
+      +`<p class="mc-gapnote" tabindex="0" data-tip="${esc(QUEUE_NOTE)}">${esc(stat)}</p>`);
   }
-  function armySection(ref,M,age,opt){
-    const V=ageView(ref,M,age),[a,b]=M.sides,span=age==='all'?'경기 전체':`${AGE_KO[age]}시대`;
+  // (the gap headline already holds both counts, so the label shows them only for the plain headlines)
+  // APP-20: the "병력 비교" box is in every age tab of every match; only its headline changes
+  // (my army missing / theirs missing / both few / both had armies / an age one side never reached / no data)
+  function armyBox(kind,inner,n,attrs=''){
+    const counts=n?` <b>군사 생산 명령 나 ${n[0]} · 상대 ${n[1]}</b>`:'';
+    return `<div class="mc-gapbox mc-gapbox-${kind}" data-section="mc-armybox"${attrs}><p class="mc-boxlabel">병력 비교${counts}</p>${inner}</div>`;
+  }
+  function plainBox(ref,V,age,pairs){
+    const reached=[!!V.pa,!!V.pb],n=[V.pa?milCount(V.pa):0,V.pb?milCount(V.pb):0];
+    const head=text=>`<p class="mc-gaphead">${esc(text)}</p>`;
+    if(age==='all'){
+      const d=n[0]-n[1];
+      return armyBox('plain',head(d===0?'경기 전체 군사 생산 명령 수가 같았어요':`경기 전체로는 ${d>0?'내 쪽':'상대 쪽'}이 군사 생산 명령을 ${Math.abs(d)} 더 냈어요`),n);
+    }
+    const ageWord=`${AGE_KO[age]}시대`;
+    if(!reached[0]&&!reached[1])return armyBox('plain',head(`이 경기는 양쪽 모두 ${ageWord}에 가지 않았어요`),n);
+    if(!reached[0])return armyBox('plain',head(`나는 ${ageWord}에 가지 않았어요 — 상대는 ${n[1]?milList(ref,V.pb):'군사 생산 명령 없음'}`),n);
+    if(!reached[1])return armyBox('plain',head(`상대는 ${ageWord}에 가지 않았어요 — 나는 ${n[0]?milList(ref,V.pa):'군사 생산 명령 없음'}`),n);
+    if(pairs)return armyBox('plain',head('양쪽 모두 병력이 있었어요 — 아래에서 주력끼리 1:1로 맞대어 봐요'),n);
+    return armyBox('plain',head(`${ageWord}엔 양쪽 병력 차이가 크지 않았어요 — 3기 이상 뽑은 주력이 한쪽에 없어 1:1로 맞대지 않아요`),n);
+  }
+  function armySection(ref,M,age,opt,reason){
+    const span=age==='all'?'경기 전체':`${AGE_KO[age]}시대`,title=`실제 생산 명령 — ${span}`;
+    const upSummary=`업그레이드 연구 명령${age==='all'?' · 5분 단위 생산':''} — ${span}`;
+    if(!M){
+      const r=reason||'생산 명령 기록이 없어 병력을 비교할 수 없어요';
+      return section('mc-army','⚔',title,`<p class="mc-when">명령 기준</p>`+armyBox('plain',`<p class="mc-gaphead">${esc(r)}</p>`)
+        +`<div class="mc-prods" data-section="mc-prods">${prodRow(ref,'mine',null,null,null,r)}${prodRow(ref,'theirs',null,null,null,r)}</div>`
+        +`<div class="mc-pairs" data-section="mc-pairs"><h5 class="mc-subhead">주력끼리 1:1</h5>${noneP(r)}</div>`
+        +`<details class="matchup-more mc-agemore" data-section="mc-upgrades"><summary>${esc(upSummary)}</summary>${noneP(r)}</details>`);
+    }
+    const V=ageView(ref,M,age),[a,b]=M.sides;
     const g=age==='all'?null:armyGap(V);
-    const title=`실제 생산 명령 — ${span}`;
-    if(!V.wa&&!V.wb)return section('mc-army','⚔',title,`<p class="mc-none">이 경기에서 ${AGE_KO[age]}시대에 들어간 쪽이 없어요</p>`);
     const sa=V.wa?sideState(ref,a.res,a.reach,V.wa[1]):null,sb=V.wb?sideState(ref,b.res,b.reach,V.wb[1]):null;
-    const when=[V.wa?`나 ${mmss(V.wa[0])}~${mmss(V.wa[1])}`:'',V.wb?`상대 ${mmss(V.wb[0])}~${mmss(V.wb[1])}`:''].filter(Boolean).join(' · ');
-    const pairs=V.pairs.length?`<h5 class="mc-subhead">주력끼리 1:1 — 그때까지 실제로 낸 업그레이드로</h5><div class="mc-lines">${V.pairs.map(x=>pairLine(ref,x)).join('')}</div>`
-      :g?'':'<p class="mc-none mc-subhead">양쪽 다 3기 이상 명령한 군사 계열이 있어야 맞대어 봐요</p>';
-    const prods=prodRow(ref,'mine',V.pa,V.wa,sa)+prodRow(ref,'theirs',V.pb,V.wb,sb);
-    // when I had no army the box above already shows their army and my production, so the rows fold away
-    const folded=g?.kind==='mine';
-    const details=`<details class="matchup-more mc-agemore"><summary>${folded?'양쪽 생산 명령 · ':''}업그레이드 연구 명령${age==='all'?' · 5분 단위 생산':''} — ${span}</summary>${folded?prods:''}${upgradeTable(ref,V.ra,V.rb)}`
+    const when=[V.wa?`나 ${mmss(V.wa[0])}~${mmss(V.wa[1])}`:'나 도달 안 함',V.wb?`상대 ${mmss(V.wb[0])}~${mmss(V.wb[1])}`:'상대 도달 안 함'].join(' · ');
+    const why=g?.kind==='mine'?'내 군사 계열이 3기 미만이라 맞대어 볼 주력이 없어요'
+      :!V.pa||!V.pb?'양쪽 모두 이 시대에 들어가야 맞대어 봐요':'양쪽 다 3기 이상 명령한 군사 계열이 있어야 맞대어 봐요';
+    const pairs=`<div class="mc-pairs" data-section="mc-pairs"><h5 class="mc-subhead">주력끼리 1:1 — 그때까지 실제로 낸 업그레이드로</h5>${V.pairs.length?`<div class="mc-lines">${V.pairs.map(x=>pairLine(ref,x)).join('')}</div>`:noneP(why)}</div>`;
+    const prods=`<div class="mc-prods" data-section="mc-prods">${prodRow(ref,'mine',V.pa,V.wa,sa)+prodRow(ref,'theirs',V.pb,V.wb,sb)}</div>`;
+    const box=g?gapBox(ref,M,V,g,opt):plainBox(ref,V,age,V.pairs.length>0);
+    const details=`<details class="matchup-more mc-agemore" data-section="mc-upgrades"><summary>${esc(upSummary)}</summary>${upgradeTable(ref,V.ra,V.rb)}`
       +(age==='all'?`<h4 class="matchup-heading">5분 단위 생산 명령</h4>${bandTable(ref,M)}`:'')
       +'<p class="compact-note">아이콘 아래 = 연구 명령 시각(완료 아님). 같은 연구를 몇 초 안에 다시 누른 것은 한 번으로, 한참 뒤 다시 누른 것은 앞 명령이 취소된 것으로 보고 마지막 시각을 써요. 무료로 받는 기술은 명령이 없어 빠져요.</p></details>';
-    return section('mc-army','⚔',title,`<p class="mc-when">${esc(when)} · 명령 기준</p>`+(g?gapBox(ref,M,V,g,opt):'')+(folded?'':prods)+pairs+details);
+    return section('mc-army','⚔',title,`<p class="mc-when">${esc(when)} · 명령 기준</p>`+box+prods+pairs+details);
   }
   // ctx (from context()): open = the age this match spent longest in, spent = seconds, made = orders per age
+  // APP-20: the same tabs and sections in every match; a civ outside the table or a match without orders
+  // keeps the layout and says why in each place
   function cardHtml(ref,mine,theirs,ctx){
-    if(!ref?.civs?.[mine]||!ref?.civs?.[theirs])return '';
-    const me=civLabel(ref,mine),them=civLabel(ref,theirs);
+    const known=!!(ref?.civs?.[mine]&&ref?.civs?.[theirs]);
+    // no match context at all = the match has no analysis yet
+    const reason=known?(ctx?null:'이 경기는 분석이 없어 생산 명령을 비교할 수 없어요'):ref?`${[mine,theirs].filter(c=>!ref?.civs?.[c]).map(c=>civLabel(ref,c)||'문명 확인 전').join(', ')}: 1v1 랭크 문명 기술표에 없는 문명이라 비교하지 않아요`:'문명 기술표를 불러오지 못했어요';
+    const me=civLabel(ref,mine)||'문명 확인 전',them=civLabel(ref,theirs)||'문명 확인 전';
     const open=AGES.includes(ctx?.open)?ctx.open:3,decided=AGES.includes(ctx?.open)&&ctx.spent>0;
     // APP-17: both sides' actual production and research commands, on top of each age tab and in an "전체" tab
-    const M=armyModel(ref,[mine,theirs],ctx?.army),flow=M?flowSentence(ref,M,ctx?.open,ctx?.result):'';
+    const M=known&&ctx?armyModel(ref,[mine,theirs],ctx?.army):null,flow=M?flowSentence(ref,M,ctx?.open,ctx?.result):'';
+    const flowWhy=reason||(M?'이 경기를 가른 시대엔 흐름을 말할 만큼 양쪽 생산·연구 명령이 없어요':'생산 명령 기록이 없어 흐름 문장을 만들 수 없어요');
     const opt={decided:decided?ctx.open:null,result:ctx?.result,made:ctx?.made};
     const tabs=AGES.map(a=>`<button type="button" role="tab" class="mc-agetab" data-age="${a}" aria-selected="${a===open}">${AGE_KO[a]}${decided&&a===ctx.open?'<small>이 경기</small>':''}</button>`).join('')
-      +(M?'<button type="button" role="tab" class="mc-agetab" data-age="all" aria-selected="false">전체<small>실제 명령</small></button>':'');
-    const panels=AGES.map(a=>`<div class="mc-agepanel" role="tabpanel" data-age="${a}" aria-label="${AGE_KO[a]}시대"${a===open?'':' hidden'}>${M?armySection(ref,M,a,opt):''}${agePanel(ref,mine,theirs,a,madeByRoot(ref,theirs,ctx?.made?.[a]))}</div>`).join('')
-      +(M?`<div class="mc-agepanel" role="tabpanel" data-age="all" aria-label="경기 전체" hidden>${armySection(ref,M,'all')}</div>`:'');
+      +'<button type="button" role="tab" class="mc-agetab" data-age="all" aria-selected="false">전체<small>실제 명령</small></button>';
+    const panels=AGES.map(a=>`<div class="mc-agepanel" role="tabpanel" data-age="${a}" aria-label="${AGE_KO[a]}시대"${a===open?'':' hidden'}>${armySection(ref,M,a,opt,reason)}${known?agePanel(ref,mine,theirs,a,madeByRoot(ref,theirs,ctx?.made?.[a])):emptyAgeRows(a,reason)}</div>`).join('')
+      +`<div class="mc-agepanel" role="tabpanel" data-age="all" aria-label="경기 전체" hidden>${armySection(ref,M,'all',opt,reason)}</div>`;
     const minutes=decided?Math.max(1,Math.round(ctx.spent/60)):0;
     return `<div class="matchup-card"><div class="mc-head"><span class="mc-kicker">MATCHUP · ${esc(me)}</span><strong class="mc-vs">VS ${esc(them)}</strong>`
       +`<span class="mc-legend"><span><span class="mc-key mc-key-mine"></span>초록 = 내 ${esc(me)}</span><span><span class="mc-key mc-key-theirs"></span>빨강 = 상대 ${esc(them)}</span><span>칼끝 = 맞는 쪽</span></span></div>`
       +`<div class="mc-ages" role="tablist" aria-label="시대별 매치업">${tabs}</div>`
-      +(decided?`<p class="mc-decided">이 경기는 ${AGE_KO[ctx.open]}시대에서 갈렸어요 — 가장 오래 이어진 시대(약 ${minutes}분)</p>`:'')
-      +(flow?`<p class="mc-flow"><b>흐름</b>${esc(flow)}</p>`:'')
+      +`<p class="mc-decided" data-section="mc-decided">${decided?`이 경기는 ${AGE_KO[ctx.open]}시대에서 갈렸어요 — 가장 오래 이어진 시대(약 ${minutes}분)`:'양쪽 시대 도달 기록이 없어 이 경기를 가른 시대를 정할 수 없어요 — 성주시대를 먼저 보여 줘요'}</p>`
+      +`<p class="mc-flow" data-section="mc-flow"><b>흐름</b>${esc(flow||flowWhy)}</p>`
       +panels
       +'<p class="mc-note">칼 위 ×N = 칼을 든 쪽이 같은 자원으로 싸울 때 유리한 정도(1:1 처치 시간 × 비용, 원거리 상대는 다가가는 시간 포함). 그 시대에 만들 수 있는 유닛만, 그때까지 할 수 있는 대장간·계열 업그레이드·문명 보너스는 모두 했다고 보고 계산(성에서 하는 연구는 성주시대부터) — 컨트롤·진형·병력 수는 제외. 줄을 누르면 근거 수치.</p></div>';
   }
@@ -831,9 +871,10 @@
   function html(ref,mine,theirs,ctx){
     const title='<div class="summary-label"><span id="civ-matchup-title">문명 매치업 및 전략 복기</span>'+(ref?.game_build?`<small>게임 빌드 ${esc(ref.game_build)} 기술표·유닛 데이터</small>`:'')+'</div>';
     const cmp=compare(ref,mine,theirs);
+    const moreTitle='자세히 — 계열·기술 비교, 상성 수치, 문명 보너스';
     if(!cmp){
       const lacking=[mine,theirs].filter(c=>!ref?.civs?.[c]).map(c=>civLabel(ref,c)||'문명 확인 전');
-      return `<section class="civ-matchup" aria-labelledby="civ-matchup-title">${title}<p class="compact-note">${ref?`${esc(lacking.join(', '))}: 1v1 랭크 문명 기술표에 없는 문명이라 비교하지 않아요.`:'문명 기술표를 불러오지 못했어요.'}</p></section>`;
+      return `<section class="civ-matchup" data-section="matchup" aria-labelledby="civ-matchup-title">${title}${cardHtml(ref,mine,theirs,ctx)}<details class="matchup-more" data-section="mc-more"><summary>${moreTitle}</summary><p class="compact-note">${ref?`${esc(lacking.join(', '))}: 1v1 랭크 문명 기술표에 없는 문명이라 비교하지 않아요.`:'문명 기술표를 불러오지 못했어요.'}</p></details></section>`;
     }
     const names=[civLabel(ref,mine),civLabel(ref,theirs)];
     const head=`<thead><tr><th scope="col"></th><th scope="col">나 · ${esc(names[0])}</th><th scope="col">상대 · ${esc(names[1])}</th></tr></thead>`;
@@ -842,8 +883,8 @@
     const lineHead=`<thead><tr><th scope="col">나 · ${esc(names[0])}</th><th scope="col">상대 · ${esc(names[1])}</th></tr></thead>`;
     const techRows=cmp.techs.filter(t=>t.group!=='dock'&&(t.a.length||t.b.length)).map(t=>`<tr><th scope="row">${esc(GROUP_KO[t.group]||t.group)}</th>${[t.a,t.b].map((ids,i)=>`<td>${ids.length?`<span class="mu-chain">${ids.map(id=>icon(ref,'t',id,{side:i?'theirs':'mine',crossed:true,tip:`${i?'상대':'나'}: ${techName(ref,id)} 없음`})).join('')}</span>`:'<span class="matchup-none">—</span>'}</td>`).join('')}</tr>`).join('');
     const bonus=cmp.sides.map((s,i)=>`<section class="matchup-bonus-side"><b>${i?'상대':'나'} · ${esc(names[i])}</b>${(s.civ.description||[]).map(r=>r.startsWith('#')?`<b>${esc(r.slice(1))}</b>`:`<span>${esc(r)}</span>`).join('')}</section>`).join('');
-    return `<section class="civ-matchup" aria-labelledby="civ-matchup-title">${title}${cardHtml(ref,mine,theirs,ctx)}`
-      +`<details class="matchup-more"><summary>자세히 — 계열·기술 비교, 상성 수치, 문명 보너스</summary>`
+    return `<section class="civ-matchup" data-section="matchup" aria-labelledby="civ-matchup-title">${title}${cardHtml(ref,mine,theirs,ctx)}`
+      +`<details class="matchup-more" data-section="mc-more"><summary>${moreTitle}</summary>`
       +`<h4 class="matchup-heading">병종 계열이 다른 곳 <small>흐린 ✕ = 없음</small></h4>${lineRows?`<div class="table-scroll"><table class="timeline matchup-table matchup-grid matchup-lines">${lineHead}<tbody>${lineRows}</tbody></table></div>`:'<p class="compact-note">공통 병종 계열은 양측 같음</p>'}`
       +`<h4 class="matchup-heading">기술 결손</h4>${techRows?`<div class="table-scroll"><table class="timeline matchup-table matchup-grid">${head}<tbody>${techRows}</tbody></table></div>`:'<p class="compact-note">양측 결손 없음</p>'}`
       +`<h4 class="matchup-heading">상대 병종 ← 공격 보너스를 갖는 내 병종</h4>${counterTable(ref,cmp.counters[0],`상대 · ${names[1]}`,`나 · ${names[0]} (타격당)`,'theirs')}`
@@ -951,7 +992,7 @@
         el.outerHTML=html(ref,a,b,c);
       });
     });
-    return `<section class="civ-matchup" data-civ-matchup="${esc(JSON.stringify([mine,theirs,ctx]))}"><div class="summary-label"><span>문명 매치업 및 전략 복기</span></div><p class="compact-note">문명 기술표를 불러오는 중…</p></section>`;
+    return `<section class="civ-matchup" data-section="matchup" data-civ-matchup="${esc(JSON.stringify([mine,theirs,ctx]))}"><div class="summary-label"><span>문명 매치업 및 전략 복기</span></div><p class="compact-note">문명 기술표를 불러오는 중…</p></section>`;
   }
   const api={lineStatus,bonusVs,pair,compare,summary,html,mount,load,linesAt,statAt,boostAt,context,cardHtml,madeByRoot,
     cleanQueue,cleanResearch,sideState,statActual,produced,armyModel,ageView,flowSentence,armyGap,gapSentence,gapFlow,milTiming,GAP};

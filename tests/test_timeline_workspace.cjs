@@ -60,7 +60,7 @@ test('paging and field selection keep the flow tab and scroll position with one 
 
 test('numbers separate observed age timings from production requests',()=>{
  const code=fs.readFileSync(path.join(__dirname,'../site/app.js'),'utf8');
- const ctx=vm.createContext({ageList:['봉건'],checkpoint:(m,a)=>m.age_checkpoints?.[a]||{},number:String,fmtTime:String,esc:String,compareTable:rows=>JSON.stringify(rows)});
+ const ctx=vm.createContext({ageList:['봉건'],checkpoint:(m,a)=>m.age_checkpoints?.[a]||{},number:String,fmtTime:String,esc:String,why:t=>`<p class="section-why">${t}</p>`,compareTable:rows=>JSON.stringify(rows)});
  vm.runInContext(code.slice(code.indexOf('  function renderNumbersPanel('),code.indexOf('\n  function ',code.indexOf('  function renderNumbersPanel(')+10)),ctx);
  const side={checkpoints:[],phases:[],villager_command_gaps:[],military_requests:50,villager_requests:40};
  const html=ctx.renderNumbersPanel({own:side,opponent:side,personal_benchmarks:[]},{eapm:30,age_checkpoints:{봉건:{reached_seconds:600}}},{eapm:40},null);
@@ -68,6 +68,10 @@ test('numbers separate observed age timings from production requests',()=>{
  assert.match(core,/봉건 도달/);assert.doesNotMatch(core,/생산 요청|병력 생산|주민 생산/);
  assert.match(html,/data-number-panel="requests" hidden/);
  assert.match(html,/5분별/);assert.match(html,/시대별/);
+ // APP-20: 시장 and 내 기록 are always there, with why when empty; no review → the same six with the reason
+ assert.match(html,/data-number-panel="market" hidden><p class="section-why">/);assert.match(html,/data-number-panel="benchmark" hidden><p class="section-why">/);
+ const bare=ctx.renderNumbersPanel(null,{},{},null,'분석 없음');
+ assert.equal((bare.match(/data-numbers=/g)||[]).length,6);assert.equal((bare.match(/분석 없음/g)||[]).length,6);
 });
 
 test('sub-tabs keep the scroll place and the matchup card age tabs are left to the card (APP-18)',()=>{

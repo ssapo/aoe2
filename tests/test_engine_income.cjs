@@ -19,39 +19,37 @@ test('missing or malformed data renders nothing',()=>{
 });
 const row=[20,100,50,0,30,20,0,0,10,0,60,0,40,0,0,0,0,10,5];
 const withSources={...curve,by_source:{columns:[],points:[[10,1,1,0,1,1,0,0,0,0,1,0,1,0,0,0,0,0,0],row]}};
-test('food sources: amounts, shares and only the sources someone used',()=>{
+test('food sources: amounts, shares and every source row in every match (APP-20)',()=>{
   const s=income.sources(withSources);
   assert.strictEqual(s.seconds,20);
   assert.deepStrictEqual(s.own.food,[100,50,30,20,0,0]);
-  assert.deepStrictEqual(s.foodShown.map(r=>r[0]),['가축','사냥','열매','농장']);
+  assert.deepStrictEqual(s.foodShown.map(r=>r[0]),['가축','사냥','열매','농장','물고기','기타']);
   const html=income.render(withSources);
   assert.ok(html.includes('식량 출처'));assert.ok(html.includes('나 · 200'));assert.ok(html.includes('상대 · 100'));
   assert.ok(html.includes('width:50%'));assert.ok(html.includes('0:20까지'));
-  assert.ok(!html.includes('물고기'));
+  assert.ok(html.includes('물고기'));
   assert.ok(html.includes('금 출처'));assert.ok(html.includes('금광'));
 });
-test('a source set up by the counted time is listed at zero on both sides; later or unrelated requests are not',()=>{
+test('a source set up by the counted time is still known (setUp); every row is listed anyway',()=>{
   const early=[20,100,50,0,0,0,0,0,0,0,60,40,0,0,0,0,0,0,0];
   const d={...curve,by_source:{points:[early]}};
-  const shown=timelines=>income.sources(d,timelines).foodShown.map(r=>r[0]);
-  assert.deepStrictEqual(shown(),['가축','사냥']);
-  assert.deepStrictEqual(shown([[{seconds:12,kind:'BUILD',label:'Farm'}],[]]),['가축','사냥','농장']);
-  assert.deepStrictEqual(shown([[],[{seconds:20,kind:'BUILD',label:'Mill'}]]),['가축','사냥','열매']);
-  assert.deepStrictEqual(shown([[{seconds:5,kind:'BUILD',label:'Folwark'},{seconds:6,kind:'BUILD',label:'Farm'}],undefined]),['가축','사냥','열매','농장']);
-  assert.deepStrictEqual(shown([[{seconds:21,kind:'BUILD',label:'Farm'},{seconds:3,kind:'QUEUE',label:'Farm'},{seconds:3,kind:'BUILD',label:'House'},{kind:'BUILD',label:'Mill'},null]]),['가축','사냥']);
-  const html=income.render(d,[[{seconds:12,kind:'BUILD',label:'Farm'}]]);
-  assert.ok(html.includes('농장'));assert.ok(!html.includes('열매'));
+  const set=timelines=>[...income.sources(d,timelines).setUp].sort();
+  assert.deepStrictEqual(set(),[]);
+  assert.deepStrictEqual(set([[{seconds:12,kind:'BUILD',label:'Farm'}],[]]),[3]);
+  assert.deepStrictEqual(set([[],[{seconds:20,kind:'BUILD',label:'Mill'}]]),[2]);
+  assert.deepStrictEqual(set([[{seconds:21,kind:'BUILD',label:'Farm'},{seconds:3,kind:'QUEUE',label:'Farm'},{seconds:3,kind:'BUILD',label:'House'},{kind:'BUILD',label:'Mill'},null]]),[]);
+  const html=income.render(d);
+  assert.ok(html.includes('농장')&&html.includes('열매'));
 });
-test('gold split is hidden when no other gold, and nothing is drawn without the by-source part',()=>{
+test('gold split is always shown; without the by-source part each block says why',()=>{
   const plain=row.slice();plain[9]=0;plain[18]=0;
   const html=income.render({...curve,by_source:{points:[plain]}});
-  assert.ok(html.includes('식량 출처'));assert.ok(!html.includes('금 출처'));
-  assert.ok(!income.render(curve).includes('income-sources'));
-  assert.strictEqual(income.renderSources({...curve,by_source:{points:[[20,1,2]]}}),'');
-  assert.strictEqual(income.renderSources({...curve,by_source:{points:[row.map((v,i)=>i===3?'<b>':v)]}}),'');
-  assert.strictEqual(income.renderSources({...curve,by_source:{points:[row.map((v,i)=>i?0:v)]}}),'');
+  assert.ok(html.includes('식량 출처'));assert.ok(html.includes('금 출처'));
+  const bare=income.render(curve);
+  assert.ok(bare.includes('data-section="food-sources"')&&bare.includes('data-section="gold-sources"')&&bare.includes('이 경기는 출처별 기록이 없어요'));
+  for(const d of [{...curve,by_source:{points:[[20,1,2]]}},{...curve,by_source:{points:[row.map((v,i)=>i===3?'<b>':v)]}}])
+    assert.ok(income.renderSources(d).includes('section-why'));
 });
-
 const animalRows={until_seconds:20,own:[{id:1,kind:'sheep',eaten:86.2,first_seconds:10,last_seconds:20},{id:2,kind:'sheep',eaten:40},{id:5,kind:'boar',eaten:290.4},{id:6,kind:'boar',eaten:281.6},{id:9,kind:'<b>',eaten:12}],opponent:[{id:7,kind:'deer',eaten:103.3},{id:8,kind:'deer',eaten:0},{id:10,kind:'boar',eaten:'x'}]};
 test('animals: grouped by kind, one chip per animal, per-kind count and sum; no remainder without the full amount',()=>{
   const s=income.animals({...withSources,animals:animalRows});
@@ -71,9 +69,9 @@ test('animals: the uneaten part shows only when the full amount is known and at 
   assert.strictEqual((html.match(/class="left"/g)||[]).length,1);assert.ok(html.includes('남김 140'));assert.ok(!html.includes('남김 54'));
   assert.ok(html.includes('먹은 동물 없음'));
 });
-test('animals: absent or empty data draws nothing and leaves the rest as it was',()=>{
-  assert.strictEqual(income.renderAnimals(withSources),'');
-  assert.strictEqual(income.renderAnimals({animals:{until_seconds:20,own:[],opponent:[]}}),'');
-  assert.strictEqual(income.renderAnimals({animals:{own:[{kind:'sheep',eaten:5}]}}),'');
-  assert.ok(!income.render(withSources).includes('동물별'));
+test('animals: absent or empty data keeps the block with why, and the rest as it was',()=>{
+  assert.ok(income.renderAnimals(withSources).includes('동물별 기록이 없는 예전 분석이에요'));
+  assert.ok(income.renderAnimals({animals:{until_seconds:20,own:[],opponent:[]}}).includes('확인된 구간(0:20) 안에 일꾼이 식량을 가져온 동물이 없어요'));
+  assert.ok(income.renderAnimals({animals:{own:[{kind:'sheep',eaten:5}]}}).includes('data-section="animals"'));
+  assert.ok(income.render(withSources).includes('data-section="animals"'));
 });

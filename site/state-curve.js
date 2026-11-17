@@ -35,8 +35,7 @@
   const resourceIcons='<span class="resource-icons" aria-hidden="true"><svg viewBox="0 0 24 24" class="food"><path d="M12 21V4M12 9C4 9 4 2 4 2s8 0 8 7Zm0 6c-8 0-8-7-8-7s8 0 8 7Zm0-3c8 0 8-7 8-7s-8 0-8 7Z"/></svg><svg viewBox="0 0 24 24" class="wood"><path d="m5 18 10-13 5 4-10 13Z"/><ellipse cx="6" cy="19" rx="4" ry="3"/><path d="m11 13 5-6M4 19h4"/></svg><svg viewBox="0 0 24 24" class="gold"><path d="m3 18 4-11h10l4 11Zm4-11 3 4h8M10 11l-3 7"/></svg><svg viewBox="0 0 24 24" class="stone"><path d="m3 18 2-10 8-5 7 6 1 9-9 3Zm2-10 8 4 7-3M13 12l-1 9"/></svg></span>';
   function ageTable(curve,mine,theirs){
     const own=ageStats(curve,mine,1),opp=ageStats(curve,theirs,2);
-    const names=['암흑','봉건','성주','왕정'].filter(age=>own.concat(opp).some(p=>p.age===age));
-    if(!names.length)return '';
+    const names=['암흑','봉건','성주','왕정']; // APP-20: every age row in every match ('—' when not reached)
     const cell=p=>p?`평균 <strong>${p.mean.toLocaleString('ko-KR')}</strong><small class="cell-meta">${clock(p.start)}–${clock(p.end)} · 계산 구간 ${clock(p.covered)}</small>`:'—';
     return `<details class="age-resource-details"><summary>시대별 보유 자원 · 나 / 상대</summary><div class="table-scroll"><table class="timeline comparison"><thead><tr><th scope="col">시대</th><th scope="col">나</th><th scope="col">상대</th></tr></thead><tbody>${names.map(age=>`<tr><th scope="row">${age}</th><td>${cell(own.find(p=>p.age===age))}</td><td>${cell(opp.find(p=>p.age===age))}</td></tr>`).join('')}</tbody></table></div></details>`;
   }
@@ -69,7 +68,7 @@
     if(!valid(curve))return '';
     const s=summary(curve);
     const points=curve.points.map(p=>p.length===5?[p[0],p[1],p[3]]:p);
-    return `<section class="state-curve"><h3 class="detail-heading">자원 흐름 </h3>${s.lines.length?`<ul class="state-lines">${s.lines.map(l=>`<li>${esc(l)}</li>`).join('')}</ul>`:''}<div class="state-charts">${chart(points,1,2,'쌓아둔 자원 (식량+나무+금+돌)')}</div>${ageTable(curve,mine,theirs)}</section>`;
+    return `<section class="state-curve" data-section="state-curve"><h3 class="detail-heading">자원 흐름 </h3>${s.lines.length?`<ul class="state-lines">${s.lines.map(l=>`<li>${esc(l)}</li>`).join('')}</ul>`:''}<div class="state-charts">${chart(points,1,2,'쌓아둔 자원 (식량+나무+금+돌)')}</div>${ageTable(curve,mine,theirs)}</section>`;
   }
   const api={summary,render,valid,stats,ageStats,resourceIcons};if(typeof module==='object'&&module.exports)module.exports=api;else global.SSAPOStateCurve=api;
 })(typeof window==='undefined'?globalThis:window);

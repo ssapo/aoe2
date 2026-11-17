@@ -42,7 +42,9 @@ test('render keeps one hero, no fixed 1000 judgement or false rates, omits sourc
  assert.doesNotMatch(b.render(r),/script|비교 선수|문명 혼합|2명|6경기/);
  r.ages=[{label:'봉건 도달',age:'봉건',value:603.4,reference,delta:103.4}];
  assert.match(b.render(r,true),/10:03/);
- assert.equal(b.render({resources:[],ages:[],villagers:[]}), '');
+ // APP-20: nothing to compare still draws the section with one reason line
+ assert.match(b.render({resources:[],ages:[],villagers:[]}),/data-section="ranked"[\s\S]*section-why">이 경기는 2000점 이상 기준과 비교할 항목이 없어요/);
+ assert.match(b.render(null,true,'분석이 없어요'),/data-section="ranked-quick"[\s\S]*분석이 없어요/);
 });
 
 test('own resource card survives missing or mismatched reference data without inventing benchmarks',()=>{
@@ -100,7 +102,7 @@ test('compare and render name the basis, or give one short reason when no tier h
  assert.equal(b.shortageText(arena),'이 맵은 2000점 이상 기준 경기가 부족해요(같은 맵 1경기, 같은 종류 맵 2경기; 5경기·2명 이상 필요)');
  assert.match(b.render(arena,true),/ranked-shortage/);
  assert.equal(b.shortageText(b.compare(match('Islands'),99,src,state)),'이 맵은 2000점 이상 기준 경기가 부족해요(같은 맵 0경기, 열린 맵·닫힌 맵 어느 쪽에도 안 넣은 맵; 5경기·2명 이상 필요)');
- assert.equal(b.shortageText(arabia),'');assert.equal(b.render(b.compare(match('Arena'),99,null,state)),'');
+ assert.equal(b.shortageText(arabia),'');assert.match(b.render(b.compare(match('Arena'),99,null,state)),/2000점 이상 기준 자료를 불러오지 못했어요/);
  const evil=b.compare({...match('<img>'),map:'<img>'},99,src,state);
  assert.doesNotMatch(b.render(evil),/<img>/);
 });
@@ -169,7 +171,7 @@ test('food rows compare shares and food left at the clamped common time with pro
  assert.equal(b.compare({id:999,map:'Arabia',analysis:{...analysis,engine_income:engine(230,[1,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0])}},99,src,state).food,null);
  assert.equal(b.compare({id:999,map:'Arabia',analysis:{...analysis,engine_income:null}},99,src,state).food,null);
  const none=b.compare({id:999,map:'Arabia',analysis},99,{...src,samples:src.samples.map(({food,...s})=>s)},state);
- assert.equal(none.food,null);assert.doesNotMatch(b.render(none),/식량 출처/);
+ assert.equal(none.food,null);assert.match(b.render(none),/식량 출처 비교<\/summary><p class="ranked-basis">(경기 재현이|위와 같은)/);
  // escaped label text
  const evil=b.compare({id:999,map:'Arabia',analysis:{...analysis,civilization:'<b>x'}},99,{...src,samples:src.samples.map(s=>({...s,civilization:'<b>x',opening_label:'<i>'}))},state);
  assert.doesNotMatch(b.render(evil)+b.render(evil,true),/<b>x|<i>/);

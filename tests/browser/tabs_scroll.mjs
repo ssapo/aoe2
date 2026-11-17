@@ -48,6 +48,25 @@ const read=sel=>{const body=document.querySelector('.review-body'),bar=document.
     cardPanels:document.querySelector('.matchup-card')?document.querySelectorAll('.matchup-card .mc-agepanel:not([hidden])').length:1,
     ageupPanels:document.querySelector('#panel-ages section[data-age-panel]')?document.querySelectorAll('#panel-ages section[data-age-panel]:not([hidden])').length:1};};
 
+// APP-20: the sections each analysis tab shows right after a match opens (stable data-section ids, outside [hidden])
+const PANELS=['summary','numbers','ages','production','timeline'];
+async function sectionList(page){
+  const out=[];
+  for(const panel of PANELS){
+    await page.click(`.review-tabs [data-panel="${panel}"]`);
+    await page.waitForTimeout(80);
+    out.push(panel+': '+(await page.evaluate(p=>[...document.querySelectorAll(`#panel-${p} [data-section]`)].filter(e=>!e.closest('[hidden]')).map(e=>e.dataset.section).join(' '),panel)));
+  }
+  await page.click('.review-tabs [data-panel="summary"]');
+  return out.join('\n');
+}
+const seen=[];  // [label, match, list]
+function sameSections(label){
+  const mine=seen.filter(x=>x[0]===label);
+  for(const [,id,list] of mine.slice(1))if(list!==mine[0][2])fail(label,`#${id} shows other sections than #${mine[0][1]}:\n${list}\n--- vs ---\n${mine[0][2]}`);
+  rows.push(`${label} same sections in ${mine.length} matches: ${mine.length?mine[0][2].split('\n').map(l=>l.split(' ').length-1).join('/'):'-'} per tab`);
+}
+
 async function pressAll(page,label,panel,buttons,anchor,offset){
   await page.click(`.review-tabs [data-panel="${panel}"]`);
   await page.waitForTimeout(150);
@@ -92,6 +111,7 @@ try{
       if(card){
         withCard++;opened++;
         const tag=`${label} #${id}${opened>1?' (reopen)':''}`;
+        seen.push([label,id,await sectionList(page)]);
         await pressAll(page,tag,'summary','.matchup-card .mc-agetab','.matchup-card .mc-ages',150);
         // a click inside the card (not on a tab) must not move anything either
         await page.evaluate(place,['.matchup-card .mc-ages',150]);
@@ -110,6 +130,20 @@ try{
       await page.waitForTimeout(200);
     }
     if(withCard<2)fail(label,`only ${withCard} matches with a matchup card were checked`);
+    // a sparse profile: a match without analysis and the oldest analysed one must show the same sections too
+    await page.goto(base+'?profile=199325');
+    await page.waitForSelector('button.match[data-match]',{timeout:20000});
+    const sparse=await page.$$eval('button.match[data-match]',b=>[b.find(x=>/분석 대기|받지 못했어요|분석하지 못했어요/.test(x.textContent)),b.find(x=>x.textContent.includes('분석 완료'))].filter(Boolean).map(x=>x.dataset.match));
+    for(const id of sparse){
+      await page.click(`button.match[data-match="${id}"]`);
+      await page.waitForSelector('#match-dialog .review-tabs',{timeout:15000});
+      await page.waitForSelector('.matchup-card .mc-agetab',{timeout:8000}).catch(()=>null);
+      seen.push([label,id,await sectionList(page)]);
+      await page.click('[data-close="match-dialog"]').catch(()=>page.keyboard.press('Escape'));
+      await page.waitForTimeout(200);
+    }
+    if(sparse.length<2)fail(label,`only ${sparse.length} sparse matches found on profile 199325`);
+    sameSections(label);
     await context.close();
   }
 }finally{await browser.close();server.close();}
