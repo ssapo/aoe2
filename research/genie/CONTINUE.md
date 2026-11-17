@@ -107,7 +107,7 @@ Codex의 초기 이동·내려놓기·주둔 복귀 정적 조사는 [결과·�
 ## 3. 지켜야 할 것
 
 - 연구 브랜치 `research/genie-188329`: 검사한 커밋은 묻지 않고 푸시하고 올린 것을 사용자에게 알린다(2026-11-15 사용자 지시). main: 충돌이 없으면 묻지 않고 푸시하되 `git fetch origin main` + rebase, 진행 중인 Actions 실행이 없는지 먼저 확인한다(2026-11-13 사용자 지시). 충돌·강제 푸시가 필요하면 멈추고 묻는다. 자세한 것은 13.4 "일하는 규칙". (2026-11-16 고침. 옛 규칙 "커밋·푸시는 연구 브랜치에만, main 병합·배포 금지"와 "연구 브랜치 푸시는 매번 묻기"는 위 지시로 바뀌었다.)
-- 커밋 작성자는 `Claude <noreply@anthropic.com>`. 사용자의 회사 메일을 쓰지 않는다.
+- 커밋 작성자는 작업한 AI 이름(Claude `noreply@anthropic.com`, Codex `noreply@openai.com` 등; 규칙 전문은 main `AGENTS.md`). 사용자의 회사 메일을 쓰지 않는다.
 - 원본 EXE·DAT·리플·메모리 덤프·디컴파일 원문·빌드 산출물·툴체인은 저장소에 넣지 않는다. PC의 `genie-replays` 폴더에만 둔다.
 - 실행 중인 게임 메모리는 **읽기만** 한다(2026-11-10 사용자 허용). 쓰기, 바이너리 수정, 설치 파일 덮어쓰기 금지. 싱글·리플 재생에서만, 온라인 대전 중에는 금지.
 - 사용자가 PC를 쓰고 있으면 화면을 건드리기 전에 묻는다. SWITCH 출근 앱 창은 건드리지 않는다. 유료 API·서비스를 쓰지 않는다.
@@ -516,7 +516,7 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 4. **하던 중인 일을 `CONTINUE.md` 맨 끝 "지금 하던 일" 절(13.4)에 덮어쓴다**: 무엇을 보고 있었나, 어디까지 확인했나, 엔진 소스가 빌드되는 상태인가, 반쯤 넣은 변경이 있는가(파일·함수), 돌려 둔 실행이 있는가.
 5. **엔진 패치를 다시 만든다**: PC에서 `cd genie && GIT_OPTIONAL_LOCKS=0 git diff --ignore-cr-at-eol > ../<새이름>.patch` → 저장소의 `sorted-lists-and-truth-trace.patch`를 그것으로 바꾼다. PC `genie\` 소스와 저장소 패치가 항상 같아야 한다.
 6. **새로 만든 도구를 저장소 `tools/`에 넣는다**(`runs\`의 스크립트 사본).
-7. **커밋하고 푸시한다**: 브랜치 `research/genie-188329`만. 작성자 `Claude <noreply@anthropic.com>` 또는 그 도우미 이름(사용자 회사 메일 금지). 커밋 메시지 첫 줄에 무엇을 했는지.
+7. **커밋하고 푸시한다**: 브랜치 `research/genie-188329`만. 작성자는 작업한 AI 이름(Claude `noreply@anthropic.com`, Codex `noreply@openai.com` 등; 사용자 회사 메일 금지). 커밋 메시지 첫 줄에 무엇을 했는지.
 8. **PC의 `genie-replays\CONTINUE.md`도 같은 내용으로 덮어쓴다.** 저장소와 PC 사본이 다르면 저장소가 기준이다.
 9. 원본 읽기 결과 원문(보고서, 손 계산 스크립트)은 PC `re-kit\`에 묶어 두고, 묶음 이름을 12.7 표에 적는다.
 
@@ -530,7 +530,9 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 13.4 지금 하던 일 (멈출 때마다 이 절을 덮어쓴다)
 
-**2026-11-17 메모: 다음 세션은 사용자 PC의 Claude Code.** 명령이 PC에서 바로 돈다(원격 다리·WMI 우회 불필요). 클라우드에만 있던 원본 디컴파일 환경(`/home/claude/re-env/re`, `out_*` 결과)은 없다 — 원본 코드를 읽어야 하면 7절대로 `re-kit`에서 다시 차린다(주소와 읽은 내용은 각 finding에 있다). 시작점: main `CLAUDE.md` → `ONBOARDING.md` → 이 절. 엔진 최신 커밋 `d5c5a12`(ENG-31, findings 130), 엔진 소스 비어 있음, 원본 기록 ⑪~⑮ 대기(ONBOARDING 「게임 켤 때」).
+**모든 AI 작업자 공통(2026-11-17 사용자 요구)**: Claude·ChatGPT Codex 등 어떤 도구든 같은 규칙으로 일한다. 규칙의 원본은 main `AGENTS.md` 하나뿐이고 `CLAUDE.md`는 그것을 가리키기만 한다(main 검사 `tests/test_agent_docs.py`가 지킨다). 이 문서에 도구별 규칙을 따로 쓰지 않는다.
+
+**2026-11-17 메모: 다음 세션은 사용자 PC에서 직접(Claude Code 또는 다른 AI 도구).** 명령이 PC에서 바로 돈다(원격 다리·WMI 우회 불필요). 클라우드에만 있던 원본 디컴파일 환경(`/home/claude/re-env/re`, `out_*` 결과)은 없다 — 원본 코드를 읽어야 하면 7절대로 `re-kit`에서 다시 차린다(주소와 읽은 내용은 각 finding에 있다). 시작점: main `CLAUDE.md` → `ONBOARDING.md` → 이 절. 엔진 최신 커밋 `d5c5a12`(ENG-31, findings 130), 엔진 소스 비어 있음, 원본 기록 ⑪~⑮ 대기(ONBOARDING 「게임 켤 때」).
 
 **2026-11-16 오후, Claude (ONBOARDING `ENG-26` A·B, `ENG-01`, 원본 기록 `truth7~9`). 묶음 A(124번 `e842db9`), ENG-01(125번 `9be7c1c`, 126번 이 문서와 같은 커밋). exe `runs\census_A32a.exe` = 패치 `runs\A32a.patch`(sha256 LF `c5d0ad4a…6f73fec9`, 778,689바이트) = `genie\` 소스. 전체 실행 `A32a*`가 지금 숫자다 — **2.1 표는 아직 옛 값(N29a)이고, 지금 값은 126번 표와 `runs/A31/tab_A32a.txt`·`ptab_A32a.txt`**. 518239882 57 / 54 그대로. 반쯤 하던 일 없음, 돌고 있는 실행 없음, 엔진 소스 비움(다음: 엔진 멈춤 넷은 `eng-stops` 세션).** 도구: `runs/A31_cmp.py`(기록 v7과 OBJECT 줄의 재탐색·look-around·자리 비교), `runs/A31_draws.py`(AI 뽑기 수), `runs/A31/rng.py`·`seedsearch.py`·`seedcmp.py`(기록의 AI 상태 단어로 SeedAll 씨앗 역추적) — 저장소 `tools/A31/`.
 
@@ -568,7 +570,7 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 - 하나 끝날 때마다(`truth\truthlog7.status`가 생김) 그 status를 `truth\truthN.status`로 복사하고 12.6 "원본 기록 목록"에 한 줄 더한다. 그다음 기록기를 띄운다.
 
 **일하는 규칙**:
-- 커밋 작성자는 `Claude <noreply@anthropic.com>`(`git -c user.name="Claude" -c user.email="noreply@anthropic.com" commit -F <UTF-8 파일>`). 사용자 회사 메일을 쓰지 않는다. git은 PC PowerShell에서만.
+- 커밋 작성자는 작업한 AI 이름(예: `git -c user.name="Claude" -c user.email="noreply@anthropic.com" commit -F <UTF-8 파일>`, Codex는 `Codex`/`noreply@openai.com`; 규칙 전문은 main `AGENTS.md`). 사용자 회사 메일을 쓰지 않는다. git은 PC PowerShell에서만.
 - 연구 브랜치: 검사한 커밋은 **묻지 않고 바로 푸시**하고, 무엇을 올렸는지 사용자에게 알린다(2026-11-15 사용자 지시). 푸시하면 다음 수집 실행부터 사이트 엔진이 바뀐다(워크플로가 실행마다 이 브랜치의 최신 패치를 받는다).
 - main: 충돌이 없으면 묻지 않고 푸시한다(2026-11-13 사용자 지시). 순서: `git fetch origin main` → rebase → GitHub API(`https://api.github.com/repos/ssapo/aoe2/actions/runs`)로 진행 중인 실행이 없는지 확인 → `git push origin HEAD:main`. 충돌·강제 푸시가 필요하면 멈추고 묻는다. `engine/**`·`scripts/**`·`site/**`·`config.json` 등을 건드린 푸시는 수집·배포를 돌린다. 스위치를 더하면 `engine/switches.env`, 확인 체크포인트 수가 바뀌면 `.github/workflows/engine-check.yml`, 저장 값이 바뀌면 `ANALYSIS_REVISION`을 같이 고친다.
 - 엔진 소스를 고치는 사람은 한 번에 하나. 도우미는 적게(5시간 사용 한도: 기본은 혼자, 꼭 필요할 때 1~2개; 공통 안내 `runs\helper-common.txt`).
@@ -811,7 +813,7 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 - 빌드 중에 실행을 띄우면 exe가 잠겨 링크가 실패한다. 빌드 성공은 `build7.err`의 "Finished"와 `census.exe` 시각으로 본다.
 
 일하는 규칙:
-- 커밋 작성자는 `Claude <noreply@anthropic.com>`. 사용자 회사 메일 금지. git은 PC PowerShell에서만.
+- 커밋 작성자는 작업한 AI 이름(Claude `noreply@anthropic.com`, Codex `noreply@openai.com` 등; 규칙 전문은 main `AGENTS.md`). 사용자의 회사 메일을 쓰지 않는다. git은 PC PowerShell에서만.
 - 배포(main 푸시)는 사용자가 말할 때만. 연구 브랜치 푸시는 해도 된다.
 - 원본 EXE·DAT·리플·메모리 기록·디컴파일 원문은 git에 넣지 않는다. 돌고 있는 게임과 SWITCH 앱은 건드리지 않는다.
 - 도우미는 적게(5시간 사용 한도): 기본은 혼자, 꼭 필요할 때 1~2개. 엔진 소스를 고치는 것은 한 번에 하나만. 도우미 공통 안내 `runs\helper-common.txt`.
