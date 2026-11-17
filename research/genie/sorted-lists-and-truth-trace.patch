@@ -1446,10 +1446,31 @@ index 68b77959..e05968e0 100644
              // the game mode is not the editor's (4) in a game
              part.pasture = roles
 diff --git a/crates/engine/genie-core/src/construction/build/more_work.rs b/crates/engine/genie-core/src/construction/build/more_work.rs
-index c7a0cf8b..367cd5c4 100644
+index c7a0cf8b..0b5106d5 100644
 --- a/crates/engine/genie-core/src/construction/build/more_work.rs
 +++ b/crates/engine/genie-core/src/construction/build/more_work.rs
-@@ -116,8 +116,17 @@ impl Unit {
+@@ -96,8 +96,15 @@ impl Unit {
+             self.id,
+             MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
+         );
++        let unit_ai = &c.w.parts.unit_ai;
+         let candidate = |id: ObjectId, owner: PlayerId, u: &Self, position: Position| {
+             let m = u.master(every, owner)?;
++            // 188329 0x10ba840: the object's unit AI slot 0x198, a hunted animal's leash (its
++            // `ai+0x204`), else 0 (findings 133)
++            let leash = unit_ai
++                .get(id)
++                .and_then(|ai| ai.hunted)
++                .map_or(0.0, |h| h.leash.get());
+             Ok(Candidate {
+                 id,
+                 player: owner,
+@@ -112,12 +119,22 @@ impl Unit {
+                 amount: u.life.amount,
+                 auto_gather: m.auto_gather.is_on(),
+                 gather_group: m.gather_group,
++                leash,
+             })
          };
          let me = candidate(me_id, player, self, self.position())?;
          let spatial: &Spatial = &c.w.spatial;
@@ -1468,7 +1489,7 @@ index c7a0cf8b..367cd5c4 100644
                  .objects_on(tile)
                  .map(|(id, p)| {
                      if id == me_id {
-@@ -128,7 +137,8 @@ impl Unit {
+@@ -128,7 +145,8 @@ impl Unit {
                      ))?;
                      candidate(id, owner, u, p.position)
                  })
@@ -1576,6 +1597,18 @@ index 76304cf8..e8c11eda 100644
          Ok(())
      }
  
+diff --git a/crates/engine/genie-core/src/construction/build/step_tests.rs b/crates/engine/genie-core/src/construction/build/step_tests.rs
+index 0ec99028..6cab3b5a 100644
+--- a/crates/engine/genie-core/src/construction/build/step_tests.rs
++++ b/crates/engine/genie-core/src/construction/build/step_tests.rs
+@@ -1371,6 +1371,7 @@ fn with_mill(t: &mut World) {
+             class: class::TREE,
+             workers: WorkerCount::of_data(-1),
+             state: None,
++            return_state: None,
+             attribute: Some(attribute::WOOD),
+         }],
+         resource_kinds: vec![attribute::WOOD],
 diff --git a/crates/engine/genie-core/src/construction/build/world_side.rs b/crates/engine/genie-core/src/construction/build/world_side.rs
 index e59bc443..7f3d5424 100644
 --- a/crates/engine/genie-core/src/construction/build/world_side.rs
@@ -1818,10 +1851,18 @@ index e526db7f..d4937d04 100644
                  "an unload whose unit finds no spot (its later rings)",
              ));
 diff --git a/crates/engine/genie-core/src/garrison/tests.rs b/crates/engine/genie-core/src/garrison/tests.rs
-index 88cdc0ef..8f8c7cd7 100644
+index 88cdc0ef..d78f3919 100644
 --- a/crates/engine/genie-core/src/garrison/tests.rs
 +++ b/crates/engine/genie-core/src/garrison/tests.rs
-@@ -2513,8 +2513,10 @@ pub(crate) fn walker(t: &mut World, p: PlayerId, id: i32, m: MasterId, at: Point
+@@ -2219,6 +2219,7 @@ fn an_enter_gives_its_load_to_drop_site_and_needs_room() {
+                 class: class::CLASS_7,
+                 workers: WorkerCount::of_data(-1),
+                 state: None,
++                return_state: None,
+                 attribute: Some(AttributeId::named(17)),
+             }],
+             ..DropSite::default()
+@@ -2513,8 +2514,10 @@ pub(crate) fn walker(t: &mut World, p: PlayerId, id: i32, m: MasterId, at: Point
              angle: Angle::ZERO,
              animated: Animated::default(),
              pauses: Vec::new(),
@@ -2061,7 +2102,7 @@ index 0f3076d6..2f75756b 100644
              if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
                  ai.set_action(record.action);
 diff --git a/crates/engine/genie-core/src/gathering/closest_resource.rs b/crates/engine/genie-core/src/gathering/closest_resource.rs
-index 9510abdd..74c7e5d5 100644
+index 9510abdd..624411b8 100644
 --- a/crates/engine/genie-core/src/gathering/closest_resource.rs
 +++ b/crates/engine/genie-core/src/gathering/closest_resource.rs
 @@ -3,7 +3,6 @@
@@ -2072,7 +2113,16 @@ index 9510abdd..74c7e5d5 100644
  use crate::map::Point;
  use crate::map::Position;
  use crate::map::Tile;
-@@ -177,11 +176,33 @@ pub(crate) fn closest_resource_of(
+@@ -145,6 +144,8 @@ pub(crate) fn closest_resource_of(
+             amount: u.life.amount,
+             auto_gather: m.auto_gather.is_on(),
+             gather_group: m.gather_group,
++            // slot 0x198 is only the builder's search's (`more_work`)
++            leash: 0.0,
+         })
+     };
+     let me = candidate(me_id, player, unit, unit.position())?;
+@@ -177,11 +178,33 @@ pub(crate) fn closest_resource_of(
      let master_id = unit.life.master_id;
      let plan = &mut c.plan;
      let blocked = mask.blocked() | BLOCKED;
@@ -2111,7 +2161,7 @@ index 9510abdd..74c7e5d5 100644
          ResourceWorld {
              map: c.spatial.map,
              world: c.spatial,
-@@ -194,11 +215,27 @@ pub(crate) fn closest_resource_of(
+@@ -194,11 +217,27 @@ pub(crate) fn closest_resource_of(
                      (spatial, by_id),
                      plan,
                      id,
@@ -2529,10 +2579,20 @@ index b1ab9a1e..fa462bea 100644
          }
          let empty = target.amount <= Amount::ZERO
 diff --git a/crates/engine/genie-core/src/gathering/gather_search.rs b/crates/engine/genie-core/src/gathering/gather_search.rs
-index b8879db5..4d36c7d4 100644
+index b8879db5..09fc2d2a 100644
 --- a/crates/engine/genie-core/src/gathering/gather_search.rs
 +++ b/crates/engine/genie-core/src/gathering/gather_search.rs
-@@ -157,18 +157,22 @@ pub fn more_work(
+@@ -71,6 +71,9 @@ pub struct Candidate {
+     pub auto_gather: bool,
+     /// Its master's `resource_gather_group` (`+0x683`).
+     pub gather_group: GatherGroup,
++    /// Its unit AI's slot 0x198 (`+0x1f0`, 0 without one): a hunted animal's leash
++    /// ([`crate::unit_ai::Hunted::leash`], 188329 `ai+0x204`), else 0.
++    pub leash: f32,
+ }
+ 
+ /// What a builder's search reads of the builder and the building it completed.
+@@ -157,23 +160,27 @@ pub fn more_work(
              for o in objects(Tile::new(i32::from(x), i32::from(y)))? {
                  // The farm class (49), which both searches treat apart.
                  if roles.of_class(o.class).contains(ClassRoles::FARM) {
@@ -2563,7 +2623,13 @@ index b8879db5..4d36c7d4 100644
                  }
                  if ObjectState::Undead <= o.state {
                      continue;
-@@ -440,6 +444,10 @@ pub fn closest_resource_at<W>(
+                 }
+-                let Some(resource) = entry.resource_of(o.class, o.state, o.workers) else {
++                let Some(resource) = entry.resource_of(o.class, o.state, o.workers, o.leash) else {
+                     continue;
+                 };
+                 let Some(g) = group_of(resource, roles) else {
+@@ -440,6 +447,10 @@ pub fn closest_resource_at<W>(
      /// The fallback's steps before it has one (`1000000`).
      const NO_STEPS: i32 = 1_000_000;
      const TILE_CENTRE: f32 = GATHER_SEARCH_TILE_CENTRE;
@@ -2574,7 +2640,7 @@ index b8879db5..4d36c7d4 100644
      let ResourceWorld {
          map,
          world,
-@@ -528,6 +536,331 @@ pub fn closest_resource_at<W>(
+@@ -528,6 +539,331 @@ pub fn closest_resource_at<W>(
      Ok((None, None))
  }
  
@@ -2906,6 +2972,30 @@ index b8879db5..4d36c7d4 100644
  /// `FUN_140fdd470` then `FUN_140fdd5f0`: the gather group of a resource held, and the most workers
  /// the Build's search for more work lets an object of it have (`0x140ab0c57`): food (0, 15 to 17)
  /// forage (1) and 6, wood (0) and 2, stone (3) and 3, gold (4) and 3, the rest fish (2) and 2.
+@@ -582,6 +918,7 @@ mod tests {
+             amount: Amount::new(100.0),
+             auto_gather: true,
+             gather_group: GatherGroup::WOOD,
++            leash: 0.0,
+         }
+     }
+ 
+@@ -596,6 +933,7 @@ mod tests {
+                 class: class::TREE,
+                 workers: WorkerCount::of_data(-1),
+                 state: None,
++                return_state: None,
+                 attribute: Some(attribute::WOOD),
+             }],
+             livestock: false,
+@@ -678,6 +1016,7 @@ mod tests {
+             class: class::CLASS_32,
+             workers: WorkerCount::of_data(-1),
+             state: None,
++            return_state: None,
+             attribute: Some(attribute::GOLD),
+         });
+         let b = Builder {
 diff --git a/crates/engine/genie-core/src/gathering/gather_search/passes.rs b/crates/engine/genie-core/src/gathering/gather_search/passes.rs
 index 2945a9b1..79aa24d9 100644
 --- a/crates/engine/genie-core/src/gathering/gather_search/passes.rs
@@ -3600,6 +3690,53 @@ index 7787900f..f932e18b 100644
              ..Self::default()
          }
      }
+diff --git a/crates/engine/genie-core/src/groups/motion/request.rs b/crates/engine/genie-core/src/groups/motion/request.rs
+index e2707dcb..25b138fe 100644
+--- a/crates/engine/genie-core/src/groups/motion/request.rs
++++ b/crates/engine/genie-core/src/groups/motion/request.rs
+@@ -413,6 +413,12 @@ pub(super) fn link(
+     (found, planned): (bool, bool),
+     now: WorldTime,
+ ) -> Result<Option<Pass>, GenieError> {
++    /// The squared reach within which a top level's plan skips its second point (188329
++    /// `DAT_14321bc84`).
++    const SKIP_NEAR2: f32 = 9.0;
++    /// The length a top level's plan must pass to skip its second point (188329
++    /// `DAT_1431fe5c8`).
++    const SKIP_LENGTH: f32 = 3.0;
+     let level = motion.paths.checked(0)?;
+     if (level.level == WaypointLevel::Top && !found) || path.points.len() < 2 {
+         if !found {
+@@ -453,6 +459,20 @@ pub(super) fn link(
+     // A new path's flags (`FUN_14152eea0`).
+     level.continue_counter = PlanTries::FULL;
+     let (range, target, top) = (level.range, level.target, level.level == WaypointLevel::Top);
++    // 188329 0x1114a30 (findings 134): a top level's plan linked as level 1 starts past its
++    // second point when the group's place lies within 3 of it (squared, `DAT_14321bc84`), the
++    // path is longer than `DAT_1431fe5c8` and has more than two points
++    let mut waypoint = WaypointIndex::SECOND;
++    if top && planned {
++        let second = path.points.get(1).copied().unwrap_or(BVector::ZERO);
++        let d = motion.position[0] - second;
++        if d.height() * d.height() + d.x() * d.x() + d.y() * d.y() < SKIP_NEAR2
++            && SKIP_LENGTH < path.length.get()
++            && 2 < path.points.len()
++        {
++            waypoint = waypoint.next();
++        }
++    }
+     let new = PathData {
+         points: path.points,
+         has_path: true,
+@@ -461,7 +481,7 @@ pub(super) fn link(
+         created: now,
+         range,
+         target,
+-        waypoint: WaypointIndex::SECOND,
++        waypoint,
+         state: if top && planned {
+             PathState::WantsPath
+         } else {
 diff --git a/crates/engine/genie-core/src/groups/order.rs b/crates/engine/genie-core/src/groups/order.rs
 index 398a973c..8fe3628e 100644
 --- a/crates/engine/genie-core/src/groups/order.rs
@@ -7068,7 +7205,7 @@ index b8bda6ff..71c767ab 100644
 +    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_SPLITTARGET_188329").is_some())
 +}
 diff --git a/crates/engine/genie-core/src/orders/start_work.rs b/crates/engine/genie-core/src/orders/start_work.rs
-index b0488a3d..6f5d131a 100644
+index b0488a3d..3da9757b 100644
 --- a/crates/engine/genie-core/src/orders/start_work.rs
 +++ b/crates/engine/genie-core/src/orders/start_work.rs
 @@ -20,7 +20,6 @@ use crate::GenieError;
@@ -7079,7 +7216,16 @@ index b0488a3d..6f5d131a 100644
  use crate::map::Rect;
  use crate::map::Tile;
  use crate::map::spatial::{BLOCKED, Spatial};
-@@ -361,7 +360,7 @@ impl World {
+@@ -326,6 +325,8 @@ impl World {
+                 amount: u.life.amount,
+                 auto_gather: m.auto_gather.is_on(),
+                 gather_group: m.gather_group,
++                // slot 0x198 is only the builder's search's (`more_work`)
++                leash: 0.0,
+             })
+         };
+         let objects = |spatial: &Spatial, tile: Tile| -> Result<Vec<Candidate>, GenieError> {
+@@ -361,7 +362,7 @@ impl World {
                          (spatial, by_id),
                          &mut plan,
                          id,
@@ -10242,7 +10388,7 @@ index 7cc2f5c9..171f8944 100644
  
  /// What a computer player's unit weighs of an object on a damage notify ([`UnitAi::damaged`]):
 diff --git a/crates/engine/genie-core/src/unit_ai/task_finder/mod.rs b/crates/engine/genie-core/src/unit_ai/task_finder/mod.rs
-index d11a4839..2289d9bc 100644
+index d11a4839..e9f15119 100644
 --- a/crates/engine/genie-core/src/unit_ai/task_finder/mod.rs
 +++ b/crates/engine/genie-core/src/unit_ai/task_finder/mod.rs
 @@ -476,6 +476,81 @@ fn finder_head<'m>(
@@ -10411,6 +10557,14 @@ index d11a4839..2289d9bc 100644
      }
      if roles
          .of_class(own.class)
+@@ -825,6 +919,7 @@ mod tests {
+                 class: class::TREE,
+                 workers: WorkerCount::NO_CAP,
+                 state: None,
++                return_state: None,
+                 attribute,
+             }],
+             ..DropSite::default()
 diff --git a/crates/engine/genie-core/src/unit_ai/tests.rs b/crates/engine/genie-core/src/unit_ai/tests.rs
 index 4cc9cc71..b603cd5e 100644
 --- a/crates/engine/genie-core/src/unit_ai/tests.rs
@@ -11483,10 +11637,26 @@ index ba6fdc83..d00f9c03 100644
          unit_give_load(
              (
 diff --git a/crates/engine/genie-core/src/world/tests.rs b/crates/engine/genie-core/src/world/tests.rs
-index dede9f25..b953b87a 100644
+index dede9f25..63ac4240 100644
 --- a/crates/engine/genie-core/src/world/tests.rs
 +++ b/crates/engine/genie-core/src/world/tests.rs
-@@ -22201,6 +22201,7 @@ fn own_razing(adds: &[(AttributeId, f32)]) -> KillLeft {
+@@ -3546,6 +3546,7 @@ pub(crate) fn forage_world() -> World {
+             class: class::CLASS_7,
+             workers: WorkerCount::of_data(-1),
+             state: None,
++            return_state: None,
+             attribute: Some(AttributeId::named(17)),
+         }],
+         ..DropSite::default()
+@@ -5559,6 +5560,7 @@ fn hunter_drops_its_meat_at_the_town_centre_and_goes_back() {
+                 class: class::PREY,
+                 workers: WorkerCount::of_data(-1),
+                 state: None,
++                return_state: None,
+                 attribute: Some(attribute::MEAT),
+             }],
+             ..DropSite::default()
+@@ -22201,6 +22203,7 @@ fn own_razing(adds: &[(AttributeId, f32)]) -> KillLeft {
                  .map(|&(a, v)| (PlayerId::new(1), a, Amount::new(v)))
                  .collect(),
          }],
@@ -11768,6 +11938,18 @@ index 2c36cb00..fea33b35 100644
              }
          } else {
              work.action = None;
+diff --git a/crates/engine/genie-import/src/tables.rs b/crates/engine/genie-import/src/tables.rs
+index c2058f71..443f8931 100644
+--- a/crates/engine/genie-import/src/tables.rs
++++ b/crates/engine/genie-import/src/tables.rs
+@@ -200,6 +200,7 @@ pub fn drop_sites(json: &str) -> Result<Vec<DropSite>, DropSitesError> {
+                         class: class(i, "object_group", field("object_group"))?,
+                         workers: WorkerCount::of_data(field("worker_num") as i32),
+                         state: object_state(i, field("object_state"))?,
++                        return_state: object_state(i, field("object_state_forced_return_state"))?,
+                         attribute: AttributeId::of_field(field("attribute_type") as i16)
+                             .map_err(|_| DropSitesError::Attribute(i, "attribute_type"))?,
+                     })
 diff --git a/crates/engine/genie-model/src/layer/generated.rs b/crates/engine/genie-model/src/layer/generated.rs
 index e28b10a7..e4ecfe66 100644
 --- a/crates/engine/genie-model/src/layer/generated.rs
@@ -11844,6 +12026,59 @@ index a34c2460..6fde0173 100644
 +        }).transpose()
 +    }
 +}
+diff --git a/crates/engine/genie-model/src/unit_ai/task_finder/drop_site.rs b/crates/engine/genie-model/src/unit_ai/task_finder/drop_site.rs
+index b3f632cb..3623fb60 100644
+--- a/crates/engine/genie-model/src/unit_ai/task_finder/drop_site.rs
++++ b/crates/engine/genie-model/src/unit_ai/task_finder/drop_site.rs
+@@ -46,25 +46,44 @@ pub struct DropTarget {
+     pub workers: WorkerCount,
+     /// `object_state`: the state such an object must be in (none for −1, any).
+     pub state: Option<ObjectState>,
++    /// `object_state_forced_return_state` (`+0xc`, none for −1): the state a hunted animal (class
++    /// 9 with a leash) must be in instead ([`DropSite::resource_of`]).
++    #[serde(default)]
++    pub return_state: Option<ObjectState>,
+     /// `attribute_type`: the resource it gives, none for −1.
+     pub attribute: Option<AttributeId>,
+ }
+ 
+ impl DropSite {
+-    /// `FUN_140fdd7b0`: the resource the drop site takes from an object of class `class` in
+-    /// state `state` with `workers` workers: its first target of that class decides, unless it
+-    /// caps the workers below the object's or wants another state (None).
++    /// `FUN_140fdd7b0` (188329 0x10ba840): the resource the drop site takes from an object of
++    /// class `class` in state `state` with `workers` workers and unit AI slot 0x198 `leash` (a
++    /// hunted animal's leash, else 0): its first target of that class decides, unless it caps
++    /// the workers below the object's or wants another state (None). A target with a state wants,
++    /// of a class 9 object with a leash above 0, its `return_state` instead (findings 133: the
++    /// live deer, not the carcass).
+     #[must_use]
+     pub fn resource_of(
+         &self,
+         class: ClassId,
+         state: ObjectState,
+         workers: WorkerCount,
++        leash: f32,
+     ) -> Option<AttributeId> {
+         let t = self.targets.iter().find(|t| t.class == class)?;
+-        if t.workers.caps(workers) || t.state.is_some_and(|wanted| wanted != state) {
++        if t.workers.caps(workers) {
+             return None;
+         }
++        if t.state.is_some() {
++            // 0x10ba8ad..0x10ba8f4: class 9 (0x17c9 ^ 0x17c0) and slot 0x198 > 0 read +0xc
++            let wanted = if class != ClassId::named(9) || leash <= 0.0 {
++                t.state
++            } else {
++                t.return_state
++            };
++            if wanted != Some(state) {
++                return None;
++            }
++        }
+         t.attribute
+     }
+ }
 diff --git a/crates/formats/genie-cpx/Cargo.toml b/crates/formats/genie-cpx/Cargo.toml
 index af397724..f9e25c3d 100644
 --- a/crates/formats/genie-cpx/Cargo.toml
