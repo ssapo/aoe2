@@ -3765,7 +3765,7 @@ index 0f5086e6..76de0a57 100644
          )?;
          let g = self.groups.held_mut(group)?;
 diff --git a/crates/engine/genie-core/src/groups/command.rs b/crates/engine/genie-core/src/groups/command.rs
-index cc0b4325..2e5e5b2f 100644
+index cc0b4325..b9bfe13d 100644
 --- a/crates/engine/genie-core/src/groups/command.rs
 +++ b/crates/engine/genie-core/src/groups/command.rs
 @@ -22,6 +22,7 @@ use crate::map::WholeDistance;
@@ -3813,21 +3813,42 @@ index cc0b4325..2e5e5b2f 100644
              return Err(GenieError::unsupported(
                  "a horde's move (commandHorde, FUN_141010180)",
              ));
-@@ -316,6 +333,13 @@ impl World {
+@@ -311,11 +328,33 @@ impl World {
+             .iter()
+             .map(|m| m.id)
+             .collect();
+-        for id in ids {
++        for (k, id) in ids.into_iter().enumerate() {
+             // FUN_1415417a0 finds a sleeping member too
              if let Some(ai) = self.parts.unit_ai.get_mut(id) {
                  ai.clear_notifies(world_time.since_start())?;
              }
-+            // 188329 0x10d9377: every member's slot 0x5a8 (0x1224d00) clears its path data
++            // 188329 0x10d9377: every member's slot 0x5a8 (0x1224d00): first its slot 0x618
++            // (0x1224d50, the unit's stop: speed, acceleration, waiting to move, its ignore list
++            // and its animation speed go, findings 163), then it clears its path data
 +            // (0x1072bb0), the kept pause too (findings 89)
++            if self.object(id).is_some()
++                && let Some(m) = self.parts.mover_mut(id)
++            {
++                m.stop()?;
++            }
 +            if crate::movement::pauseall_188329()
 +                && let Some(m) = self.parts.mover_mut(id)
 +            {
 +                m.rest_pause = Seconds::ZERO;
 +            }
++            // 188329 0x10d9397..0x10d93c7: then every member's own move record (`+0xf8`, 0x30
++            // bytes) clears, whatever the member holds (findings 163): active 0, path and reason
++            // -1, the rest 0
++            self.groups.held_mut(group)?.members.checked_mut(k)?.specific_move = SpecificMove {
++                path_id: MovePath::NONE,
++                reason: MoveReason::None,
++                ..SpecificMove::default()
++            };
          }
          let owner = self.groups.held(group)?.owner_player()?;
          let min_column = self
-@@ -499,7 +523,7 @@ impl World {
+@@ -499,7 +538,7 @@ impl World {
                  last.point.ground(),
                  MoveTo {
                      range: last.range,
@@ -3836,7 +3857,7 @@ index cc0b4325..2e5e5b2f 100644
                  },
              )?;
          }
-@@ -560,6 +584,72 @@ impl World {
+@@ -560,6 +599,72 @@ impl World {
          }
      }
  
