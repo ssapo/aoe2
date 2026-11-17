@@ -6167,10 +6167,38 @@ index fbef4ed9..2335262d 100644
                  sprites: TaskSprites::of_data([-1, -1, -1, 5]),
                  ..unsprited
 diff --git a/crates/engine/genie-core/src/movement/long_walk.rs b/crates/engine/genie-core/src/movement/long_walk.rs
-index f6314358..9d7b8d8a 100644
+index f6314358..a82d0a1f 100644
 --- a/crates/engine/genie-core/src/movement/long_walk.rs
 +++ b/crates/engine/genie-core/src/movement/long_walk.rs
-@@ -425,6 +425,7 @@ pub(crate) fn short_path_including(
+@@ -303,10 +303,14 @@ pub(crate) struct Walker {
+ /// shape of its own, gets a temporary one there (`FUN_141054fe0` with 1, not the object's: its
+ /// `+0x64c` stays -1), which the step's every exit removes; one past the list's end gets
+ /// neither. The new pather's test before the shape (`FUN_14152b6e0`) always holds
+-/// ([`old_pather_for`]).
++/// ([`old_pather_for`]). 188329 `0x120ca10` (findings 157): the temporary shape (object `+0x194`
++/// -1) is made only for a hit whose master's class (`0x1245ed0`) is not one of `0x10bb080`'s
++/// (3, 27, 39, 49, 52, 60, 67: [`ClassRoles::PRIORITY_3_TARGET`] and 67) - so a gate its owner's
++/// update opened (record and shape dropped) gets none and the re-plan goes through it.
+ pub(super) fn include_kept(
+     world: &Spatial,
+     pathing: Option<&mut Pathing>,
++    roles: &crate::world::layer::Roles,
+     kept: &[ObjectId],
+     include: &mut Vec<ObjectId>,
+ ) -> Result<(), GenieError> {
+@@ -322,6 +326,11 @@ pub(super) fn include_kept(
+             let p = world
+                 .get_known(id)?
+                 .ok_or(GenieError::unsupported("a kept hit without a place"))?;
++            if roles.of_class(p.class).contains(ClassRoles::PRIORITY_3_TARGET)
++                || p.class.get() == 67
++            {
++                continue;
++            }
+             if p.obstruction_kind == ObstructionKind::KIND_11 {
+                 return Err(GenieError::unsupported(
+                     "a kept hit of obstruction type 11 (its outline)",
+@@ -425,6 +434,7 @@ pub(crate) fn short_path_including(
              shape: plan.pathing.shape(id),
          })
          .collect();
@@ -6178,7 +6206,7 @@ index f6314358..9d7b8d8a 100644
      let call = Call {
          from: Point::new(x, y),
          to: to.ground(),
-@@ -474,6 +475,19 @@ pub(crate) fn short_path_including(
+@@ -474,6 +484,32 @@ pub(crate) fn short_path_including(
              "a short path without the game's mesh",
          ))?;
      let found = pather.search(mesh, &words, &query, &shapes)?;
@@ -6194,6 +6222,19 @@ index f6314358..9d7b8d8a 100644
 +            found.result,
 +            to_path(&found.points).points
 +        );
++        if std::env::var_os("GENIE_TRACE_SHAPES").is_some() {
++            let b = [
++                x.min(to.x()) - 2.0,
++                y.min(to.y()) - 2.0,
++                x.max(to.x()) + 2.0,
++                y.max(to.y()) + 2.0,
++            ];
++            eprintln!(
++                "SHAPES walker={:?} near={:?}",
++                walker.id,
++                plan.pathing.shapes_near(b)
++            );
++        }
 +    }
      for p in to_path(&found.points).points {
          let _ = out.push(p);
@@ -6879,7 +6920,7 @@ index 8c1a150a..77fd054c 100644
          let blocked = r.fails()
              || length <= EPSILON
 diff --git a/crates/engine/genie-core/src/movement/step.rs b/crates/engine/genie-core/src/movement/step.rs
-index 75476db0..23587342 100644
+index 75476db0..6f8a1d9e 100644
 --- a/crates/engine/genie-core/src/movement/step.rs
 +++ b/crates/engine/genie-core/src/movement/step.rs
 @@ -107,6 +107,12 @@ impl Mover {
@@ -6928,8 +6969,17 @@ index 75476db0..23587342 100644
          if ground(position, waypoint).get() < EPSILON {
              self.paths.walked_mut()?.flags |= LevelFlags::REACHED | LevelFlags::AT_WAYPOINT;
              return Ok(Next::Again);
+@@ -615,7 +633,7 @@ impl Mover {
+                     (now, player_kind),
+                 )?;
+                 if !avoided.kept.is_empty() {
+-                    include_kept(world, pathing, &avoided.kept, include)?;
++                    include_kept(world, pathing, by_id.roles(), &avoided.kept, include)?;
+                 }
+                 if avoided.at_target {
+                     // FUN_140f9b4d0 three times: bit 0 on and bit 1 off on the walked level, bit 2
 diff --git a/crates/engine/genie-core/src/movement/tests.rs b/crates/engine/genie-core/src/movement/tests.rs
-index eb4f2f5f..e68091b5 100644
+index eb4f2f5f..c9e4cc82 100644
 --- a/crates/engine/genie-core/src/movement/tests.rs
 +++ b/crates/engine/genie-core/src/movement/tests.rs
 @@ -221,8 +221,11 @@ pub(crate) fn builder_9177() -> Mover {
@@ -6944,7 +6994,24 @@ index eb4f2f5f..e68091b5 100644
      }
  }
  
-@@ -3574,6 +3577,15 @@ fn request_spends_try_and_gives_up_or_goes_on_without_more() {
+@@ -885,6 +888,7 @@ fn kept_hits_join_the_include_list_up_to_its_room() {
+         include_kept(
+             &w,
+             Some(&mut pathing),
++            &crate::world::layer::Roles::default(),
+             &[object_id(9175), object_id(9177)],
+             &mut include
+         ),
+@@ -900,7 +904,7 @@ fn kept_hits_join_the_include_list_up_to_its_room() {
+     let mut include = Vec::new();
+     let before = shapes(&pathing);
+     assert_eq!(
+-        include_kept(&w, Some(&mut pathing), &[object_id(9177)], &mut include),
++        include_kept(&w, Some(&mut pathing), &crate::world::layer::Roles::default(), &[object_id(9177)], &mut include),
+         Ok(())
+     );
+     assert_eq!((include, shapes(&pathing)), (vec![object_id(9177)], before));
+@@ -3574,6 +3578,15 @@ fn request_spends_try_and_gives_up_or_goes_on_without_more() {
          (m.paths[0].flags, m.paths[0].continue_counter),
          (LevelFlags::REACHED, PlanTries::FULL)
      );
@@ -8537,6 +8604,40 @@ index 65cff0cf..ad2f674d 100644
      })
  }
  
+diff --git a/crates/engine/genie-core/src/pathing/mod.rs b/crates/engine/genie-core/src/pathing/mod.rs
+index 4f3846ef..5244899c 100644
+--- a/crates/engine/genie-core/src/pathing/mod.rs
++++ b/crates/engine/genie-core/src/pathing/mod.rs
+@@ -250,6 +250,29 @@ impl Pathing {
+         Some((self.mesh.as_mut()?, &mut self.pather))
+     }
+ 
++    /// DIAGNOSTIC (R40): the mesh's live shapes overlapping `[x0, y0, x1, y1]` (tiles), each with
++    /// the object that owns it (none for a temporary one) and its box in tiles.
++    #[must_use]
++    pub fn shapes_near(&self, b: [f32; 4]) -> Vec<(Option<ObjectId>, u32, [f32; 4])> {
++        let Some(mesh) = self.mesh.as_ref() else {
++            return Vec::new();
++        };
++        let owner = |s: ShapeId| self.shapes.iter().find(|(_, v)| **v == s).map(|(o, _)| o);
++        let mut out = Vec::new();
++        for (i, r) in mesh.shapes.iter().enumerate() {
++            let s = ShapeId::new(i as u32);
++            if !mesh.is_shape(s) {
++                continue;
++            }
++            let f = r.get().map(|v| v as f32 / ONE as f32);
++            if f[2] < b[0] || b[2] < f[0] || f[3] < b[1] || b[3] < f[1] {
++                continue;
++            }
++            out.push((owner(s), i as u32, f));
++        }
++        out
++    }
++
+     /// An object's shape in the mesh.
+     #[must_use]
+     pub fn shape(&self, id: ObjectId) -> Option<ShapeId> {
 diff --git a/crates/engine/genie-core/src/pathing/short_path/geometry.rs b/crates/engine/genie-core/src/pathing/short_path/geometry.rs
 index cdaefff8..70eff0eb 100644
 --- a/crates/engine/genie-core/src/pathing/short_path/geometry.rs
