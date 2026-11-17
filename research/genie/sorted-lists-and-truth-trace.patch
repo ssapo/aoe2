@@ -1448,7 +1448,7 @@ index 68b77959..e05968e0 100644
              // the game mode is not the editor's (4) in a game
              part.pasture = roles
 diff --git a/crates/engine/genie-core/src/construction/build/more_work.rs b/crates/engine/genie-core/src/construction/build/more_work.rs
-index c7a0cf8b..0b5106d5 100644
+index c7a0cf8b..e36379ba 100644
 --- a/crates/engine/genie-core/src/construction/build/more_work.rs
 +++ b/crates/engine/genie-core/src/construction/build/more_work.rs
 @@ -96,8 +96,15 @@ impl Unit {
@@ -1501,6 +1501,37 @@ index c7a0cf8b..0b5106d5 100644
          };
          let found = {
              let planner = c.w.pathing.planner(restriction, spatial.tiles()).ok_or(
+@@ -153,17 +171,20 @@ impl Unit {
+         let Some(found) = found else {
+             return Ok(None);
+         };
+-        if roles.of_class(found.class).contains(ClassRoles::FARM) {
+-            return Err(GenieError::unsupported(
+-                "a builder's search for more work finding a farm",
+-            ));
+-        }
+-        let (kind, cap) = gather_group(found.attribute, roles);
+-        let target = self.resource_search(actions, c, kind, cap)?;
++        // 188329 0xba1b10 case 0xdf (findings 153, `re-kit/re/out_r31/r31b_a.c` 455~): a found
++        // object of class 0x31 (a farm) skips the unit AI's ClosestResourceObject (slot 0x80): the
++        // builder works the farm itself at its place (slot 0x8a8)
++        let target = if roles.of_class(found.class).contains(ClassRoles::FARM) {
++            found.id
++        } else {
++            let (kind, cap) = gather_group(found.attribute, roles);
++            let target = self.resource_search(actions, c, kind, cap)?;
++            let spatial: &Spatial = &c.w.spatial;
++            target
++                .filter(|&t| spatial.get(t).is_some())
++                .unwrap_or(found.id)
++        };
+         let spatial: &Spatial = &c.w.spatial;
+-        let target = target
+-            .filter(|&t| spatial.get(t).is_some())
+-            .unwrap_or(found.id);
+         let point = spatial
+             .get(target)
+             .ok_or(GenieError::unsupported(
 diff --git a/crates/engine/genie-core/src/construction/build/placing.rs b/crates/engine/genie-core/src/construction/build/placing.rs
 index 89344b09..a4628c11 100644
 --- a/crates/engine/genie-core/src/construction/build/placing.rs
