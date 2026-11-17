@@ -3094,10 +3094,41 @@ index 2df7dd4b..b5cbd7cf 100644
          if roles
              .of_class(victim.class)
 diff --git a/crates/engine/genie-core/src/gathering/hunt/hunter.rs b/crates/engine/genie-core/src/gathering/hunt/hunter.rs
-index 3e35c7a5..c72b54d0 100644
+index 3e35c7a5..6963f159 100644
 --- a/crates/engine/genie-core/src/gathering/hunt/hunter.rs
 +++ b/crates/engine/genie-core/src/gathering/hunt/hunter.rs
-@@ -140,6 +140,20 @@ impl Unit {
+@@ -98,15 +98,27 @@ impl Unit {
+     /// finds the target it holds past state 6, code 5), or whose `MoveTo` failed (code 3), and
+     /// whose class is a tree's: it searches for the next tree (`FUN_140ac4670` with 8 and -1
+     /// both times).
++    ///
++    /// 188329 (findings 149, `GENIE_EXPERIMENT_HUNT_188329`; the hunt update 0xbb6230, state 4 at
++    /// 0xbb66f9..0xbb672b): the walk's `MoveTo` codes 4 and 5 (the target went) first ask the
++    /// unit AI's queue (0xd31a10, `[ai+0x18]`): with orders queued the hunt ends (case P18 in
++    /// `HuntAction::update_walk`) and the search (0xbb2c90) does not run; only code 3 (failed)
++    /// searches whatever the queue holds. 158041's update searched first.
+     pub(crate) fn tree_lost(&self, actions: &Action, c: &Step<'_>, roles: &Roles) -> bool {
++        let queued = std::env::var_os("GENIE_EXPERIMENT_HUNT_188329").is_some()
++            && c.w.parts
++                .unit_ai
++                .get(self.id)
++                .is_some_and(|ai| !ai.orders.is_empty());
+         actions.list.hunt().is_some_and(|h| {
+             matches!(h.state, HuntState::Walk { .. })
+                 && Seconds::ZERO <= h.timer
+                 && h.state.move_to().is_some_and(|m| {
+                     m.state == MoveTo::Failed
+-                        || m.target.is_some_and(|t| {
+-                            c.w.object_state(t).is_some_and(|s| ObjectState::Undead < s)
+-                        })
++                        || (!queued
++                            && m.target.is_some_and(|t| {
++                                c.w.object_state(t).is_some_and(|s| ObjectState::Undead < s)
++                            }))
+                 })
+         }) && c.w.parts.unit_ai.get(self.id).is_some_and(|ai| {
+             let class = ai
+@@ -140,6 +152,20 @@ impl Unit {
                  (Some(h.state), h.timer, h.target)
              });
          match state {
@@ -3118,7 +3149,7 @@ index 3e35c7a5..c72b54d0 100644
              Some(HuntState::Drop { .. }) if timer < Seconds::ZERO => {
                  self.hunt_drop_wait(actions, c, roles)?;
              }
-@@ -199,8 +213,8 @@ impl Unit {
+@@ -199,8 +225,8 @@ impl Unit {
      /// State 8, which has no target: its drop site (the second target) is what it walks to
      /// ([`crate::gathering::hunt::HuntAction::update_drop`]); a load dropped goes to the player
      /// at once ([`Step::give_load`]) and the hunt walks back ([`Unit::hunt_after_drop`]); a
@@ -3129,7 +3160,7 @@ index 3e35c7a5..c72b54d0 100644
      pub(crate) fn hunt_drop_walk(
          &mut self,
          actions: &mut Action,
-@@ -271,6 +285,15 @@ impl Unit {
+@@ -271,6 +297,15 @@ impl Unit {
                  // the local player's tracker (FUN_14097daf0) are not held; a sharing player's
                  // allies' share (+0x1426) is not modelled
                  c.give_load(kind, amount)?;
@@ -3145,7 +3176,7 @@ index 3e35c7a5..c72b54d0 100644
                  return self.hunt_after_drop(actions, c, roles);
              }
              Dropped::Again => {
-@@ -281,9 +304,13 @@ impl Unit {
+@@ -281,9 +316,13 @@ impl Unit {
                  self.hunt_drop_off(actions, c, roles)?;
              }
              Dropped::Idle => {
