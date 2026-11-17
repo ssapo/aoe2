@@ -9132,10 +9132,22 @@ index e920970d..e2a0a10a 100644
      /// (food, wood, stone, gold: 0 to 3) of player `p`, with `stat` (its fourth argument) and
      /// `share` (its fifth, [`ResourceShare`]): with `stat` 1 the gathered total grows first (166 to
 diff --git a/crates/engine/genie-core/src/production/spawn/new_unit.rs b/crates/engine/genie-core/src/production/spawn/new_unit.rs
-index 21b51dda..d941c894 100644
+index 21b51dda..5920f80c 100644
 --- a/crates/engine/genie-core/src/production/spawn/new_unit.rs
 +++ b/crates/engine/genie-core/src/production/spawn/new_unit.rs
-@@ -116,7 +116,10 @@ impl World {
+@@ -37,6 +37,11 @@ use crate::vision::SightShape;
+ use crate::world::parts::{Object, ObjectParts};
+ use crate::world::slots::PlayerSlots;
+ 
++/// The faith a new priest starts with (`0x12d424c`: 100.0) and its attribute (`0x12d4256`: 0x22).
++const FULL_FAITH: Amount = Amount::new(100.0);
++const FAITH: crate::players::attribute::AttributeId =
++    crate::players::attribute::AttributeId::named(0x22);
++
+ use crate::combat::missile::grounded;
+ use crate::objects::facing::{SpriteFacets, drawn_angle, draws_angle};
+ use crate::objects::layers::{Action, Combat, DefaultTask, Motion, Static};
+@@ -116,7 +121,10 @@ impl World {
                  "a new unit of a master that does not move",
              ));
          }
@@ -9147,7 +9159,36 @@ index 21b51dda..d941c894 100644
          let new = self.combat_object(p, master, &made, point.with_height(position.z()))?;
          let class = self.tracker_key(p, master).class;
          let owner = self.players.player_mut(p)?;
-@@ -529,3 +532,48 @@ impl World {
+@@ -437,6 +445,17 @@ impl World {
+                 owner.add_attribute(kind, amount)?;
+             }
+         }
++        // 188329 0x12d417b..0x12d4256 (in the unit setup 0x12d29c0, findings 151): a master of
++        // class 0x12 or 0x35, or one with a task of action type 0x68 (0x168f5c0), starts with
++        // full faith: `+0x168` = 100.0 of attribute 0x22 (truth23 520848973 P2 monk 10453 at
++        // 1312.285 s holds 100 from its first tick)
++        let faith = made.class.get() == 0x12
++            || made.class.get() == 0x35
++            || made
++                .action_part()
++                .tasks
++                .iter()
++                .any(|t| t.action_kind == ActionKind::named(0x68));
+         let cost: i32 = made
+             .creatable_part()
+             .cost
+@@ -478,8 +497,8 @@ impl World {
+                 class: Class::Animated,
+                 state: ObjectState::Alive,
+                 hp: HitPoints::of_master(made.hit_points),
+-                attribute_kind: None,
+-                amount: Amount::ZERO,
++                attribute_kind: faith.then_some(FAITH),
++                amount: if faith { FULL_FAITH } else { Amount::ZERO },
+                 dying_sprite: made.death_sprite,
+                 death_spawn: made.death_spawns[0].is_some(),
+                 death_facets: None,
+@@ -529,3 +548,48 @@ impl World {
          Ok(idx)
      }
  }
