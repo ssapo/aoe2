@@ -530,6 +530,9 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 13.4 지금 하던 일 (멈출 때마다 이 절을 덮어쓴다)
 
+**2026-11-17 저녁, Claude (ENG-31 + 520848973 100% 목표; 사용자 지시 "한 경기를 원본과 100% 일치").** 엔진 = 패치 `runs\R34g.patch`(연구 `3341188`, findings 132~149), exe `runs\census_R34g.exe` = `genie\` 소스. 원본 기록(PC `truth\`): truth17(521084500 0~410초 매 틱), truth19/19b(521467291), truth20/20b(519009176), truth21(521511686), truth22(519686090), **truth23(520848973 Arena 41:51, 매 틱 0~2068.5초, 그 뒤 띄엄띄엄, 27.6GB)**. 도구: `runs\R36_idx.py`(큰 기록 색인), `R36_*`/`R34_cmp23.py`/`R34_get23.py`(IDX=), `runs\R37_t1\`(1초 표본 전 개체 비교), `runs\R36_ops.py <리플> <ms0> <ms1> [선수]`(리플 명령 — **어긋남마다 먼저 볼 것**: 1158.7초는 Shift 예약 명령이었다). 
+지금 첫 어긋남: 520848973 P1 1159.964초 농부 10128(농장 10262; 원본은 든 양이 멈추고 Gather 7 → 4, 농장 음식이 +0.0052/틱 늘어남, P1 명령 없음) → P2 농부 10172 1160.965초 같은 꼴 → 10311 1161.238초 다시 길찾기; 엔진 멈춤 P2 u103046 유물 넣기 0x88(128번). 521084500 422.890초(3유닛 Move 뒤 그룹 자리 약 0.1 뒤), 521467291 363.116초(Ctrl 셋이 한 그룹 7로 — 합치는 곳 미발견). genie-core lib 검사는 검사 초기값의 빠진 칸(near_master·spacing_half·queued) 때문에 컴파일 안 됨 — 고칠 것.
+
 **2026-11-17 오후, Claude (원본 기록 ⑪~⑯을 사용자 없이 게임을 직접 돌려 뜸 — main ONBOARDING 「게임 켤 때」 끝 메모).** 엔진 = 패치 `runs\R03a.patch`(findings 132, ENG-03: 내려놓을 곳 짧은 길 거리 = 188329 slot 0x420), exe `runs\census_R03a.exe` = `genie\` 소스, 전체 실행 `R03a*`가 지금 숫자(519686090 사이트 9:40.9, 520848973 끝까지 맞음). 다음: findings 133(521084500 건축가 다음 일 — class 9 forced_return_state)·134(그룹 길 가까운 둘째 점 건너뛰기, 0x1114a30)를 엔진에 넣고 전체 실행. ⑬⑭⑮(`truth19b`·`truth20b`·`truth21`)는 분석 중.
 
 **모든 AI 작업자 공통(2026-11-17 사용자 요구)**: Claude·ChatGPT Codex 등 어떤 도구든 같은 규칙으로 일한다. 규칙은 main `AGENTS.md` 하나뿐이고 도구별 시작 파일(`CLAUDE.md` 등)은 두지 않는다(main 검사 `tests/test_agent_docs.py`가 지킨다). 세션을 시작하면 `AGENTS.md`부터 읽는다. 이 문서에 도구별 규칙을 따로 쓰지 않는다.
