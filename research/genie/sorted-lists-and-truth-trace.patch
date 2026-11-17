@@ -4251,7 +4251,7 @@ index 8b0a27f0..86ea74ea 100644
  
  impl UnitGroups {
 diff --git a/crates/engine/genie-core/src/groups/mod.rs b/crates/engine/genie-core/src/groups/mod.rs
-index 7787900f..ab88d077 100644
+index 7787900f..046d228d 100644
 --- a/crates/engine/genie-core/src/groups/mod.rs
 +++ b/crates/engine/genie-core/src/groups/mod.rs
 @@ -50,7 +50,7 @@ pub use self::formation_category::FormationCategory;
@@ -4271,7 +4271,15 @@ index 7787900f..ab88d077 100644
  pub use self::create::LeavingWalk;
  
  use crate::math::fmath::sqrt;
-@@ -204,6 +205,8 @@ pub struct FormationLine {
+@@ -79,6 +80,7 @@ pub use order::CommandArgs;
+ pub mod formation;
+ mod layout;
+ mod lock;
++mod merge;
+ mod motion;
+ pub use self::motion::PathBudget;
+ mod order;
+@@ -204,6 +206,8 @@ pub struct FormationLine {
      pub attack_range: Distance,
      /// `mDistanceBack`.
      pub distance_back: Distance,
@@ -4280,7 +4288,7 @@ index 7787900f..ab88d077 100644
  }
  
  /// A formation (`BFormation`, read by `FUN_1410180b0`).
-@@ -469,6 +472,84 @@ pub struct UnitGroup {
+@@ -469,6 +473,84 @@ pub struct UnitGroup {
      /// (`BUnitGroup::command` sets it), so its next move empties the command queue first;
      /// `checkQueuedOrders` (`FUN_14100d460`) clears it.
      pub replaces_queue: u8,
@@ -4365,7 +4373,7 @@ index 7787900f..ab88d077 100644
  }
  
  impl Motion {
-@@ -536,6 +617,7 @@ impl UnitGroup {
+@@ -536,6 +618,7 @@ impl UnitGroup {
              current_target: TargetData::default(),
              differentiator_id: Differentiator::NONE,
              replaces_queue: 1,
@@ -13072,6 +13080,78 @@ index be560628..1917696a 100644
  }
  
  /// The objects of recyclable masters (`+0x680`, the `.dat`'s `recyclable`): a new one takes the
+diff --git a/crates/engine/genie-core/src/world/schedule.rs b/crates/engine/genie-core/src/world/schedule.rs
+index 187c02c8..73f3fd95 100644
+--- a/crates/engine/genie-core/src/world/schedule.rs
++++ b/crates/engine/genie-core/src/world/schedule.rs
+@@ -20,6 +20,9 @@ pub enum WorldStep {
+     /// frame seed and the players' commands run (`BaseWorld::update` up to
+     /// `RGE_Command__do_commands`, before `FUN_141552990`).
+     Commands,
++    /// One tick after an order split its units into groups, the groups that stand together and
++    /// do the same merge (188329 `0x162a8f0`, right after `do_commands`; findings 164).
++    MergeGroups,
+     /// The world stream draws the seed that `Reseed` gives the streams (`rand15` at
+     /// `0x141551aca`); before it the frozen objects' unknown places grow by the update (genie's
+     /// own, for the forced replay).
+@@ -77,7 +80,7 @@ pub enum PlayerStep {
+ }
+ 
+ /// The steps before the players' (`BaseWorld::update` up to its player loop).
+-pub const BEFORE_PLAYERS: [WorldStep; 1] = [WorldStep::Commands];
++pub const BEFORE_PLAYERS: [WorldStep; 2] = [WorldStep::Commands, WorldStep::MergeGroups];
+ 
+ /// Each player's steps, in the player loop of `BaseWorld::update`.
+ pub const EACH_PLAYER: [PlayerStep; 10] = [
+@@ -112,6 +115,7 @@ impl WorldStep {
+     pub const fn name(self) -> &'static str {
+         match self {
+             Self::Commands => "Commands",
++            Self::MergeGroups => "MergeGroups",
+             Self::Draw => "Draw",
+             Self::Ghosts => "Ghosts",
+             Self::Watched => "Watched",
+@@ -291,6 +295,7 @@ impl World {
+                 self.command_phase(run.dt, run.commands);
+                 run.start_work = take(&mut self.start_work_due);
+             }
++            WorldStep::MergeGroups => self.merge_groups()?,
+             WorldStep::Draw => {
+                 self.grow_unknown(run.dt.seconds());
+                 run.seed = self.streams.get(Stream::World).rand15();
+@@ -409,21 +414,22 @@ mod tests {
+     }
+ 
+     /// The number of world steps: [`world_place`]'s arms.
+-    const WORLD_STEPS: usize = 10;
++    const WORLD_STEPS: usize = 11;
+ 
+     /// Each world step's place in the update; the match fails to compile for a new step.
+     const fn world_place(step: WorldStep) -> usize {
+         match step {
+             WorldStep::Commands => 0,
+-            WorldStep::Draw => 1,
+-            WorldStep::Ghosts => 2,
+-            WorldStep::Watched => 3,
+-            WorldStep::Reseed => 4,
+-            WorldStep::Turn => 5,
+-            WorldStep::Victory => 6,
+-            WorldStep::FrameSeed => 7,
+-            WorldStep::LastRandoms => 8,
+-            WorldStep::Vision => 9,
++            WorldStep::MergeGroups => 1,
++            WorldStep::Draw => 2,
++            WorldStep::Ghosts => 3,
++            WorldStep::Watched => 4,
++            WorldStep::Reseed => 5,
++            WorldStep::Turn => 6,
++            WorldStep::Victory => 7,
++            WorldStep::FrameSeed => 8,
++            WorldStep::LastRandoms => 9,
++            WorldStep::Vision => 10,
+         }
+     }
+ 
 diff --git a/crates/engine/genie-core/src/world/setup.rs b/crates/engine/genie-core/src/world/setup.rs
 index 9912d9e7..a645c607 100644
 --- a/crates/engine/genie-core/src/world/setup.rs
@@ -19092,6 +19172,145 @@ index 00000000..f10e049d
 +        g.flags |= GroupFlags::NO_PATH_UNIT;
 +        Ok(GroupMove::Begun)
 +    }
++}
+diff --git a/crates/engine/genie-core/src/groups/merge.rs b/crates/engine/genie-core/src/groups/merge.rs
+new file mode 100644
+index 00000000..e8b44cf1
+--- /dev/null
++++ b/crates/engine/genie-core/src/groups/merge.rs
+@@ -0,0 +1,133 @@
++//! The world's merge of a command's groups (188329 `0x162a8f0`): one tick after an order split
++//! its units into several groups, the groups that stand together and do the same take each
++//! other in.
++
++use crate::GenieError;
++use crate::groups::GroupCommandKind;
++use crate::groups::GroupId;
++use crate::groups::UnitGroup;
++use crate::objects::ObjectId;
++use crate::objects::masters::ActionKind;
++use crate::world::World;
++use crate::world::slots::PlayerSlots;
++
++/// A group on this command (a garrison, `0x2713`) takes no other in.
++const GARRISON: GroupCommandKind = GroupCommandKind::named(0x2713);
++/// Two groups merge only nearer than this on the ground, squared (`DAT_14369ff64`, 1.0).
++const MERGE_REACH_SQUARED: f32 = 1.0;
++/// Where the owner breaks formations by speed, two groups whose top speeds differ by more than
++/// this stay apart (`DAT_14408ea98`, 0.2).
++const MERGE_SPEED_GAP: f32 = 0.2;
++/// A group takes another in only while both have at most this many members together (`0x3c`).
++const MERGE_MOST: usize = 60;
++/// The action types (`0x7c`, `0x7d`) a member's top action keeps its group from merging
++/// (`0x10d28f0`).
++const UNMERGED_ACTIONS: [ActionKind; 2] = [ActionKind::named(0x7c), ActionKind::named(0x7d)];
++
++impl World {
++    /// 188329 `0x162a8f0`, which the world update runs right after the commands (`0x1628552`,
++    /// after `do_commands` `0xf52d70`) and before any group updates (findings 164). Each group of
++    /// the world's list, in order, with members and not on a garrison command (`+0x3b0` not
++    /// `0x2713`), goes through its differentiator groups (`+0x108`, count `+0x110`) in order; one
++    /// that is not itself and that the world holds (an id the world does not hold the game sets
++    /// to −1, `0x10f6460`, which no reader tells from a gone id: ids are never given twice) is
++    /// taken in when:
++    /// - the owner breaks formations by speed (player `+0x5f8` 1) only: the groups' top speeds
++    ///   (`+0xbc`) differ by at most [`MERGE_SPEED_GAP`] (`COMISS`, `JA`: a NaN gap merges);
++    /// - their places (`+8`) are nearer than 1 on the ground (`(dx² + 0) + dy²` below 1.0;
++    ///   `COMISS`, `JBE`: a NaN does not merge);
++    /// - they do the same ([`same_commands`], `0x10d2820`);
++    /// - no member of either is on a top action of type `0x7c` or `0x7d` (`0x10d28f0`);
++    /// - neither hibernates (`+0x13c`);
++    /// - their members are at most 60 together (else the game only logs).
++    ///
++    /// Then each member of the other, its first in turn, joins the group (`AddUnit` `0x10d3c50`
++    /// with −1 and 0, [`World::add_to_group`], which takes it out of the other); a first member
++    /// that stays first after a second join ends the loop (the game logs it). The group then
++    /// votes its formation type ([`World::calc_formation_kind`], `0x10d4ff0`). The emptied group
++    /// stays in the list; its own update deletes it.
++    ///
++    /// # Errors
++    ///
++    /// What the joins and the vote do not model.
++    pub(crate) fn merge_groups(&mut self) -> Result<(), GenieError> {
++        let order: Vec<GroupId> = self.groups.groups.iter().map(|g| g.id).collect();
++        for id in order {
++            let Some(group) = self.groups.get(id) else {
++                continue;
++            };
++            if group.members.is_empty() || group.current_command == GARRISON {
++                continue;
++            }
++            let others = group.differentiator_groups.clone();
++            for other in others {
++                if other == id || !self.merges(id, other)? {
++                    continue;
++                }
++                let mut last: Option<ObjectId> = None;
++                while let Some(first) = self.groups.held(other)?.members.first().map(|m| m.id) {
++                    let _ = self.add_to_group(id, first)?;
++                    if last == Some(first) {
++                        break;
++                    }
++                    last = Some(first);
++                }
++                self.calc_formation_kind(id)?;
++            }
++        }
++        Ok(())
++    }
++
++    /// Whether group `id` takes group `other` in ([`World::merge_groups`]'s tests): false for an
++    /// `other` the world does not hold, and for two groups past 60 members together.
++    fn merges(&self, id: GroupId, other: GroupId) -> Result<bool, GenieError> {
++        let group = self.groups.held(id)?;
++        let Some(that) = self.groups.get(other) else {
++            return Ok(false);
++        };
++        let formations = self.players.player(group.owner_player()?)?.formations;
++        let gap = (group.motion.maximum_velocity_forward.get()
++            - that.motion.maximum_velocity_forward.get())
++        .abs();
++        if formations.by_speed && MERGE_SPEED_GAP < gap {
++            return Ok(false);
++        }
++        let (a, b) = (group.motion.position[0], that.motion.position[0]);
++        let (dx, dy) = (a.x() - b.x(), a.y() - b.y());
++        let reach = dx * dx + 0.0 + dy * dy;
++        if !(reach < MERGE_REACH_SQUARED) {
++            return Ok(false);
++        }
++        Ok(same_commands(group, that)
++            && !self.on_unmerged_action(group)
++            && !self.on_unmerged_action(that)
++            && group.hibernating == 0
++            && that.hibernating == 0
++            && group.members.len() + that.members.len() <= MERGE_MOST)
++    }
++
++    /// `0x10d28f0`: some member of `group` the world holds as a unit is on a top action of type
++    /// `0x7c` or `0x7d`.
++    fn on_unmerged_action(&self, group: &UnitGroup) -> bool {
++        group.members.iter().any(|m| {
++            self.object(m.id).is_some()
++                && self
++                    .parts
++                    .actions_of(m.id)
++                    .top_action_kind()
++                    .is_some_and(|k| UNMERGED_ACTIONS.contains(&k))
++        })
++    }
++}
++
++/// `0x10d2820`: two groups do the same: the same current command (`+0x3b0`), the same number of
++/// queued commands (`+0x460`) and, in order, the same command and target in each (the queue at
++/// `+0x430`).
++fn same_commands(a: &UnitGroup, b: &UnitGroup) -> bool {
++    a.current_command == b.current_command
++        && a.command_queue.len() == b.command_queue.len()
++        && a.command_queue
++            .iter()
++            .zip(&b.command_queue)
++            .all(|(x, y)| x.command == y.command && x.target_id == y.target_id)
 +}
 diff --git a/crates/engine/genie-core/src/objects/convert.rs b/crates/engine/genie-core/src/objects/convert.rs
 new file mode 100644
