@@ -1,6 +1,6 @@
 # AGENTS.md — 이 저장소에서 일하는 AI 작업자(Claude Code, ChatGPT Codex 등) 공통 안내
 
-도구에 상관없이 같은 규칙을 따른다. Claude Code는 `CLAUDE.md`를 통해 이 파일을 읽는다.
+도구에 상관없이 같은 규칙을 따른다. **규칙은 이 파일 하나에만 쓴다.** 도구별 시작 파일(`CLAUDE.md` 등)은 이 파일을 가리키기만 하고 자기 규칙을 가질 수 없다 — `tests/test_agent_docs.py`가 매 수집 실행에서 검사한다. 다른 문서(ONBOARDING·DEVELOPMENT·연구 인계서)에도 특정 도구만 따르는 규칙을 쓰지 않는다.
 
 먼저 [ONBOARDING.md](ONBOARDING.md)를 끝까지 읽는다(공통 작업 상태·맡을 일·규칙의 기준). 맡은 일이 엔진이면 연구 브랜치 `research/genie-188329`의 `research/genie/CONTINUE.md`(13.4가 최신 인계, 2.1 현황, 12.5 남은 일)를 읽는다. 화면·수집기 일은 [DEVELOPMENT.md](DEVELOPMENT.md)의 해당 절.
 

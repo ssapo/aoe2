@@ -8,9 +8,9 @@
 
 ## 1. 공통 작업 상태
 
-### 지금 한눈에 (2026-11-17 갱신 — 다음 세션은 Claude Code)
+### 지금 한눈에 (2026-11-17 갱신)
 
-**다음 세션 시작 (Claude Code, 사용자 PC에서 직접)**: 저장소 루트의 [AGENTS.md](AGENTS.md)(도구 공통; Codex가 읽음, Claude Code는 `CLAUDE.md`를 거쳐 읽음)가 시작점이다 — 이 문서(ONBOARDING) → 맡을 일의 필수 문서 순서로 읽는다. Cowork 세션과 다른 점: 명령이 PC에서 바로 돈다(원격 다리·WMI 우회 필요 없음), 클라우드의 원본 디컴파일 환경(`/home/claude/re-env/re`)은 없다 — 원본 코드를 읽어야 하면 연구 인계서 7절대로 PC `genie-replays\re-kit`에서 다시 차린다.
+**다음 세션 시작 (어떤 AI 도구든 같다 — Claude Code·ChatGPT Codex 등, 사용자 PC에서 직접)**: 저장소 루트의 [AGENTS.md](AGENTS.md)(도구 공통; Codex가 읽음, Claude Code는 `CLAUDE.md`를 거쳐 읽음)가 시작점이다 — 이 문서(ONBOARDING) → 맡을 일의 필수 문서 순서로 읽는다. 원격(Cowork) 세션과 다른 점: 명령이 PC에서 바로 돈다(원격 다리·WMI 우회 필요 없음), 클라우드의 원본 디컴파일 환경(`/home/claude/re-env/re`)은 없다 — 원본 코드를 읽어야 하면 연구 인계서 7절대로 PC `genie-replays\re-kit`에서 다시 차린다.
 
 **11-16 ~ 11-17 사이트 작업 요약 (전부 main·배포됨)**: `APP-16` 위협·대응 카드를 시대별(봉건/성주/왕정)로 · `APP-17` 양쪽이 실제로 뽑은 병력·업그레이드 비교(생산 명령 기준, 주력끼리 1:1, 흐름 문장, 「전체」 탭) · 탭 누르면 창이 비던 문제(`874779a`) · `APP-18` 하위 탭 스크롤 튐 수정(+ 브라우저 클릭 검사 `tests/browser/tabs_scroll.mjs`), 직접 수집 경기가 사라지던 문제(경기 단위 합치기), DEC-01 서버 코드 · `APP-19` 결정 시대에 내 병력이 없으면 그것을 패인으로 맨 위에 · `APP-20` **모든 경기에서 같은 칸이 같은 순서로 항상 보임**(31곳, 데이터 없으면 이유 한 줄; 아래 규칙). 사용자가 직접 확인 중(11-17).
 
@@ -76,7 +76,7 @@
 
 **지금 규칙 요약** (자세한 것은 4절과 DEVELOPMENT 「커밋·검증 원칙」):
 
-- 커밋 작성자는 `Claude <noreply@anthropic.com>`. 사용자의 회사 메일을 쓰지 않는다.
+- 커밋 작성자는 작업한 AI 이름(Claude `noreply@anthropic.com`, Codex `noreply@openai.com` 등; 규칙 전문은 main `AGENTS.md`). 사용자의 회사 메일을 쓰지 않는다.
 - 화면: 모든 경기에서 같은 칸·탭을 같은 순서로(없으면 이유 한 줄), 요약 먼저·상세 접기, 아이콘+툴팁, 쉬운 한국어, 320px(`APP-20`·`APP-15` 피드백).
 - main: 검사한 커밋은 충돌이 없으면 묻지 않고 푸시한다. 먼저 `git fetch origin main` → rebase, 진행 중인 Actions 실행이 없는지 확인 → `git push origin HEAD:main`. 충돌·강제 푸시가 필요하면 멈추고 묻는다.
 - 연구 브랜치: 검사한 커밋은 묻지 않고 푸시하고 올린 것을 사용자에게 알린다. 다음 수집 실행부터 사이트 엔진에 반영된다.
