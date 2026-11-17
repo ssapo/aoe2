@@ -558,6 +558,135 @@ index ce3b1bff..f28c0026 100644
      }
      if MasterKind::RGE_COMBAT <= src.kind && t.hp >= HitPoints::new(ONE) {
          attack_effects(&src.source, t)?;
+diff --git a/crates/engine/genie-core/src/combat/missile/mod.rs b/crates/engine/genie-core/src/combat/missile/mod.rs
+index c4299951..d7131358 100644
+--- a/crates/engine/genie-core/src/combat/missile/mod.rs
++++ b/crates/engine/genie-core/src/combat/missile/mod.rs
+@@ -354,6 +354,36 @@ pub fn aim(
+     Ok(Position::new(x, y, z))
+ }
+ 
++/// 188329 `0x3225df0`: the most a smart missile's lead takes of its target's speed.
++const LEAD_CAP: f32 = 2.15;
++
++/// What a smart missile's launch (188329 `0xb8f440` set_state 3, findings 158) reads to lead its
++/// target: the target's current speed (slot 0x210, `+0x350`: the animated layer's), its velocity
++/// (slot 0x5b8: the velocity data's at `+0x400`, zero without), its facing (slot 0x218, `+0x380`,
++/// the moving layer's angle), the missile master's `+0x238` (its work rate), the target master's
++/// height radius (`+0x80`) and the height share (`0x31fe5c8`, 3.0), the action's point height
++/// (`+0x40`), the map's size and its tiles' elevations (`0x141041d60`, the tile's `+0x14`).
++pub struct Lead<'a> {
++    /// The target's current speed.
++    pub speed: f32,
++    /// The target's velocity.
++    pub velocity: crate::math::fmath::BVector,
++    /// The target's facing, radians.
++    pub angle: f32,
++    /// The missile master's work rate.
++    pub work_rate: f32,
++    /// The target master's height radius.
++    pub height: f32,
++    /// The missile tuning's `height_share`.
++    pub height_share: f32,
++    /// The missile action's point's height.
++    pub point_z: f32,
++    /// The map's width and height in tiles.
++    pub size: (i32, i32),
++    /// A tile's elevation (x, y), the tile held on the map.
++    pub elevation: &'a dyn Fn(i32, i32) -> Result<u8, GenieError>,
++}
++
+ impl MissileAction {
+     /// `set_state(3)` (`FUN_140a9de70` case 3) from `from` toward the aimed point: the way left
+     /// (its length), a straight missile's unit direction (projectile type 0; type 3 keeps the
+@@ -361,24 +391,71 @@ impl MissileAction {
+     /// the timer back to 0, the arc's acceleration and vertical speed (`arc` not 0: twice the
+     /// arc's rise, `−arc × way × way` or `−arc × way` above 0, over the half flight time squared;
+     /// the speed the opposite of the acceleration times that time); then `set_state(4)`. A smart
+-    /// missile leading a moving target and the projectile types 1 and 2 are not modelled; the
+-    /// sprite's pitch facet is not held.
++    /// missile with a target leads it (188329 `0xb8f440` 0xb8f646..0xb8f9b2, findings 158,
++    /// [`Lead`]): the way left (`+0x7c`) stays the unled one, the direction and the arc take the
++    /// led way. The projectile types 1 and 2 are not modelled; the sprite's pitch facet is not
++    /// held.
++    ///
++    /// # Errors
++    ///
++    /// A smart missile with a target but no [`Lead`], a projectile type 1 or 2.
+     pub fn launch(
+         &mut self,
+         from: Position,
+         aimed: Position,
+         stats: &MissileStats,
++        lead: Option<&Lead<'_>>,
+     ) -> Result<Option<Angle>, GenieError> {
+-        let dx = aimed.x() - from.x();
+-        let dy = aimed.y() - from.y();
+-        let dz = aimed.z() - from.z();
++        let mut dx = aimed.x() - from.x();
++        let mut dy = aimed.y() - from.y();
++        let mut dz = aimed.z() - from.z();
+         let dz2 = dz * dz;
+-        let way = sqrt(dy * dy + dx * dx + dz2);
++        let mut way = sqrt(dy * dy + dx * dx + dz2);
+         self.distance = Distance::new(way);
+         if stats.smart_mode.contains(SmartMode::LEADS_TARGET) && self.target.is_some() {
+-            return Err(GenieError::unsupported(
++            let l = lead.ok_or(GenieError::unsupported(
+                 "a smart missile leading its target",
+-            ));
++            ))?;
++            // the target's slot 0x210 (+0x350, its current speed) above 0
++            if 0.0 < l.speed {
++                // slot 0x5b8 (+0x400's velocity): its length, times the missile master's +0x238
++                // when above 0, at most 2.15 (`MINSS` 0x3225df0)
++                let v = l.velocity;
++                let mut s = sqrt(v.height() * v.height() + v.x() * v.x() + v.y() * v.y());
++                if 0.0 < l.work_rate {
++                    s *= l.work_rate;
++                }
++                let s = if LEAD_CAP < s { LEAD_CAP } else { s };
++                // slot 0x218 (+0x380, its facing): cosf and sinf of it times that speed
++                let cx = cos(l.angle) * s;
++                let sy = sin(l.angle) * s;
++                let ex = cx + dx;
++                let ey = sy + dy;
++                let d2 = sqrt(ey * ey + ex * ex + dz2);
++                let gain = stats.speed.get() + (way - d2);
++                if stats.speed.get() * HALF < gain {
++                    let t = way / gain;
++                    // the tile of the unled point, held on the map (shorts)
++                    let hold = |v: f32, last: i32| {
++                        let v = i32::from(v as i32 as i16);
++                        if v < 0 {
++                            0
++                        } else if last < v {
++                            last
++                        } else {
++                            v
++                        }
++                    };
++                    let tx = hold(from.x() + dx, l.size.0 - 1);
++                    let ty = hold(from.y() + dy, l.size.1 - 1);
++                    let rise = l.height / l.height_share;
++                    dy += t * sy;
++                    dx += t * cx;
++                    let e = (l.elevation)(tx, ty)?;
++                    dz += (f32::from(e) + rise) - l.point_z;
++                    way = sqrt(dy * dy + dx * dx + dz * dz);
++                }
++            }
+         }
+         let angle = match stats.projectile_kind {
+             ProjectileKind::STRAIGHT => {
+@@ -550,6 +627,7 @@ mod tests {
+                 Position::new(0.0, 0.0, 0.0),
+                 Position::new(2.80657, 0.0, 0.0),
+                 &stats,
++                None,
+             )
+             .unwrap();
+         assert_eq!(angle, Some(Angle::ZERO));
 diff --git a/crates/engine/genie-core/src/combat/missile/unit.rs b/crates/engine/genie-core/src/combat/missile/unit.rs
 index 9edd4dcf..64c59e93 100644
 --- a/crates/engine/genie-core/src/combat/missile/unit.rs
@@ -1123,7 +1252,7 @@ index d29be68b..c897b0a3 100644
  /// above 0): a trebuchet, packed or not, whose kill counts as a unit's.
  pub(crate) fn is_trebuchet(master: &Master, roles: &Roles) -> bool {
 diff --git a/crates/engine/genie-core/src/combat/volley/launch.rs b/crates/engine/genie-core/src/combat/volley/launch.rs
-index 9a856bbb..7bcc3fe5 100644
+index 9a856bbb..8c31034d 100644
 --- a/crates/engine/genie-core/src/combat/volley/launch.rs
 +++ b/crates/engine/genie-core/src/combat/volley/launch.rs
 @@ -130,8 +130,11 @@ impl Unit {
@@ -1138,6 +1267,40 @@ index 9a856bbb..7bcc3fe5 100644
          };
          let mut position = mover.set_position(shot.at, c.w.spatial.map, &c.w.model.tuning.movement);
          if !flying {
+@@ -238,7 +241,32 @@ impl Unit {
+                 &c.w.model.tuning.missile,
+             )?
+         };
+-        if let Some(a) = action.launch(position, point, &stats)? {
++        // a smart missile's lead (findings 158): what it reads of its target
++        let terrain = c.w.spatial.terrain.as_ref();
++        let elevation = |x: i32, y: i32| {
++            terrain
++                .and_then(|t| t.elevation(crate::map::Tile::new(x, y)))
++                .ok_or(GenieError::unsupported(
++                    "a smart missile's lead without the map's elevations",
++                ))
++        };
++        let lead = aimed.target.map(|t| {
++            let m = c.w.parts.mover_of(t);
++            crate::combat::missile::Lead {
++                speed: m.map_or(0.0, |m| m.animated.speed.get()),
++                velocity: m
++                    .and_then(|m| m.velocity)
++                    .map_or(BVector::ZERO, |v| v.velocity),
++                angle: m.map_or(0.0, |m| m.angle.get()),
++                work_rate: made.action.as_ref().map_or(0.0, |a| a.work_rate.get()),
++                height: aimed.radius.z(),
++                height_share: c.w.model.tuning.missile.height_share,
++                point_z: action.point.z(),
++                size: terrain.map_or((0, 0), |t| (t.size().width(), t.size().height())),
++                elevation: &elevation,
++            }
++        });
++        if let Some(a) = action.launch(position, point, &stats, lead.as_ref())? {
+             mover.angle = a;
+         }
+         let missile = Self {
 diff --git a/crates/engine/genie-core/src/commands/builders.rs b/crates/engine/genie-core/src/commands/builders.rs
 index 1c85e4af..e12c25c7 100644
 --- a/crates/engine/genie-core/src/commands/builders.rs
@@ -5886,6 +6049,26 @@ index a1c2993f..e019e22a 100644
      );
      let livestock = with(|f| f.group = Some(class_id(58)));
      let mut sheep = Placed {
+diff --git a/crates/engine/genie-core/src/map/terrain.rs b/crates/engine/genie-core/src/map/terrain.rs
+index bef4a9dd..68687410 100644
+--- a/crates/engine/genie-core/src/map/terrain.rs
++++ b/crates/engine/genie-core/src/map/terrain.rs
+@@ -327,6 +327,15 @@ impl Terrain {
+         self.size
+     }
+ 
++    /// A tile's elevation (the map tile's `+0x14` in 188329, `0x141041d60`), None off the map or
++    /// without the map's elevations.
++    #[must_use]
++    pub fn elevation(&self, tile: Tile) -> Option<u8> {
++        self.size
++            .index(tile)
++            .and_then(|i| self.elevations.get(i).copied())
++    }
++
+     /// A tile's terrain (the map tile's `+0x9`), None off the map.
+     #[must_use]
+     pub fn kind(&self, tile: Tile) -> Option<TerrainId> {
 diff --git a/crates/engine/genie-core/src/movement/explore.rs b/crates/engine/genie-core/src/movement/explore.rs
 index bce6387c..613cb811 100644
 --- a/crates/engine/genie-core/src/movement/explore.rs
