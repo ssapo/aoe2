@@ -530,7 +530,7 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 13.4 지금 하던 일 (멈출 때마다 이 절을 덮어쓴다)
 
-**모든 AI 작업자 공통(2026-11-17 사용자 요구)**: Claude·ChatGPT Codex 등 어떤 도구든 같은 규칙으로 일한다. 규칙의 원본은 main `AGENTS.md` 하나뿐이고 `CLAUDE.md`는 그것을 가리키기만 한다(main 검사 `tests/test_agent_docs.py`가 지킨다). 이 문서에 도구별 규칙을 따로 쓰지 않는다.
+**모든 AI 작업자 공통(2026-11-17 사용자 요구)**: Claude·ChatGPT Codex 등 어떤 도구든 같은 규칙으로 일한다. 규칙은 main `AGENTS.md` 하나뿐이고 도구별 시작 파일(`CLAUDE.md` 등)은 두지 않는다(main 검사 `tests/test_agent_docs.py`가 지킨다). 세션을 시작하면 `AGENTS.md`부터 읽는다. 이 문서에 도구별 규칙을 따로 쓰지 않는다.
 
 **2026-11-17 메모: 다음 세션은 사용자 PC에서 직접(Claude Code 또는 다른 AI 도구).** 명령이 PC에서 바로 돈다(원격 다리·WMI 우회 불필요). 클라우드에만 있던 원본 디컴파일 환경(`/home/claude/re-env/re`, `out_*` 결과)은 없다 — 원본 코드를 읽어야 하면 7절대로 `re-kit`에서 다시 차린다(주소와 읽은 내용은 각 finding에 있다). 시작점: main `CLAUDE.md` → `ONBOARDING.md` → 이 절. 엔진 최신 커밋 `d5c5a12`(ENG-31, findings 130), 엔진 소스 비어 있음, 원본 기록 ⑪~⑮ 대기(ONBOARDING 「게임 켤 때」).
 
