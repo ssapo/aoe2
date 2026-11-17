@@ -1776,7 +1776,7 @@ index e59bc443..7f3d5424 100644
      }
  
 diff --git a/crates/engine/genie-core/src/construction/building_update.rs b/crates/engine/genie-core/src/construction/building_update.rs
-index d42efbec..8b973922 100644
+index d42efbec..238eb89a 100644
 --- a/crates/engine/genie-core/src/construction/building_update.rs
 +++ b/crates/engine/genie-core/src/construction/building_update.rs
 @@ -32,6 +32,7 @@ use crate::objects::sprite::new_sprite;
@@ -1787,7 +1787,19 @@ index d42efbec..8b973922 100644
  use crate::unit_ai::HUMAN_ORDER_CAP;
  use crate::world::Millis;
  use crate::world::Seconds;
-@@ -298,6 +299,10 @@ impl Unit {
+@@ -293,11 +294,21 @@ impl Unit {
+             return Ok(());
+         }
+         let master = self.master(c.w.master_tables(), c.player)?;
+-        if !walls_branch(master, roles) && c.w.parts.building_of(self.id).annex_of.is_some() {
++        // 188329 (findings 154): an annex in the walls' branch does not complete on its own
++        // update either — truth23 520848973 castle annex 10569 (master 2718, class 27, built
++        // already as an annex) stays in state 0 from 1552.382 s until its castle 10568
++        // completes at 1635.86 s (the castle's set_state(2) completes its annexes first). The
++        // update's own path is not read (inferred: its byte +0x948 skips the update, 0x1280d3f)
++        let _ = walls_branch(master, roles);
++        if c.w.parts.building_of(self.id).annex_of.is_some() {
+             return Ok(());
          }
          let (p, id) = (c.player, self.id);
          c.lend((&mut *self, &mut *actions), |w| {
@@ -1798,7 +1810,7 @@ index d42efbec..8b973922 100644
              w.set_state(p, id, ObjectState::Alive)
          })
      }
-@@ -307,7 +312,7 @@ impl Unit {
+@@ -307,7 +318,7 @@ impl Unit {
      /// none): `FUN_1411c39b0` (attribute 255 naming its master: a terrain
      /// effect around it, not modelled); then for each whole second since `last_garrison_time`
      /// (`+0xbe0`, which moves on by them): a monastery's (master 104) relics give their goods
@@ -1807,7 +1819,7 @@ index d42efbec..8b973922 100644
      /// `raider_build_countdown` (`+0x9a0`) runs would be let out at its end (not modelled); the
      /// units inside (from the first) heal by the master's `garrison_heal_rate` below their
      /// master's hit points (slot 0x110, [`Unit::heal`]); with villagers inside, a damaged
-@@ -374,12 +379,19 @@ impl Unit {
+@@ -374,12 +385,19 @@ impl Unit {
          if self.damaged_lately.running() {
              self.damaged_lately = self.damaged_lately.tick();
          }
