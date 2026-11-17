@@ -5051,6 +5051,33 @@ index 999d44b5..1edf79c0 100644
          Ok(hits.is_empty())
      }
  
+diff --git a/crates/engine/genie-core/src/groups/update/attack.rs b/crates/engine/genie-core/src/groups/update/attack.rs
+index 3130ba99..96309f7e 100644
+--- a/crates/engine/genie-core/src/groups/update/attack.rs
++++ b/crates/engine/genie-core/src/groups/update/attack.rs
+@@ -182,9 +182,9 @@ impl World {
+     /// `finished`. With [`GroupFlags::ARRIVED`] the category is released at once; else it is when
+     /// one of its units is within its attack range of the target: the footprint gap less a slack,
+     /// at most the category's range (negative or unordered: 0). The slack is
+-    /// `GroupTuning::contact_slack` for a category without a range, `GroupTuning::ranged_slack` for
+-    /// one with, and `GroupTuning::chasing_slack` when the target moves (slot 0x5c8) and the
+-    /// category's range is above the target's own weapon range (slot 0x230) plus
++    /// `GroupTuning::contact_slack` for a category without a range, 0 for one with (188329
++    /// `0x110c143`, findings 146), and `GroupTuning::chasing_slack` when the target moves (slot
++    /// 0x5c8) and the category's range is above the target's own weapon range (slot 0x230) plus
+     /// `GroupTuning::ranged_slack`. A category without one in range ends `finished` (going). A
+     /// released category stops the group's walk, clears [`GroupFlags::ATTACKING`] and sends its
+     /// units at the target.
+@@ -261,7 +261,8 @@ impl World {
+             if outranged {
+                 self.model.tuning.group.chasing_slack
+             } else {
+-                self.model.tuning.group.ranged_slack
++                // 188329 0x110c143 (findings 146): no slack for a ranged category in reach
++                0.0
+             }
+         } else {
+             self.model.tuning.group.contact_slack
 diff --git a/crates/engine/genie-core/src/groups/update/awake.rs b/crates/engine/genie-core/src/groups/update/awake.rs
 index 4ce9b2f7..b8899f03 100644
 --- a/crates/engine/genie-core/src/groups/update/awake.rs
