@@ -6172,6 +6172,28 @@ index bef4a9dd..68687410 100644
      /// A tile's terrain (the map tile's `+0x9`), None off the map.
      #[must_use]
      pub fn kind(&self, tile: Tile) -> Option<TerrainId> {
+diff --git a/crates/engine/genie-core/src/movement/ai_moves.rs b/crates/engine/genie-core/src/movement/ai_moves.rs
+index bf0aa945..6d1521a1 100644
+--- a/crates/engine/genie-core/src/movement/ai_moves.rs
++++ b/crates/engine/genie-core/src/movement/ai_moves.rs
+@@ -3,6 +3,7 @@
+ //! `MoveTo` that ends at its start.
+ 
+ use crate::GenieError;
++use crate::objects::convert::CONVERT;
+ use crate::map::Distance;
+ use crate::map::Position;
+ use crate::movement::Mover;
+@@ -268,7 +269,8 @@ impl Unit {
+                 | FLY
+                 | MISSILE
+                 | MAKE
+-                | WAIT_SOLIDIFY,
++                | WAIT_SOLIDIFY
++                | CONVERT,
+             ) => Ok(PointMove::Declined),
+             Some(ARTIFACT_KIND) => {
+                 let sprites = self.point_sprites(sprites)?;
 diff --git a/crates/engine/genie-core/src/movement/explore.rs b/crates/engine/genie-core/src/movement/explore.rs
 index bce6387c..613cb811 100644
 --- a/crates/engine/genie-core/src/movement/explore.rs
@@ -7425,19 +7447,20 @@ index 54c082c7..13031ea9 100644
              }
              LinkedPathKind::AsksAgain => {
 diff --git a/crates/engine/genie-core/src/objects/actions.rs b/crates/engine/genie-core/src/objects/actions.rs
-index 118ae20f..c293282c 100644
+index 118ae20f..d70334a8 100644
 --- a/crates/engine/genie-core/src/objects/actions.rs
 +++ b/crates/engine/genie-core/src/objects/actions.rs
-@@ -39,6 +39,8 @@ use crate::objects::ActionState;
+@@ -39,6 +39,9 @@ use crate::objects::ActionState;
  use crate::objects::ObjectId;
  use crate::objects::RoleId;
  use crate::objects::masters::ActionKind;
++use crate::objects::convert::{CONVERT, ConvertAction};
 +use crate::objects::relic_deposit::{RELIC_DEPOSIT, RelicDepositAction};
 +use crate::objects::relic_pickup::{RELIC_PICKUP, RelicPickupAction};
  use crate::ownership::artifact::ARTIFACT_KIND;
  use crate::ownership::artifact::Artifact;
  use genie_diff::Diff;
-@@ -135,6 +137,12 @@ action_kinds! {
+@@ -135,6 +138,14 @@ action_kinds! {
      /// A villager's wait for a foundation ([`crate::construction::wait_solidify`]).
      WaitSolidify(WaitSolidify) => wait_solidify, wait_solidify_mut, take_wait_solidify,
          set_wait_solidify, with_wait_solidify;
@@ -7447,37 +7470,42 @@ index 118ae20f..c293282c 100644
 +    /// A monk's relic delivery ([`crate::objects::relic_deposit`]).
 +    RelicDeposit(RelicDepositAction) => relic_deposit, relic_deposit_mut, take_relic_deposit,
 +        set_relic_deposit, with_relic_deposit;
++    /// A monk's conversion ([`crate::objects::convert`]).
++    Convert(ConvertAction) => convert, convert_mut, take_convert, set_convert, with_convert;
  }
  
  impl Action {
-@@ -156,6 +164,8 @@ impl Action {
+@@ -156,6 +167,9 @@ impl Action {
              Self::Missile(_) => MISSILE,
              Self::Make(_) => MAKE,
              Self::WaitSolidify(_) => WAIT_SOLIDIFY,
 +            Self::RelicPickup(_) => RELIC_PICKUP,
 +            Self::RelicDeposit(_) => RELIC_DEPOSIT,
++            Self::Convert(_) => CONVERT,
          }
      }
  
-@@ -177,6 +187,8 @@ impl Action {
+@@ -177,6 +191,9 @@ impl Action {
              Self::Missile(a) => a.state.get(),
              Self::Make(a) => a.state.get(),
              Self::WaitSolidify(a) => a.state.get(),
 +            Self::RelicPickup(a) => a.state.get(),
 +            Self::RelicDeposit(a) => a.state.get(),
++            Self::Convert(a) => a.state.get(),
          })
      }
  }
-@@ -197,6 +209,8 @@ impl Action {
+@@ -197,6 +214,9 @@ impl Action {
              Self::Attack(a) => a.target.map(RoleId::id),
              Self::Enter(a) => a.target.map(RoleId::id),
              Self::Missile(a) => a.target.map(RoleId::id),
 +            Self::RelicPickup(a) => a.target,
 +            Self::RelicDeposit(a) => a.target,
++            Self::Convert(a) => a.target,
              Self::Fly(_)
              | Self::Explore(_)
              | Self::Transport(_)
-@@ -259,6 +273,11 @@ impl ActionList {
+@@ -259,6 +279,11 @@ impl ActionList {
          self.0.first()
      }
  
@@ -7490,26 +7518,28 @@ index 118ae20f..c293282c 100644
      /// run it).
      pub(crate) fn pop_head(&mut self) -> Option<Action> {
 diff --git a/crates/engine/genie-core/src/objects/layers/action.rs b/crates/engine/genie-core/src/objects/layers/action.rs
-index 8555387e..cf9ce304 100644
+index 8555387e..c69b96c6 100644
 --- a/crates/engine/genie-core/src/objects/layers/action.rs
 +++ b/crates/engine/genie-core/src/objects/layers/action.rs
-@@ -125,6 +125,8 @@ impl Action {
+@@ -125,6 +125,9 @@ impl Action {
              actions::Action::Explore(e) => walking(e.state.move_to().map(|m| m.state)),
              actions::Action::Enter(e) => walking(e.state.move_to().map(|m| m.state)),
              actions::Action::Transport(t) => walking(t.state.move_to().map(|m| m.state)),
 +            actions::Action::RelicPickup(r) => walking(r.state.move_to().map(|m| m.state)),
 +            actions::Action::RelicDeposit(r) => walking(r.state.move_to().map(|m| m.state)),
++            actions::Action::Convert(r) => walking(r.state.move_to().map(|m| m.state)),
              actions::Action::MoveTo(_)
              | actions::Action::Missile(_)
              | actions::Action::Make(_)
 diff --git a/crates/engine/genie-core/src/objects/mod.rs b/crates/engine/genie-core/src/objects/mod.rs
-index 8e11f247..ee7aea9f 100644
+index 8e11f247..cc837c47 100644
 --- a/crates/engine/genie-core/src/objects/mod.rs
 +++ b/crates/engine/genie-core/src/objects/mod.rs
-@@ -22,6 +22,8 @@ pub mod object_list;
+@@ -22,6 +22,9 @@ pub mod object_list;
  mod outcomes;
  use genie_model::objects::regeneration;
  pub(crate) mod release;
++pub mod convert;
 +pub mod relic_deposit;
 +pub mod relic_pickup;
  mod relic_count;
@@ -7589,10 +7619,10 @@ index bd8b67b7..b04ae357 100644
      }
  }
 diff --git a/crates/engine/genie-core/src/objects/teardown.rs b/crates/engine/genie-core/src/objects/teardown.rs
-index b22ddd84..0dd0f47f 100644
+index b22ddd84..24350111 100644
 --- a/crates/engine/genie-core/src/objects/teardown.rs
 +++ b/crates/engine/genie-core/src/objects/teardown.rs
-@@ -97,6 +97,17 @@ impl Action {
+@@ -97,6 +97,25 @@ impl Action {
                  torn.release(e.target.map(ContainerId::id));
              }
              Self::Transport(t) => stop_if_moving(motion, t.state.move_to().is_some())?,
@@ -7604,6 +7634,14 @@ index b22ddd84..0dd0f47f 100644
 +            }
 +            // 0xbaa990: as the pick-up's (findings 152)
 +            Self::RelicDeposit(r) => {
++                stop_if_moving(motion, r.state.move_to().is_some())?;
++                torn.release(r.target);
++            }
++            // 0xba6360: a conversion turning, converting or walking with time converting whose
++            // target is its player's or an ally's spends the faith (0xba6480; the update stops
++            // on such a target first, findings 162); the target's slot 0x4e0 for a converter
++            // of class 53 is not held; then the base lets the target go
++            Self::Convert(r) => {
 +                stop_if_moving(motion, r.state.move_to().is_some())?;
 +                torn.release(r.target);
 +            }
@@ -7690,7 +7728,7 @@ index cee0a80b..c1040a9b 100644
              path_made: m
                  .paths
 diff --git a/crates/engine/genie-core/src/objects/unit/update.rs b/crates/engine/genie-core/src/objects/unit/update.rs
-index d7751598..a2645eda 100644
+index d7751598..0437afbd 100644
 --- a/crates/engine/genie-core/src/objects/unit/update.rs
 +++ b/crates/engine/genie-core/src/objects/unit/update.rs
 @@ -105,6 +105,7 @@ impl Unit {
@@ -7701,16 +7739,17 @@ index d7751598..a2645eda 100644
          self.after_actions(c)?;
          Ok(captured)
      }
-@@ -149,6 +150,8 @@ impl Unit {
+@@ -149,6 +150,9 @@ impl Unit {
              Some(Action::Build(_)) => self.build_part(actions, c, me),
              Some(Action::Repair(_)) => self.repair_part(actions, c, me, roles),
              Some(Action::Enter(_)) => self.enter_part(actions, c, me, roles),
 +            Some(Action::RelicPickup(_)) => self.relic_pickup_part(actions, c, me, roles),
 +            Some(Action::RelicDeposit(_)) => self.relic_deposit_part(actions, c, me, roles),
++            Some(Action::Convert(_)) => self.convert_part(actions, c, me, roles),
              Some(Action::Transport(_)) => self.transport_update(actions, c, me, roles),
              Some(Action::WaitSolidify(_)) => Ok(actions.wait_solidify_part(
                  OthersRef::of(&c.w.players, &c.w.index, c.player)?,
-@@ -299,6 +302,25 @@ impl Unit {
+@@ -299,6 +303,25 @@ impl Unit {
          Ok(())
      }
  
@@ -7736,7 +7775,7 @@ index d7751598..a2645eda 100644
      /// After the actions: the units its walk met take their pauses (slot 0x5f0: their walked
      /// level's pause; the walk read them from its own list till now, `Mover::pause_of`). A unit
      /// whose walk met others in its way is not modelled.
-@@ -310,10 +332,15 @@ impl Unit {
+@@ -310,10 +333,15 @@ impl Unit {
              if c.w.object(id).is_none() {
                  continue;
              }
@@ -8562,19 +8601,20 @@ index 72090fb3..3f1a775d 100644
                      source: OrderSource::Queued,
                  },
 diff --git a/crates/engine/genie-core/src/orders/work.rs b/crates/engine/genie-core/src/orders/work.rs
-index 9e2d36cf..59980f6a 100644
+index 9e2d36cf..472ae913 100644
 --- a/crates/engine/genie-core/src/orders/work.rs
 +++ b/crates/engine/genie-core/src/orders/work.rs
-@@ -33,6 +33,8 @@ use crate::orders::OrderSource;
+@@ -33,6 +33,9 @@ use crate::orders::OrderSource;
  use crate::orders::gather::HuntOrder;
  use crate::orders::{ATTACK_TASK, Work};
  use crate::ownership::artifact::ARTIFACT_KIND;
++use crate::objects::convert::CONVERT;
 +use crate::objects::relic_deposit::{RELIC_DEPOSIT, RelicDepositAction};
 +use crate::objects::relic_pickup::{RELIC_PICKUP, RelicPickupAction};
  use crate::players::Amount;
  use crate::players::PlayerId;
  use crate::unit_ai::AiAction;
-@@ -192,7 +194,7 @@ impl World {
+@@ -192,7 +195,7 @@ impl World {
      /// task of [`crate::objects::masters::work_master`] (the master changes, slot 0x90), the task's
      /// requirement, then the task's action from the action list's factory (slot 0x10), the unit
      /// AI's notify (slot 0x828) and the install (slot 0x808).
@@ -8583,7 +8623,7 @@ index 9e2d36cf..59980f6a 100644
          &mut self,
          player: PlayerId,
          idx: ListIndex,
-@@ -381,6 +383,47 @@ impl World {
+@@ -381,6 +384,52 @@ impl World {
              _ if top == Some(TRANSPORT) && task.action_kind == TRANSPORT => {
                  self.retake_transport((player, idx), (target, point), task, notifies)?
              }
@@ -8628,10 +8668,15 @@ index 9e2d36cf..59980f6a 100644
 +                }
 +                Answer::Taken
 +            }
++            // 188329 the conversion's slot 0x48 (0xbaa500) answers 1 (findings 162)
++            _ if top == Some(CONVERT) && task.action_kind == CONVERT => {
++                self.retake_convert(player, idx, (target.ok_or(TERRAIN_TASK)?, point), notifies)?;
++                Answer::Taken
++            }
              // the top action's slot 0x48 (FUN_140a977a0) on the same task: the base's
              // (FUN_140a7bf40: the MoveTo's, the Enter's, the missile's, the Fly's, the Make's, the
              // wait for a foundation's) answers 0, and the work goes on to the factory
-@@ -496,14 +539,83 @@ impl World {
+@@ -496,14 +545,87 @@ impl World {
              // the factory makes no action of a mule cart's task: the move without one
              CART_TASK => self.work_move(player, idx, target, point, (notifies, source)),
              TRANSPORT => self.start_transport((player, idx), (target, point), task, notifies),
@@ -8642,6 +8687,10 @@ index 9e2d36cf..59980f6a 100644
 +            RELIC_DEPOSIT => {
 +                let target = target.ok_or(TERRAIN_TASK)?;
 +                self.start_relic_deposit(player, idx, target, task)
++            }
++            CONVERT => {
++                let target = target.ok_or(TERRAIN_TASK)?;
++                self.start_convert(player, idx, (target, point), task, notifies)
 +            }
              ENTER | ATTACK_TASK | HUNT | ActionKind::BUILD | REPAIR | GATHER => {
                  let target = target.ok_or(TERRAIN_TASK)?;
@@ -8716,7 +8765,7 @@ index 9e2d36cf..59980f6a 100644
      /// [`World::start_task`]'s actions on an object: the Enter, Attack, Hunt, Build, Repair or
      /// Gather on `target` starts.
      fn start_object_task(
-@@ -537,7 +649,11 @@ impl World {
+@@ -537,7 +659,11 @@ impl World {
              ActionKind::BUILD => self.start_build(player, idx, target, task, point, notifies),
              REPAIR => self.start_repair(player, idx, target, task, point, notifies),
              GATHER => self.start_gather(player, idx, target, task, Some((point, notifies))),
@@ -13123,7 +13172,7 @@ index 8b58e128..cda336a8 100644
              graphics: Graphics::default(),
              terrain: TerrainTable::default(),
 diff --git a/crates/engine/genie-import/src/dat/dat_work.rs b/crates/engine/genie-import/src/dat/dat_work.rs
-index b4034340..d6b0ea25 100644
+index b4034340..78839cad 100644
 --- a/crates/engine/genie-import/src/dat/dat_work.rs
 +++ b/crates/engine/genie-import/src/dat/dat_work.rs
 @@ -76,6 +76,14 @@ pub(super) fn sound_event(event: u32, sound: i16, sounds: &[Sound]) -> i32 {
@@ -13151,6 +13200,18 @@ index b4034340..d6b0ea25 100644
          object_id: MasterId::of_data(t.unit_id),
          combat_level: t.enable_targeting,
          combat_level_flag: TaskFlags::from_bits_retain(t.combat_level_flag),
+@@ -261,6 +270,11 @@ fn dat_combat(t: &Type50) -> work::CombatPart {
+         attack_sprite2: t.attack_graphic2.and_then(SpriteId::of_data),
+         terrain_bonus: RestrictionField::of_data(t.defense_terrain_bonus),
+         garrison_firepower: t.garrison_firepower.map_or(Firepower::ZERO, Firepower::new),
++        // the save does not hold `orig_speed_of_attack` (`+0x85c`): the `.dat`'s
++        shown: work::Shown {
++            reload: Seconds::new(t.displayed_reload_time),
++            ..work::Shown::default()
++        },
+         ..work::CombatPart::default()
+     }
+ }
 diff --git a/crates/engine/genie-import/src/install.rs b/crates/engine/genie-import/src/install.rs
 index 77f51e58..f71f9582 100644
 --- a/crates/engine/genie-import/src/install.rs
@@ -13392,6 +13453,29 @@ index e28b10a7..e4ecfe66 100644
      /// The attribute naming the world's effect a player gets after each research (`+0x868`: 269).
      pub world_effect: AttributeId,
      /// The owner's attribute of a pasture's food, which its livestock share.
+diff --git a/crates/engine/genie-model/src/objects/masters/master.rs b/crates/engine/genie-model/src/objects/masters/master.rs
+index ca74e2c8..0e98d595 100644
+--- a/crates/engine/genie-model/src/objects/masters/master.rs
++++ b/crates/engine/genie-model/src/objects/masters/master.rs
+@@ -54,6 +54,7 @@ use crate::players::Amount;
+ use crate::players::attribute::AttributeId;
+ use crate::production::{HotkeyId, LocationButton};
+ use crate::technology::TechId;
++use crate::world::Seconds;
+ use crate::world::WholeSeconds;
+ use genie_diff::Diff;
+ use serde::Deserialize;
+@@ -336,6 +337,10 @@ pub struct Shown {
+     pub range: Distance,
+     /// `+0x854`, `orig_armor`.
+     pub melee_armor: DamageAmount,
++    /// `+0x85c`, `orig_speed_of_attack` (the `.dat`'s displayed reload time): a conversion's
++    /// time between its draws (188329 `0xba8b30` case 7 reads the master's `+0x2fc`, findings
++    /// 162). No effect writes it.
++    pub reload: Seconds,
+ }
+ 
+ /// A player's masters by id.
 diff --git a/crates/engine/genie-model/src/objects/masters/task.rs b/crates/engine/genie-model/src/objects/masters/task.rs
 index a34c2460..6fde0173 100644
 --- a/crates/engine/genie-model/src/objects/masters/task.rs
@@ -13479,6 +13563,38 @@ index b3f632cb..3623fb60 100644
          t.attribute
      }
  }
+diff --git a/crates/engine/genie-model/src/world/settings.rs b/crates/engine/genie-model/src/world/settings.rs
+index 540cb73f..60ad8b35 100644
+--- a/crates/engine/genie-model/src/world/settings.rs
++++ b/crates/engine/genie-model/src/world/settings.rs
+@@ -88,6 +88,27 @@ pub struct Settings {
+     pub starting_age: Age,
+     /// `mResourceLevel` (`+0x54`).
+     pub resource_level: ResourceLevel,
++    /// `mGameSpeed` (`+0x44`): a conversion's time to its next draw reads it (188329
++    /// `0xba8b30` case 7, findings 162).
++    pub game_speed: GameSpeed,
++}
++
++/// The game speed option (`mGameSpeed`, `+0x44`, a float), kept as its bits.
++#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
++pub struct GameSpeed(u32);
++
++impl GameSpeed {
++    /// The speed of the option's bits `bits`.
++    #[must_use]
++    pub const fn of_bits(bits: u32) -> Self {
++        Self(bits)
++    }
++
++    /// The speed.
++    #[must_use]
++    pub const fn get(self) -> f32 {
++        f32::from_bits(self.0)
++    }
+ }
+ 
+ /// A technology's mode (its `+0x28`) that tests the root's `+0x560` entry (`FUN_140c87f20`),
 diff --git a/crates/formats/genie-cpx/Cargo.toml b/crates/formats/genie-cpx/Cargo.toml
 index af397724..f9e25c3d 100644
 --- a/crates/formats/genie-cpx/Cargo.toml
@@ -17494,9 +17610,18 @@ index a098b509..66f208ee 100644
  }
  
 diff --git a/crates/tools/genie-oracle/src/setup.rs b/crates/tools/genie-oracle/src/setup.rs
-index 0c6a6c44..bb683526 100644
+index 0c6a6c44..e56bee2d 100644
 --- a/crates/tools/genie-oracle/src/setup.rs
 +++ b/crates/tools/genie-oracle/src/setup.rs
+@@ -55,7 +55,7 @@ use genie_core::vision::VisionBits;
+ use genie_core::vision::ghost::Ghost;
+ use genie_core::world::parts::ObjectParts;
+ use genie_core::world::parts::Part;
+-use genie_core::world::settings::{FarmMode, OptionFlags, Settings};
++use genie_core::world::settings::{FarmMode, GameSpeed, OptionFlags, Settings};
+ use genie_core::world::{
+     Age, ContentMode, Formations, GameMode, ResourceLevel, SubModeFlags, TreatyLength, Unread,
+     Visibility,
 @@ -99,6 +99,15 @@ pub fn layer() -> Result<&'static BuildLayer, GenieError> {
  /// The build layer does not evaluate ([`layer`]); what else the slice does not model of the save
  /// stops every player instead.
@@ -17513,6 +17638,14 @@ index 0c6a6c44..bb683526 100644
      let build = layer()?;
      let missile_tuning = &build.tuning.missile;
      let victory = &header.world.base_world.victory_conditions;
+@@ -545,6 +554,7 @@ pub const fn settings(o: &GameOptions) -> Settings {
+         treaty_length: TreatyLength::of_minutes(o.treaty_length),
+         starting_age: Age::of_data(o.starting_age),
+         resource_level: ResourceLevel::of_data(o.resource_level),
++        game_speed: GameSpeed::of_bits(o.game_speed),
+         flags: option(OptionFlags::FULL_TECH_TREE, o.full_tech_tree_enabled)
+             .union(option(
+                 OptionFlags::VILLAGER_FORCE_DROP,
 diff --git a/crates/tools/genie-oracle/src/top_actions.rs b/crates/tools/genie-oracle/src/top_actions.rs
 index b2774f57..522ab704 100644
 --- a/crates/tools/genie-oracle/src/top_actions.rs
@@ -18937,6 +19070,1062 @@ index 00000000..f10e049d
 +        g.current_command = command;
 +        g.flags |= GroupFlags::NO_PATH_UNIT;
 +        Ok(GroupMove::Begun)
++    }
++}
+diff --git a/crates/engine/genie-core/src/objects/convert.rs b/crates/engine/genie-core/src/objects/convert.rs
+new file mode 100644
+index 00000000..b27fcb21
+--- /dev/null
++++ b/crates/engine/genie-core/src/objects/convert.rs
+@@ -0,0 +1,1050 @@
++//! A monk's conversion (`TRIBE_Action_Convert`, type 0x68; 188329: the factory 0xbb8c30 case
++//! 0x68 -> 0xbb8d28, constructor 0xba5100, vtable 0x3226cc8: start (slot 5) 0xba6b40, update
++//! (slot 6) 0xba9310, its new target (slot 9) 0xbaa500, `set_state` (slot 16) 0xba8b30, the
++//! destructor 0xba6360; findings 162).
++
++use crate::GenieError;
++use crate::combat::attack::Aim;
++use crate::combat::attack::face_target;
++use crate::map::Distance;
++use crate::map::Position;
++use crate::map::Tile;
++use crate::math::rng::Stream;
++use crate::movement::Me;
++use crate::movement::footprint_gap;
++use crate::movement::move_to::Patience;
++use crate::movement::move_to::{
++    GiveUp, ListUpdate, MoveToAction, MoveToReads, Sprites, TargetMoved, update_sub_actions,
++};
++use crate::movement::footprint_gap_squared;
++use crate::objects::ObjectId;
++use crate::objects::ObjectState;
++use crate::objects::SpriteId;
++use crate::objects::layers::Action;
++use crate::objects::masters::ActionKind;
++use crate::objects::masters::ChargeKind;
++use crate::objects::masters::ClassId;
++use crate::objects::masters::Master;
++use crate::objects::masters::OwnerMasters;
++use crate::objects::masters::PlayersMasters;
++use crate::objects::masters::Task;
++use crate::objects::masters::TaskId;
++use crate::objects::masters::WorkValue;
++use crate::objects::teardown::HeadCode;
++use crate::objects::unit::Unit;
++use crate::players::Amount;
++use crate::players::AllyTest;
++use crate::players::PlayerId;
++use crate::players::attribute::AttributeId;
++use crate::unit_ai::AiAction;
++use crate::unit_ai::Notify;
++use crate::unit_ai::NotifyKind;
++use crate::unit_ai::TargetRules;
++use crate::unit_ai::UnitAiKind;
++use crate::unit_ai::UnitStance;
++use crate::unit_ai::task_finder::allied;
++use crate::unit_ai::{Converter, Convertee, can_convert};
++use crate::world::Seconds;
++use crate::world::World;
++use crate::world::layer::ClassRoles;
++use crate::world::layer::Roles;
++use crate::world::lets::release;
++use crate::world::slots::PlayerSlots;
++use crate::world::step::Step;
++use genie_diff::Diff;
++
++/// The conversion's action type (0x68).
++pub const CONVERT: ActionKind = ActionKind::CONVERT;
++
++/// The unit AI's action value of a conversion (0x25c), which its notifies carry.
++const AI_CONVERT: AiAction = AiAction::Convert;
++
++/// `set_state(7)`'s constant less the speed's share (`[0x143dafef8]` = 0.255).
++const CHECK_BASE: f32 = 0.255_000_03;
++
++/// The full faith a conversion starts with (`[0x14369ffb4]` = 100.0).
++const FULL_FAITH: f32 = 100.0;
++
++/// The elapsed time from which a combat target hears the conversion each update
++/// (`[0x14369ff64]` = 1.0).
++const ONE: f32 = 1.0;
++
++/// The draw's chance outside the shortest and the longest time (`-1000`, `1000`).
++const NEVER: i32 = -1000;
++const ALWAYS: i32 = 1000;
++
++/// The player attributes of the conversion times: the converter's 176 and 177, the target
++/// owner's 178 and 179, and the converter's 180 and 181 against a building (class 3) or class
++/// 52 (`player+0x98` at `+0x580`..`+0x5a8`).
++const MIN_TIME_BY: usize = 176;
++const MAX_TIME_BY: usize = 177;
++const MIN_TIME_OF: usize = 178;
++const MAX_TIME_OF: usize = 179;
++const MIN_TIME_BUILDING: usize = 180;
++const MAX_TIME_BUILDING: usize = 181;
++
++/// The target owner's attribute 77 (`+0x268`) that scales the draw.
++const DRAW_SCALE: usize = 77;
++
++/// The converter's attribute 67 (`+0x218`) at most 0: no conversion at all.
++const CONVERTS: usize = 67;
++
++/// The conversion's state (`+0x18`) with the `MoveTo` of its walks.
++#[derive(Clone, Copy, Debug, PartialEq, Diff)]
++pub enum ConvertState {
++    /// 1: done (its update returns 1, the list deletes it).
++    Done,
++    /// 2: halted.
++    Halted,
++    /// 3: idle; the unit AI was told to search (0x202).
++    Idle,
++    /// 4: walking to the target within the range.
++    Walk {
++        /// The quiet `MoveTo` (0xb92150 with the range and the task's moving sprite, 1, 1;
++        /// `+0x61` = 1).
++        move_to: Option<MoveToAction>,
++    },
++    /// 6: turning to the target.
++    Face,
++    /// 7: converting.
++    Convert,
++    /// 11: walking to the target's last place (`+0x38`..`+0x40`).
++    WalkPoint {
++        /// The quiet `MoveTo` to the point (0xb920a0).
++        move_to: Option<MoveToAction>,
++    },
++    /// 13: failed.
++    Failed,
++}
++
++impl ConvertState {
++    /// The state's number.
++    #[must_use]
++    pub const fn get(&self) -> u8 {
++        match self {
++            Self::Done => 1,
++            Self::Halted => 2,
++            Self::Idle => 3,
++            Self::Walk { .. } => 4,
++            Self::Face => 6,
++            Self::Convert => 7,
++            Self::WalkPoint { .. } => 11,
++            Self::Failed => 13,
++        }
++    }
++
++    /// Its walk's `MoveTo`, if it walks with one.
++    #[must_use]
++    pub const fn move_to(&self) -> Option<&MoveToAction> {
++        match self {
++            Self::Walk { move_to } | Self::WalkPoint { move_to } => move_to.as_ref(),
++            _ => None,
++        }
++    }
++}
++
++/// What the conversion reads of its task (`+0x48`).
++#[derive(Clone, Copy, Debug, PartialEq, Diff)]
++pub struct ConvertTask {
++    /// The task's id.
++    pub id: TaskId,
++    /// `+0x40`, the moving sprite.
++    pub moving: Option<SpriteId>,
++    /// `+0x48`, the sprite while it converts (`set_state(7)`).
++    pub proceeding: Option<SpriteId>,
++    /// `+0x22`: the converter's attribute that is the chance (else its master's).
++    pub chance: Option<AttributeId>,
++    /// `+0x26`: the converter's attribute a conversion needs above 0.
++    pub needs: Option<AttributeId>,
++    /// `+0x28` and `+0x2c`: the shortest and longest time's share.
++    pub min_time: WorkValue,
++    /// `+0x2c`.
++    pub max_time: WorkValue,
++    /// `+0x30`: the range, at most 0 for the unit's.
++    pub work_range: Distance,
++}
++
++/// The conversion action (0x90 bytes).
++#[derive(Clone, Copy, Debug, PartialEq, Diff)]
++pub struct ConvertAction {
++    /// The target (`+0x20`, `+0x30`).
++    pub target: Option<ObjectId>,
++    /// `+0x18`.
++    pub state: ConvertState,
++    /// `+0x38`..`+0x40`: the target's place at the start (state 11 walks to it).
++    pub point: Position,
++    /// `+0x7c`, `+0x80`: where its owner last saw the target.
++    pub seen: Position,
++    /// `+0x84`: the target lost from sight.
++    pub lost: Option<ObjectId>,
++    /// `+0x6c`: the range (the constructor's 1.0, then the start's).
++    pub range: Distance,
++    /// `+0x70`: the time converting (−1 new).
++    pub elapsed: Seconds,
++    /// `+0x44`: the time to the next draw.
++    pub timer: Seconds,
++    /// `+0x88`: the last target's master class (−1 none).
++    pub class: Option<ClassId>,
++    /// `+0x48`'s parts.
++    pub task: ConvertTask,
++}
++
++impl ConvertAction {
++    /// The constructor (0xba5100) with `task` on `target` at `at`: `+0x6c` 1.0, `+0x70` −1.0,
++    /// `+0x84` −1, `+0x88` none; the target taken (0xb6ba50, the caller's) and its place both
++    /// the point and where it was seen.
++    #[must_use]
++    pub fn new(target: ObjectId, at: Position, task: &Task) -> Self {
++        Self {
++            target: Some(target),
++            state: ConvertState::Idle,
++            point: at,
++            seen: at,
++            lost: None,
++            range: Distance::new(1.0),
++            elapsed: Seconds::new(-1.0),
++            timer: Seconds::ZERO,
++            class: None,
++            task: ConvertTask {
++                id: task.id,
++                moving: task.sprites.moving,
++                proceeding: task.sprites.proceeding,
++                chance: task.attribute_kind2,
++                needs: task.attribute_kind4,
++                min_time: task.work_val1,
++                max_time: task.work_val2,
++                work_range: task.work_range,
++            },
++        }
++    }
++}
++
++/// What the conversion reads of its target.
++#[derive(Clone, Debug)]
++struct Target {
++    id: ObjectId,
++    owner: PlayerId,
++    state: ObjectState,
++    inside: bool,
++    position: Position,
++    master: Master,
++    hp: f32,
++}
++
++fn target_of(w: &World, id: Option<ObjectId>) -> Result<Option<Target>, GenieError> {
++    let Some((q, t)) = w.object(id) else {
++        return Ok(None);
++    };
++    Ok(Some(Target {
++        id: t.id,
++        owner: q,
++        state: t.life.state,
++        inside: t.life.inside.is_some(),
++        position: t.position(),
++        master: t.master(w.master_tables(), q)?.clone(),
++        hp: t.life.hp.get(),
++    }))
++}
++
++/// An attribute of `attributes` at `i`, none outside the list.
++fn attribute(attributes: &[Amount], i: usize) -> Option<f32> {
++    attributes.get(i).map(|a| a.get())
++}
++
++/// What the start (slot 5) found.
++struct Started {
++    range: Distance,
++    class: ClassId,
++    reset: bool,
++}
++
++/// The start's checks and its range (0xba6b40 with a target): the paths that refuse a target
++/// (each the interface's message 0x76..0x81, then a `set_state` the decompile drops) are not
++/// modelled; the range, the class kept and whether the time converting starts anew.
++fn start_checks(
++    a: &ConvertAction,
++    (monk, monk_master, attributes): (&Unit, &Master, &[Amount]),
++    t: &Target,
++) -> Result<Started, GenieError> {
++    let class = t.master.class;
++    let c = class.get();
++    // livestock (0x3a) and flags (0x1e) turn to 13 at once; walls, gates, class 49 and 67 are
++    // refused
++    if c == 0x3a || c == 0x1e || matches!(c, 27 | 39 | 49 | 67) {
++        return Err(GenieError::unsupported(
++            "a conversion's start on a target it refuses (0xba6b40)",
++        )
++        .with("class", c));
++    }
++    // full faith (`+0x168`: below 100 refused)
++    if monk.life.amount.get() < FULL_FAITH {
++        return Err(GenieError::unsupported(
++            "a conversion's start without full faith (0xba6b40)",
++        ));
++    }
++    let own_range = || -> Result<Distance, GenieError> {
++        let m = monk_master.class.get();
++        let r = if m == 0x12 || m == 0x35 {
++            // the unit's slot 0x248 (0x115ce20: its master's range)
++            monk_master.combat_part().weapon_range
++        } else {
++            return Err(GenieError::unsupported(
++                "a conversion's range of a converter of another class (attribute 280)",
++            ));
++        };
++        Ok(
++            if monk_master.creatable_part().charge_kind == ChargeKind::EVERY_TARGET {
++                Distance::new(f32::from(monk_master.creatable_part().charge_event.get()))
++            } else {
++                r
++            },
++        )
++    };
++    let range = if a.task.work_range.get() <= 0.0 {
++        own_range()?
++    } else {
++        match a.task.needs.and_then(|i| attribute(attributes, i.index())) {
++            Some(v) if ONE < v => own_range()?,
++            _ => a.task.work_range,
++        }
++    };
++    if attribute(attributes, CONVERTS).is_some_and(|v| v <= 0.0) {
++        return Err(GenieError::unsupported(
++            "a conversion's start with the converter's attribute 67 at most 0 (0xba6b40)",
++        ));
++    }
++    let hero = t.master.creatable_part().hero_flag;
++    if !hero.is_empty() || c == 0x3d {
++        return Err(GenieError::unsupported(
++            "a conversion's start on a hero or class 61 (0xba6b40)",
++        ));
++    }
++    if let Some(i) = a.task.needs
++        && attribute(attributes, i.index()).is_some_and(|v| !(0.0 < v))
++    {
++        return Err(GenieError::unsupported(
++            "a conversion's start without the task's attribute (0xba6b40)",
++        ));
++    }
++    // a target of another kind than the last (a building's classes 3, 27, 39, 49, 52, 67 or
++    // not; a villager, class 4, always) starts the time anew
++    let building = |k: i16| matches!(k, 3 | 27 | 39 | 49 | 52 | 67);
++    let reset = match a.class {
++        None => false,
++        Some(last) => c == 4 || building(last.get()) != building(c),
++    };
++    Ok(Started {
++        range,
++        class,
++        reset,
++    })
++}
++
++/// The conversion's times and chance for the draw (0xba9a94..0xba9e8b).
++fn draw_bounds(
++    a: &ConvertAction,
++    (monk_master, attributes): (&Master, &[Amount]),
++    t: &Target,
++    target_attributes: &[Amount],
++) -> (i32, f32, f32) {
++    let chance = match a.task.chance.and_then(|i| attribute(attributes, i.index())) {
++        Some(v) => v as i32,
++        None => {
++            if monk_master.creatable_part().charge_kind == ChargeKind::EVERY_TARGET {
++                i32::from(monk_master.creatable_part().charge_target.get())
++            } else {
++                i32::from(monk_master.combat_part().hit_chance.get())
++            }
++        }
++    };
++    let get = |s: &[Amount], i| attribute(s, i).unwrap_or(0.0);
++    let conv = t.master.creatable_part().conversion;
++    let mut min = get(attributes, MIN_TIME_BY)
++        + get(target_attributes, MIN_TIME_OF)
++        + a.task.min_time.get()
++        + conv.min_time;
++    let mut max = get(attributes, MAX_TIME_BY)
++        + get(target_attributes, MAX_TIME_OF)
++        + a.task.max_time.get()
++        + conv.max_time;
++    if matches!(t.master.class.get(), 3 | 52) {
++        min += get(attributes, MIN_TIME_BUILDING);
++        max += get(attributes, MAX_TIME_BUILDING);
++    }
++    // the converter's player's `+0x598` (its `+0x24` above 0 divides both) is not held
++    (chance, min, max)
++}
++
++impl Unit {
++    /// The conversion's update with the action copied out of the list and put back.
++    ///
++    /// # Errors
++    ///
++    /// What the update does not model.
++    pub(crate) fn convert_part(
++        &mut self,
++        actions: &mut Action,
++        c: &mut Step<'_>,
++        me: Me,
++        roles: &Roles,
++    ) -> Result<HeadCode, GenieError> {
++        let Some(mut a) = actions.list.convert().copied() else {
++            return Ok(HeadCode::Keeps);
++        };
++        let code = self.convert_update(&mut a, c, me, roles);
++        if let Some(x) = actions.list.convert_mut() {
++            *x = a;
++        }
++        code
++    }
++
++    /// Slot 0x68 with none: the target goes (its slot 0x180).
++    fn convert_drop(&mut self, a: &mut ConvertAction, c: &mut Step<'_>) -> Result<(), GenieError> {
++        if let Some(t) = a.target.take() {
++            let by = self.releaser(c)?;
++            release(c, self, Some(t), by)?;
++        }
++        Ok(())
++    }
++
++    /// Slot 0x70 (`new_sprite`) with `id`.
++    fn convert_show(&mut self, c: &mut Step<'_>, id: Option<SpriteId>) -> Result<(), GenieError> {
++        let mut sprites = Sprites {
++            sprite: &mut self.sprite,
++            rng: c.w.streams.get(Stream::Sprite),
++            graphics: &c.w.model.graphics,
++        };
++        sprites
++            .shown(id)?
++            .show(c.w.parts.move_stats_mut(self.id), c.w.model.tuning.sprite);
++        Ok(())
++    }
++
++    fn convert_standing(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
++        self.show_standing(
++            c.w.parts.motion.layer_mut(self.id),
++            OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
++            &c.w.model.graphics,
++            c.w.streams.get(Stream::Sprite),
++            c.w.model.tuning.sprite,
++        )
++    }
++
++    /// `set_state` (0xba8b30): the sub-actions go (a walking `MoveTo`'s teardown stops the
++    /// unit), then by the new state. 2: the standing sprite. 3: the unit AI hears 0x202 with
++    /// 0x25c, the standing sprite. 4: the target's place is the point; the quiet `MoveTo` to
++    /// it within the range (its `+0x61` 1). 6: a priest that may convert the target (its unit
++    /// AI's slot 0x1b8 with 0) faces it, else 13. 7: the proceeding sprite (else the master's
++    /// attack sprite), then the time to the next draw. 11: the quiet `MoveTo` to the point.
++    /// Not modelled: 1 and 13 (slot 0x5a8, a group member's end `0x10f64b0`), class 53.
++    fn convert_set_state(
++        &mut self,
++        a: &mut ConvertAction,
++        c: &mut Step<'_>,
++        state: ConvertState,
++        roles: &Roles,
++    ) -> Result<(), GenieError> {
++        if a.state.move_to().is_some()
++            && let Some(m) = c.w.parts.mover_mut(self.id)
++        {
++            m.stop()?;
++        }
++        a.state = match state {
++            ConvertState::Walk { .. } => ConvertState::Walk { move_to: None },
++            ConvertState::WalkPoint { .. } => ConvertState::WalkPoint { move_to: None },
++            s => s,
++        };
++        match state {
++            ConvertState::Done | ConvertState::Failed => {
++                return Err(GenieError::unsupported(
++                    "a conversion's set_state 1 or 13 (slot 0x5a8, 0x10f64b0)",
++                ));
++            }
++            ConvertState::Halted => self.convert_standing(c)?,
++            ConvertState::Idle => {
++                self.post_own(
++                    &mut c.w.parts.unit_ai,
++                    NotifyKind::REQUIRES_SEARCH,
++                    [AI_CONVERT.value(), 0, 0],
++                )?;
++                self.convert_standing(c)?;
++            }
++            ConvertState::Walk { .. } => {
++                let t = target_of(c.w, a.target)?;
++                if let Some(t) = &t {
++                    a.point = t.position;
++                }
++                let move_reads = self.move_to_reads(
++                    c.w.parts.motion.mover(self.id),
++                    c.w.master_tables(),
++                    c.player,
++                    (
++                        &c.w.model.graphics,
++                        c.w.parts.combat_of(self.id).abilities.look.as_ref(),
++                    ),
++                    roles,
++                )?;
++                let move_to = match move_reads.walk_to(c.w, a.target)? {
++                    Some(to) => move_reads.to_object(
++                        to,
++                        a.range,
++                        a.task.moving,
++                        TargetMoved::AsksAgain,
++                        &c.w.model.tuning.move_to,
++                    )?,
++                    None => {
++                        return Err(GenieError::unsupported(
++                            "a conversion's walk without its target",
++                        ));
++                    }
++                };
++                a.state = ConvertState::Walk { move_to };
++            }
++            ConvertState::WalkPoint { .. } => {
++                let move_reads = self.move_to_reads(
++                    c.w.parts.motion.mover(self.id),
++                    c.w.master_tables(),
++                    c.player,
++                    (
++                        &c.w.model.graphics,
++                        c.w.parts.combat_of(self.id).abilities.look.as_ref(),
++                    ),
++                    roles,
++                )?;
++                let move_to =
++                    move_reads.to_point(a.point, a.range, a.task.moving, &c.w.model.tuning.move_to)?;
++                a.state = ConvertState::WalkPoint { move_to };
++            }
++            ConvertState::Face => {
++                let own = self.master(c.w.master_tables(), c.player)?.clone();
++                if own.class.get() == 0x35 {
++                    return Err(GenieError::unsupported(
++                        "a conversion's turn by a converter of class 53 (its sprite, slot 0x4d8)",
++                    ));
++                }
++                let may = match target_of(c.w, a.target)? {
++                    Some(t) if c
++                        .w
++                        .parts
++                        .unit_ai
++                        .get(self.id)
++                        .is_some_and(|ai| ai.ai_kind == UnitAiKind::Priest) =>
++                    {
++                        let attributes = &c.w.players.player(c.player)?.attributes;
++                        let converter = Converter {
++                            class: own.class,
++                            master: self.life.master_id,
++                            faith: self.life.amount,
++                            attributes,
++                            tasks: &own.action_part().tasks,
++                        };
++                        let convertee = Convertee {
++                            owner: t.owner,
++                            class: t.master.class,
++                            master: t.master.id,
++                            hero: t.master.creatable_part().hero_flag,
++                        };
++                        can_convert(
++                            &converter,
++                            Some(&convertee),
++                            TargetRules::Own,
++                            roles,
++                            &c.w.model.tuning.unit_ai,
++                        )
++                    }
++                    // another unit AI's slot 0x1b8 answers 0
++                    Some(_) => false,
++                    None => false,
++                };
++                if !may {
++                    return self.convert_set_state(a, c, ConvertState::Failed, roles);
++                }
++            }
++            ConvertState::Convert => {
++                let own = self.master(c.w.master_tables(), c.player)?.clone();
++                let sprite = a.task.proceeding.or(own.combat_part().attack_sprite);
++                self.convert_show(c, sprite)?;
++                // the monk's sound (slot 0x4f8) is not simulation; the target owner's AI
++                // (`player+0x648` above 0: 0 for every player probed)
++                if let Some(t) = target_of(c.w, a.target)?
++                    && c.w.players.player(t.owner)?.kind.is_computer()
++                {
++                    return Err(GenieError::unsupported(
++                        "a conversion of a computer player's unit (its AI's slot 0x1c8)",
++                    ));
++                }
++                let k = (ONE / 60.0) * 3.0;
++                let step = CHECK_BASE - k * c.w.settings.game_speed.get();
++                a.timer = Seconds::new(step + own.combat_part().shown.reload.get());
++                let e = if 0.0 > a.elapsed.get() {
++                    0.0
++                } else {
++                    a.elapsed.get()
++                };
++                a.elapsed = Seconds::new(e - step);
++            }
++        }
++        Ok(())
++    }
++
++    /// Slot 0x358 of the target with 500 (the "damaged" notify, as a hit's): the converter, the
++    /// target's hit points and its master's.
++    fn convert_hurts(&self, c: &mut Step<'_>, t: &Target) -> Result<(), GenieError> {
++        if let Some(ai) = c.w.parts.unit_ai.get_mut(t.id) {
++            ai.post(
++                Notify {
++                    caller: Some(self.id),
++                    recipient: t.id,
++                    kind: NotifyKind::DAMAGED,
++                    p: [
++                        self.id.get(),
++                        t.hp as i32,
++                        i32::from(t.master.hit_points.get()),
++                    ],
++                },
++                t.state,
++            )?;
++        }
++        Ok(())
++    }
++
++    /// The update (0xba9310).
++    fn convert_update(
++        &mut self,
++        a: &mut ConvertAction,
++        c: &mut Step<'_>,
++        me: Me,
++        roles: &Roles,
++    ) -> Result<HeadCode, GenieError> {
++        if a.state == ConvertState::Failed {
++            return self.convert_failed(a, c, roles);
++        }
++        let t = target_of(c.w, a.target)?;
++        if a.target.is_some() && t.is_none() {
++            self.convert_drop(a, c)?;
++            self.convert_set_state(a, c, ConvertState::Idle, roles)?;
++            return Ok(HeadCode::Keeps);
++        }
++        if let Some(t) = &t {
++            let relations = &c.w.players.player(c.player)?.relations;
++            if allied(relations, c.player, t.owner, AllyTest::WithRelation4) {
++                return Err(GenieError::unsupported(
++                    "a conversion whose target is its player's or an ally's (0xba6480)",
++                ));
++            }
++            if t.state != ObjectState::Alive || t.inside {
++                let next = if t.state == ObjectState::Foundation {
++                    ConvertState::Failed
++                } else {
++                    ConvertState::Idle
++                };
++                self.convert_set_state(a, c, next, roles)?;
++                self.convert_drop(a, c)?;
++                return Ok(HeadCode::Keeps);
++            }
++            self.convert_follow(a, c, t, roles)?;
++        }
++        match a.state {
++            ConvertState::Done => return Ok(HeadCode::Deletes),
++            ConvertState::Walk { .. } => {
++                match self.convert_walk(a, c, me, roles)? {
++                    1 | 2 => self.convert_set_state(a, c, ConvertState::Face, roles)?,
++                    3 => {
++                        let t = target_of(c.w, a.target)?.ok_or(GenieError::unsupported(
++                            "a conversion's failed walk without its target",
++                        ))?;
++                        let own = self.master(c.w.master_tables(), c.player)?.radius;
++                        let gap = footprint_gap(self.position(), own, t.position, t.master.radius);
++                        let next = if gap.get() <= a.range.get() {
++                            ConvertState::Face
++                        } else {
++                            ConvertState::Failed
++                        };
++                        self.convert_set_state(a, c, next, roles)?;
++                    }
++                    4 | 5 => {
++                        self.convert_drop(a, c)?;
++                        self.convert_set_state(a, c, ConvertState::WalkPoint { move_to: None }, roles)?;
++                    }
++                    _ => {}
++                }
++            }
++            ConvertState::WalkPoint { .. } => match self.convert_walk(a, c, me, roles)? {
++                1 | 2 | 5 => self.convert_set_state(a, c, ConvertState::Idle, roles)?,
++                3 => self.convert_set_state(a, c, ConvertState::Failed, roles)?,
++                4 => {
++                    self.convert_drop(a, c)?;
++                    self.convert_set_state(a, c, ConvertState::WalkPoint { move_to: None }, roles)?;
++                }
++                _ => {}
++            },
++            ConvertState::Face => {
++                let Some(t) = target_of(c.w, a.target)? else {
++                    self.convert_set_state(a, c, ConvertState::Idle, roles)?;
++                    return Ok(HeadCode::Keeps);
++                };
++                let at = self.position();
++                let mover = c.w.parts.mover_mut(self.id).ok_or(GenieError::unsupported(
++                    "a converter without movement state",
++                ))?;
++                if face_target(mover, at, t.position, c.w.world_time)? == Aim::Turning {
++                    return Ok(HeadCode::Keeps);
++                }
++                self.convert_set_state(a, c, ConvertState::Convert, roles)?;
++                if 0.0 < a.elapsed.get() {
++                    return Ok(HeadCode::Keeps);
++                }
++                // the interface's event 0x89 is not simulation
++                if !hears_late(&t, roles) {
++                    self.convert_hurts(c, &t)?;
++                }
++            }
++            ConvertState::Convert => {
++                let Some(t) = target_of(c.w, a.target)? else {
++                    self.convert_set_state(a, c, ConvertState::Idle, roles)?;
++                    return Ok(HeadCode::Keeps);
++                };
++                let dt = c.dt.seconds().get();
++                a.elapsed = Seconds::new(dt + a.elapsed.get());
++                if !hears_late(&t, roles) || ONE <= a.elapsed.get() {
++                    self.convert_hurts(c, &t)?;
++                }
++                a.timer = Seconds::new(a.timer.get() - dt);
++                if 0.0 < a.timer.get() {
++                    return Ok(HeadCode::Keeps);
++                }
++                self.convert_draw(a, c, &t)?;
++                self.convert_set_state(a, c, ConvertState::Walk { move_to: None }, roles)?;
++            }
++            ConvertState::Failed => return self.convert_failed(a, c, roles),
++            ConvertState::Halted | ConvertState::Idle => {}
++        }
++        Ok(HeadCode::Keeps)
++    }
++
++    /// State 13 (and the update's first test): the unit AI hears 0x1f9 with 0x25c, `set_state(2)`,
++    /// and its 3 deletes the action.
++    fn convert_failed(
++        &mut self,
++        a: &mut ConvertAction,
++        c: &mut Step<'_>,
++        roles: &Roles,
++    ) -> Result<HeadCode, GenieError> {
++        self.post_own(
++            &mut c.w.parts.unit_ai,
++            NotifyKind::ACTION_FAILED,
++            [AI_CONVERT.value(), 0, 0],
++        )?;
++        self.convert_set_state(a, c, ConvertState::Halted, roles)?;
++        Ok(HeadCode::Deletes)
++    }
++
++    /// The `MoveTo`'s update (0xb8ae30) and its code.
++    fn convert_walk(
++        &mut self,
++        a: &mut ConvertAction,
++        c: &mut Step<'_>,
++        me: Me,
++        roles: &Roles,
++    ) -> Result<u8, GenieError> {
++        let master = self.master(c.w.master_tables(), c.player)?;
++        let how = ListUpdate {
++            gives_up: GiveUp {
++                patience: if roles.of_class(master.class).contains(ClassRoles::VILLAGER)
++                    && !c.w.players.player(c.player)?.kind.is_computer()
++                {
++                    Patience::WaitsOnce
++                } else {
++                    Patience::Fails
++                },
++                stance: c
++                    .w
++                    .parts
++                    .unit_ai
++                    .get(self.id)
++                    .map_or(UnitStance::Aggressive, |ai| ai.stance),
++            },
++            ..ListUpdate::default()
++        };
++        let code = match &mut a.state {
++            ConvertState::Walk { move_to } | ConvertState::WalkPoint { move_to } => {
++                update_sub_actions(move_to, c, self, me, how)?
++            }
++            _ => update_sub_actions(&mut None, c, self, me, how)?,
++        };
++        Ok(code.get())
++    }
++
++    /// 0xba6590, before each update's state: where its owner sees the target (its unit AI's
++    /// tile test, 0xd44470: 0xf) is where it was seen; a target beyond the range (the squared
++    /// footprint gap 0x124daf0 above the squared range) that it sees, out of state 4 and not
++    /// while it turns or converts with an animated sprite still playing (the sprite's slot 8,
++    /// 0x147c640), makes it walk again (4). A target it does not see is not modelled.
++    fn convert_follow(
++        &mut self,
++        a: &mut ConvertAction,
++        c: &mut Step<'_>,
++        t: &Target,
++        roles: &Roles,
++    ) -> Result<(), GenieError> {
++        let sees = c.w.parts.unit_ai.contains(self.id)
++            && c.w.spatial.sees_tile(
++                c.player,
++                Tile::new(t.position.x() as i32, t.position.y() as i32),
++            );
++        if sees {
++            a.seen = t.position;
++        }
++        let own = self.master(c.w.master_tables(), c.player)?.radius;
++        let gap2 = footprint_gap_squared(self.position(), own, t.position, t.master.radius).get();
++        let r = a.range.get();
++        if !(r * r < gap2) {
++            return Ok(());
++        }
++        if !sees {
++            return Err(GenieError::unsupported(
++                "a conversion's target beyond its range out of sight (0xba6590)",
++            ));
++        }
++        if matches!(a.state, ConvertState::Walk { .. }) {
++            return Ok(());
++        }
++        let working = matches!(a.state, ConvertState::Face | ConvertState::Convert);
++        // dil: the sprite's slot 8 (0x147c640: animating and animated) or a still sprite
++        let done = match self.sprite.as_ref() {
++            Some(s) => {
++                (s.animate != crate::objects::AnimateState::Stopped && s.graphic.animated())
++                    || !s.graphic.animated()
++            }
++            None => {
++                return Err(GenieError::unsupported(
++                    "a converter whose sprite the slice does not hold (0xba6590)",
++                ));
++            }
++        };
++        if working && !done {
++            return Ok(());
++        }
++        self.convert_set_state(a, c, ConvertState::Walk { move_to: None }, roles)
++    }
++
++    /// The draw of state 7 (0xba98a0..0xba9e9e): the Action stream's `rand15` × 100 / 0x7fff,
++    /// scaled by the target's resistance (its master's `+0x3dc` plus its slot 0x790, `+0x6d8`,
++    /// not held: 0) and its owner's attribute 77 when their sum is above 0; the chance is the
++    /// task's attribute of the converter's player, else the master's (its charge target for a
++    /// charge of type −4, else its accuracy); before the shortest time it is −1000, from the
++    /// longest 1000. A draw at most the chance converts: not modelled.
++    fn convert_draw(
++        &mut self,
++        a: &mut ConvertAction,
++        c: &mut Step<'_>,
++        t: &Target,
++    ) -> Result<(), GenieError> {
++        if c.w.players.player(t.owner)?.kind.is_computer() {
++            return Err(GenieError::unsupported(
++                "a conversion of a computer player's unit (its AI's slot 0x1c8)",
++            ));
++        }
++        let r = c.w.streams.get(Stream::Action).rand15() as i32;
++        let mut draw = (r * 100) / 0x7fff;
++        let target_attributes = c.w.players.player(t.owner)?.attributes.clone();
++        let scale = t.master.creatable_part().conversion.chance
++            + attribute(&target_attributes, DRAW_SCALE).unwrap_or(0.0);
++        if 0.0 < scale {
++            draw = (draw as f32 * scale) as i32;
++        }
++        let own = self.master(c.w.master_tables(), c.player)?.clone();
++        let attributes = &c.w.players.player(c.player)?.attributes;
++        let (chance, min, max) = draw_bounds(a, (&own, attributes), t, &target_attributes);
++        let e = a.elapsed.get();
++        let chance = if min <= e {
++            if max <= e { ALWAYS } else { chance }
++        } else {
++            NEVER
++        };
++        if draw <= chance {
++            return Err(GenieError::unsupported(
++                "a conversion that converts its target (0xba9f29..0xbaa4a6)",
++            ));
++        }
++        Ok(())
++    }
++}
++
++/// 0xba5d20: a target of class 2, 4 or 21 hears the conversion only from its first second.
++fn hears_late(t: &Target, _roles: &Roles) -> bool {
++    matches!(t.master.class.get(), 2 | 4 | 21)
++}
++
++impl World {
++    /// The start (slot 5, 0xba6b40 with 1) from the work command or the new target: the checks,
++    /// the range, the class kept (`+0x88`) and `set_state(4)` (the point is the target's place,
++    /// the quiet `MoveTo` to it within the range; a walking `MoveTo` before stops the unit).
++    ///
++    /// # Errors
++    ///
++    /// A target the start refuses, a unit or master the world lacks.
++    pub(crate) fn convert_start(
++        &mut self,
++        player: PlayerId,
++        idx: crate::objects::ListIndex,
++        a: &mut ConvertAction,
++    ) -> Result<(), GenieError> {
++        let Some(t) = target_of(self, a.target)? else {
++            return Err(GenieError::unsupported(
++                "a conversion's start without a target (set_state 3)",
++            ));
++        };
++        let unit = self.players.live(player, idx)?;
++        let master = unit.master(self.master_tables(), player)?.clone();
++        let started = start_checks(
++            a,
++            (unit, &master, &self.players.player(player)?.attributes),
++            &t,
++        )?;
++        a.range = started.range;
++        if started.reset {
++            a.elapsed = Seconds::new(-1.0);
++        }
++        a.class = Some(started.class);
++        let id = unit.id;
++        let move_reads = MoveToReads::of(
++            (unit, self.parts.mover_of(id)),
++            &master,
++            (
++                &self.model.graphics,
++                self.parts.combat_of(id).abilities.look.as_ref(),
++            ),
++            &self.model.roles,
++        );
++        let to = move_reads
++            .walk_to(self, a.target)?
++            .ok_or(GenieError::unsupported("a conversion's walk without its target"))?;
++        let walk = move_reads.to_object(
++            to,
++            a.range,
++            a.task.moving,
++            TargetMoved::AsksAgain,
++            &self.model.tuning.move_to,
++        )?;
++        if a.state.move_to().is_some()
++            && let Some(m) = self.parts.mover_mut(id)
++        {
++            m.stop()?;
++        }
++        a.point = t.position;
++        a.state = ConvertState::Walk { move_to: walk };
++        Ok(())
++    }
++}
++
++impl World {
++    /// The factory's conversion (0xbb8c30 case 0x68 -> 0xbb8d28, constructor 0xba5100) on
++    /// `target` from the work command: the action takes the target (0xb6ba50, slot 0x178); the
++    /// unit AI hears the convert order and action on it at `point` (slot 0x828); the install
++    /// clears the action list, its start (slot 5 with 1, [`World::convert_start`]) walks to the
++    /// target, and the list holds it.
++    ///
++    /// # Errors
++    ///
++    /// What the start does not model, a unit or master the world lacks.
++    pub(crate) fn start_convert(
++        &mut self,
++        player: PlayerId,
++        idx: crate::objects::ListIndex,
++        (target, point): (ObjectId, Position),
++        task: &Task,
++        notifies: crate::unit_ai::Notifies,
++    ) -> Result<(), GenieError> {
++        let t = target_of(self, Some(target))?.ok_or(GenieError::unsupported(
++            "a conversion's target the world does not hold",
++        ))?;
++        let mut action = ConvertAction::new(target, t.position, task);
++        let id = self.players.live(player, idx)?.id;
++        self.take(target, self.releaser(player, idx)?)?;
++        if let Some(ai) = self.parts.unit_ai.get_mut(id) {
++            ai.notify_work(
++                Some(crate::unit_ai::OrderKind::Convert),
++                Some(AI_CONVERT),
++                Some((target, t.master.class)),
++                point,
++                notifies,
++                self.streams.get(Stream::Ai),
++            )?;
++            self.remember_order(
++                player,
++                idx,
++                (Some(crate::unit_ai::OrderKind::Convert), Some(AI_CONVERT)),
++            )?;
++        }
++        self.clear_actions(player, idx)?;
++        self.convert_start(player, idx, &mut action)?;
++        self.parts.actions_mut(id)?.list.set_convert(Some(action));
++        Ok(())
++    }
++
++    /// The conversion on top takes the work command's `target` (its slot 9, 0xbaa500): its own
++    /// target again changes nothing while it turns or converts (6, 7), nor for a computer
++    /// player's converter walking to it (4); else slot 0x68 takes the target, its place is the
++    /// point and where it was seen, `+0x84` none, and the start runs again (slot 5 with 1). The
++    /// slot answers 1; the unit AI then hears the convert order and action (slot 0x828).
++    ///
++    /// # Errors
++    ///
++    /// What the start does not model, a unit or master the world lacks.
++    pub(crate) fn retake_convert(
++        &mut self,
++        player: PlayerId,
++        idx: crate::objects::ListIndex,
++        (target, point): (ObjectId, Position),
++        notifies: crate::unit_ai::Notifies,
++    ) -> Result<(), GenieError> {
++        let t = target_of(self, Some(target))?.ok_or(GenieError::unsupported(
++            "a conversion's target the world does not hold",
++        ))?;
++        let id = self.players.live(player, idx)?.id;
++        let mut a = self
++            .parts
++            .actions_of(id)
++            .list
++            .convert()
++            .copied()
++            .ok_or(GenieError::unreachable("a conversion's retarget without one"))?;
++        let computer = self.players.player(player)?.kind.is_computer();
++        let stays = a.target == Some(target)
++            && (matches!(a.state, ConvertState::Face | ConvertState::Convert)
++                || (matches!(a.state, ConvertState::Walk { .. }) && computer));
++        if !stays {
++            a.target = self.retarget_action(
++                player,
++                idx,
++                a.target,
++                target,
++                crate::objects::Voice::Loud,
++            )?;
++            a.point = t.position;
++            a.seen = t.position;
++            a.lost = None;
++            self.convert_start(player, idx, &mut a)?;
++            if let Some(x) = self.parts.actions_mut(id)?.list.convert_mut() {
++                *x = a;
++            }
++        }
++        if let Some(ai) = self.parts.unit_ai.get_mut(id) {
++            ai.notify_work(
++                Some(crate::unit_ai::OrderKind::Convert),
++                Some(AI_CONVERT),
++                Some((target, t.master.class)),
++                point,
++                notifies,
++                self.streams.get(Stream::Ai),
++            )?;
++            self.remember_order(
++                player,
++                idx,
++                (Some(crate::unit_ai::OrderKind::Convert), Some(AI_CONVERT)),
++            )?;
++        }
++        Ok(())
 +    }
 +}
 diff --git a/crates/engine/genie-core/src/objects/relic_deposit.rs b/crates/engine/genie-core/src/objects/relic_deposit.rs
