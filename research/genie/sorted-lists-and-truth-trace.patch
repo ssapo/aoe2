@@ -9615,7 +9615,7 @@ index 38514e3f..1e07358a 100644
          self.attack_object(target, OrderForce::Forced, TargetRules::Own, at, side)
      }
 diff --git a/crates/engine/genie-core/src/unit_ai/attack_pick.rs b/crates/engine/genie-core/src/unit_ai/attack_pick.rs
-index 4bca7b20..05c44079 100644
+index 4bca7b20..6a87074e 100644
 --- a/crates/engine/genie-core/src/unit_ai/attack_pick.rs
 +++ b/crates/engine/genie-core/src/unit_ai/attack_pick.rs
 @@ -9,7 +9,13 @@ use crate::map::Footprint;
@@ -9713,12 +9713,20 @@ index 4bca7b20..05c44079 100644
  impl Seeker {
      /// `canMoveToAttack` with no target (slot 0x1d0 with −1, `FUN_140c48420`; the slice holds no
      /// unit groups): with an order, or without one in a stance below 2.
-@@ -316,6 +389,23 @@ pub fn can_attack(
+@@ -309,13 +382,31 @@ impl Seeker {
+ /// (`FUN_140c48400`: the boar, the ranged units, the ships, the artifact, the siege tower,
+ /// livestock) always; the building's (`FUN_140c18b60`) never; the tower's
+ /// ([`tower_can_attack`]), the soldier's ([`soldier_can_attack`]) and the siege unit's. The
+-/// priest's (`FUN_140c19020`: its conversion test, slot 0x1b8) is not modelled here.
++/// priest's needs its conversion test from the caller ([`can_attack_on`]).
+ pub fn can_attack(
+     me: &Attacker,
+     seeker: &Seeker,
      t: &Target,
      roles: &Roles,
      unit_ai_tuning: &UnitAiTuning,
 +) -> Result<bool, GenieError> {
-+    can_attack_on(me, seeker, t, roles, unit_ai_tuning, None)
++    can_attack_on(me, seeker, t, roles, unit_ai_tuning, None, None)
 +}
 +
 +/// [`can_attack`] with the unit's own path `route`, which 188329's soldier reads in Defend
@@ -9734,10 +9742,11 @@ index 4bca7b20..05c44079 100644
 +    roles: &Roles,
 +    unit_ai_tuning: &UnitAiTuning,
 +    route: Option<PatrolRoute<'_>>,
++    converts: Option<bool>,
  ) -> Result<bool, GenieError> {
      match me.ai_kind {
          UnitAiKind::Hunted => Ok(matches!(me.top_action, Some(ATTACK | ActionKind::COMBAT))),
-@@ -333,7 +423,9 @@ pub fn can_attack(
+@@ -333,14 +424,45 @@ pub fn can_attack(
          UnitAiKind::Civilian => Ok(civilian_may_attack(me.attack_priority, t.class, roles)),
          UnitAiKind::Building => Ok(false),
          UnitAiKind::Tower => tower_can_attack(me, t, roles, unit_ai_tuning),
@@ -9748,7 +9757,46 @@ index 4bca7b20..05c44079 100644
          UnitAiKind::Siege => {
              siege_can_attack(me, seeker, t, TargetRules::Own, roles, unit_ai_tuning)
          }
-@@ -462,6 +554,22 @@ pub fn soldier_can_attack(
+-        UnitAiKind::Priest => Err(GenieError::unsupported(
+-            "an attack check (slot 0xa0) of a unit-AI type not modelled",
+-        )),
++        UnitAiKind::Priest => priest_can_attack(me, t, roles, converts),
++    }
++}
++
++/// The priest's slot 0xa0 (188329 `0xcf6d60`, findings 144/147): a Gaia priest only on the
++/// computer's way (a unit of type 50 or above outside the scenario modes; genie holds no
++/// `+0x51c`, so 0), any other player's always; of attack priority 3 (the master's `+0x3cc`,
++/// `0x12b5510`) only the classes of `0x10bb080` ([`ClassRoles::PRIORITY_3_TARGET`] and class
++/// 67); then its conversion test with 0 (slot 0x1b8, `CanConvert` with [`TargetRules::Own`]),
++/// which the caller gives (`converts`).
++///
++/// # Errors
++///
++/// A priest's check whose caller gave no conversion test.
++fn priest_can_attack(
++    me: &Attacker,
++    t: &Target,
++    roles: &Roles,
++    converts: Option<bool>,
++) -> Result<bool, GenieError> {
++    let computer_way = MasterKind::RGE_COMBAT <= me.kind && !me.scenario;
++    if me.player == PlayerId::GAIA && !computer_way {
++        return Ok(false);
+     }
++    if me.attack_priority == AttackPriority::PRIORITY_3
++        && !(roles.of_class(t.class).contains(ClassRoles::PRIORITY_3_TARGET)
++            || t.class.get() == 67)
++    {
++        return Ok(false);
++    }
++    converts.ok_or(GenieError::unsupported(
++        "a priest's attack check (slot 0xa0) without its conversion test",
++    ))
+ }
+ 
+ /// The predator's slot 0xa0 (`FUN_140c18ed0`) without its `any` flag: by the master's attack
+@@ -462,6 +584,22 @@ pub fn soldier_can_attack(
      t: &Target,
      roles: &Roles,
      unit_ai_tuning: &UnitAiTuning,
@@ -9771,7 +9819,7 @@ index 4bca7b20..05c44079 100644
  ) -> Result<bool, GenieError> {
      if roles.of_class(t.class).contains(ClassRoles::LAND_MINE) {
          return Ok(false);
-@@ -504,7 +612,7 @@ pub fn soldier_can_attack(
+@@ -504,7 +642,7 @@ pub fn soldier_can_attack(
      if s.stance == UnitStance::NoAttack {
          return Ok(false);
      }
@@ -9780,7 +9828,7 @@ index 4bca7b20..05c44079 100644
          return Ok(false);
      }
      Ok(!me.attack_priority.limited()
-@@ -547,8 +655,82 @@ pub(super) fn stance_reaches(
+@@ -547,8 +685,82 @@ pub(super) fn stance_reaches(
      s: &Seeker,
      t: &Target,
      unit_ai_tuning: &UnitAiTuning,
@@ -11917,7 +11965,7 @@ index 77dc93ea..59cc443e 100644
          let (at, player_kind) = (self.unit.position(), self.player_kind);
          // the search about the town centre only while the player has no scout map
 diff --git a/crates/engine/genie-core/src/unit_ai/world_view/unit_view.rs b/crates/engine/genie-core/src/unit_ai/world_view/unit_view.rs
-index 9fe88757..f8bf962f 100644
+index 9fe88757..75a190dc 100644
 --- a/crates/engine/genie-core/src/unit_ai/world_view/unit_view.rs
 +++ b/crates/engine/genie-core/src/unit_ai/world_view/unit_view.rs
 @@ -17,7 +17,7 @@ use crate::players::PlayerId;
@@ -11929,11 +11977,22 @@ index 9fe88757..f8bf962f 100644
  use crate::world::index::ObjectsRef;
  use crate::world::layer::Roles;
  use crate::world::lets::{release as lets_release, take as lets_take, torn_down as lets_torn_down};
-@@ -76,12 +76,15 @@ impl UnitView<'_, '_> {
+@@ -76,12 +76,27 @@ impl UnitView<'_, '_> {
      ) -> Result<Option<(ClassId, Position)>, GenieError> {
          let picker = self.picker(Some(*seeker))?;
          let (t, _) = picker.target(&self.c.w.spatial, target)?;
 -        Ok(can_attack(
++        let converts = (self.attacker.ai_kind == crate::unit_ai::UnitAiKind::Priest)
++            .then(|| {
++                picker.converts(
++                    self.unit.id,
++                    target,
++                    crate::unit_ai::TargetRules::Own,
++                    roles,
++                    &self.c.w.model.tuning.unit_ai,
++                )
++            })
++            .transpose()?;
 +        Ok(crate::unit_ai::attack_pick::can_attack_on(
              &self.attacker,
              seeker,
@@ -11943,14 +12002,26 @@ index 9fe88757..f8bf962f 100644
 +            Some(crate::unit_ai::attack_pick::PatrolRoute::of(
 +                self.c.w.parts.mover_of(self.unit.id),
 +            )),
++            converts,
          )?
          .then_some((t.class, t.position)))
      }
-@@ -199,12 +202,15 @@ impl UnitView<'_, '_> {
+@@ -199,12 +214,27 @@ impl UnitView<'_, '_> {
          };
          let picker = self.picker(None)?;
          let (target, _) = picker.target(&self.c.w.spatial, attacker)?;
 -        can_attack(
++        let converts = (ai.ai_kind == crate::unit_ai::UnitAiKind::Priest)
++            .then(|| {
++                picker.converts(
++                    u.id,
++                    attacker,
++                    crate::unit_ai::TargetRules::Own,
++                    roles,
++                    &self.c.w.model.tuning.unit_ai,
++                )
++            })
++            .transpose()?;
 +        crate::unit_ai::attack_pick::can_attack_on(
              &me,
              &ai.seeker_with(target_master_kind),
@@ -11960,20 +12031,24 @@ index 9fe88757..f8bf962f 100644
 +            Some(crate::unit_ai::attack_pick::PatrolRoute::of(
 +                self.c.w.parts.mover_of(u.id),
 +            )),
++            converts,
          )
      }
  }
 diff --git a/crates/engine/genie-core/src/unit_ai/world_view/world_picker.rs b/crates/engine/genie-core/src/unit_ai/world_view/world_picker.rs
-index acf8fb4a..6372fe05 100644
+index acf8fb4a..34b04d5e 100644
 --- a/crates/engine/genie-core/src/unit_ai/world_view/world_picker.rs
 +++ b/crates/engine/genie-core/src/unit_ai/world_view/world_picker.rs
-@@ -541,7 +541,16 @@ impl AttackPicker for WorldPicker<'_> {
+@@ -541,7 +541,20 @@ impl AttackPicker for WorldPicker<'_> {
              "an attack test outside bestUnitToAttack",
          ))?;
          let (target, _) = self.target(spatial, id)?;
 -        unit_ai_can_attack(self.attacker, &seeker, &target, roles, unit_ai_tuning)
 +        // 188329's soldier reads the unit's own path in Defend (slots 0x690, 0x4a8)
 +        let route = crate::unit_ai::attack_pick::PatrolRoute::of(self.parts.mover_of(self.me));
++        let converts = (self.attacker.ai_kind == UnitAiKind::Priest)
++            .then(|| self.converts(self.me, id, TargetRules::Own, roles, unit_ai_tuning))
++            .transpose()?;
 +        crate::unit_ai::attack_pick::can_attack_on(
 +            self.attacker,
 +            &seeker,
@@ -11981,6 +12056,7 @@ index acf8fb4a..6372fe05 100644
 +            roles,
 +            unit_ai_tuning,
 +            Some(route),
++            converts,
 +        )
      }
  

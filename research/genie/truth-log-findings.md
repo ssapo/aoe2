@@ -1467,3 +1467,8 @@
 - 엔진 `groups/update/attack.rs` `category_in_reach`가 사거리 > 0이고 대상에게 사거리로 밀리지 않는 범주에 여유 `ranged_slack` 2.0을 썼다. 188329 0x110c143: 상수 −2.0(0x32028bc), 0.25(0x320532c), 2.0(0x31b6518) — "밀림" = 대상 slot 0x610 ≠ 0이고 우리 원래 사거리 > 대상 slot 0x248 + 2.0; 여유 = 밀림 ? −2.0 : 0.0(사거리 > 0), 사거리 ≤ 0이면 0.25; 풀어 줌 = max(0, 사거리) ≥ 간격 − 여유. 이제 0.0(밀림은 그대로 chasing_slack, 밀림 검사 자체는 ranged_slack 더함). 근거 읽기는 137번 뒤 R35 도우미(PC `re-kit\re\out_r35\r35_b.c`).
 - 패치 PC `runs\R34d.patch`(= 이 커밋의 패치, sha256 `e0cd315e…08ce2e`, 863,581바이트), 표 `runs\R34_tab_R34d.txt`·`R34_ptab_R34d.txt`(이전 = R34c, 145번). 결과: 거의 영향 없음 — .out은 521467291의 멈춤만(60053 → 60092, 첫 어긋남 뒤), CPWORDS는 V 520282194 첫 어긋남 뒤만. 첫 어긋남·사이트·프로 변화 없음, 518239882 57 / 54 멈춤 없음.
 - 정정(145번): 520848973 1158.729초 나무꾼 10311이 사냥감 9713으로 간 것은 원본의 자동 다음 대상 찾기가 아니라 **P2의 명령**(1157.702초 Order/Interact, 대상 9713, 유닛 10351·10311·10151)이다 — 사용자 지적으로 Shift 예약 명령일 가능성이 큼(나무를 마저 캐고 나무가 떨어지는 틱에 예약 명령 실행). 원본 코드로 확인 중.
+
+## 147. 수도사 공격 검사 slot 0xa0 = 0xcf6d60을 엔진에 넣음 (스위치 없음; 144번 (a))
+
+- `unit_ai/attack_pick.rs` 새 `priest_can_attack`: 가이아는 컴퓨터 길에서만, 공격 우선 3이면 `PRIORITY_3_TARGET` 클래스 또는 67만, 그다음 호출자의 `can_convert(.., TargetRules::Own)`. `can_attack_on`이 `converts: Option<bool>`을 받고 세 호출부(unit_view attack_check·helper_free, world_picker can_attack)가 `WorldPicker::converts`로 채움.
+- 패치 PC `runs\R34e.patch`(= 이 커밋의 패치, sha256 `6c70b04a…ce808ec`, 866,735바이트), 표 `runs\R34_tab_R34e.txt`·`R34_ptab_R34e.txt`(이전 = R34d, 146번). 전체 실행: 모든 .out·CPWORDS 바이트까지 같음(ENG-31 네 판·프로 14판 포함) — 검사 세트의 어느 판도 첫 어긋남 전에 수도사 검사에 닿지 않음. 520848973은 지금 약 u103k에서 멈춰 u155445 사례 전이라 이 수정 자체는 아직 실행으로 확인 못 함. 518239882 57 / 54 멈춤 없음.
