@@ -2217,6 +2217,80 @@ index 1e001e13..c5944259 100644
              }
              // set_state(11) without a target: to the point within the task's range
              let mover =
+diff --git a/crates/engine/genie-core/src/gathering/drop_sites.rs b/crates/engine/genie-core/src/gathering/drop_sites.rs
+index acdc7c73..b3bbb64f 100644
+--- a/crates/engine/genie-core/src/gathering/drop_sites.rs
++++ b/crates/engine/genie-core/src/gathering/drop_sites.rs
+@@ -93,8 +93,8 @@ impl Seeker<'_, '_> {
+ 
+     /// What `FUN_1411671e0` measures to the drop site `o` (of `master`, its centre `squared`
+     /// away), or none when the planner passes it over: the planner's result decides whether it
+-    /// counts ([`counted`]); by path its path's length, within `TurnTuning::short_drop_reach` the shorter
+-    /// of that and the short path (`TurnTuning::drop_reach`), kept in `last`; without a planner `last`;
++    /// counts ([`counted`]); by path its path's length, within `TurnTuning::short_drop_reach` the short
++    /// path's (`TurnTuning::drop_reach`) when it finds one, kept in `last`; without a planner `last`;
+     /// else `squared`.
+     ///
+     /// # Errors
+@@ -127,25 +127,43 @@ impl Seeker<'_, '_> {
+             radii,
+             tile_path_tuning,
+         )?;
++        if crate::movement::trace_steer() {
++            // DIAGNOSTIC (findings 132): each drop site the search measures
++            eprintln!(
++                "DROPSEARCH unit={:?} site={:?} at={:?} to={:?} radii={:?} planned={:?} squared={}",
++                self.unit.id,
++                o.id,
++                self.unit.position(),
++                to,
++                radii,
++                planned,
++                squared
++            );
++        }
+         Ok(match planned {
+             Some((found, length)) if counted(found, nearest, roles.of_class(self.class), near) => {
+                 if nearest == DropMeasure::ByDistance {
+                     return Ok(Some(squared));
+                 }
+                 *last = length.get();
++                // 188329 (0x122a3f8..0x122a42e, findings 132): within 10 the short path's length
++                // replaces the path's whenever slot 0x420 (`0x120f950`) finds one, longer or not;
++                // that slot paths through the dispatcher 0x1078690, not the old pather alone
+                 if length.get() <= turn_tuning.short_drop_reach
+-                    && let Some(short) = self.mover.short_reach(
++                    && let Some(short) = self.mover.short_reach_188329(
+                         self.unit.position(),
+                         &self.me,
+-                        self.spatial,
++                        (self.spatial, by_id),
++                        self.plan,
+                         o.id,
+                         Distance::new(turn_tuning.drop_reach),
+-                        by_id,
+                     )?
+-                    && short < length
+                 {
+                     *last = short.get();
+                 }
++                if crate::movement::trace_steer() {
++                    eprintln!("DROPSEARCH unit={:?} site={:?} measured={}", self.unit.id, o.id, *last);
++                }
+                 Some(*last)
+             }
+             // the planner's other results pass the object over
+@@ -200,8 +218,8 @@ pub(crate) fn counted(
+ /// master in `sites`, the nearest to `at`. With the `seeker`, only objects in its zone count (its
+ /// restriction's zone of its tile against each object's tile) and only those the tile planner
+ /// reaches (its goal or its range; radii the seeker's and the object's, [`Mover::plan_length`]),
+-/// the nearest by path ([`Seeker::nearest`]): the path's length, within 10 tiles the shorter of
+-/// it and the seeker's short path (slot 0x3e8 within 0.1, [`Mover::short_reach`]); else by the
++/// the nearest by path ([`Seeker::nearest`]): the path's length, within 10 tiles the seeker's
++/// short path's when it finds one (188329 slot 0x420 within 0.1, [`Mover::short_reach_188329`]); else by the
+ /// squared distance of the centres. Without a planner the game keeps the distance it last
+ /// measured (of an earlier object, else the largest float) by path. Without a seeker, by the
+ /// squared distance of the centres. A fishing ship (class 21) seeks in every zone, and by path a
 diff --git a/crates/engine/genie-core/src/gathering/farm_queue.rs b/crates/engine/genie-core/src/gathering/farm_queue.rs
 index 40398a75..697d377b 100644
 --- a/crates/engine/genie-core/src/gathering/farm_queue.rs
@@ -5449,10 +5523,29 @@ index 8ae7fee5..35ac2065 100644
              return MoveTo::Failed;
          }
 diff --git a/crates/engine/genie-core/src/movement/new_path.rs b/crates/engine/genie-core/src/movement/new_path.rs
-index 1f873756..19e5c91a 100644
+index 1f873756..5b3a08f6 100644
 --- a/crates/engine/genie-core/src/movement/new_path.rs
 +++ b/crates/engine/genie-core/src/movement/new_path.rs
-@@ -65,6 +65,15 @@ impl Mover {
+@@ -2,6 +2,7 @@
+ //! and a blocked start.
+ 
+ use crate::map::Distance;
++use crate::math::fmath::BVector;
+ use crate::map::DistanceSquared;
+ use crate::map::Point;
+ use crate::map::Position;
+@@ -21,8 +22,8 @@ use crate::movement::request_plans::NewPath;
+ use crate::movement::request_plans::PlanFlags;
+ use crate::movement::{
+     AfterRequest, LONG_PATHER, Me, Mover, PathData, Planning, ReachAsk, SHORT_PATHER, ShortAsk,
+-    TileAsk, Walker, footprint_gap_squared, owner_number, short_path_including, split,
+-    tile_plan_for,
++    TileAsk, Walker, footprint_gap_squared, owner_number, short_path_for, short_path_including,
++    split, tile_plan_for,
+ };
+ use crate::objects::ObjectId;
+ use crate::objects::masters::MasterId;
+@@ -65,6 +66,15 @@ impl Mover {
          }
          let level = self.paths.walked_mut()?;
          if !flags.contains(PlanFlags::FOUND) || level.range < to_end {
@@ -5468,7 +5561,7 @@ index 1f873756..19e5c91a 100644
              if level.waypoint.at_or_past_last(level.points.len()) {
                  if level.continue_counter.left() {
                      // the unit pauses itself (slot 0x5f0, the walked level's `+0x34`) and stops
-@@ -131,6 +140,7 @@ impl Mover {
+@@ -131,6 +141,7 @@ impl Mover {
              } else {
                  LinkedPathKind::MovesOn
              };
@@ -5476,7 +5569,7 @@ index 1f873756..19e5c91a 100644
              self.paths.insert(0, new);
              return Ok(if SHORT_PATHER || LONG_PATHER {
                  AfterRequest::Again
-@@ -170,6 +180,7 @@ impl Mover {
+@@ -170,6 +181,7 @@ impl Mover {
              level.length = Distance::ZERO;
              level.created = WorldTime::ZERO;
          }
@@ -5484,7 +5577,7 @@ index 1f873756..19e5c91a 100644
          self.paths.insert(0, new);
          Ok(AfterRequest::Walk)
      }
-@@ -216,15 +227,33 @@ impl Mover {
+@@ -216,15 +228,33 @@ impl Mover {
          if let Some((target_id, t)) = target
              && !self.is_moving()
              && me.action_state.get() == 8
@@ -5520,7 +5613,7 @@ index 1f873756..19e5c91a 100644
              for id in world.obstruction_candidates(rect, Distance::new(grow), &skip) {
                  let Some(p) = world.get(id) else { continue };
                  let gait = by_id.gait(id);
-@@ -247,12 +276,16 @@ impl Mover {
+@@ -247,12 +277,16 @@ impl Mover {
                      .task_0x99
                      .get(p.player.index())
                      .is_some_and(|m| m.contains(&p.master));
@@ -5540,10 +5633,55 @@ index 1f873756..19e5c91a 100644
                  {
                      continue;
                  }
-@@ -463,6 +496,64 @@ impl Mover {
+@@ -463,6 +497,109 @@ impl Mover {
          Ok(result.reaches().then(|| path.length()))
      }
  
++    /// 188329 slot 0x420 of the unit (`0x120f950`, which the drop-site search 0x1229bb0 calls):
++    /// the length of its short path to object `target` within `range` through the short
++    /// pather's dispatcher `0x1078690` (as a MoveTo's: the new pather for a unit at most half a
++    /// tile wide), with the unit's radius (master `+0x78`) and the ignore list of the unit and
++    /// the target (`0x120f9cf`..`0x120fab8`), measured (`0x14106eca0`) when its result is below 2
++    /// (`0x120fada`); None for another result or a target that is gone. 158041's slot (0x3e8,
++    /// [`Mover::short_reach`]) called the old pather `FindShortPath` alone (findings 132).
++    ///
++    /// # Errors
++    ///
++    /// The short pather's.
++    pub(crate) fn short_reach_188329(
++        &self,
++        at: Position,
++        me: &Me,
++        (world, by_id): (&mut Spatial, ObjectsRef<'_>),
++        plan: &mut Planning<'_>,
++        target: ObjectId,
++        range: Distance,
++    ) -> Result<Option<Distance>, GenieError> {
++        let Some(t) = world.get_known(target)? else {
++            return Ok(None);
++        };
++        let to = t.position.ground();
++        let mut path = Path::default();
++        let result = short_path_for(
++            self.walker(me.id),
++            at.ground(),
++            (world, by_id),
++            plan,
++            (BVector::new(to.x(), 0.0, to.y()), range, Some(target)),
++            &[me.id, target],
++            &mut path,
++        )?;
++        path.measure();
++        if crate::movement::trace_steer() {
++            // DIAGNOSTIC (findings 132): slot 0x420's short path
++            eprintln!(
++                "SHORTREACH unit={:?} target={:?} range={:?} result={:?} length={:?} points={:?}",
++                me.id, target, range, result, path.length, path.points
++            );
++        }
++        Ok(result.reaches().then_some(path.length))
++    }
++
 +    /// 188329 evasiveMoveFrom (0xd26200): the tile planner's path (0x1057a40 with the radii
 +    /// `radii`, range 0, the tile search, no smoothing unit) from the unit to `to`, measured;
 +    /// None without a planner for the unit's restriction.
@@ -5605,7 +5743,7 @@ index 1f873756..19e5c91a 100644
      /// The length of the tile planner's path (`FUN_140f7c530` with the radii `radii`, range 0, no
      /// closed tiles, the tile search for a human player, no smoothing) from the unit to `to`, and
      /// the planner's result; None without a planner for the unit's restriction.
-@@ -493,3 +584,17 @@ impl Mover {
+@@ -493,3 +630,17 @@ impl Mover {
          Ok(Some((found, path.length)))
      }
  }
