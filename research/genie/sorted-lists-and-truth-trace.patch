@@ -6977,21 +6977,10 @@ index 5f058dd9..b167fc33 100644
              self.own_move_give_up(actions, c, roles)?;
          }
 diff --git a/crates/engine/genie-core/src/movement/walk.rs b/crates/engine/genie-core/src/movement/walk.rs
-index ff48ae22..43c3e385 100644
+index ff48ae22..d6dfeeae 100644
 --- a/crates/engine/genie-core/src/movement/walk.rs
 +++ b/crates/engine/genie-core/src/movement/walk.rs
-@@ -56,6 +56,10 @@ impl Mover {
-         by_id: ObjectsRef<'_>,
-     ) -> Result<Next, GenieError> {
-         let movement_tuning = &by_id.tuning().movement;
-+        // DIAGNOSTIC: the kept hits a walk turns around (findings 155)
-+        if crate::movement::trace_steer() {
-+            eprintln!("GOROUND walker={:?} hits={hits:?}", me.id);
-+        }
-         let level = self.paths.walked()?;
-         let player = world
-             .get(me.id)
-@@ -89,6 +93,14 @@ impl Mover {
+@@ -89,6 +89,14 @@ impl Mover {
              // slot 0x5f0 with the walker's player's view of the hit's (FUN_141663d90 with the
              // ally flag): an ally pauses 0.1, anyone else 0.5 (Gaia counts for no one)
              let allied = world.allied_with(player, other.player);
@@ -7006,7 +6995,7 @@ index ff48ae22..43c3e385 100644
              if outranks && by_id.gait(id).is_some_and(|g| g.pause.is_some()) {
                  self.pauses.push((id, hit_pause(allied, movement_tuning)));
              }
-@@ -152,6 +164,17 @@ impl Mover {
+@@ -152,6 +160,17 @@ impl Mover {
          flat = flat.with_height(0.0);
          let flat = normalize(flat);
          let (turn, clipped) = self.turn_toward(flat, direction, self.turn_dt(dt, movement_tuning));
@@ -7024,7 +7013,7 @@ index ff48ae22..43c3e385 100644
          if self.paths.walked()?.flags.contains(LevelFlags::REACHED) && turn == Angle::ZERO {
              return Ok(clipped);
          }
-@@ -255,9 +278,10 @@ impl Mover {
+@@ -255,9 +274,10 @@ impl Mover {
      /// 0.
      #[must_use]
      pub fn paused(&self) -> bool {
@@ -7413,7 +7402,7 @@ index d7751598..a2645eda 100644
          if c.w
              .parts
 diff --git a/crates/engine/genie-core/src/orders/actions.rs b/crates/engine/genie-core/src/orders/actions.rs
-index 00aaf602..6cc52207 100644
+index 00aaf602..9d2e97f2 100644
 --- a/crates/engine/genie-core/src/orders/actions.rs
 +++ b/crates/engine/genie-core/src/orders/actions.rs
 @@ -15,6 +15,7 @@ use crate::objects::ObjectId;
@@ -7424,52 +7413,7 @@ index 00aaf602..6cc52207 100644
  use crate::objects::masters::Master;
  use crate::objects::masters::MasterId;
  use crate::objects::masters::MasterKind;
-@@ -32,7 +33,6 @@ use crate::unit_ai::OrderKind;
- use crate::unit_ai::OrderRecord;
- use crate::unit_ai::best_target::category;
- use crate::vision::SightLayer;
--use crate::world::Millis;
- use crate::world::Seconds;
- use crate::world::World;
- use crate::world::index::ObjectsRef;
-@@ -225,8 +225,8 @@ impl World {
-     /// player's masters, without masters of its own ([`crate::world::Gate::other_masters`]),
-     /// changes to its master's `transform_unit` (slot 0x90, [`World::transform_building`]). A
-     /// gate that shut (the new master's height above 0) kills the units in it (slot 0xd8 on
--    /// those its count finds, [`World::shut_in_gate`]) and takes the world time plus 1 as its
--    /// last move time (`+0x870`).
-+    /// those its count finds, [`World::shut_in_gate`]); 158041 then took the world time plus 1
-+    /// as its last move time (`+0x870`), 188329 does not (findings 155).
-     pub(crate) fn toggle_gate(
-         &mut self,
-         player: PlayerId,
-@@ -253,7 +253,6 @@ impl World {
-         };
-         self.transform_building(player, idx, new)?;
-         let height = self.master(player, new)?.height;
--        let now = self.world_time;
-         if Distance::ZERO < height {
-             let id = self.players.live(player, idx)?.id;
-             let annexes: Vec<ObjectId> = self.objects().annexes(id).ids().collect();
-@@ -273,12 +272,11 @@ impl World {
-             for u in units {
-                 self.shut_in_gate(u)?;
-             }
--            self.parts
--                .mover_mut(self.players.live(player, idx)?.id)
--                .ok_or(GenieError::unsupported(
--                    "a shut gate without its moving part",
--                ))?
--                .last_move = now.after(Millis::new(1));
-+            // 188329 (findings 155): a shut gate keeps its last move time (`+0x408`, which the
-+            // walk's kept-hit test reads through slot 0x630 = 0x113c230 on the hit's main
-+            // building): its writers of now + 1 are the lock setter 0x1293f10 (`+0x92c` = 1) and
-+            // 0x129fa60's tail, not the toggle (truth23 520848973 P2 builder 10495 at 1570.621 s
-+            // walks on past its own gate's post 9405 after the gate shut at 1570.569 s)
-         }
-         Ok(())
-     }
-@@ -339,6 +337,22 @@ impl World {
+@@ -339,6 +340,22 @@ impl World {
          new: MasterId,
      ) -> Result<(), GenieError> {
          self.clear_actions(player, idx)?;
@@ -7492,7 +7436,7 @@ index 00aaf602..6cc52207 100644
          let unit = &self.players.live(player, idx)?;
          let old = unit.master(self.master_tables(), player)?.clone();
          let next = self.master(player, new)?.clone();
-@@ -440,13 +454,60 @@ pub(crate) fn switch_master(
+@@ -440,13 +457,60 @@ pub(crate) fn switch_master(
              1.0
          };
          let old_hp = unit.life.hp;
