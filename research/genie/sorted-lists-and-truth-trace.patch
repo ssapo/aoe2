@@ -6538,6 +6538,34 @@ index 8dd9623e..c8fce247 100644
 +    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
 +    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_MEMBERHIT_188329").is_some())
 +}
+diff --git a/crates/engine/genie-core/src/movement/request.rs b/crates/engine/genie-core/src/movement/request.rs
+index 57e0d943..484efafb 100644
+--- a/crates/engine/genie-core/src/movement/request.rs
++++ b/crates/engine/genie-core/src/movement/request.rs
+@@ -188,9 +188,11 @@ impl Mover {
+     }
+ 
+     /// The level spends a try unless its top path loops or the unit moves to attack. Out of
+-    /// tries: a level 2 short of its last waypoint gets its tries again and goes on (flag 1); a
+-    /// lower level, or a top without more points, resets and gives up (`FUN_140f9b4b0`:
+-    /// `FUN_140f98e80`, state 6; the unit stops, slot 0x5d0); else the level takes state 5.
++    /// tries: a level 0 or 1 under a top with more points takes state 5; else a level 1 or 2
++    /// short of its last waypoint gets its tries again and goes on (flag 1, 188329
++    /// `0x1211fa1`..`0x1211fda`, findings 142: the plan's level too); a level 0, or one on its
++    /// last waypoint, resets and gives up (`FUN_140f9b4b0`: `FUN_140f98e80`, state 6; the unit
++    /// stops, slot 0x5d0).
+     pub(super) fn spend_try(&mut self) -> Result<Option<AfterRequest>, GenieError> {
+         let top_loops = self
+             .paths
+@@ -206,7 +208,7 @@ impl Mover {
+             return Ok(None);
+         }
+         if WaypointLevel::Planned < level.level || !top_has_more {
+-            if level.level == WaypointLevel::Top
++            if WaypointLevel::Walked < level.level
+                 && !level.waypoint.at_or_past_last(level.points.len())
+             {
+                 level.flags |= LevelFlags::REACHED;
 diff --git a/crates/engine/genie-core/src/movement/request_plans.rs b/crates/engine/genie-core/src/movement/request_plans.rs
 index 8c1a150a..77fd054c 100644
 --- a/crates/engine/genie-core/src/movement/request_plans.rs
@@ -6651,7 +6679,7 @@ index 75476db0..e1cc0d50 100644
              self.paths.walked_mut()?.flags |= LevelFlags::REACHED | LevelFlags::AT_WAYPOINT;
              return Ok(Next::Again);
 diff --git a/crates/engine/genie-core/src/movement/tests.rs b/crates/engine/genie-core/src/movement/tests.rs
-index eb4f2f5f..d53b88be 100644
+index eb4f2f5f..482f100a 100644
 --- a/crates/engine/genie-core/src/movement/tests.rs
 +++ b/crates/engine/genie-core/src/movement/tests.rs
 @@ -221,8 +221,10 @@ pub(crate) fn builder_9177() -> Mover {
@@ -6665,6 +6693,22 @@ index eb4f2f5f..d53b88be 100644
      }
  }
  
+@@ -3574,6 +3576,15 @@ fn request_spends_try_and_gives_up_or_goes_on_without_more() {
+         (m.paths[0].flags, m.paths[0].continue_counter),
+         (LevelFlags::REACHED, PlanTries::FULL)
+     );
++    // 188329 (findings 142): a plan's level (1) short of its last waypoint goes on too
++    let mut m = last_try();
++    m.paths[0].level = WaypointLevel::Planned;
++    m.paths[0].waypoint = WaypointIndex::of_data(0);
++    assert_eq!(m.spend_try(), Ok(Some(AfterRequest::Again)));
++    assert_eq!(
++        (m.paths[0].flags, m.paths[0].continue_counter),
++        (LevelFlags::REACHED, PlanTries::FULL)
++    );
+ }
+ 
+ /// The request's way from where [`builder_9177`] last moved to (28, 89) to its waypoint
 diff --git a/crates/engine/genie-core/src/movement/unit.rs b/crates/engine/genie-core/src/movement/unit.rs
 index 5f058dd9..b167fc33 100644
 --- a/crates/engine/genie-core/src/movement/unit.rs
