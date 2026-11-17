@@ -4634,7 +4634,7 @@ index 398a973c..8fe3628e 100644
              self.stop_all_units(group, StopScope::Busy)?;
          }
 diff --git a/crates/engine/genie-core/src/groups/place.rs b/crates/engine/genie-core/src/groups/place.rs
-index 51f6a791..7bdd90cd 100644
+index 51f6a791..07031b87 100644
 --- a/crates/engine/genie-core/src/groups/place.rs
 +++ b/crates/engine/genie-core/src/groups/place.rs
 @@ -16,6 +16,8 @@ use crate::map::DistanceSquared;
@@ -4646,7 +4646,37 @@ index 51f6a791..7bdd90cd 100644
  use crate::map::{GroundOffset, Point};
  use crate::math::fmath::BVector;
  use crate::math::fmath::{cross, normalize};
-@@ -386,15 +388,20 @@ impl World {
+@@ -298,7 +300,11 @@ impl World {
+             return Ok(());
+         };
+         let m = &g.motion;
+-        let forward = m.position[1];
++        let forward = if crate::groups::forming_188329() {
++            front_forward_188329(g)
++        } else {
++            m.position[1]
++        };
+         let front = ahead.get() * forward + m.position[0];
+         let held: Vec<(ObjectId, BVector)> = g
+             .members
+@@ -340,7 +346,15 @@ impl World {
+                 return Ok(());
+             }
+         }
+-        let limit = if g.formation_locked_kind == Some(FormationKind::Staggered) {
++        let limit = if crate::groups::forming_188329() {
++            // 188329 0x10ef046..0x10ef05e (findings 172): the spacing (`+0x15c`), doubled for a
++            // staggered lock (type 7)
++            if g.formation_locked_kind == Some(FormationKind::Staggered) {
++                g.desired_spacing * 2.0
++            } else {
++                g.desired_spacing
++            }
++        } else if g.formation_locked_kind == Some(FormationKind::Staggered) {
+             g.desired_spacing
+         } else {
+             g.desired_spacing * self.model.tuning.group.front_share
+@@ -386,15 +400,38 @@ impl World {
                          beside <= (r + r) * (r + r)
                      } =>
              {
@@ -4662,6 +4692,24 @@ index 51f6a791..7bdd90cd 100644
 +        let Some((lead_id, at)) = spot else {
              return Ok(());
          };
++        // 188329 0x10ef1cf..0x10ef27a (findings 172): when the member chosen differs from the
++        // member nearest the point ahead (or for a flanked group), the place moves along the
++        // forward by the nearest member's depth: `at += fwd * dot(place(nearest) - at, fwd)`
++        let at = match nearest.filter(|&n| crate::groups::forming_188329() && n != lead_id) {
++            Some(n) => match held.iter().find(|&&(id, _)| id == n) {
++                Some(&(_, p)) => {
++                    let (dx, dh, dy) = (p.x() - at.x(), p.height() - at.height(), p.y() - at.y());
++                    let k = dx * forward.x() + dh * forward.height() + dy * forward.y();
++                    BVector::new(
++                        at.x() + k * forward.x(),
++                        at.height() + k * forward.height(),
++                        at.y() + k * forward.y(),
++                    )
++                }
++                None => at,
++            },
++            None => at,
++        };
 +        let at = if crate::groups::forming_188329() {
 +            self.front_lead_188329(group, lead_id, (at, centre), &held)?
 +        } else {
@@ -4670,7 +4718,7 @@ index 51f6a791..7bdd90cd 100644
          let g = self.groups.held_mut(group)?;
          g.stored_positions.clear_points();
          g.motion.new_position[0] = at;
-@@ -402,6 +409,237 @@ impl World {
+@@ -402,6 +439,237 @@ impl World {
          Ok(())
      }
  
@@ -4908,7 +4956,7 @@ index 51f6a791..7bdd90cd 100644
      /// The terrain classes master `master` of player `p` lets its objects stand on: its
      /// restriction (`+0x606`) in the map's table (`FUN_141054630`).
      ///
-@@ -870,3 +1108,31 @@ mod tests {
+@@ -870,3 +1138,61 @@ mod tests {
          );
      }
  }
@@ -4919,6 +4967,36 @@ index 51f6a791..7bdd90cd 100644
 +/// group, else the group's place; findings 160) the 10 is counted from there: the sum starts with
 +/// the ground distance from `at` to the current waypoint (`0x10ef53c`..`0x10ef5d0`, constant
 +/// `0x31fd87c`).
++/// 188329 movePositionToFront's forward (`0x10eed89`..`0x10eee93`, findings 172): the first
++/// level from the walked one up whose level byte (`+0x14`) is not 0 (else the last), when it
++/// holds a path, gives the direction from the group's place to its current waypoint (`+0x24`),
++/// normalized (`0x140a841c0`) unless its length is below 1e-7 (`[0x1431fd5a0]`, `COMISS`/`JA`);
++/// else the group's forward (`+0x14`).
++fn front_forward_188329(g: &crate::groups::UnitGroup) -> BVector {
++    let m = &g.motion;
++    let level = m
++        .paths
++        .iter()
++        .find(|l| l.level.get() != 0)
++        .or_else(|| m.paths.last());
++    let Some(l) = level.filter(|l| l.has_path) else {
++        return m.position[1];
++    };
++    let Some(w) = usize::try_from(l.waypoint.get())
++        .ok()
++        .and_then(|i| l.points.get(i))
++    else {
++        return m.position[1];
++    };
++    let at = m.position[0];
++    let (x, h, y) = (w.x() - at.x(), w.height() - at.height(), w.y() - at.y());
++    let len = sqrt(h * h + x * x + y * y);
++    if 1.0e-7_f32 > len.abs() {
++        return m.position[1];
++    }
++    BVector::new(x / len, h / len, y / len)
++}
++
 +fn front_goal_188329(g: &crate::groups::UnitGroup, at: Option<BVector>) -> Option<BVector> {
 +    match g.motion.paths.first() {
 +        Some(l) if l.level.get() != 0 => l.points.last().copied(),
