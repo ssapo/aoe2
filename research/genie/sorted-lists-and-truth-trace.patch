@@ -3477,6 +3477,22 @@ index c9f58b16..c6df3d71 100644
          };
          self.order_work(p, idx, &work)
      }
+diff --git a/crates/engine/genie-core/src/groups/attack.rs b/crates/engine/genie-core/src/groups/attack.rs
+index 0f5086e6..76de0a57 100644
+--- a/crates/engine/genie-core/src/groups/attack.rs
++++ b/crates/engine/genie-core/src/groups/attack.rs
+@@ -141,7 +141,10 @@ impl World {
+             at.ground(),
+             MoveTo {
+                 range: Distance::new(range),
+-                flags: MoveFlags::KEEP_FLAG | MoveFlags::DIRECT,
++                // 188329 0x10d7d80 passes commandMoveTo's last argument from its own `param_8`,
++                // 1 from each caller the slice runs (0x10d79c5, 0x10d6d4f, 0x110c44c): the
++                // group lays out again at its turn (findings 139)
++                flags: MoveFlags::KEEP_FLAG | MoveFlags::DIRECT | MoveFlags::FRESH,
+             },
+         )?;
+         let g = self.groups.held_mut(group)?;
 diff --git a/crates/engine/genie-core/src/groups/command.rs b/crates/engine/genie-core/src/groups/command.rs
 index cc0b4325..4fb39fb9 100644
 --- a/crates/engine/genie-core/src/groups/command.rs
@@ -3554,6 +3570,18 @@ index 24636f40..7fb0849f 100644
          lay_line(
              formation,
              cat,
+diff --git a/crates/engine/genie-core/src/groups/formation/mod.rs b/crates/engine/genie-core/src/groups/formation/mod.rs
+index aa9efdcf..905968c7 100644
+--- a/crates/engine/genie-core/src/groups/formation/mod.rs
++++ b/crates/engine/genie-core/src/groups/formation/mod.rs
+@@ -10,6 +10,7 @@ use crate::world::slots::CheckedIndex;
+ 
+ mod column_line;
+ mod desired_positions;
++pub(crate) mod lapjv;
+ mod passability;
+ mod slots;
+ 
 diff --git a/crates/engine/genie-core/src/groups/formation/passability.rs b/crates/engine/genie-core/src/groups/formation/passability.rs
 index 25d0c676..9d18d973 100644
 --- a/crates/engine/genie-core/src/groups/formation/passability.rs
@@ -3576,10 +3604,292 @@ index 25d0c676..9d18d973 100644
          // calculateYawAngle without its clamp (`param_5` 0), with the world's update time
          let dt = self.dt_seconds;
          let yaw = g
+diff --git a/crates/engine/genie-core/src/groups/formation/slots.rs b/crates/engine/genie-core/src/groups/formation/slots.rs
+index 13c48a1c..2bad5f2d 100644
+--- a/crates/engine/genie-core/src/groups/formation/slots.rs
++++ b/crates/engine/genie-core/src/groups/formation/slots.rs
+@@ -7,7 +7,6 @@ use crate::groups::FormationKind;
+ use crate::groups::GroupId;
+ use crate::groups::UnitKind;
+ use crate::groups::{Formation, UnitGroup, sub_formation};
+-use crate::map::Distance;
+ use crate::objects::ObjectId;
+ use crate::world::slots::CheckedIndex;
+ 
+@@ -16,13 +15,9 @@ const NO_PLACE_IN_ORDER: GenieError =
+     GenieError::unreachable("a line order that lacks a place up to the list's length");
+ use crate::groups::WorldObject;
+ use crate::math::fmath::BVector;
+-use crate::math::fmath::sqrt;
+ use crate::math::image::group::FARTHEST;
+ use crate::world::World;
+ 
+-/// The capacity of `ClosestUnit`'s list of the units the slots took (`DAT_143f20710`, 0x118
+-/// bytes).
+-pub(super) const USED_UNITS: usize = 70;
+ /// The feature's assignment's arrays (`FUN_14100a0c0`): 70 members or slots a side
+ /// (`DAT_143f1fb50`, `DAT_143f1fc70`, 0x118 bytes each) ...
+ pub(super) const ASSIGNMENT_SIDE: usize = 70;
+@@ -134,74 +129,68 @@ impl World {
+         Ok(closest)
+     }
+ 
+-    /// The ground distance from slot place `at` to unit `id`'s (`FUN_14087e560`, its height
+-    /// zeroed, `sqrt(x² + 0 + y²)`), None for a unit the world does not hold.
+-    pub(super) fn slot_distance(&self, at: BVector, id: ObjectId) -> Option<Distance> {
+-        let object = self.world_object(id)?;
+-        let mut d = at - object.moved_vector();
+-        d = d.with_height(0.0);
+-        Some(Distance::new(sqrt(d.x() * d.x() + 0.0 + d.y() * d.y())))
+-    }
+-
+-    /// `FUN_141009760` of `formation` for group `g` without the settings' flag `DAT_143f01834`
+-    /// (the world's saved `mUseFeatureFlags` being 1, which `World::load_world` hands to
+-    /// `FUN_140ecabe0`; 0 in every recording of this build), with which the game takes the
+-    /// feature's assignment instead ([`World::assign_slots_by_variance`]; the slice holds
+-    /// neither the flag nor that routine's process-global costs yet). The transformed active
+-    /// slots in use take the closest units of their sub-formation and type
+-    /// ([`World::closest_unit`]), none taken twice. Two orders are measured first, as the sum of
+-    /// the ground distances (slot to unit) and the count found: the slots in order, and the same
+-    /// with the first slot's unit of that order barred from the first slot that finds one (whose
+-    /// unit then takes its place in the list). The second wins unless the first is shorter or
+-    /// finds more; then the slots take their units in the winner's order and are filled.
++    /// 188329's slots' assignment (`0x10d4a50`, every caller's; findings 135), which replaces
++    /// 158041's two greedy orders (`FUN_141009760`): for each member in the group's order the
++    /// world holds, a cost row over the slots of the array: `BARRED` for a slot not active or not
++    /// transformed, of another sub-formation ([`World::unit_category`]) or of another master,
++    /// else `(int)(((y - slot y)^2 + (x - slot x)^2) * 100)` from the member's place (slot 0x560,
++    /// `+0x3bc`) to the slot's (`+0x14`, `+0x18`); then the least total cost
++    /// (Jonker and Volgenant, `0x10d29d0`) gives each member its slot, filled. The costs and the
++    /// solution are process globals ([`crate::groups::UnitGroups::slot_assignment`]): a member the
++    /// world does not hold keeps its last row. A held member with no slot it may take, or a
++    /// formation of no slots, assigns nothing (the rows written stay).
+     ///
+     /// # Errors
+     ///
+-    /// A member of a master the slice does not have.
++    /// A member of a master the slice does not have, and a cost cell past the game's globals.
+     pub fn populate_slots(
+         &self,
+         formation: &mut Formation,
+         g: &UnitGroup,
+     ) -> Result<(), GenieError> {
+-        // what the slots ask for (the assignments change only their units)
+-        let asks: Vec<(BVector, FormationCategory, UnitKind)> = formation
++        use super::lapjv::{MemberAsk, Populate, SlotAsk};
++        let mut members = Vec::with_capacity(g.members.len());
++        for m in &g.members {
++            members.push(match self.world_object(m.id) {
++                None => None,
++                Some(object) => {
++                    let at = object.position().vector();
++                    Some(MemberAsk {
++                        x: at.x(),
++                        y: at.y(),
++                        category: self.unit_category(Some(object))?.get(),
++                        master: UnitKind::of(object.master_id(self.model.slots)).get(),
++                    })
++                }
++            });
++        }
++        let slots: Vec<SlotAsk> = formation
+             .slots
+             .iter()
+-            .map(|s| {
+-                (
+-                    s.transform_position,
+-                    s.desired_category,
+-                    s.desired_sub_category,
+-                )
++            .map(|s| SlotAsk {
++                x: s.transform_position.x(),
++                y: s.transform_position.y(),
++                usable: s.active != 0 && s.transformed != 0,
++                category: s.desired_category.get(),
++                master: s.desired_sub_category.get(),
+             })
+             .collect();
+-        let wanted: Vec<usize> = formation
+-            .slots
+-            .iter()
+-            .enumerate()
+-            .filter(|(_, s)| s.transformed != 0 && s.active != 0)
+-            .map(|(i, _)| i)
+-            .collect();
+-        let ask = |i: usize, used: &[Option<ObjectId>]| {
+-            let (at, category, sub_category) = *asks.checked(i)?;
+-            self.closest_unit(g, at, category, sub_category, used)
+-        };
+-        let dist = |i: usize, id: ObjectId| self.slot_distance(asks.get(i)?.0, id);
+-        let pick = Picker {
+-            ask: &ask,
+-            dist: &dist,
+-        };
+-        // the slots in order
+-        // zeros, object 0's id, as the game's array starts
+-        let mut used = vec![Some(ObjectId::default()); USED_UNITS];
+-        let (sum_first, found_first, first) = pick.trial(&wanted, &mut used, (0, false))?;
+-        // the first unit barred from the first slot that finds one
+-        let (sum_second, found_second, _) = pick.trial(&wanted, &mut used, (1, true))?;
+-        if sum_first < sum_second || found_second < found_first {
+-            pick.fill(formation, &wanted, &mut used, (0, false))?;
+-        } else {
+-            *used.checked_mut(0)? = first;
+-            pick.fill(formation, &wanted, &mut used, (1, true))?;
++        let result = self
++            .groups
++            .slot_assignment
++            .lock()
++            .populate(&members, &slots)
++            .map_err(|_| GenieError::unreachable("slot costs past the game's globals"))?;
++        if let Populate::Assigned(pairs) = result {
++            for (i, s) in pairs {
++                // the index may be a spare slot of the array (a stale solution), as the game
++                // writes it
++                let s = usize::try_from(s)
++                    .map_err(|_| GenieError::unreachable("a negative slot of the assignment"))?;
++                let slot = formation.slot_mut(s)?;
++                slot.unit_id = Some(g.members.checked(i)?.id);
++                slot.position_filled = 1;
++            }
+         }
+         Ok(())
+     }
+@@ -467,76 +456,6 @@ impl World {
+     }
+ }
+ 
+-/// What [`World::populate_slots`] reads: the unit nearest a slot not in `used`, and its distance.
+-struct Picker<'a> {
+-    ask: &'a AskUnit<'a>,
+-    dist: &'a dyn Fn(usize, ObjectId) -> Option<Distance>,
+-}
+-
+-/// The unit nearest a slot, not among those taken.
+-type AskUnit<'a> = dyn Fn(usize, &[Option<ObjectId>]) -> Result<Option<ObjectId>, GenieError> + 'a;
+-
+-impl Picker<'_> {
+-    /// One trial over the `wanted` slots, `used` holding the units taken (`count` of them, the
+-    /// first place kept for the unit of the first slot that finds one while `leading`): the
+-    /// sum of the distances, how many slots found a unit, and the first unit found.
+-    fn trial(
+-        &self,
+-        wanted: &[usize],
+-        used: &mut [Option<ObjectId>],
+-        (mut count, mut leading): (usize, bool),
+-    ) -> Result<(f32, i32, Option<ObjectId>), GenieError> {
+-        let (mut sum, mut found, mut first) = (0.0f32, 0, None);
+-        for &i in wanted {
+-            let Some(id) = (self.ask)(i, used.head(count)?)? else {
+-                continue;
+-            };
+-            let Some(d) = (self.dist)(i, id) else {
+-                continue;
+-            };
+-            sum += d.get();
+-            if leading {
+-                leading = false;
+-                *used.checked_mut(0)? = Some(id);
+-            } else {
+-                *used.checked_mut(count)? = Some(id);
+-                count += 1;
+-            }
+-            if first.is_none() {
+-                first = Some(id);
+-            }
+-            found += 1;
+-        }
+-        Ok((sum, found, first))
+-    }
+-
+-    /// The final pass: each wanted slot takes its unit (the first place of `used` kept for the
+-    /// first while `leading`), filled when it found one.
+-    fn fill(
+-        &self,
+-        formation: &mut Formation,
+-        wanted: &[usize],
+-        used: &mut [Option<ObjectId>],
+-        (mut count, mut leading): (usize, bool),
+-    ) -> Result<(), GenieError> {
+-        for &i in wanted {
+-            let id = (self.ask)(i, used.head(count)?)?;
+-            formation.slots.checked_mut(i)?.unit_id = id;
+-            if id.is_some() {
+-                formation.slots.checked_mut(i)?.position_filled = 1;
+-                if leading {
+-                    leading = false;
+-                    *used.checked_mut(0)? = id;
+-                } else {
+-                    *used.checked_mut(count)? = id;
+-                    count += 1;
+-                }
+-            }
+-        }
+-        Ok(())
+-    }
+-}
+-
+ /// [`World::assign_slots_by_variance`]'s search: from each starting member, the members in turn
+ /// take their cheapest slot left (`preferences`), `s` pairs at most; the pairs of the least
+ /// variance win.
+diff --git a/crates/engine/genie-core/src/groups/group_list.rs b/crates/engine/genie-core/src/groups/group_list.rs
+index 8b0a27f0..86ea74ea 100644
+--- a/crates/engine/genie-core/src/groups/group_list.rs
++++ b/crates/engine/genie-core/src/groups/group_list.rs
+@@ -24,6 +24,30 @@ impl Default for GroupLink {
+     }
+ }
+ 
++/// 188329's slots' assignment globals ([`UnitGroups::slot_assignment`]) behind a lock: the
++/// assignment runs from `&World` and the world is shared between threads.
++#[derive(Debug, Default)]
++pub struct SlotAssignment(std::sync::Mutex<crate::groups::formation::lapjv::Lapjv>);
++
++impl SlotAssignment {
++    /// The globals, to run an assignment on.
++    pub(crate) fn lock(&self) -> std::sync::MutexGuard<'_, crate::groups::formation::lapjv::Lapjv> {
++        self.0.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
++    }
++}
++
++impl Clone for SlotAssignment {
++    fn clone(&self) -> Self {
++        Self(std::sync::Mutex::new(self.lock().clone()))
++    }
++}
++
++impl PartialEq for SlotAssignment {
++    fn eq(&self, other: &Self) -> bool {
++        std::ptr::eq(self, other) || *self.lock() == *other.lock()
++    }
++}
++
+ /// The world's unit groups (`mNumberUnitGroups`, `mUnitGroupCounter`, `FUN_141536ef0`).
+ #[derive(Clone, Debug, Default, PartialEq)]
+ pub struct UnitGroups {
+@@ -40,6 +64,9 @@ pub struct UnitGroups {
+     /// front and copies the whole array into the group's `mUnitTypes`, so the words past the
+     /// types are an earlier count's. Empty is all zero, as the process starts.
+     pub unit_kinds_scratch: Vec<UnitKind>,
++    /// 188329's slots' assignment globals (`0x144365360`..`0x144374360`, `0x10d4a50` and
++    /// `0x10d29d0`; findings 135): process-wide, 0 as the process starts, never saved.
++    pub slot_assignment: SlotAssignment,
+ }
+ 
+ impl UnitGroups {
 diff --git a/crates/engine/genie-core/src/groups/mod.rs b/crates/engine/genie-core/src/groups/mod.rs
-index 7787900f..f932e18b 100644
+index 7787900f..ab88d077 100644
 --- a/crates/engine/genie-core/src/groups/mod.rs
 +++ b/crates/engine/genie-core/src/groups/mod.rs
+@@ -50,7 +50,7 @@ pub use self::formation_category::FormationCategory;
+ pub use self::formation_kind::FormationKind;
+ pub use self::group_flags::GroupFlags;
+ pub use self::group_id::GroupId;
+-pub use self::group_list::{GroupLink, UnitGroups, common_group};
++pub use self::group_list::{GroupLink, SlotAssignment, UnitGroups, common_group};
+ pub use self::motion_flags::MotionFlags;
+ pub use self::move_reason::{MovePath, MoveReason};
+ pub(crate) use self::objects::WorldObject;
 @@ -68,6 +68,7 @@ mod attack;
  mod command;
  pub use self::command::StopScope;
@@ -16023,7 +16333,7 @@ index 99849470..2db8af15 100644
                  continue;
              }
 diff --git a/crates/tools/genie-oracle/src/groups.rs b/crates/tools/genie-oracle/src/groups.rs
-index 7364f8c6..c9b2aecd 100644
+index 7364f8c6..6dac3449 100644
 --- a/crates/tools/genie-oracle/src/groups.rs
 +++ b/crates/tools/genie-oracle/src/groups.rs
 @@ -122,6 +122,7 @@ fn formation(f: &saved::Formation) -> Result<Formation, GenieError> {
@@ -16045,6 +16355,14 @@ index 7364f8c6..c9b2aecd 100644
 +        forming_speeds: Vec::new(),
 +        first_pass: false,
 +        motion_was_new: false,
+     })
+ }
+ 
+@@ -301,6 +309,7 @@ pub fn unit_groups(world: &saved::BaseWorld) -> Result<UnitGroups, GenieError> {
+         counter: GroupId::try_from(g.unit_group_counter)?,
+         commands,
+         unit_kinds_scratch: Vec::new(),
++        slot_assignment: genie_core::groups::SlotAssignment::default(),
      })
  }
  
@@ -16797,6 +17115,587 @@ index 00000000..d2a51e54
 +            }
 +        }
 +    }
++}
+diff --git a/crates/engine/genie-core/src/groups/formation/lapjv.rs b/crates/engine/genie-core/src/groups/formation/lapjv.rs
+new file mode 100644
+index 00000000..d3591e84
+--- /dev/null
++++ b/crates/engine/genie-core/src/groups/formation/lapjv.rs
+@@ -0,0 +1,575 @@
++//! 188329's formation slot assignment (findings 135): the integer cost rows of `0x10d4a50` and
++//! the Jonker–Volgenant solver `0x10d29d0` it calls, ported line for line from the disassembly
++//! (`re-kit/re/out_r31/r31c_d.c`, `r31c_e.c`; every comparison checked against the instructions).
++//!
++//! Both routines work on one block of process globals (BSS, all 0 as the process starts),
++//! modelled here as one flat `i32` array, [`Lapjv::mem`], at the game's own offsets from
++//! `0x144365360`:
++//!
++//! | offset (cells) | address        | what                                   |
++//! |----------------|----------------|----------------------------------------|
++//! | [`COST`]       | `0x144365360`  | the costs, 120 × 120, row = member     |
++//! | [`ROWSOL`]     | `0x144373460`  | each row's column (member → slot)      |
++//! | [`COLSOL`]     | `0x144373640`  | each column's row                      |
++//! | [`V`]          | `0x144373820`  | the column prices                      |
++//! | [`FREE`]       | `0x144373a00`  | the free rows                          |
++//! | [`COLLIST`]    | `0x144373be0`  | the columns to scan                    |
++//! | [`MATCHES`]    | `0x144373dc0`  | how often a row was a column's minimum |
++//! | [`D`]          | `0x144373fa0`  | the shortest path distances            |
++//! | [`PRED`]       | `0x144374180`  | each column's predecessor row          |
++//!
++//! What stays from one call to the next (and so must live as long as the match, shared by every
++//! group of every player): the cost rows of members the world does not hold (never rewritten),
++//! the cost rows a call wrote before an early return, and `rowsol` past the matrix size (read
++//! for members beyond the slot count). The solver itself fills everything it reads for
++//! `n <= 120`.
++//!
++//! All integer arithmetic wraps as the 32-bit instructions do.
++
++/// The side of the game's arrays: the solver does nothing for a size above it (`cmp ebp, 0x78;
++/// ja` at `0x10d29de`, unsigned).
++pub const SIDE: usize = 120;
++/// Cells of the cost matrix (`0x144365360`..`0x144373460`).
++pub const CELLS: usize = SIDE * SIDE;
++/// Offsets (in `i32` cells from `0x144365360`) of the globals, see the crate docs.
++pub const COST: usize = 0;
++/// `0x144373460`.
++pub const ROWSOL: usize = CELLS;
++/// `0x144373640`.
++pub const COLSOL: usize = ROWSOL + SIDE;
++/// `0x144373820`.
++pub const V: usize = COLSOL + SIDE;
++/// `0x144373a00`.
++pub const FREE: usize = V + SIDE;
++/// `0x144373be0`.
++pub const COLLIST: usize = FREE + SIDE;
++/// `0x144373dc0`.
++pub const MATCHES: usize = COLLIST + SIDE;
++/// `0x144373fa0`.
++pub const D: usize = MATCHES + SIDE;
++/// `0x144374180`.
++pub const PRED: usize = D + SIDE;
++/// `0x144374360`: past the block (what lies there is not modelled).
++pub const END: usize = PRED + SIDE;
++
++/// The cost of a slot a member may not take (`mov eax, 0xf4240`).
++pub const BARRED: i32 = 1_000_000;
++/// The scale of the squared distance (`[0x14369ffb4]` = 100.0f).
++pub const SCALE: f32 = 100.0;
++/// The solver's "infinity" (`0x7fffffff`).
++const BIG: i32 = i32::MAX;
++
++/// What `0x10d4a50` reads of one slot in use (188329 slot, 0x3c bytes).
++#[derive(Clone, Copy, Debug, PartialEq)]
++pub struct SlotAsk {
++    /// `+0x14`: the slot's place x (the transform place's x).
++    pub x: f32,
++    /// `+0x18`: the slot's place y (the map's y; the transform place's third component).
++    pub y: f32,
++    /// `+0x34 != 0 && +0x38 != 0` (the slot is active and transformed).
++    pub usable: bool,
++    /// `+0x2c`: the desired sub-formation, -1 for any.
++    pub category: i32,
++    /// `+0x30`: the desired master (unit type), -1 for any.
++    pub master: i32,
++}
++
++/// What `0x10d4a50` reads of one member the world holds (`0x141616cf0` found it).
++#[derive(Clone, Copy, Debug, PartialEq)]
++pub struct MemberAsk {
++    /// Vtable slot 0x560 (`0x113c4a0`, a copy of `+0x3bc`..`+0x3c8`): component 0, the x of the
++    /// unit's place (not where it last moved to).
++    pub x: f32,
++    /// The same vector's component 2: the map's y.
++    pub y: f32,
++    /// `0x10d9790(unit, 0)`: its sub-formation (158041 `FUN_141011300`).
++    pub category: i32,
++    /// Its master id, read as a 16-bit value and sign-extended (`movsx ecx, ax` at `0x10d4bdd`).
++    pub master: i32,
++}
++
++/// How a call of `0x10d4a50` ended.
++#[derive(Clone, Debug, PartialEq, Eq)]
++pub enum Populate {
++    /// The solver ran (or returned at once for a size above 120): each member index in order
++    /// with the slot index `rowsol` holds for it. Every member of the list takes one, held by the
++    /// world or not; the index may be stale (rows at or past the slot count) and may point at a
++    /// spare slot of the array. Apply in order: `slot[s].unit = member; slot[s].+0x28 = 1`.
++    Assigned(Vec<(usize, i32)>),
++    /// A member the world holds met a formation of no slots (`cmp [rbp+4], 0; jle` at
++    /// `0x10d4af6`): nothing assigned; earlier rows stay written.
++    NoSlots,
++    /// A member the world holds had no slot it could take (all 1,000,000 from the "bad" path or
++    /// the master path; `test dil, dil` at `0x10d4c8e`): nothing assigned; its row and the
++    /// earlier rows stay written.
++    MemberWithoutSlot,
++}
++
++/// A cell index past the modelled block (the game would write or read whatever follows).
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub struct OutOfRange(pub u64);
++
++/// x86 `cvttss2si` to a 32-bit register: truncation, and `0x80000000` for NaN or out of range
++/// (Rust's `as` saturates instead).
++#[must_use]
++pub fn cvttss2si(v: f32) -> i32 {
++    if v.is_nan() || v >= 2_147_483_648.0 || v < -2_147_483_648.0 {
++        i32::MIN
++    } else {
++        v as i32
++    }
++}
++
++/// `0x10d4a50`'s cost of member `u` at slot `s` when neither barred: the squared ground gap
++/// times 100, in the instructions' order (`0x10d4c42`..`0x10d4c67`):
++/// `cvttss2si(((uy - sy)² + (ux - sx)²) * 100.0f)`, all f32.
++#[must_use]
++pub fn cell_cost(u: &MemberAsk, s: &SlotAsk) -> i32 {
++    let dy = u.y - s.y; // xmm1 = [rax+8] - [slot+0x18]
++    let dx = u.x - s.x; // xmm0 = [rax]   - [slot+0x14]
++    let sum = dy * dy + dx * dx; // mulss xmm1,xmm1; mulss xmm0,xmm0; addss xmm1,xmm0
++    cvttss2si(sum * SCALE) // mulss xmm1,xmm6; cvttss2si
++}
++
++/// The process globals of `0x10d4a50`/`0x10d29d0`. One per match (process), shared by every
++/// group of every player; all 0 at the start ([`Lapjv::default`]).
++#[derive(Clone, Debug, PartialEq, Eq)]
++pub struct Lapjv {
++    /// The block from `0x144365360` to `0x144374360`, see the crate docs.
++    pub mem: Vec<i32>,
++}
++
++impl Default for Lapjv {
++    fn default() -> Self {
++        Self { mem: vec![0; END] }
++    }
++}
++
++impl Lapjv {
++    /// A cell of the block by a (non-negative) index the game computes.
++    fn at(&self, i: i64) -> i32 {
++        self.mem[usize::try_from(i).expect("negative cell index")]
++    }
++
++    /// Writes a cell.
++    fn put(&mut self, i: i64, v: i32) {
++        self.mem[usize::try_from(i).expect("negative cell index")] = v;
++    }
++
++    /// The cost cell `i` (row-major, row = member).
++    #[must_use]
++    pub fn cost(&self, i: usize) -> i32 {
++        self.mem[COST + i]
++    }
++
++    /// `rowsol[i]`: member (row) `i`'s slot (column).
++    #[must_use]
++    pub fn rowsol(&self, i: usize) -> i32 {
++        self.mem[ROWSOL + i]
++    }
++
++    /// `0x10d4a50` without the solver and the assignment: the cost rows of `members` (in the
++    /// group's order, `+0xf0`, `+0xe4` of them; None for one the world does not hold) over
++    /// `slots` (the formation's slots in use, `+0x10`, `+0x4` of them). On `Ok(None)` the caller
++    /// goes on to the solver of size `slots.len()`; `Ok(Some(..))` is an early return.
++    ///
++    /// # Errors
++    ///
++    /// A row index past the modelled block (members × slots above about 15,000).
++    pub fn slot_costs(
++        &mut self,
++        members: &[Option<MemberAsk>],
++        slots: &[SlotAsk],
++    ) -> Result<Option<Populate>, OutOfRange> {
++        let n_slots = slots.len() as i32; // [rbp+4]
++        let count = members.len() as u32; // [rdx+0xe4], unsigned loop (`jb` at 0x10d4cbb)
++        let mut m: u32 = 0;
++        while m < count {
++            if let Some(u) = members[m as usize] {
++                if n_slots < 1 {
++                    return Ok(Some(Populate::NoSlots));
++                }
++                let mut any = false; // [rsp+0xb0]
++                let mut s: i32 = 0;
++                while s < n_slots {
++                    let slot = &slots[s as usize];
++                    // +0x38 == 0 || +0x34 == 0
++                    let mut bad = !slot.usable;
++                    // 0x10d9790 runs for every slot; -1 takes any
++                    if slot.category != -1 && u.category != slot.category {
++                        bad = true;
++                    }
++                    // eax = m * S + s, 32-bit, zero-extended into the address
++                    let cell = m.wrapping_mul(n_slots as u32).wrapping_add(s as u32);
++                    let value = if slot.master == -1 || u.master == slot.master {
++                        if bad {
++                            BARRED
++                        } else {
++                            any = true;
++                            cell_cost(&u, slot)
++                        }
++                    } else {
++                        BARRED
++                    };
++                    if u64::from(cell) >= END as u64 {
++                        return Err(OutOfRange(u64::from(cell)));
++                    }
++                    self.mem[COST + cell as usize] = value;
++                    s += 1;
++                }
++                if !any {
++                    return Ok(Some(Populate::MemberWithoutSlot));
++                }
++            }
++            m += 1;
++        }
++        // rows count..S-1 are 0 (unsigned `jae` at 0x10d4cd5)
++        let mut r = count;
++        while r < n_slots as u32 {
++            let mut c: i32 = 0;
++            while c < n_slots {
++                let cell = (n_slots as u32).wrapping_mul(r).wrapping_add(c as u32);
++                if u64::from(cell) >= END as u64 {
++                    return Err(OutOfRange(u64::from(cell)));
++                }
++                self.mem[COST + cell as usize] = 0;
++                c += 1;
++            }
++            r += 1;
++        }
++        Ok(None)
++    }
++
++    /// `0x10d4a50` (`param_1` the formation, `param_2` the group): [`Lapjv::slot_costs`], the
++    /// solver of size `slots.len()` ([`Lapjv::solve`]), then each member `i` in order takes
++    /// slot `rowsol[i]` (read as `movsxd` from `0x144373460 + 4 i`, past the 120 entries into the
++    /// following arrays as the game would).
++    ///
++    /// The game's caller clears every slot's unit and `+0x28` first (`0x110d690`, the engine's
++    /// `Formation::clear_units`).
++    ///
++    /// # Errors
++    ///
++    /// As [`Lapjv::slot_costs`].
++    pub fn populate(
++        &mut self,
++        members: &[Option<MemberAsk>],
++        slots: &[SlotAsk],
++    ) -> Result<Populate, OutOfRange> {
++        if let Some(early) = self.slot_costs(members, slots)? {
++            return Ok(early);
++        }
++        self.solve(slots.len() as i32);
++        let count = members.len() as i32; // `cmp dword [rsi+0xe4], 0; jle`, signed
++        let mut out = Vec::new();
++        let mut i: i32 = 0;
++        while i < count {
++            let cell = ROWSOL as u64 + i as u64;
++            if cell >= END as u64 {
++                return Err(OutOfRange(cell));
++            }
++            out.push((i as usize, self.mem[cell as usize]));
++            i += 1;
++        }
++        Ok(Populate::Assigned(out))
++    }
++
++    /// `0x10d29d0`: Jonker–Volgenant on the `n` × `n` costs at [`COST`] (cell `n * row + col`),
++    /// the result in `rowsol` / `colsol`. Line for line with the instructions; the comments
++    /// name the classic `lap.cpp` steps and the addresses.
++    #[allow(clippy::too_many_lines)]
++    pub fn solve(&mut self, n: i32) {
++        // movsxd rbp, ecx; cmp ebp, 0x78; ja -> return (so negative sizes return too)
++        if (n as u32) > 0x78 {
++            return;
++        }
++        let nl = i64::from(n);
++        let cost = |s: &Self, i: i32| s.at(COST as i64 + i64::from(i));
++        // memset(matches, 0, 4 n) when n > 0
++        if n > 0 {
++            for k in 0..n as usize {
++                self.mem[MATCHES + k] = 0;
++            }
++        }
++
++        // ---- COLUMN REDUCTION (0x10d2a5b..0x10d2b56): j from n-1 down to 0
++        let mut j: i32 = n - 1;
++        while j >= 0 {
++            let mut min: i32 = BIG;
++            let mut imin: i64 = 0;
++            let mut i: i32 = 0;
++            while i64::from(i) < nl {
++                let c = cost(self, n.wrapping_mul(i).wrapping_add(j));
++                // cmp ecx, r8d; cmovge keeps the old: a new minimum only when strictly less
++                if c < min {
++                    min = c;
++                    imin = i64::from(i);
++                }
++                i += 1;
++            }
++            let m = self.at(MATCHES as i64 + imin);
++            self.put(V as i64 + i64::from(j), min);
++            if m == 0 {
++                self.put(ROWSOL as i64 + imin, j);
++                self.put(COLSOL as i64 + i64::from(j), imin as i32);
++            } else {
++                let old = i64::from(self.at(ROWSOL as i64 + imin));
++                // cmp r8d, [v + old]; jge -> unassigned
++                if min < self.at(V as i64 + old) {
++                    self.put(COLSOL as i64 + i64::from(j), imin as i32);
++                    self.put(COLSOL as i64 + old, -1);
++                    self.put(ROWSOL as i64 + imin, j);
++                } else {
++                    self.put(COLSOL as i64 + i64::from(j), -1);
++                }
++            }
++            self.put(MATCHES as i64 + imin, m.wrapping_add(1));
++            j -= 1;
++        }
++
++        // ---- REDUCTION TRANSFER (0x10d2b5c..0x10d2bf2)
++        let mut numfree: i32 = 0;
++        {
++            let mut row_base: i32 = 0; // esi, += n per row
++            let mut i: i64 = 0;
++            while i < nl {
++                let m = self.at(MATCHES as i64 + i);
++                if m == 0 {
++                    self.put(FREE as i64 + i64::from(numfree), i as i32);
++                    numfree += 1;
++                } else if m == 1 {
++                    let j1 = i64::from(self.at(ROWSOL as i64 + i));
++                    let mut min: i32 = BIG;
++                    let mut k: i64 = 0;
++                    let mut cell = row_base;
++                    while k < nl {
++                        if k != j1 {
++                            let h = cost(self, cell).wrapping_sub(self.at(V as i64 + k));
++                            if h < min {
++                                min = h;
++                            }
++                        }
++                        k += 1;
++                        cell += 1;
++                    }
++                    let vj = self.at(V as i64 + j1);
++                    self.put(V as i64 + j1, vj.wrapping_sub(min));
++                }
++                row_base = row_base.wrapping_add(n);
++                i += 1;
++            }
++        }
++
++        // ---- AUGMENTING ROW REDUCTION, twice (0x10d2c00..0x10d2d4f)
++        let mut pass: i64 = 2;
++        loop {
++            let prvnumfree = i64::from(numfree);
++            numfree = 0;
++            let mut write: i64 = 0; // r12: the next place of the new free list
++            let mut k: i64 = 0; // r15
++            if prvnumfree > 0 {
++                loop {
++                    let i = self.at(FREE as i64 + k);
++                    let k_here = k;
++                    k += 1;
++                    let mut umin: i32 = BIG; // r10
++                    let mut usubmin: i32 = BIG; // r9
++                    let mut j1: i64 = 0; // rbp / esi
++                    let mut j2: i64 = 0; // rbx / r11
++                    let row = n.wrapping_mul(i);
++                    let mut jj: i64 = 0;
++                    while jj < nl {
++                        let h = cost(self, row.wrapping_add(jj as i32))
++                            .wrapping_sub(self.at(V as i64 + jj));
++                        // cmp eax, r9d; jge skip
++                        if h < usubmin {
++                            // cmp eax, r10d; jl -> new minimum
++                            if h >= umin {
++                                usubmin = h;
++                                j2 = jj;
++                            } else {
++                                usubmin = umin;
++                                j2 = j1;
++                                umin = h;
++                                j1 = jj;
++                            }
++                        }
++                        jj += 1;
++                    }
++                    let mut i0 = self.at(COLSOL as i64 + j1);
++                    if umin < usubmin {
++                        let vj = self.at(V as i64 + j1);
++                        self.put(V as i64 + j1, vj.wrapping_add(umin.wrapping_sub(usubmin)));
++                    } else if i0 > -1 {
++                        i0 = self.at(COLSOL as i64 + j2);
++                        j1 = j2;
++                    }
++                    self.put(ROWSOL as i64 + i64::from(i), j1 as i32);
++                    self.put(COLSOL as i64 + j1, i);
++                    if i0 > -1 {
++                        if umin < usubmin {
++                            // free[--k] = i0
++                            k = k_here;
++                            self.put(FREE as i64 + k_here, i0);
++                        } else {
++                            self.put(FREE as i64 + write, i0);
++                            write += 1;
++                            numfree += 1;
++                        }
++                    }
++                    if k >= prvnumfree {
++                        break;
++                    }
++                }
++            }
++            pass -= 1;
++            if pass == 0 {
++                break;
++            }
++        }
++
++        // ---- AUGMENTATION, one shortest path per free row (0x10d2d55..0x10d3084)
++        let mut f: i64 = 0;
++        while f < i64::from(numfree) {
++            let freerow = self.at(FREE as i64 + f);
++            if n - 1 >= 0 {
++                for c in 0..n as usize {
++                    self.mem[PRED + c] = freerow; // rep stosd
++                }
++                let base = n.wrapping_mul(freerow);
++                let mut jj: i32 = n - 1;
++                while jj >= 0 {
++                    self.put(COLLIST as i64 + i64::from(jj), jj);
++                    let dj = cost(self, base.wrapping_add(jj))
++                        .wrapping_sub(self.at(V as i64 + i64::from(jj)));
++                    self.put(D as i64 + i64::from(jj), dj);
++                    jj -= 1;
++                }
++            }
++            let mut low: i64 = 0; // r13d / rsi
++            let mut up: i64 = 0; // edi
++            let mut last: i64 = 0; // [rsp+0x28]
++            let mut min: i32 = 0; // r8d
++            let endofpath: i32 = 'search: loop {
++                if up == low {
++                    // scan up..n-1 for the new minimum (0x10d2e40..0x10d2eba)
++                    last = low - 1;
++                    let first = self.at(COLLIST as i64 + up);
++                    up += 1;
++                    min = self.at(D as i64 + i64::from(first));
++                    let mut kk = up;
++                    while kk < nl {
++                        let jc = self.at(COLLIST as i64 + kk);
++                        let h = self.at(D as i64 + i64::from(jc));
++                        // cmp eax, r8d; jg skip
++                        if h <= min {
++                            if h < min {
++                                up = low;
++                            }
++                            let moved = self.at(COLLIST as i64 + up);
++                            self.put(COLLIST as i64 + kk, moved);
++                            self.put(COLLIST as i64 + up, jc);
++                            up += 1;
++                            // cmovge: min stays when h >= min
++                            if h < min {
++                                min = h;
++                            }
++                        }
++                        kk += 1;
++                    }
++                    // an unassigned column among the minima ends the path at once
++                    let mut kk = low;
++                    while kk < up {
++                        let jc = self.at(COLLIST as i64 + kk);
++                        if self.at(COLSOL as i64 + i64::from(jc)) < 0 {
++                            break 'search jc;
++                        }
++                        kk += 1;
++                    }
++                }
++                // scan the next column of the minimum (0x10d2ef4..0x10d2f2f)
++                let j1 = self.at(COLLIST as i64 + low);
++                low += 1;
++                let i = self.at(COLSOL as i64 + i64::from(j1));
++                let row = n.wrapping_mul(i);
++                let h = cost(self, row.wrapping_add(j1))
++                    .wrapping_sub(self.at(V as i64 + i64::from(j1)))
++                    .wrapping_sub(min);
++                // cmp edi, ebx; jge -> back to the top
++                if up >= nl {
++                    continue;
++                }
++                let mut kk = up;
++                while kk < nl {
++                    let jc = self.at(COLLIST as i64 + kk);
++                    let v2 = cost(self, row.wrapping_add(jc))
++                        .wrapping_sub(self.at(V as i64 + i64::from(jc)))
++                        .wrapping_sub(h);
++                    // cmp r11d, [d + j]; jge skip
++                    if v2 < self.at(D as i64 + i64::from(jc)) {
++                        self.put(PRED as i64 + i64::from(jc), i);
++                        if v2 == min {
++                            if self.at(COLSOL as i64 + i64::from(jc)) < 0 {
++                                break 'search jc;
++                            }
++                            let moved = self.at(COLLIST as i64 + up);
++                            self.put(COLLIST as i64 + kk, moved);
++                            self.put(COLLIST as i64 + up, jc);
++                            up += 1;
++                        }
++                        self.put(D as i64 + i64::from(jc), v2);
++                    }
++                    kk += 1;
++                }
++            };
++            // column prices: k from last + 1 (one more than lap.cpp's `last`; that column's
++            // d equals min, so it adds 0) down to 0 (0x10d2ff0..0x10d3033)
++            let mut kk = last + 1;
++            while kk >= 0 {
++                let jc = i64::from(self.at(COLLIST as i64 + kk));
++                let add = self.at(D as i64 + jc).wrapping_sub(min);
++                let vj = self.at(V as i64 + jc);
++                self.put(V as i64 + jc, vj.wrapping_add(add));
++                kk -= 1;
++            }
++            // the alternating path back to the free row (0x10d3040..0x10d3069)
++            let mut jc = endofpath;
++            loop {
++                let i = self.at(PRED as i64 + i64::from(jc));
++                self.put(COLSOL as i64 + i64::from(jc), i);
++                let next = self.at(ROWSOL as i64 + i64::from(i));
++                self.put(ROWSOL as i64 + i64::from(i), jc);
++                jc = next;
++                if i == freerow {
++                    break;
++                }
++            }
++            f += 1;
++        }
++    }
++}
++
++/// `0x10d4a50`'s cost rows from all-zero globals, as a vector of `max(members, slots)` rows of
++/// `slots.len()` cells (row = member); None for the early returns ([`Populate::NoSlots`],
++/// [`Populate::MemberWithoutSlot`]). A stateless view for tests and tracing: the engine must use
++/// a persistent [`Lapjv`] (see the crate docs).
++#[must_use]
++pub fn slot_costs(members: &[Option<MemberAsk>], slots: &[SlotAsk]) -> Option<Vec<i32>> {
++    let mut l = Lapjv::default();
++    match l.slot_costs(members, slots) {
++        Ok(None) => {
++            let rows = members.len().max(slots.len());
++            Some(l.mem[..rows * slots.len()].to_vec())
++        }
++        _ => None,
++    }
++}
++
++/// [`Lapjv::solve`] of a square matrix on fresh globals: each row's column.
++#[must_use]
++pub fn solve_matrix(costs: &[i32], n: usize) -> Vec<i32> {
++    let mut l = Lapjv::default();
++    l.mem[..n * n].copy_from_slice(&costs[..n * n]);
++    l.solve(n as i32);
++    (0..n).map(|i| l.rowsol(i)).collect()
 +}
 diff --git a/crates/engine/genie-core/src/groups/horde.rs b/crates/engine/genie-core/src/groups/horde.rs
 new file mode 100644
