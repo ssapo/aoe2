@@ -5829,6 +5829,56 @@ index 1991cb20..85f19f8c 100644
      }
  
      /// `FUN_141017f00` of object `id` (the group it gets is not read): whether the member is
+diff --git a/crates/engine/genie-core/src/groups/update/entry.rs b/crates/engine/genie-core/src/groups/update/entry.rs
+index d3230577..bf45bd8b 100644
+--- a/crates/engine/genie-core/src/groups/update/entry.rs
++++ b/crates/engine/genie-core/src/groups/update/entry.rs
+@@ -197,7 +197,7 @@ impl World {
+     /// (`COMISS` then `JNC`: a NaN waits too) and its owner and the group's count each other as
+     /// allies (`FUN_141663d90` with the ally flag both ways); else, or without the target, the
+     /// queued commands run. No command (-1) and a move (1) run the queued commands when there
+-    /// are any. A build (101) waits while its target stands below state 2 for the group's own
++    /// are any and no member the world holds has a unit AI with an order ([`World::member_ordered`]). A build (101) waits while its target stands below state 2 for the group's own
+     /// player; else the queued commands run. Every other command deletes the group.
+     ///
+     /// # Errors
+@@ -212,7 +212,10 @@ impl World {
+         Ok(Some(match g.current_command {
+             PICK_UP_RELIC | DELIVER_RELIC | ATTACK => !self.target_pending(group)?,
+             REPAIR => !self.repair_waits(target, owner)?,
+-            NO_COMMAND | MOVE_COMMAND => !g.command_queue.is_empty(),
++            // 188329 0x110a0d0..: with queued commands, 0x10d19a0 keeps the group asleep while
++            // a member the world holds has a unit AI (`+0x1f0`) with an order (`+0x3c`, 0xd25d20,
++            // not -1) (findings 171)
++            NO_COMMAND | MOVE_COMMAND => !g.command_queue.is_empty() && !self.member_ordered(group)?,
+             BUILD => !self
+                 .world_object(target)
+                 .is_some_and(|t| t.state() < ObjectState::Alive && t.player() == owner),
+@@ -220,6 +223,24 @@ impl World {
+         }))
+     }
+ 
++    /// `0x10d19a0`: a member of group `group` that the world holds (`0x1616cf0`) has a unit AI
++    /// whose current order (`+0x3c`, `0xd25d20`) is not -1.
++    ///
++    /// # Errors
++    ///
++    /// When the world does not hold `group`.
++    pub(super) fn member_ordered(&self, group: GroupId) -> Result<bool, GenieError> {
++        let g = self.groups.held(group)?;
++        Ok(g.members.iter().any(|m| {
++            matches!(self.world_object(Some(m.id)), Some(WorldObject::Unit(..)))
++                && self
++                    .parts
++                    .unit_ai
++                    .get(m.id)
++                    .is_some_and(|ai| ai.current_order.is_some())
++        }))
++    }
++
+     /// A hibernating repair's wait (`0x14103dbc4`..`0x14103dcee`): its target `target` is held,
+     /// below its master's hit points (the short at `+0x530`, `CVTDQ2PS`), and its player and
+     /// `owner` count each other as allies.
 diff --git a/crates/engine/genie-core/src/groups/update/mod.rs b/crates/engine/genie-core/src/groups/update/mod.rs
 index 0e406949..ed5ae5a2 100644
 --- a/crates/engine/genie-core/src/groups/update/mod.rs
@@ -6356,7 +6406,7 @@ index bef4a9dd..68687410 100644
      #[must_use]
      pub fn kind(&self, tile: Tile) -> Option<TerrainId> {
 diff --git a/crates/engine/genie-core/src/movement/ai_moves.rs b/crates/engine/genie-core/src/movement/ai_moves.rs
-index bf0aa945..6d1521a1 100644
+index bf0aa945..a842fe7a 100644
 --- a/crates/engine/genie-core/src/movement/ai_moves.rs
 +++ b/crates/engine/genie-core/src/movement/ai_moves.rs
 @@ -3,6 +3,7 @@
@@ -6367,13 +6417,14 @@ index bf0aa945..6d1521a1 100644
  use crate::map::Distance;
  use crate::map::Position;
  use crate::movement::Mover;
-@@ -268,7 +269,8 @@ impl Unit {
+@@ -268,7 +269,9 @@ impl Unit {
                  | FLY
                  | MISSILE
                  | MAKE
 -                | WAIT_SOLIDIFY,
 +                | WAIT_SOLIDIFY
-+                | CONVERT,
++                | CONVERT
++                | crate::objects::unpack::UNPACK,
              ) => Ok(PointMove::Declined),
              Some(ARTIFACT_KIND) => {
                  let sprites = self.point_sprites(sprites)?;
@@ -7630,20 +7681,21 @@ index 54c082c7..13031ea9 100644
              }
              LinkedPathKind::AsksAgain => {
 diff --git a/crates/engine/genie-core/src/objects/actions.rs b/crates/engine/genie-core/src/objects/actions.rs
-index 118ae20f..d70334a8 100644
+index 118ae20f..f8ead826 100644
 --- a/crates/engine/genie-core/src/objects/actions.rs
 +++ b/crates/engine/genie-core/src/objects/actions.rs
-@@ -39,6 +39,9 @@ use crate::objects::ActionState;
+@@ -39,6 +39,10 @@ use crate::objects::ActionState;
  use crate::objects::ObjectId;
  use crate::objects::RoleId;
  use crate::objects::masters::ActionKind;
 +use crate::objects::convert::{CONVERT, ConvertAction};
++use crate::objects::unpack::{UNPACK, UnpackAction};
 +use crate::objects::relic_deposit::{RELIC_DEPOSIT, RelicDepositAction};
 +use crate::objects::relic_pickup::{RELIC_PICKUP, RelicPickupAction};
  use crate::ownership::artifact::ARTIFACT_KIND;
  use crate::ownership::artifact::Artifact;
  use genie_diff::Diff;
-@@ -135,6 +138,14 @@ action_kinds! {
+@@ -135,6 +139,16 @@ action_kinds! {
      /// A villager's wait for a foundation ([`crate::construction::wait_solidify`]).
      WaitSolidify(WaitSolidify) => wait_solidify, wait_solidify_mut, take_wait_solidify,
          set_wait_solidify, with_wait_solidify;
@@ -7655,40 +7707,45 @@ index 118ae20f..d70334a8 100644
 +        set_relic_deposit, with_relic_deposit;
 +    /// A monk's conversion ([`crate::objects::convert`]).
 +    Convert(ConvertAction) => convert, convert_mut, take_convert, set_convert, with_convert;
++    /// A packed siege engine's unpack ([`crate::objects::unpack`]).
++    Unpack(UnpackAction) => unpack, unpack_mut, take_unpack, set_unpack, with_unpack;
  }
  
  impl Action {
-@@ -156,6 +167,9 @@ impl Action {
+@@ -156,6 +170,10 @@ impl Action {
              Self::Missile(_) => MISSILE,
              Self::Make(_) => MAKE,
              Self::WaitSolidify(_) => WAIT_SOLIDIFY,
 +            Self::RelicPickup(_) => RELIC_PICKUP,
 +            Self::RelicDeposit(_) => RELIC_DEPOSIT,
 +            Self::Convert(_) => CONVERT,
++            Self::Unpack(_) => UNPACK,
          }
      }
  
-@@ -177,6 +191,9 @@ impl Action {
+@@ -177,6 +195,10 @@ impl Action {
              Self::Missile(a) => a.state.get(),
              Self::Make(a) => a.state.get(),
              Self::WaitSolidify(a) => a.state.get(),
 +            Self::RelicPickup(a) => a.state.get(),
 +            Self::RelicDeposit(a) => a.state.get(),
 +            Self::Convert(a) => a.state.get(),
++            Self::Unpack(a) => a.state.get(),
          })
      }
  }
-@@ -197,6 +214,9 @@ impl Action {
+@@ -197,6 +219,10 @@ impl Action {
              Self::Attack(a) => a.target.map(RoleId::id),
              Self::Enter(a) => a.target.map(RoleId::id),
              Self::Missile(a) => a.target.map(RoleId::id),
 +            Self::RelicPickup(a) => a.target,
 +            Self::RelicDeposit(a) => a.target,
 +            Self::Convert(a) => a.target,
++            Self::Unpack(a) => a.target,
              Self::Fly(_)
              | Self::Explore(_)
              | Self::Transport(_)
-@@ -259,6 +279,11 @@ impl ActionList {
+@@ -259,6 +285,11 @@ impl ActionList {
          self.0.first()
      }
  
@@ -7701,28 +7758,30 @@ index 118ae20f..d70334a8 100644
      /// run it).
      pub(crate) fn pop_head(&mut self) -> Option<Action> {
 diff --git a/crates/engine/genie-core/src/objects/layers/action.rs b/crates/engine/genie-core/src/objects/layers/action.rs
-index 8555387e..c69b96c6 100644
+index 8555387e..5d72f241 100644
 --- a/crates/engine/genie-core/src/objects/layers/action.rs
 +++ b/crates/engine/genie-core/src/objects/layers/action.rs
-@@ -125,6 +125,9 @@ impl Action {
+@@ -125,6 +125,10 @@ impl Action {
              actions::Action::Explore(e) => walking(e.state.move_to().map(|m| m.state)),
              actions::Action::Enter(e) => walking(e.state.move_to().map(|m| m.state)),
              actions::Action::Transport(t) => walking(t.state.move_to().map(|m| m.state)),
 +            actions::Action::RelicPickup(r) => walking(r.state.move_to().map(|m| m.state)),
 +            actions::Action::RelicDeposit(r) => walking(r.state.move_to().map(|m| m.state)),
 +            actions::Action::Convert(r) => walking(r.state.move_to().map(|m| m.state)),
++            actions::Action::Unpack(r) => walking(r.state.move_to().map(|m| m.state)),
              actions::Action::MoveTo(_)
              | actions::Action::Missile(_)
              | actions::Action::Make(_)
 diff --git a/crates/engine/genie-core/src/objects/mod.rs b/crates/engine/genie-core/src/objects/mod.rs
-index 8e11f247..cc837c47 100644
+index 8e11f247..6e4dee2f 100644
 --- a/crates/engine/genie-core/src/objects/mod.rs
 +++ b/crates/engine/genie-core/src/objects/mod.rs
-@@ -22,6 +22,9 @@ pub mod object_list;
+@@ -22,6 +22,10 @@ pub mod object_list;
  mod outcomes;
  use genie_model::objects::regeneration;
  pub(crate) mod release;
 +pub mod convert;
++pub mod unpack;
 +pub mod relic_deposit;
 +pub mod relic_pickup;
  mod relic_count;
@@ -7802,10 +7861,10 @@ index bd8b67b7..b04ae357 100644
      }
  }
 diff --git a/crates/engine/genie-core/src/objects/teardown.rs b/crates/engine/genie-core/src/objects/teardown.rs
-index b22ddd84..24350111 100644
+index b22ddd84..34c7c513 100644
 --- a/crates/engine/genie-core/src/objects/teardown.rs
 +++ b/crates/engine/genie-core/src/objects/teardown.rs
-@@ -97,6 +97,25 @@ impl Action {
+@@ -97,6 +97,37 @@ impl Action {
                  torn.release(e.target.map(ContainerId::id));
              }
              Self::Transport(t) => stop_if_moving(motion, t.state.move_to().is_some())?,
@@ -7824,6 +7883,18 @@ index b22ddd84..24350111 100644
 +            // target is its player's or an ally's spends the faith (0xba6480; the update stops
 +            // on such a target first, findings 162); the target's slot 0x4e0 for a converter
 +            // of class 53 is not held; then the base lets the target go
++            // 0xbd06e0: an unpack that changed the master (`+0x87` 1 or 2) changes it back
++            // (slot 0x98 with `+0x82`), which the slice does not model (it never gets there);
++            // then the base lets the target go
++            Self::Unpack(r) => {
++                if r.stage != 0 {
++                    return Err(GenieError::unsupported(
++                        "the teardown of an unpack that changed its master (0xbd06e0)",
++                    ));
++                }
++                stop_if_moving(motion, r.state.move_to().is_some())?;
++                torn.release(r.target);
++            }
 +            Self::Convert(r) => {
 +                stop_if_moving(motion, r.state.move_to().is_some())?;
 +                torn.release(r.target);
@@ -7920,7 +7991,7 @@ index cee0a80b..c1040a9b 100644
              path_made: m
                  .paths
 diff --git a/crates/engine/genie-core/src/objects/unit/update.rs b/crates/engine/genie-core/src/objects/unit/update.rs
-index d7751598..0437afbd 100644
+index d7751598..7895ef3b 100644
 --- a/crates/engine/genie-core/src/objects/unit/update.rs
 +++ b/crates/engine/genie-core/src/objects/unit/update.rs
 @@ -105,6 +105,7 @@ impl Unit {
@@ -7931,17 +8002,18 @@ index d7751598..0437afbd 100644
          self.after_actions(c)?;
          Ok(captured)
      }
-@@ -149,6 +150,9 @@ impl Unit {
+@@ -149,6 +150,10 @@ impl Unit {
              Some(Action::Build(_)) => self.build_part(actions, c, me),
              Some(Action::Repair(_)) => self.repair_part(actions, c, me, roles),
              Some(Action::Enter(_)) => self.enter_part(actions, c, me, roles),
 +            Some(Action::RelicPickup(_)) => self.relic_pickup_part(actions, c, me, roles),
 +            Some(Action::RelicDeposit(_)) => self.relic_deposit_part(actions, c, me, roles),
 +            Some(Action::Convert(_)) => self.convert_part(actions, c, me, roles),
++            Some(Action::Unpack(_)) => self.unpack_part(actions, c, me, roles),
              Some(Action::Transport(_)) => self.transport_update(actions, c, me, roles),
              Some(Action::WaitSolidify(_)) => Ok(actions.wait_solidify_part(
                  OthersRef::of(&c.w.players, &c.w.index, c.player)?,
-@@ -299,6 +303,25 @@ impl Unit {
+@@ -299,6 +304,25 @@ impl Unit {
          Ok(())
      }
  
@@ -7967,7 +8039,7 @@ index d7751598..0437afbd 100644
      /// After the actions: the units its walk met take their pauses (slot 0x5f0: their walked
      /// level's pause; the walk read them from its own list till now, `Mover::pause_of`). A unit
      /// whose walk met others in its way is not modelled.
-@@ -310,10 +333,15 @@ impl Unit {
+@@ -310,10 +334,15 @@ impl Unit {
              if c.w.object(id).is_none() {
                  continue;
              }
@@ -8832,7 +8904,7 @@ index 72090fb3..3f1a775d 100644
                      source: OrderSource::Queued,
                  },
 diff --git a/crates/engine/genie-core/src/orders/work.rs b/crates/engine/genie-core/src/orders/work.rs
-index 9e2d36cf..472ae913 100644
+index 9e2d36cf..366ff44f 100644
 --- a/crates/engine/genie-core/src/orders/work.rs
 +++ b/crates/engine/genie-core/src/orders/work.rs
 @@ -33,6 +33,9 @@ use crate::orders::OrderSource;
@@ -8854,7 +8926,7 @@ index 9e2d36cf..472ae913 100644
          &mut self,
          player: PlayerId,
          idx: ListIndex,
-@@ -381,6 +384,52 @@ impl World {
+@@ -381,11 +384,60 @@ impl World {
              _ if top == Some(TRANSPORT) && task.action_kind == TRANSPORT => {
                  self.retake_transport((player, idx), (target, point), task, notifies)?
              }
@@ -8907,7 +8979,16 @@ index 9e2d36cf..472ae913 100644
              // the top action's slot 0x48 (FUN_140a977a0) on the same task: the base's
              // (FUN_140a7bf40: the MoveTo's, the Enter's, the missile's, the Fly's, the Make's, the
              // wait for a foundation's) answers 0, and the work goes on to the factory
-@@ -496,14 +545,87 @@ impl World {
+             _ if top == Some(task.action_kind) && top != Some(HUNT) => match top {
+-                Some(MOVE_TO | ENTER | MISSILE | FLY | MAKE | WAIT_SOLIDIFY) => Answer::NotTaken,
++                // 188329: the unpack's slot 0x48 is 0xb6dd60 (answers 0)
++                Some(MOVE_TO | ENTER | MISSILE | FLY | MAKE | WAIT_SOLIDIFY | ActionKind::UNPACK) => {
++                    Answer::NotTaken
++                }
+                 _ => {
+                     return Err(GenieError::unsupported(
+                         "a work command on the unit's current task",
+@@ -496,12 +548,90 @@ impl World {
              // the factory makes no action of a mule cart's task: the move without one
              CART_TASK => self.work_move(player, idx, target, point, (notifies, source)),
              TRANSPORT => self.start_transport((player, idx), (target, point), task, notifies),
@@ -8923,6 +9004,11 @@ index 9e2d36cf..472ae913 100644
 +                let target = target.ok_or(TERRAIN_TASK)?;
 +                self.start_convert(player, idx, (target, point), task, notifies)
 +            }
++            // 188329 0xbb8c30 case 0x7d (findings 170)
++            ActionKind::UNPACK => {
++                let target = target.ok_or(TERRAIN_TASK)?;
++                self.start_unpack(player, idx, (target, point), notifies)
++            }
              ENTER | ATTACK_TASK | HUNT | ActionKind::BUILD | REPAIR | GATHER => {
                  let target = target.ok_or(TERRAIN_TASK)?;
                  self.start_object_task(player, idx, (target, point), task, notifies)
@@ -8933,9 +9019,9 @@ index 9e2d36cf..472ae913 100644
 +                eprintln!("UNMODELLED_TASK kind={:#x} task={:?}", kind.get(), task.id);
 +                Err(UNMODELLED_FACTORY)
 +            }
-         }
-     }
- 
++        }
++    }
++
 +    /// The factory's relic pick-up (188329 0xbb8c30 case 0x84, constructor 0xbc2f60): the
 +    /// action takes the relic (0xb6ba50, slot 0x178); the unit AI takes the order 0x2db (its
 +    /// history recorded) and the action 0x277 (0xd40990, 0xd40980; its `+0x1b0` flag, 0xd1bdb0,
@@ -8983,7 +9069,7 @@ index 9e2d36cf..472ae913 100644
 +        if let Some(ai) = self.parts.unit_ai.get_mut(id) {
 +            ai.set_order(Some(OrderKind::OnTarget), self.streams.get(Stream::Ai));
 +            ai.set_action(Some(AiAction::OnTarget));
-+        }
+         }
 +        self.clear_actions(player, idx)?;
 +        self.relic_deposit_start(player, idx, &mut action)?;
 +        self.parts
@@ -8991,12 +9077,10 @@ index 9e2d36cf..472ae913 100644
 +            .list
 +            .set_relic_deposit(Some(action));
 +        Ok(())
-+    }
-+
+     }
+ 
      /// [`World::start_task`]'s actions on an object: the Enter, Attack, Hunt, Build, Repair or
-     /// Gather on `target` starts.
-     fn start_object_task(
-@@ -537,7 +659,11 @@ impl World {
+@@ -537,7 +667,11 @@ impl World {
              ActionKind::BUILD => self.start_build(player, idx, target, task, point, notifies),
              REPAIR => self.start_repair(player, idx, target, task, point, notifies),
              GATHER => self.start_gather(player, idx, target, task, Some((point, notifies))),
@@ -21512,6 +21596,433 @@ index 00000000..a8069986
 +        };
 +        let i = self.wake(id)?;
 +        self.players.live_mut(owner, i)?.life.hp = crate::objects::HitPoints::ZERO;
++        Ok(())
++    }
++}
+diff --git a/crates/engine/genie-core/src/objects/unpack.rs b/crates/engine/genie-core/src/objects/unpack.rs
+new file mode 100644
+index 00000000..ba176db4
+--- /dev/null
++++ b/crates/engine/genie-core/src/objects/unpack.rs
+@@ -0,0 +1,421 @@
++//! A packed siege engine's unpack (type 0x7d; 188329: the factory 0xbb8c30 case 0x7d ->
++//! 0xbb94de, constructor 0xbcf0c0, vtable 0x3228238: start (slot 5) 0xbd1230, update (slot 6)
++//! 0xbd2f80, `set_state` (slot 16) 0xbd2950, the destructor 0xbd06e0; findings 170).
++//!
++//! The slice models the walk to the target within the unpacked master's range (state 11); the
++//! unpacking itself (states 2 and 6, the master change), the pack before it (state 10) and the
++//! walk without a target stop as unsupported.
++
++use crate::GenieError;
++use crate::map::Distance;
++use crate::map::Position;
++use crate::math::rng::Stream;
++use crate::movement::Me;
++use crate::movement::footprint_gap_squared;
++use crate::movement::move_to::Patience;
++use crate::movement::move_to::{
++    GiveUp, ListUpdate, MoveToAction, MoveToReads, TargetMoved, update_sub_actions,
++};
++use crate::objects::ListIndex;
++use crate::objects::ObjectId;
++use crate::objects::ObjectState;
++use crate::objects::SpriteId;
++use crate::objects::layers::Action;
++use crate::objects::masters::ActionKind;
++use crate::objects::masters::Master;
++use crate::objects::masters::MasterId;
++use crate::objects::masters::MasterKind;
++use crate::objects::teardown::HeadCode;
++use crate::objects::unit::Unit;
++use crate::players::PlayerId;
++use crate::unit_ai::Notifies;
++use crate::unit_ai::UnitStance;
++use crate::world::World;
++use crate::world::layer::ClassRoles;
++use crate::world::layer::Roles;
++use crate::world::lets::release;
++use crate::world::slots::PlayerSlots;
++use crate::world::step::Step;
++use genie_diff::Diff;
++
++/// The unpack's action type (0x7d).
++pub const UNPACK: ActionKind = ActionKind::UNPACK;
++
++/// The constructor's range less this (`[0x143202890]` = 0.1).
++const RANGE_SHORT: f32 = 0.1;
++
++/// The unpack's state (`+0x18`) with the `MoveTo` of its walk.
++#[derive(Clone, Copy, Debug, PartialEq, Diff)]
++pub enum UnpackState {
++    /// 1: done (its update returns 1).
++    Done,
++    /// 11: walking to the target (or the point) within the range.
++    Walk {
++        /// The quiet `MoveTo` (0xb92150 with the range, the own master's walking sprite
++        /// `+0x1e8`, 1, 1; 0xb6b990 with 1).
++        move_to: Option<MoveToAction>,
++    },
++}
++
++impl UnpackState {
++    /// The state's number.
++    #[must_use]
++    pub const fn get(&self) -> u8 {
++        match self {
++            Self::Done => 1,
++            Self::Walk { .. } => 11,
++        }
++    }
++
++    /// Its walk's `MoveTo`, if it walks with one.
++    #[must_use]
++    pub const fn move_to(&self) -> Option<&MoveToAction> {
++        match self {
++            Self::Walk { move_to } => move_to.as_ref(),
++            Self::Done => None,
++        }
++    }
++}
++
++/// The unpack action (0x90 bytes).
++#[derive(Clone, Copy, Debug, PartialEq, Diff)]
++pub struct UnpackAction {
++    /// The target (`+0x20`, `+0x30`).
++    pub target: Option<ObjectId>,
++    /// `+0x18`.
++    pub state: UnpackState,
++    /// `+0x38`, `+0x3c`: the constructor's point (the work command's).
++    pub point: Position,
++    /// `+0x70`: the unpacked master's range less 0.1 (0 without a target).
++    pub range: Distance,
++    /// `+0x82`: the master it unpacks from (the unit's own).
++    pub own: MasterId,
++    /// `+0x84`: the master it unpacks into (the task's `+0x12`).
++    pub into: MasterId,
++    /// `+0x80`: the task's `work_val1`, the unpacking's length.
++    pub length: i16,
++    /// `+0x88`: the flags of the task's `+0x34` (0x10 -> 1, 0x20 -> 2, 8 -> 4, 0x40 -> 8,
++    /// 0x80 -> 0x10, 0x200 -> 0x20).
++    pub flags: u8,
++    /// `+0x87`: 0 until the master changes (1, 2 while it unpacks).
++    pub stage: u8,
++}
++
++/// The unpack info of a master (0x12f3c60) from its first task of type 0x7d (0x116a370): the
++/// task's `+0x12` (the master it unpacks into), its `work_val1` (the length) and the flags of
++/// its `+0x34`. None for a master without one; master 444 and class 51 without such a task take
++/// other values, not modelled.
++fn unpack_info(master: &Master) -> Result<Option<(MasterId, i16, u8)>, GenieError> {
++    let Some(task) = master
++        .action_part()
++        .tasks
++        .iter()
++        .find(|t| t.action_kind == UNPACK)
++    else {
++        if master.id.get() == 0x1bc || master.class.get() == 0x33 {
++            return Err(GenieError::unsupported(
++                "an unpack of master 444 or class 51 without an unpack task (0x12f3c60)",
++            ));
++        }
++        return Ok(None);
++    };
++    let into = task.object_id.ok_or(GenieError::unsupported(
++        "an unpack task without its master (0x12f3c60)",
++    ))?;
++    let w = task.work_flag;
++    let mut flags = 0u8;
++    for (bit, flag) in [(0x10, 1), (0x20, 2), (8, 4), (0x40, 8), (0x80, 0x10), (0x200, 0x20)] {
++        if w & bit != 0 {
++            flags |= flag;
++        }
++    }
++    Ok(Some((into, task.work_val1.get() as i32 as i16, flags)))
++}
++
++/// Whether the master has the pack info (0x12f38b0): a task of type 0x7c (0x116a370), class 54,
++/// or master 109 (under its own rules).
++fn packs_first(master: &Master) -> bool {
++    master
++        .action_part()
++        .tasks
++        .iter()
++        .any(|t| t.action_kind == ActionKind::PACK)
++        || master.class.get() == 0x36
++        || master.id.get() == 0x6d
++}
++
++impl Unit {
++    /// The unpack's update with the action copied out of the list and put back.
++    ///
++    /// # Errors
++    ///
++    /// What the update does not model.
++    pub(crate) fn unpack_part(
++        &mut self,
++        actions: &mut Action,
++        c: &mut Step<'_>,
++        me: Me,
++        roles: &Roles,
++    ) -> Result<HeadCode, GenieError> {
++        let Some(mut a) = actions.list.unpack().copied() else {
++            return Ok(HeadCode::Keeps);
++        };
++        let code = self.unpack_update(&mut a, c, me, roles);
++        if let Some(x) = actions.list.unpack_mut() {
++            *x = a;
++        }
++        code
++    }
++
++    /// Slot 0x68 with none: the target goes (its slot 0x180).
++    fn unpack_drop(&mut self, a: &mut UnpackAction, c: &mut Step<'_>) -> Result<(), GenieError> {
++        if let Some(t) = a.target.take() {
++            let by = self.releaser(c)?;
++            release(c, self, Some(t), by)?;
++        }
++        Ok(())
++    }
++
++    /// The update (0xbd2f80): a target gone or above state 2 goes (slot 0x68 with 0); then by
++    /// the state. 11: the `MoveTo`'s code (0xb8ae30): 1 or 2 unpack (6); 0 and 3 test the
++    /// footprints' squared gap (0x124daf0) against the squared range: within it unpacks (6),
++    /// else 3 fails (13) and 0 walks on; 4 lets the target go and walks again (11).
++    fn unpack_update(
++        &mut self,
++        a: &mut UnpackAction,
++        c: &mut Step<'_>,
++        me: Me,
++        roles: &Roles,
++    ) -> Result<HeadCode, GenieError> {
++        if a.target.is_some() {
++            let gone = match c.w.object(a.target) {
++                None => true,
++                Some((_, t)) => ObjectState::Alive < t.life.state,
++            };
++            if gone {
++                self.unpack_drop(a, c)?;
++            }
++        }
++        match a.state {
++            UnpackState::Done => Ok(HeadCode::Deletes),
++            UnpackState::Walk { .. } => {
++                let code = self.unpack_walk(a, c, me, roles)?;
++                match code {
++                    1 | 2 => Err(UNPACKING),
++                    0 | 3 => {
++                        let Some((tp, t)) = c.w.object(a.target) else {
++                            return Err(GenieError::unsupported(
++                                "an unpack's walk without its target (0xbd30b4)",
++                            ));
++                        };
++                        let tr = t.master(c.w.master_tables(), tp)?.radius;
++                        let at = t.position();
++                        let own = self.master(c.w.master_tables(), c.player)?.radius;
++                        let gap2 = footprint_gap_squared(self.position(), own, at, tr).get();
++                        let r = a.range.get();
++                        // COMISS, JB: within the range (NaN out)
++                        if r * r >= gap2 {
++                            return Err(UNPACKING);
++                        }
++                        if code == 3 {
++                            return Err(GenieError::unsupported(
++                                "an unpack's failed walk (set_state 13)",
++                            ));
++                        }
++                        Ok(HeadCode::Keeps)
++                    }
++                    4 => Err(GenieError::unsupported(
++                        "an unpack's walk again after its target moved (0xbd3077)",
++                    )),
++                    _ => Ok(HeadCode::Keeps),
++                }
++            }
++        }
++    }
++
++    /// The `MoveTo`'s update (0xb8ae30) and its code.
++    fn unpack_walk(
++        &mut self,
++        a: &mut UnpackAction,
++        c: &mut Step<'_>,
++        me: Me,
++        roles: &Roles,
++    ) -> Result<u8, GenieError> {
++        let master = self.master(c.w.master_tables(), c.player)?;
++        let how = ListUpdate {
++            gives_up: GiveUp {
++                patience: if roles.of_class(master.class).contains(ClassRoles::VILLAGER)
++                    && !c.w.players.player(c.player)?.kind.is_computer()
++                {
++                    Patience::WaitsOnce
++                } else {
++                    Patience::Fails
++                },
++                stance: c
++                    .w
++                    .parts
++                    .unit_ai
++                    .get(self.id)
++                    .map_or(UnitStance::Aggressive, |ai| ai.stance),
++            },
++            ..ListUpdate::default()
++        };
++        let code = match &mut a.state {
++            UnpackState::Walk { move_to } => update_sub_actions(move_to, c, self, me, how)?,
++            UnpackState::Done => update_sub_actions(&mut None, c, self, me, how)?,
++        };
++        Ok(code.get())
++    }
++}
++
++/// The unpacking itself (`set_state` 6 and 2: the master change, the length counted) is not
++/// modelled.
++const UNPACKING: GenieError =
++    GenieError::unsupported("an unpack's unpacking (set_state 6, 0xbd2950)");
++
++impl World {
++    /// The factory's unpack (0xbb8c30 case 0x7d -> 0xbb94de, constructor 0xbcf0c0 with the work's
++    /// point and -1) on `target` from the work command: the action takes the target (0xb6ba50);
++    /// its own master (`+0x82`) is the unit's (no pack info, 0x12f3bd0) and the unpack info of it
++    /// (0x12f3c60) gives the master it unpacks into (`+0x84`), the length and the flags; the range
++    /// (`+0x70`) is that master's weapon range (0x1280c80: `+0x2c8` through the unit's own
++    /// modifiers 0x1241910, which the slice does not hold) less 0.1. The unit AI hears type
++    /// 0x7d (slot 0x8e8 -> 0x113e030: order and action −1, the target with its class at the
++    /// point); the install (slot 0x8c8) clears the action list and the list's add starts it
++    /// (slot 5 with 1, [`World::unpack_start`]).
++    ///
++    /// # Errors
++    ///
++    /// What the start does not model, a unit or master the world lacks.
++    pub(crate) fn start_unpack(
++        &mut self,
++        player: PlayerId,
++        idx: ListIndex,
++        (target, point): (ObjectId, Position),
++        notifies: Notifies,
++    ) -> Result<(), GenieError> {
++        let unit = self.players.live(player, idx)?;
++        let id = unit.id;
++        let own = unit.master(self.master_tables(), player)?.clone();
++        if own.kind < MasterKind::BUILDING {
++            return Err(GenieError::unsupported(
++                "an unpack by a unit of a type below 80 (0xbd0d90)",
++            ));
++        }
++        if packs_first(&own) {
++            return Err(GenieError::unsupported(
++                "an unpack by a unit with the pack info (0x12f3bd0, set_state 10)",
++            ));
++        }
++        let (into, length, flags) = unpack_info(&own)?.ok_or(GenieError::unsupported(
++            "an unpack by a master without the unpack info (0xbd0d90)",
++        ))?;
++        if flags & 0x20 != 0 {
++            return Err(GenieError::unsupported(
++                "an unpack whose task's flag 0x200 marks its point (0xbd1080)",
++            ));
++        }
++        let (tp, t) = self.object(Some(target)).ok_or(GenieError::unsupported(
++            "an unpack's target the world does not hold",
++        ))?;
++        let class = t.master(self.master_tables(), tp)?.class;
++        let range = match self.master(player, into) {
++            Ok(m) if MasterKind::COMBAT <= m.kind => {
++                Distance::new(m.combat_part().weapon_range.get() - RANGE_SHORT)
++            }
++            _ => Distance::ZERO,
++        };
++        let mut a = UnpackAction {
++            target: Some(target),
++            state: UnpackState::Walk { move_to: None },
++            point: Position::new(point.x(), point.y(), 0.0),
++            range,
++            own: own.id,
++            into,
++            length,
++            flags,
++            stage: 0,
++        };
++        self.take(target, self.releaser(player, idx)?)?;
++        if let Some(ai) = self.parts.unit_ai.get_mut(id) {
++            ai.notify_work(
++                None,
++                None,
++                Some((target, class)),
++                point,
++                notifies,
++                self.streams.get(Stream::Ai),
++            )?;
++            self.remember_order(player, idx, (None, None))?;
++        }
++        self.clear_actions(player, idx)?;
++        self.unpack_start(player, idx, &mut a)?;
++        self.parts.actions_mut(id)?.list.set_unpack(Some(a));
++        Ok(())
++    }
++
++    /// The start (slot 5 with 1, 0xbd1230): with its own master and the one it unpacks into (of
++    /// a type of at least 80) in the player's table, a unit in a group leaves it (0x10f64b0 with
++    /// −1 and 0: it stands); without the pack info (0x12f3bd0) `set_state(11)`: the sub-actions
++    /// go and the quiet `MoveTo` to the target within the range with the own master's walking
++    /// sprite (0xb92150 with 1, 1; 0xb6b990 with 1). Else 13, not modelled.
++    ///
++    /// # Errors
++    ///
++    /// What the start does not model, a unit or master the world lacks.
++    pub(crate) fn unpack_start(
++        &mut self,
++        player: PlayerId,
++        idx: ListIndex,
++        a: &mut UnpackAction,
++    ) -> Result<(), GenieError> {
++        let own = self.master(player, a.own).ok().cloned();
++        let into_ok = self
++            .master(player, a.into)
++            .is_ok_and(|m| MasterKind::BUILDING <= m.kind);
++        let Some(own) = own.filter(|_| into_ok) else {
++            return Err(GenieError::unsupported(
++                "an unpack's start without its masters (set_state 13)",
++            ));
++        };
++        let unit = self.players.live(player, idx)?;
++        let id = unit.id;
++        if let Some(group) = unit.group.id {
++            let _ = self.remove_unit(group, id, None, crate::groups::LeavingWalk::Stands)?;
++        }
++        let unit = self.players.live(player, idx)?;
++        if packs_first(unit.master(self.master_tables(), player)?) {
++            return Err(GenieError::unsupported(
++                "an unpack's start with the pack info (set_state 10)",
++            ));
++        }
++        let master = unit.master(self.master_tables(), player)?;
++        let move_reads = MoveToReads::of(
++            (unit, self.parts.mover_of(id)),
++            master,
++            (
++                &self.model.graphics,
++                self.parts.combat_of(id).abilities.look.as_ref(),
++            ),
++            &self.model.roles,
++        );
++        let to = move_reads
++            .walk_to(self, a.target)?
++            .ok_or(GenieError::unsupported("an unpack's walk without its target"))?;
++        let sprite: Option<SpriteId> = own.moving_part().move_sprite;
++        let walk = move_reads.to_object(
++            to,
++            a.range,
++            sprite,
++            TargetMoved::AsksAgain,
++            &self.model.tuning.move_to,
++        )?;
++        if a.state.move_to().is_some()
++            && let Some(m) = self.parts.mover_mut(id)
++        {
++            m.stop()?;
++        }
++        a.state = UnpackState::Walk { move_to: walk };
 +        Ok(())
 +    }
 +}
