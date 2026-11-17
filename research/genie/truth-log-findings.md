@@ -1472,3 +1472,8 @@
 
 - `unit_ai/attack_pick.rs` 새 `priest_can_attack`: 가이아는 컴퓨터 길에서만, 공격 우선 3이면 `PRIORITY_3_TARGET` 클래스 또는 67만, 그다음 호출자의 `can_convert(.., TargetRules::Own)`. `can_attack_on`이 `converts: Option<bool>`을 받고 세 호출부(unit_view attack_check·helper_free, world_picker can_attack)가 `WorldPicker::converts`로 채움.
 - 패치 PC `runs\R34e.patch`(= 이 커밋의 패치, sha256 `6c70b04a…ce808ec`, 866,735바이트), 표 `runs\R34_tab_R34e.txt`·`R34_ptab_R34e.txt`(이전 = R34d, 146번). 전체 실행: 모든 .out·CPWORDS 바이트까지 같음(ENG-31 네 판·프로 14판 포함) — 검사 세트의 어느 판도 첫 어긋남 전에 수도사 검사에 닿지 않음. 520848973은 지금 약 u103k에서 멈춰 u155445 사례 전이라 이 수정 자체는 아직 실행으로 확인 못 함. 518239882 57 / 54 멈춤 없음.
+
+## 148. 그룹 전체 STOP = 188329 0x10d9540을 엔진에 넣음 (스위치 없음; 144번 (b))
+
+- `orders/commands.rs` `stop_command`: STOP이 정확히 한 그룹의 멤버 전부를 가리키면 유닛 AI마다 대기열 비우기·놂 타이머를 조정된 시간으로, 그다음 `groups/command.rs` 새 `World::stop_group`(0x10d9540 순서): motion.stop_walk, TargetData::default, 현재 명령 NONE → 멤버마다 공격한 뒤 초 = f32::MAX → stop_all_units(All) → 연결된 멤버 끊기, 움직이는 중이고 자유이면 Mover::stop + show_standing, 그다음 leave_statistic → 멤버마다 spare_seconds = f32::MAX, 멤버 비우기, 선두 None, RELAYOUT. 램 다시 넣기(0x10f5ad0)는 뺌.
+- 패치 PC `runs\R34f.patch`(= 이 커밋의 패치, sha256 `3b8b358a…49866828`, 872,745바이트), 표 `runs\R34_tab_R34f.txt`·`R34_ptab_R34f.txt`(이전 = R34e, 147번). 그룹 STOP 멈춤 셋이 모두 없어짐(첫 어긋남·사이트 그대로): 519009176 멈춤 없음(P1 u51210이었음, 첫 어긋남 49999/50499 그대로), V 520282194 P2 60563(사수 없는 투사체)·P1 62628까지 감, 프로 519908353 멈춤 없음. 나머지 같음, 518239882 57 / 54 멈춤 없음.

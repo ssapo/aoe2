@@ -3494,10 +3494,18 @@ index 0f5086e6..76de0a57 100644
          )?;
          let g = self.groups.held_mut(group)?;
 diff --git a/crates/engine/genie-core/src/groups/command.rs b/crates/engine/genie-core/src/groups/command.rs
-index cc0b4325..4fb39fb9 100644
+index cc0b4325..2e5e5b2f 100644
 --- a/crates/engine/genie-core/src/groups/command.rs
 +++ b/crates/engine/genie-core/src/groups/command.rs
-@@ -71,6 +71,11 @@ bitflags::bitflags! {
+@@ -22,6 +22,7 @@ use crate::map::WholeDistance;
+ use crate::math::fmath::BVector;
+ use crate::math::fmath::{at_most_or_unordered, below_or_unordered, sqrt};
+ use crate::math::image::group::EPSILON as GROUP_EPSILON;
++use crate::movement::Mover;
+ use crate::movement::PathData;
+ use crate::movement::PathFlags;
+ use crate::movement::PathState;
+@@ -71,6 +72,11 @@ bitflags::bitflags! {
          const DIRECT = 1 << 4;
          /// `param_11`.
          const KEEP_FLAG = 1 << 5;
@@ -3509,7 +3517,7 @@ index cc0b4325..4fb39fb9 100644
      }
  }
  
-@@ -274,6 +279,13 @@ impl World {
+@@ -274,6 +280,13 @@ impl World {
          let world_time = self.world_time;
          let g = self.groups.held_mut(group)?;
          g.flags &= !(GroupFlags::MEMBERS_SENT | GroupFlags::FOLLOWED);
@@ -3523,7 +3531,7 @@ index cc0b4325..4fb39fb9 100644
          // the game compares the two integers: a target of none changes a group with one
          let changed = target != g.current_target.target.key();
          if let Some(done) = self.queue_move(group, point, how)? {
-@@ -295,6 +307,10 @@ impl World {
+@@ -295,6 +308,10 @@ impl World {
              m.seconds_since_attacking = Seconds::MAX;
          }
          if self.all_horde_units(group)? {
@@ -3534,7 +3542,7 @@ index cc0b4325..4fb39fb9 100644
              return Err(GenieError::unsupported(
                  "a horde's move (commandHorde, FUN_141010180)",
              ));
-@@ -316,6 +332,13 @@ impl World {
+@@ -316,6 +333,13 @@ impl World {
              if let Some(ai) = self.parts.unit_ai.get_mut(id) {
                  ai.clear_notifies(world_time.since_start())?;
              }
@@ -3548,7 +3556,7 @@ index cc0b4325..4fb39fb9 100644
          }
          let owner = self.groups.held(group)?.owner_player()?;
          let min_column = self
-@@ -499,7 +522,7 @@ impl World {
+@@ -499,7 +523,7 @@ impl World {
                  last.point.ground(),
                  MoveTo {
                      range: last.range,
@@ -3557,6 +3565,79 @@ index cc0b4325..4fb39fb9 100644
                  },
              )?;
          }
+@@ -560,6 +584,72 @@ impl World {
+         }
+     }
+ 
++    /// The group's stop of a STOP of all its members (188329 `0x10d9540`, 158041
++    /// `FUN_1410110c0`; findings 144/148): its walk stops and its path levels reset
++    /// (`0x11147f0`, [`crate::groups::Motion::stop_walk`]), its target data and command go
++    /// (target −1, place, range and radius 0, retargeting 0, command −1); the rams are not added
++    /// again (`0x10f5ad0`, gated by a global as 158041's `FUN_14102b730`); every member's seconds
++    /// since attacking are `f32::MAX`, `stopAllUnits` with all ([`World::stop_all_units`]); then
++    /// each member whose link names the group leaves it (`+0x210` −1) and, when it moves (slot
++    /// 0x610) and is free ([`World::member_idle`]), stops (slot 0x618) and shows its standing
++    /// sprite (slot 0x6c0, [`World::show_standing`]); it leaves its statistic
++    /// ([`World::leave_statistic`]). The group keeps no member and no lead and takes
++    /// [`GroupFlags::RELAYOUT`]; it stays in the list (an empty group goes at its next update).
++    ///
++    /// # Errors
++    ///
++    /// What the members' stop does not model.
++    pub(crate) fn stop_group(&mut self, group: GroupId) -> Result<(), GenieError> {
++        {
++            let g = self.groups.held_mut(group)?;
++            g.motion.stop_walk()?;
++            g.current_target = crate::groups::TargetData::default();
++            g.current_command = GroupCommandKind::NONE;
++            for m in &mut g.members {
++                m.seconds_since_attacking = Seconds::MAX;
++            }
++        }
++        self.stop_all_units(group, StopScope::All)?;
++        let gid = self.groups.held(group)?.id;
++        let ids: Vec<ObjectId> = self
++            .groups
++            .held(group)?
++            .members
++            .iter()
++            .map(|m| m.id)
++            .collect();
++        for &id in &ids {
++            let linked = self
++                .object(id)
++                .is_some_and(|(_, u)| u.group.id == Some(gid));
++            if linked {
++                if let Some(place) = self.place(id) {
++                    let u = match place {
++                        Place::Live(p, i) => self.players.live_mut(p, i)?,
++                        Place::Sleeping(p, i) => self.players.asleep_mut(p, i)?,
++                    };
++                    u.group.id = None;
++                }
++                let moving = self.parts.mover_of(id).is_some_and(Mover::is_moving);
++                if moving && self.member_idle(id)? {
++                    if let Some(m) = self.parts.mover_mut(id) {
++                        m.stop()?;
++                    }
++                    self.show_standing(id)?;
++                }
++            }
++            let _ = self.leave_statistic(group, id)?;
++        }
++        let g = self.groups.held_mut(group)?;
++        for _ in 0..g.members.len() {
++            g.spare_seconds.insert(0, Seconds::MAX);
++        }
++        g.members.clear();
++        g.motion.lead = None;
++        g.flags |= GroupFlags::RELAYOUT;
++        Ok(())
++    }
++
+     /// `stopAllUnits` (`FUN_14103a0d0`) of group `group`: each member the world holds with an
+     /// action (slot 0x530, `actionType`, not -1), or every one with `all`, stops (slot 0x148,
+     /// [`World::object_stop`]; slot 0x560: its movement stands and its path level resets) and its
 diff --git a/crates/engine/genie-core/src/groups/formation/column_line.rs b/crates/engine/genie-core/src/groups/formation/column_line.rs
 index 24636f40..7fb0849f 100644
 --- a/crates/engine/genie-core/src/groups/formation/column_line.rs
@@ -7179,6 +7260,48 @@ index 00aaf602..3ac37dc9 100644
              return Err(GenieError::unsupported(
                  "a master change that changes the damage sprites (FUN_1411859a0)",
              ));
+diff --git a/crates/engine/genie-core/src/orders/commands.rs b/crates/engine/genie-core/src/orders/commands.rs
+index 3ac3e455..0466c505 100644
+--- a/crates/engine/genie-core/src/orders/commands.rs
++++ b/crates/engine/genie-core/src/orders/commands.rs
+@@ -230,7 +230,7 @@ impl World {
+     /// [`crate::unit_ai::UnitAi::reset_for_order`]). Several entries (a gone unit's null among
+     /// them) that are exactly one unit group's members (`FUN_14152ec80`, the group's size
+     /// `+0xe4`) stop as the group: each unit AI's order queue empties and its idle timer takes its
+-    /// adjusted timeout, then the group's stop (`FUN_1410110c0`), which is not modelled. Else each
++    /// adjusted timeout, then the group's stop ([`World::stop_group`]). Else each
+     /// unit leaves the unit group the world holds of its link (`FUN_14102c160` with -1 and 0,
+     /// [`World::remove_unit`]), its unit AI's order queue empties (`FUN_140c5e010`) and its idle
+     /// timer takes its adjusted timeout (`+0x160` = `+0x164`), its ignore list empties
+@@ -264,13 +264,21 @@ impl World {
+         }
+         if 1 < list.len() {
+             let group = common_group(&list, |id| self.object(id).map(|(_, u)| u.group));
+-            if group
+-                .and_then(|id| self.groups.get(id))
+-                .is_some_and(|g| g.members.len() == list.len())
+-            {
+-                return Err(GenieError::unsupported(
+-                    "a STOP of a whole unit group (FUN_1410110c0)",
+-                ));
++            if let Some(g) = group.filter(|&id| {
++                self.groups
++                    .get(id)
++                    .is_some_and(|g| g.members.len() == list.len())
++            }) {
++                // 188329 0x16ecd10 (findings 144/148): each entry's queue empties and its idle
++                // timer takes its adjusted timeout, then the group's stop (0x10d9540); nothing
++                // else per unit
++                for &id in &units {
++                    if let Some(ai) = self.parts.unit_ai.get_mut(id) {
++                        ai.orders.clear();
++                        ai.idle_timer = ai.adjusted_idle_timeout;
++                    }
++                }
++                return self.stop_group(g);
+             }
+         }
+         for &id in &units {
 diff --git a/crates/engine/genie-core/src/orders/drop_site.rs b/crates/engine/genie-core/src/orders/drop_site.rs
 index d65b2d84..ecf8ab20 100644
 --- a/crates/engine/genie-core/src/orders/drop_site.rs
