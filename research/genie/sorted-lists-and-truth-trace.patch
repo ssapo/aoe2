@@ -5052,7 +5052,7 @@ index 999d44b5..1edf79c0 100644
      }
  
 diff --git a/crates/engine/genie-core/src/groups/update/awake.rs b/crates/engine/genie-core/src/groups/update/awake.rs
-index 4ce9b2f7..c0872e13 100644
+index 4ce9b2f7..b8899f03 100644
 --- a/crates/engine/genie-core/src/groups/update/awake.rs
 +++ b/crates/engine/genie-core/src/groups/update/awake.rs
 @@ -106,6 +106,7 @@ impl World {
@@ -5112,6 +5112,58 @@ index 4ce9b2f7..c0872e13 100644
          if let Some(mut f) = self.groups.held_mut(group)?.current_formation.take() {
              let moved = self.formation_transform(&mut f, group, SlotOrder::Closest);
              self.groups.held_mut(group)?.current_formation = Some(f);
+@@ -434,10 +462,13 @@ impl World {
+ 
+     /// The relayout's choice (`0x14103e53f`..`0x14103e5f7`) after the update's start counted
+     /// `count` members: (relayout, refill). A changed count refills an attack's (9) formation of
+-    /// kind 6 (`FUN_1410163f0` later), else sets [`GroupFlags::RELAYOUT_SPREAD`] for a total
+-    /// spacing (`+0x47c`) of at most 6 (`COMISS` then `JBE`: a NaN too), else relays out. Flags bit
+-    /// 7 with a spacing above 6 relays out and clears bits 7 and 1; then [`GroupFlags::RELAYOUT`]
+-    /// with a spacing above 6 and an idle group ([`World::is_idle`]) relays out and clears bit 1.
++    /// kind 6 (`FUN_1410163f0` later), else sets [`GroupFlags::RELAYOUT_SPREAD`] for a time not
++    /// under attack of at most 6 s (`COMISS` then `JBE`: a NaN too), else relays out. Flags bit
++    /// 7 with a time above 6 s relays out and clears bits 7 and 1; then [`GroupFlags::RELAYOUT`]
++    /// with a time above 6 s and an idle group ([`World::is_idle`]) relays out and clears bit 1.
++    /// 188329 (`0x110a8a0`..`0x110a9c5`, findings 143) tests the group's `+0x48c`, the seconds
++    /// no member was under attack ([`UnitGroup::seconds_not_under_attack`], the statistics'
++    /// `0x10d5b26`..`0x10d5b4e`), where the port of 158041 read the total spacing.
+     pub(super) fn relayout_choice(
+         &mut self,
+         group: GroupId,
+@@ -445,6 +476,8 @@ impl World {
+     ) -> Result<(bool, bool), GenieError> {
+         let idle = self.is_idle(group);
+         let g = self.groups.held_mut(group)?;
++        // 188329: the seconds not under attack (+0x48c), findings 143
++        let calm = Distance::new(g.seconds_not_under_attack.get());
+         let (mut relayout, mut refill) = (false, false);
+         if count != g.members.len() {
+             if g.current_command == ATTACK
+@@ -454,7 +487,7 @@ impl World {
+             {
+                 refill = true;
+             } else if at_most_or_unordered(
+-                g.total_spacing.get(),
++                calm.get(),
+                 Distance::new(self.model.tuning.missile.volley_reach_margin).get(),
+             ) {
+                 g.flags |= GroupFlags::RELAYOUT_SPREAD;
+@@ -463,13 +496,13 @@ impl World {
+             }
+         }
+         if g.flags.contains(GroupFlags::RELAYOUT_SPREAD)
+-            && Distance::new(self.model.tuning.missile.volley_reach_margin) < g.total_spacing
++            && Distance::new(self.model.tuning.missile.volley_reach_margin) < calm
+         {
+             relayout = true;
+             g.flags &= !(GroupFlags::RELAYOUT | GroupFlags::RELAYOUT_SPREAD);
+         }
+         if g.flags.contains(GroupFlags::RELAYOUT)
+-            && Distance::new(self.model.tuning.missile.volley_reach_margin) < g.total_spacing
++            && Distance::new(self.model.tuning.missile.volley_reach_margin) < calm
+             && idle
+         {
+             g.flags &= !GroupFlags::RELAYOUT;
 diff --git a/crates/engine/genie-core/src/groups/update/mod.rs b/crates/engine/genie-core/src/groups/update/mod.rs
 index 0e406949..ed5ae5a2 100644
 --- a/crates/engine/genie-core/src/groups/update/mod.rs
