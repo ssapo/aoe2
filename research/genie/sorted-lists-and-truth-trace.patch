@@ -19314,10 +19314,10 @@ index 00000000..e8b44cf1
 +}
 diff --git a/crates/engine/genie-core/src/objects/convert.rs b/crates/engine/genie-core/src/objects/convert.rs
 new file mode 100644
-index 00000000..b27fcb21
+index 00000000..7c93ea6c
 --- /dev/null
 +++ b/crates/engine/genie-core/src/objects/convert.rs
-@@ -0,0 +1,1050 @@
+@@ -0,0 +1,1083 @@
 +//! A monk's conversion (`TRIBE_Action_Convert`, type 0x68; 188329: the factory 0xbb8c30 case
 +//! 0x68 -> 0xbb8d28, constructor 0xba5100, vtable 0x3226cc8: start (slot 5) 0xba6b40, update
 +//! (slot 6) 0xba9310, its new target (slot 9) 0xbaa500, `set_state` (slot 16) 0xba8b30, the
@@ -19329,6 +19329,7 @@ index 00000000..b27fcb21
 +use crate::map::Distance;
 +use crate::map::Position;
 +use crate::map::Tile;
++use crate::math::fmath::sqrt;
 +use crate::math::rng::Stream;
 +use crate::movement::Me;
 +use crate::movement::footprint_gap;
@@ -19884,14 +19885,12 @@ index 00000000..b27fcb21
 +                let own = self.master(c.w.master_tables(), c.player)?.clone();
 +                let sprite = a.task.proceeding.or(own.combat_part().attack_sprite);
 +                self.convert_show(c, sprite)?;
-+                // the monk's sound (slot 0x4f8) is not simulation; the target owner's AI
-+                // (`player+0x648` above 0: 0 for every player probed)
-+                if let Some(t) = target_of(c.w, a.target)?
-+                    && c.w.players.player(t.owner)?.kind.is_computer()
-+                {
-+                    return Err(GenieError::unsupported(
-+                        "a conversion of a computer player's unit (its AI's slot 0x1c8)",
-+                    ));
++                // the monk's sound (slot 0x4f8) is not simulation; 188329 0xba8fd4..0xba9116
++                // (findings 165): a target whose owner's number (`player+0x648`) is above 0 (any
++                // player but Gaia) has that player make a flare (slot 0x1c8 with master 0x70)
++                // at the converter's place
++                if let Some(t) = target_of(c.w, a.target)? {
++                    self.convert_flare(c, &t)?;
 +                }
 +                let k = (ONE / 60.0) * 3.0;
 +                let step = CHECK_BASE - k * c.w.settings.game_speed.get();
@@ -20098,8 +20097,8 @@ index 00000000..b27fcb21
 +    /// 0xba6590, before each update's state: where its owner sees the target (its unit AI's
 +    /// tile test, 0xd44470: 0xf) is where it was seen; a target beyond the range (the squared
 +    /// footprint gap 0x124daf0 above the squared range) that it sees, out of state 4 and not
-+    /// while it turns or converts with an animated sprite still playing (the sprite's slot 8,
-+    /// 0x147c640), makes it walk again (4). A target it does not see is not modelled.
++    /// while it turns or converts with an animated sprite that has not looped yet (the sprite
++    /// list's slot 8 0x1482bd0, the node's slot 12 0x147c670), makes it walk again (4). A target it does not see is not modelled.
 +    fn convert_follow(
 +        &mut self,
 +        a: &mut ConvertAction,
@@ -20121,21 +20120,39 @@ index 00000000..b27fcb21
 +        if !(r * r < gap2) {
 +            return Ok(());
 +        }
-+        if !sees {
-+            return Err(GenieError::unsupported(
-+                "a conversion's target beyond its range out of sight (0xba6590)",
-+            ));
++        // 0xba6590 (findings 167): unseen, how far the target went from where it was seen
++        // (`sqrt(dy² + dx²)`, 0x140a841c0); a target seen, or in state 11, or that went at most
++        // the converter's line of sight (slot 0x228, as `0x1245c70`: its master's) is followed
++        // as below; else the point (`+0x38`, `+0x3c`) takes where it was seen, `+0x84` the
++        // target, the target goes (slot 0x68 with 0) and the converter walks to the point (11)
++        let moved = if sees {
++            0.0
++        } else {
++            let dx = a.seen.x() - t.position.x();
++            let dy = a.seen.y() - t.position.y();
++            sqrt(dy * dy + dx * dx)
++        };
++        let sight = self
++            .master(c.w.master_tables(), c.player)?
++            .line_of_sight
++            .get();
++        let walks_to_point = matches!(a.state, ConvertState::WalkPoint { .. });
++        // COMISS, JA: a NaN distance loses the target
++        if !(walks_to_point || sees || moved <= sight) {
++            a.point = Position::new(a.seen.x(), a.seen.y(), a.point.z());
++            a.lost = Some(t.id);
++            self.convert_drop(a, c)?;
++            return self.convert_set_state(a, c, ConvertState::WalkPoint { move_to: None }, roles);
 +        }
-+        if matches!(a.state, ConvertState::Walk { .. }) {
++        if matches!(a.state, ConvertState::Walk { .. }) || sight < moved {
 +            return Ok(());
 +        }
 +        let working = matches!(a.state, ConvertState::Face | ConvertState::Convert);
-+        // dil: the sprite's slot 8 (0x147c640: animating and animated) or a still sprite
++        // dil (0xba6aa1..0xba6aca, findings 166): the unit's sprite list (+0x28) slot 8
++        // (0x1482bd0) finds the node of its current graphic (+0x20) and answers its slot 12
++        // (0x147c670: `+0x35`, the sprite looped), or a still graphic (`+0x1a` bit 0 clear)
 +        let done = match self.sprite.as_ref() {
-+            Some(s) => {
-+                (s.animate != crate::objects::AnimateState::Stopped && s.graphic.animated())
-+                    || !s.graphic.animated()
-+            }
++            Some(s) => s.looped || !s.graphic.animated(),
 +            None => {
 +                return Err(GenieError::unsupported(
 +                    "a converter whose sprite the slice does not hold (0xba6590)",
@@ -20160,11 +20177,8 @@ index 00000000..b27fcb21
 +        c: &mut Step<'_>,
 +        t: &Target,
 +    ) -> Result<(), GenieError> {
-+        if c.w.players.player(t.owner)?.kind.is_computer() {
-+            return Err(GenieError::unsupported(
-+                "a conversion of a computer player's unit (its AI's slot 0x1c8)",
-+            ));
-+        }
++        // 188329 0xba98ac..0xba99c5 (findings 165): before the draw, the flare of set_state(7)
++        self.convert_flare(c, t)?;
 +        let r = c.w.streams.get(Stream::Action).rand15() as i32;
 +        let mut draw = (r * 100) / 0x7fff;
 +        let target_attributes = c.w.players.player(t.owner)?.attributes.clone();
@@ -20188,6 +20202,25 @@ index 00000000..b27fcb21
 +            ));
 +        }
 +        Ok(())
++    }
++}
++
++impl Unit {
++    /// The flare a conversion makes (188329 `set_state(7)` at 0xba8fd4 and the draw at
++    /// 0xba98ac): when the target's owner's number (`player+0x648`) is above 0 (not Gaia), that
++    /// player's slot 0x1c8 with master 0x70 at the converter's place (x, y and z of `+0x170`..
++    /// `+0x180`), 0 and a flag byte 1: the hit's flare ([`World::make_flare`], not doubled).
++    /// Not modelled: a computer player's (its slot 0x1c8 may be its AI's).
++    fn convert_flare(&self, c: &mut Step<'_>, t: &Target) -> Result<(), GenieError> {
++        if t.owner == PlayerId::GAIA {
++            return Ok(());
++        }
++        if c.w.players.player(t.owner)?.kind.is_computer() {
++            return Err(GenieError::unsupported(
++                "a conversion of a computer player's unit (its slot 0x1c8)",
++            ));
++        }
++        c.w.make_flare(t.owner, self.position(), false)
 +    }
 +}
 +
