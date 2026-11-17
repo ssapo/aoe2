@@ -4099,7 +4099,7 @@ index 398a973c..8fe3628e 100644
              self.stop_all_units(group, StopScope::Busy)?;
          }
 diff --git a/crates/engine/genie-core/src/groups/place.rs b/crates/engine/genie-core/src/groups/place.rs
-index 51f6a791..584af934 100644
+index 51f6a791..db637350 100644
 --- a/crates/engine/genie-core/src/groups/place.rs
 +++ b/crates/engine/genie-core/src/groups/place.rs
 @@ -16,6 +16,8 @@ use crate::map::DistanceSquared;
@@ -4135,7 +4135,7 @@ index 51f6a791..584af934 100644
          let g = self.groups.held_mut(group)?;
          g.stored_positions.clear_points();
          g.motion.new_position[0] = at;
-@@ -402,6 +409,230 @@ impl World {
+@@ -402,6 +409,234 @@ impl World {
          Ok(())
      }
  
@@ -4208,40 +4208,39 @@ index 51f6a791..584af934 100644
 +            path = p;
 +        }
 +        let path = &path[..];
-+        // 0x10d1b10: the distance along the path of a point's projection
++        // 0x10d1b10 (findings 141): the distance along the path of a point's projection, on the
++        // ground: of the segments the first whose projection (t clamped to [0, 1], a NaN t 0) is
++        // nearest (strictly) wins; its distance is the whole segments before it plus the length
++        // from its start to the projection's rounded place (height 0 less the start's height)
 +        let along = |p: BVector| -> f32 {
 +            let mut best = f32::MAX;
-+            let mut best_along = 0.0_f32;
-+            let mut acc = 0.0_f32;
-+            for s in path.windows(2) {
++            let (mut proj_x, mut proj_y, mut index) = (0.0_f32, 0.0_f32, 0_usize);
++            for (i, s) in path.windows(2).enumerate() {
 +                let (a, b) = (s[0], s[1]);
-+                let (dx, dh, dy) = (b.x() - a.x(), b.height() - a.height(), b.y() - a.y());
-+                let len2 = dx * dx + dh * dh + dy * dy;
-+                let len = sqrt(len2);
-+                let (qx, qh, qy) = (p.x() - a.x(), p.height() - a.height(), p.y() - a.y());
-+                let t = if 0.0 < len2 {
-+                    (qx * dx + qh * dh + qy * dy) / len2
++                let (dx, dy) = (b.x() - a.x(), b.y() - a.y());
++                let t = ((p.y() - a.y()) * dy + (p.x() - a.x()) * dx) / (dy * dy + dx * dx);
++                let t = if 0.0 <= t {
++                    if t <= 1.0 { t } else { 1.0 }
 +                } else {
 +                    0.0
 +                };
-+                let t = if t < 0.0 { 0.0 } else if 1.0 < t { 1.0 } else { t };
-+                let (ox, oh, oy) = (qx - t * dx, qh - t * dh, qy - t * dy);
-+                let off = ox * ox + oh * oh + oy * oy;
-+                let here = if 1.0 <= t {
-+                    acc + len
-+                } else if t <= 0.0 {
-+                    acc
-+                } else {
-+                    let (px, ph, py) = (t * dx, t * dh, t * dy);
-+                    acc + sqrt(px * px + ph * ph + py * py)
-+                };
++                let y = t * dy + a.y();
++                let x = t * dx + a.x();
++                let (oy, ox) = (p.y() - y, p.x() - x);
++                let off = oy * oy + ox * ox;
 +                if off < best {
 +                    best = off;
-+                    best_along = here;
++                    (proj_x, proj_y, index) = (x, y, i);
 +                }
-+                acc += len;
 +            }
-+            best_along
++            let mut acc = 0.0_f32;
++            for s in path.windows(2).take(index) {
++                let (a, b) = (s[0], s[1]);
++                acc += sqrt((b.y() - a.y()) * (b.y() - a.y()) + (b.x() - a.x()) * (b.x() - a.x()));
++            }
++            let a = path.get(index).copied().unwrap_or(BVector::ZERO);
++            let (ex, eh, ey) = (proj_x - a.x(), 0.0 - a.height(), proj_y - a.y());
++            sqrt(eh * eh + ex * ex + ey * ey) + acc
 +        };
 +        let mut d = along(at);
 +        for &(_, p) in held {
@@ -4260,20 +4259,25 @@ index 51f6a791..584af934 100644
 +        if patrol && d < 0.5 {
 +            d = 0.5;
 +        }
-+        // 0x106e0b0: the place at `d` along the path (ground lengths)
-+        let mut point = c;
++        // 0x106e0b0 (findings 141): the place at `d` along the path, ground lengths; on the
++        // segment that reaches `d` the start's height, past the end the last point
++        // fewer than two points: the origin (0x10ef7a0)
++        let mut point = if path.len() < 2 {
++            BVector::ZERO
++        } else {
++            path.last().copied().unwrap_or(c)
++        };
 +        let mut acc = 0.0_f32;
-+        let n = path.len();
-+        for (k, s) in path.windows(2).enumerate() {
++        for s in path.windows(2) {
 +            let (a, b) = (s[0], s[1]);
-+            let (dx, dh, dy) = (b.x() - a.x(), b.height() - a.height(), b.y() - a.y());
-+            let len = sqrt(dx * dx + dy * dy);
-+            if d <= acc + len || k + 2 == n {
-+                let t = if 0.0 < len { (d - acc) / len } else { 0.0 };
-+                point = BVector::new(t * dx + a.x(), t * dh + a.height(), t * dy + a.y());
++            let (dx, dy) = (b.x() - a.x(), b.y() - a.y());
++            let len = sqrt(dx * dx + 0.0 + dy * dy);
++            if d <= len + acc {
++                let t = (d - acc) / len;
++                point = BVector::new(t * dx + a.x(), t * 0.0 + a.height(), t * dy + a.y());
 +                break;
 +            }
-+            acc += len;
++            acc += sqrt(dx * dx + 0.0 * 0.0 + dy * dy);
 +        }
 +        if crate::groups::trace_forming() {
 +            eprintln!(
@@ -4366,7 +4370,7 @@ index 51f6a791..584af934 100644
      /// The terrain classes master `master` of player `p` lets its objects stand on: its
      /// restriction (`+0x606`) in the map's table (`FUN_141054630`).
      ///
-@@ -870,3 +1101,29 @@ mod tests {
+@@ -870,3 +1105,29 @@ mod tests {
          );
      }
  }
