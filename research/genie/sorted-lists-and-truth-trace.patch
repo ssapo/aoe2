@@ -4451,7 +4451,7 @@ index 398a973c..8fe3628e 100644
              self.stop_all_units(group, StopScope::Busy)?;
          }
 diff --git a/crates/engine/genie-core/src/groups/place.rs b/crates/engine/genie-core/src/groups/place.rs
-index 51f6a791..db637350 100644
+index 51f6a791..7bdd90cd 100644
 --- a/crates/engine/genie-core/src/groups/place.rs
 +++ b/crates/engine/genie-core/src/groups/place.rs
 @@ -16,6 +16,8 @@ use crate::map::DistanceSquared;
@@ -4480,14 +4480,14 @@ index 51f6a791..db637350 100644
              return Ok(());
          };
 +        let at = if crate::groups::forming_188329() {
-+            self.front_lead_188329(group, lead_id, at, &held)?
++            self.front_lead_188329(group, lead_id, (at, centre), &held)?
 +        } else {
 +            at
 +        };
          let g = self.groups.held_mut(group)?;
          g.stored_positions.clear_points();
          g.motion.new_position[0] = at;
-@@ -402,6 +409,234 @@ impl World {
+@@ -402,6 +409,237 @@ impl World {
          Ok(())
      }
  
@@ -4501,16 +4501,18 @@ index 51f6a791..db637350 100644
 +    /// as the straight line [W, centroid] (SUSPECTED: true on open ground). `d` = the least
 +    /// distance along it of the chosen member's place and the members' (`0x10d1b10`), less the
 +    /// lead, at least 0 (at least 0.5 on a patrol); the place at `d` along the path
-+    /// (`0x106e0b0`). `at` (the member's place) without a path.
++    /// (`0x106e0b0`). `at` (the member's place) without a path. `centre` is the group's centre
++    /// as the routine's start took it (`xmm11`/`xmm13`: the members' mean place for a new group,
++    /// else the group's place), from which W's 10 is counted.
 +    fn front_lead_188329(
 +        &mut self,
 +        group: GroupId,
 +        lead_id: ObjectId,
-+        at: BVector,
++        (at, centre): (BVector, BVector),
 +        held: &[(ObjectId, BVector)],
 +    ) -> Result<BVector, GenieError> {
 +        let searched = if std::env::var_os("GENIE_EXPERIMENT_FRONTPATH_188329").is_some() {
-+            self.front_path_188329(group, lead_id, at)?
++            self.front_path_188329(group, lead_id, centre)?
 +        } else {
 +            None
 +        };
@@ -4543,8 +4545,9 @@ index 51f6a791..db637350 100644
 +        if g.formed && !(lead <= 0.1) {
 +            lead = 0.1;
 +        }
-+        // EXPERIMENT (FRONTPATH): the 10 is counted from the member's place (`0x10ef53c`)
-+        let w = front_goal_188329(g, searched.as_ref().map(|_| at));
++        // EXPERIMENT (FRONTPATH): the 10 is counted from the group's centre (`0x10ef53c`: `xmm11`,
++        // `xmm13`, findings 160)
++        let w = front_goal_188329(g, searched.as_ref().map(|_| centre));
 +        let Some(w) = w else {
 +            return Ok(at);
 +        };
@@ -4663,10 +4666,10 @@ index 51f6a791..db637350 100644
 +        &mut self,
 +        group: GroupId,
 +        lead_id: ObjectId,
-+        at: BVector,
++        centre: BVector,
 +    ) -> Result<Option<(Found, Vec<BVector>)>, GenieError> {
 +        let g = self.groups.held(group)?;
-+        let Some(w) = front_goal_188329(g, Some(at)) else {
++        let Some(w) = front_goal_188329(g, Some(centre)) else {
 +            return Ok(None);
 +        };
 +        let (c, range) = (g.centroid, g.current_target.range);
@@ -4722,15 +4725,17 @@ index 51f6a791..db637350 100644
      /// The terrain classes master `master` of player `p` lets its objects stand on: its
      /// restriction (`+0x606`) in the map's table (`FUN_141054630`).
      ///
-@@ -870,3 +1105,29 @@ mod tests {
+@@ -870,3 +1108,31 @@ mod tests {
          );
      }
  }
 +
 +/// 188329 movePositionToFront's W (`0x10ef4d4`..): the walked level's last point (its level
 +/// byte not 0), else the parent's waypoint at least 10 beyond its current one; with `at` (the
-+/// chosen member's place) the 10 is counted from there: the sum starts with the ground distance
-+/// from `at` to the current waypoint (`0x10ef53c`..`0x10ef5d0`, constant `0x31fd87c`).
++/// group's centre, `xmm11`/`xmm13` of the routine's start: the members' mean place for a new
++/// group, else the group's place; findings 160) the 10 is counted from there: the sum starts with
++/// the ground distance from `at` to the current waypoint (`0x10ef53c`..`0x10ef5d0`, constant
++/// `0x31fd87c`).
 +fn front_goal_188329(g: &crate::groups::UnitGroup, at: Option<BVector>) -> Option<BVector> {
 +    match g.motion.paths.first() {
 +        Some(l) if l.level.get() != 0 => l.points.last().copied(),
@@ -5543,6 +5548,104 @@ index 4ce9b2f7..b8899f03 100644
              && idle
          {
              g.flags &= !GroupFlags::RELAYOUT;
+diff --git a/crates/engine/genie-core/src/groups/update/checks.rs b/crates/engine/genie-core/src/groups/update/checks.rs
+index 1991cb20..85f19f8c 100644
+--- a/crates/engine/genie-core/src/groups/update/checks.rs
++++ b/crates/engine/genie-core/src/groups/update/checks.rs
+@@ -15,6 +15,7 @@ use crate::groups::{UnitGroup, WorldObject};
+ use crate::map::Distance;
+ use crate::map::DistanceSquared;
+ use crate::map::Tile;
++use crate::map::spatial::TileSight;
+ use crate::math::conversions::cvttss2si;
+ use crate::math::fmath::maxss;
+ use crate::math::rng::Stream;
+@@ -400,15 +401,18 @@ impl World {
+         }))
+     }
+ 
+-    /// `FUN_141188ea0` of `object` for player `player`: its tile (`CVTTSS2SI` of its x and y)
+-    /// seen by the player now (slot 0x1e0, `FUN_1416635e0`, 0xf: [`crate::map::spatial::Spatial::
+-    /// sees_tile`]), or, for a master whose `fog_visibility` (`+0x605`) is set, seen or explored
+-    /// ([`crate::map::spatial::Spatial::explored`]).
++    /// `FUN_141188ea0` (188329 `0x12462e0`) of `object` for player `player`: the object's sight
++    /// for the player (slot 0x1e0, 188329 slot 0x1f8) is 0xf, or, for a master whose
++    /// `fog_visibility` (`+0x605`, 188329 `+0xa5`) is set, not 0. The slot is the player's tile
++    /// test of its tile (`CVTTSS2SI` of its x and y; `0x1251870` -> `0x1732570`,
++    /// [`crate::map::spatial::Spatial::tile_sight`]) for any object but a building (type 80),
++    /// whose slot (188329 `0x128ab40`, [`World::building_seen`]) also counts its own visibility
++    /// mask and its ghosts on its tile (findings 161).
+     ///
+     /// # Errors
+     ///
+-    /// An object of a master the slice does not have, and the explored test without the
+-    /// players' sight.
++    /// An object of a master the slice does not have, and the sight test without the players'
++    /// sight.
+     pub(super) fn sees_object(
+         &self,
+         object: WorldObject<'_>,
+@@ -416,12 +420,56 @@ impl World {
+     ) -> Result<bool, GenieError> {
+         let master = self.master(object.player(), object.master_id(self.model.slots))?;
+         let (x, y) = (object.position().x(), object.position().y());
+-        let (x, y) = (cvttss2si(x), cvttss2si(y));
+-        if master.fog_visibility == FogVisibility::INVISIBLE {
+-            Ok(self.spatial.sees_tile(player, Tile::new(x, y)))
++        let tile = Tile::new(cvttss2si(x), cvttss2si(y));
++        let sight = self
++            .spatial
++            .tile_sight(player, tile)
++            .ok_or(GenieError::unsupported(
++                "a test of explored tiles without the players' sight",
++            ))?;
++        let sight = if master.kind == MasterKind::BUILDING && !sight.seen() {
++            if self.building_seen(object.id(), object.position(), tile, player) {
++                TileSight::Seen
++            } else {
++                sight
++            }
++        } else {
++            sight
++        };
++        Ok(if master.fog_visibility == FogVisibility::INVISIBLE {
++            sight.seen()
+         } else {
+-            self.spatial.explored(player, Tile::new(x, y))
++            sight != TileSight::Unknown
++        })
++    }
++
++    /// A building's slot 0x1f8 short of its tile test's 0xf (188329 `0x128ab40`, 158041
++    /// `FUN_1411d3280`): seen when it follows its footprint's UMV entry and its visibility mask
++    /// meets the player's visible or explored mask ([`crate::map::spatial::Spatial::
++    /// building_sight`]), or when a ghost (type 25) on its tile's list shows it (the ghost's
++    /// original, 188329 `+0x358`) and the player is not among those who cannot see that ghost
++    /// (`+0x388`, `1 << player+0x648`), whichever player's ghost it is.
++    fn building_seen(
++        &self,
++        id: ObjectId,
++        position: crate::map::Position,
++        tile: Tile,
++        player: PlayerId,
++    ) -> bool {
++        if self
++            .spatial
++            .building_sight(id, position, player)
++            .is_some_and(TileSight::seen)
++        {
++            return true;
+         }
++        self.spatial.tile_list(tile).iter().any(|&on| {
++            self.players.iter().any(|p| {
++                p.ghosts.iter().any(|g| {
++                    g.id == on && g.original == Some(id) && !g.cant_see.holds(player)
++                })
++            })
++        })
+     }
+ 
+     /// `FUN_141017f00` of object `id` (the group it gets is not read): whether the member is
 diff --git a/crates/engine/genie-core/src/groups/update/mod.rs b/crates/engine/genie-core/src/groups/update/mod.rs
 index 0e406949..ed5ae5a2 100644
 --- a/crates/engine/genie-core/src/groups/update/mod.rs
