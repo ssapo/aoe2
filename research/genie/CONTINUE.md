@@ -530,6 +530,8 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 13.4 지금 하던 일 (멈출 때마다 이 절을 덮어쓴다)
 
+**2026-11-17 밤 늦게(가장 최신).** 엔진 = `runs\R40b.patch`(연구 `5f6000b`, findings 157·158), 520848973 두 선수 모든 체크포인트 1739.0초까지. 다음 = findings 159(열림, 1744.920초 3유닛 Move의 그룹 앞 길), 그다음 엔진 멈춤 P2 u136985(1784.323초 Order가 만드는 미모델 작업). 노트 PC `runs\R40_notes.txt`.
+
 **2026-11-17 밤 갱신(위 문단보다 최신).** 엔진 = `runs\R39e.patch`(연구 `dc987b0`/`05d742d`, findings 150~154; 155는 철회, 156), exe `runs\census_R39e.exe` = `genie\` 소스. 520848973: P1 모든 체크포인트가 엔진 멈춤 u126773(~1640초)까지, P2 1568.9초까지, P2 첫 어긋남 1575.4초. 다음: P2 1570.608초 건축가 10495(·10503 1571.960초)가 자기 쪽 막 닫힌 문 9403으로 곧장 가는 길을 원본은 받는데 엔진 짧은 길찾기(`movement/long_walk.rs` ~455, 그물 + 칸 단어)는 Partial로 돌아감 — 먼저 칸 단어(문 비트 0x8000, `Spatial::mark`), `drop_record`가 막 닫힌 문 표시를 지우는지, 기둥 9404·9405 그물 모양. 그다음 엔진 멈춤 P2 u125710 "a smart missile leading its target"(탄도학 성). 노트 PC `runs\R39_notes.txt`(증명/추정 구분), 색인 `runs\R39_t23idx_a/b/c.txt`(1160~1750초).
 
 **2026-11-17 저녁, Claude (ENG-31 + 520848973 100% 목표; 사용자 지시 "한 경기를 원본과 100% 일치").** 엔진 = 패치 `runs\R34g.patch`(연구 `3341188`, findings 132~149), exe `runs\census_R34g.exe` = `genie\` 소스. 원본 기록(PC `truth\`): truth17(521084500 0~410초 매 틱), truth19/19b(521467291), truth20/20b(519009176), truth21(521511686), truth22(519686090), **truth23(520848973 Arena 41:51, 매 틱 0~2068.5초, 그 뒤 띄엄띄엄, 27.6GB)**. 도구: `runs\R36_idx.py`(큰 기록 색인), `R36_*`/`R34_cmp23.py`/`R34_get23.py`(IDX=), `runs\R37_t1\`(1초 표본 전 개체 비교), `runs\R36_ops.py <리플> <ms0> <ms1> [선수]`(리플 명령 — **어긋남마다 먼저 볼 것**: 1158.7초는 Shift 예약 명령이었다). 
