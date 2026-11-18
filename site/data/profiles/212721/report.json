@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-18T09:56:33.321989+00:00",
-  "last_checked_at": "2026-11-18T09:54:48.630369+00:00",
+  "updated_at": "2026-11-18T10:26:48.922559+00:00",
+  "last_checked_at": "2026-11-18T10:25:21.249391+00:00",
   "sync_error": null,
   "profile": {
     "id": 212721,
@@ -279453,7 +279453,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 31,
+        "analysis_revision": 32,
         "duration_game_seconds": 1229.2,
         "civilization": "Gurjaras",
         "random_civ": true,
@@ -315405,7 +315405,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 31,
+        "analysis_revision": 32,
         "duration_game_seconds": 1436.38,
         "civilization": "Teutons",
         "random_civ": true,
@@ -354103,7 +354103,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 31,
+        "analysis_revision": 32,
         "duration_game_seconds": 1323.45,
         "civilization": "Poles",
         "random_civ": true,
@@ -393888,17 +393888,39 @@
               221,
               0,
               0
+            ],
+            [
+              380.0,
+              741,
+              207,
+              0,
+              0,
+              835,
+              221,
+              0,
+              0
+            ],
+            [
+              390.0,
+              746,
+              210,
+              0,
+              0,
+              913,
+              221,
+              0,
+              0
             ]
           ],
-          "verified_until_seconds": 379.2,
+          "verified_until_seconds": 392.2,
           "own_total": [
-            741,
-            207,
+            746,
+            213,
             0,
             0
           ],
           "opponent_total": [
-            835,
+            913,
             221,
             0,
             0
@@ -394702,11 +394724,53 @@
                 0,
                 0,
                 0
+              ],
+              [
+                380.0,
+                394,
+                346,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                127,
+                708,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                390.0,
+                394,
+                352,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                205,
+                708,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
               ]
             ]
           },
           "animals": {
-            "until_seconds": 370.0,
+            "until_seconds": 390.0,
             "own": [
               {
                 "id": 3901,
@@ -394743,9 +394807,9 @@
               {
                 "id": 4314,
                 "kind": "boar",
-                "eaten": 1.7,
+                "eaten": 7.0,
                 "first_seconds": 330.0,
-                "last_seconds": 330.0
+                "last_seconds": 390.0
               }
             ],
             "opponent": [
@@ -394772,8 +394836,19 @@
                 "first_seconds": 250.0,
                 "last_seconds": 350.0,
                 "full": 400.0
+              },
+              {
+                "id": 3904,
+                "kind": "sheep",
+                "eaten": 78.0,
+                "first_seconds": 390.0,
+                "last_seconds": 390.0
               }
             ]
+          },
+          "engine_version": {
+            "research_commit": "9f76e74",
+            "patch_sha256": "26c6a1700ef1"
           }
         },
         "game_build": 188329,
@@ -529960,7 +530035,7 @@
       "analysis": null,
       "attempts": 0,
       "source_url": "https://www.aoe2insights.com/match/98537956/",
-      "civ_choice_tries": 1
+      "civ_choice_tries": 2
     },
     {
       "id": 95823402,
@@ -529992,7 +530067,8 @@
       "analysis_status": "pending",
       "analysis": null,
       "attempts": 0,
-      "source_url": "https://www.aoe2insights.com/match/95823402/"
+      "source_url": "https://www.aoe2insights.com/match/95823402/",
+      "civ_choice_tries": 1
     },
     {
       "id": 95810346,
@@ -530024,7 +530100,8 @@
       "analysis_status": "pending",
       "analysis": null,
       "attempts": 0,
-      "source_url": "https://www.aoe2insights.com/match/95810346/"
+      "source_url": "https://www.aoe2insights.com/match/95810346/",
+      "civ_choice_tries": 1
     },
     {
       "id": 95679806,
@@ -530056,7 +530133,8 @@
       "analysis_status": "pending",
       "analysis": null,
       "attempts": 0,
-      "source_url": "https://www.aoe2insights.com/match/95679806/"
+      "source_url": "https://www.aoe2insights.com/match/95679806/",
+      "civ_choice_tries": 1
     },
     {
       "id": 95678538,
