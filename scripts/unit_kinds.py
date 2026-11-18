@@ -26,7 +26,7 @@ from bisect import bisect_right
 from pathlib import Path
 
 STEP_MS = 5000
-UNTIL_MS = 1_200_000      # marks up to 20 game minutes; the verified span has stayed under 15
+UNTIL_MS = 2_700_000      # marks up to 45 game minutes, past the engine's 44-minute run (engine_income.UPDATES)
 WORDS = (1, 6, 10)        # checkpoint words: stockpile sum, object count, object id sum
 VILLAGER_TASKS = {'Villager', 'Builder', 'Farmer', 'Fisherman', 'Fisherwoman', 'Forager', 'Hunter',
                   'Lumberjack', 'Stone Miner', 'Gold Miner', 'Repairer', 'Shepherd'}

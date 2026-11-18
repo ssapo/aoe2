@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MAX_DOWNLOAD = 64 * 1024 * 1024
 MAX_REPLAY = 256 * 1024 * 1024
 AGE_IDS = {101: '봉건', 102: '성주', 103: '왕정'}
-ANALYSIS_REVISION = 31
+ANALYSIS_REVISION = 32
 
 
 def now():
@@ -469,6 +469,16 @@ def metadata(match, own_id, aliases):
     }
 
 
+def has_time():
+    """False once the run's analysis deadline (AOE2_ANALYSIS_DEADLINE, unix seconds) has passed: the
+    matches left are analysed or brought up to date in a later run, so the workflow stays inside its time limit."""
+    deadline = os.environ.get('AOE2_ANALYSIS_DEADLINE')
+    try:
+        return not deadline or time.time() < float(deadline)
+    except ValueError:
+        return True
+
+
 def upgrade_analysis(row, existing, match, own_id):
     """Retry an outdated successful analysis without discarding it on failure."""
     state = existing.get('analysis_upgrade', {})
@@ -540,10 +550,10 @@ def main():
         if existing.get('analysis_status') == 'complete':
             # Keep analysis, but refresh finalized outcome and rating.
             row.update({k: existing[k] for k in ('analysis', 'analysis_status', 'attempts', 'analysis_upgrade') if k in existing})
-            if budget and (existing.get('analysis') or {}).get('analysis_revision', 0) < ANALYSIS_REVISION:
+            if budget and has_time() and (existing.get('analysis') or {}).get('analysis_revision', 0) < ANALYSIS_REVISION:
                 if upgrade_analysis(row, existing, match, own_id):
                     budget -= 1
-        elif budget and existing.get('attempts', 0) < 3:
+        elif budget and has_time() and existing.get('attempts', 0) < 3:
             budget -= 1
             row['attempts'] = existing.get('attempts', 0) + 1
             row['analysis_status'] = 'unavailable'
@@ -569,7 +579,7 @@ def main():
     # Kept rows the API no longer lists: their replay is asked for by match id alone, so an
     # outdated analysis is brought up to date with what is left of this run's budget, newest first.
     for row in sorted(old.values(), key=lambda m: m.get('started_at') or 0, reverse=True):
-        if not budget:
+        if not budget or not has_time():
             break
         if row['id'] in listed or row.get('analysis_status') != 'complete':
             continue

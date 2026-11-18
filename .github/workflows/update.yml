@@ -27,7 +27,7 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -35,6 +35,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: main
+      - name: Analysis deadline
+        # Replays (each with a whole-game engine run of up to 10 minutes) start only in the first 25 minutes;
+        # the rest wait for a later run, so the job stays inside its 45-minute limit.
+        run: echo "AOE2_ANALYSIS_DEADLINE=$(( $(date +%s) + 1500 ))" >> "$GITHUB_ENV"
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'

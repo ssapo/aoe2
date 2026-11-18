@@ -42,7 +42,7 @@ from pathlib import Path
 STEP = 10                 # seconds between stored points
 MIN_VERIFIED = 300        # a shorter verified span is not shown
 TIMEOUT = 600
-UPDATES = '90000'         # about 20 game minutes: longer than any span verified so far
+UPDATES = '200000'        # about 44 game minutes: a whole 41:51 game took about 5 minutes on the development PC
 ORDER = (0, 1, 3, 2)      # engine: food, wood, stone, gold -> stored: food, wood, gold, stone
 FOOD_SOURCES = ('sheep', 'boar', 'deer', 'berries', 'farm', 'fish', 'other')
 GOLD_SOURCES = ('mine', 'other')
