@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-18T10:52:44.166399+00:00",
-  "last_checked_at": "2026-11-18T10:48:40.320673+00:00",
+  "updated_at": "2026-11-18T11:11:56.672833+00:00",
+  "last_checked_at": "2026-11-18T11:11:17.612593+00:00",
   "sync_error": null,
   "profile": {
     "id": 8793414,
@@ -170339,7 +170339,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 31,
+        "analysis_revision": 32,
         "duration_game_seconds": 1037.45,
         "civilization": "Bulgarians",
         "random_civ": true,
@@ -189814,7 +189814,10 @@
               "seconds": 418.33,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 89.469,
@@ -189822,7 +189825,10 @@
               "seconds": 419.55,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 1
+              }
             },
             {
               "x": 87.021,
@@ -189831,7 +189837,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 54
+              "group": 54,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 87.99,
@@ -189839,7 +189848,10 @@
               "seconds": 420.15,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 1
+              }
             },
             {
               "x": 88.354,
@@ -189847,7 +189859,10 @@
               "seconds": 420.56,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 1
+              }
             },
             {
               "x": 88.354,
@@ -189855,7 +189870,10 @@
               "seconds": 420.76,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 1
+              }
             },
             {
               "x": 82.948,
@@ -189864,7 +189882,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 2,
-              "group": 74
+              "group": 74,
+              "units": {
+                "Villager": 2
+              }
             },
             {
               "x": 87.823,
@@ -189872,7 +189893,10 @@
               "seconds": 421.98,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 1
+              }
             },
             {
               "x": 84.208,
@@ -189881,7 +189905,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 5,
-              "group": 75
+              "group": 75,
+              "units": {
+                "Villager": 5
+              }
             },
             {
               "x": 84.208,
@@ -189889,7 +189916,10 @@
               "seconds": 422.8,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 5
+              }
             },
             {
               "x": 91.74,
@@ -189897,7 +189927,10 @@
               "seconds": 423.81,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 1
+              }
             },
             {
               "x": 89.087,
@@ -189906,7 +189939,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 1,
-              "group": 26
+              "group": 26,
+              "units": {
+                "Town Center": 1
+              }
             },
             {
               "x": 89.237,
@@ -189914,7 +189950,10 @@
               "seconds": 424.62,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Town Center": 1
+              }
             },
             {
               "x": 76.146,
@@ -198178,7 +198217,7 @@
               "selected_count": null
             }
           ],
-          "command_units_until": 418.2
+          "command_units_until": 424.7
         },
         "metrics": {
           "age_commands": {
@@ -203762,6 +203801,10 @@
                 "last_seconds": 410.0
               }
             ]
+          },
+          "engine_version": {
+            "research_commit": "9f76e74",
+            "patch_sha256": "26c6a1700ef1"
           }
         },
         "game_build": 188329,

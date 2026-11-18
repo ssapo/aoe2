@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-18T10:57:52.691176+00:00",
-  "last_checked_at": "2026-11-18T10:57:48.873739+00:00",
+  "updated_at": "2026-11-18T11:17:38.709744+00:00",
+  "last_checked_at": "2026-11-18T11:14:37.747032+00:00",
   "sync_error": null,
   "profile": {
     "id": 212721,
@@ -395183,7 +395183,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 31,
+        "analysis_revision": 32,
         "duration_game_seconds": 1287.07,
         "civilization": "Japanese",
         "random_civ": true,
@@ -427392,7 +427392,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 31,
+        "analysis_revision": 32,
         "duration_game_seconds": 3143.99,
         "civilization": "Incas",
         "random_civ": true,
@@ -444584,7 +444584,10 @@
               "seconds": 359.94,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 41.222,
@@ -444592,7 +444595,10 @@
               "seconds": 359.94,
               "side": "mine",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Champi Scout": 3
+              }
             },
             {
               "x": 40.528,
@@ -444601,7 +444607,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 1,
-              "group": 1
+              "group": 1,
+              "units": {
+                "Scout Cavalry": 1
+              }
             },
             {
               "x": 40.719,
@@ -444609,7 +444618,10 @@
               "seconds": 361.17,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 1
+              }
             },
             {
               "x": 48.115,
@@ -444618,7 +444630,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 3,
-              "group": 66
+              "group": 66,
+              "units": {
+                "Champi Scout": 3
+              }
             },
             {
               "x": 47.792,
@@ -444627,7 +444642,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 4,
-              "group": 56
+              "group": 56,
+              "units": {
+                "Champi Scout": 4
+              }
             },
             {
               "x": 48.062,
@@ -444636,7 +444654,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 4,
-              "group": 56
+              "group": 56,
+              "units": {
+                "Champi Scout": 4
+              }
             },
             {
               "x": 44.5,
@@ -477335,7 +477356,7 @@
               "selected_count": null
             }
           ],
-          "command_units_until": 359.9
+          "command_units_until": 366.4
         },
         "metrics": {
           "age_commands": {
@@ -488895,17 +488916,28 @@
               129,
               0,
               0
+            ],
+            [
+              390.0,
+              843,
+              195,
+              63,
+              0,
+              862,
+              129,
+              0,
+              0
             ]
           ],
-          "verified_until_seconds": 385.9,
+          "verified_until_seconds": 392.4,
           "own_total": [
             843,
             195,
-            51,
+            63,
             0
           ],
           "opponent_total": [
-            812,
+            862,
             129,
             0,
             0
@@ -489730,11 +489762,32 @@
                 0,
                 0,
                 0
+              ],
+              [
+                390.0,
+                167,
+                271,
+                362,
+                0,
+                0,
+                0,
+                0,
+                38,
+                0,
+                262,
+                300,
+                249,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
               ]
             ]
           },
           "animals": {
-            "until_seconds": 380.0,
+            "until_seconds": 390.0,
             "own": [
               {
                 "id": 2752,
@@ -489842,6 +489895,10 @@
                 "full": 140.0
               }
             ]
+          },
+          "engine_version": {
+            "research_commit": "9f76e74",
+            "patch_sha256": "26c6a1700ef1"
           }
         },
         "game_build": 188329,
@@ -490328,7 +490385,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 31,
+        "analysis_revision": 32,
         "duration_game_seconds": 1318.58,
         "civilization": "Mapuche",
         "random_civ": true,
@@ -527848,6 +527905,10 @@
                 "last_seconds": 300.0
               }
             ]
+          },
+          "engine_version": {
+            "research_commit": "9f76e74",
+            "patch_sha256": "26c6a1700ef1"
           }
         },
         "game_build": 188329,
@@ -530167,7 +530228,7 @@
       "analysis": null,
       "attempts": 0,
       "source_url": "https://www.aoe2insights.com/match/95678538/",
-      "civ_choice_tries": 1
+      "civ_choice_tries": 2
     },
     {
       "id": 49634814,
@@ -530199,7 +530260,8 @@
       "analysis_status": "pending",
       "analysis": null,
       "attempts": 0,
-      "source_url": "https://www.aoe2insights.com/match/49634814/"
+      "source_url": "https://www.aoe2insights.com/match/49634814/",
+      "civ_choice_tries": 1
     },
     {
       "id": 49511128,
@@ -530231,7 +530293,8 @@
       "analysis_status": "pending",
       "analysis": null,
       "attempts": 0,
-      "source_url": "https://www.aoe2insights.com/match/49511128/"
+      "source_url": "https://www.aoe2insights.com/match/49511128/",
+      "civ_choice_tries": 1
     },
     {
       "id": 49428463,
@@ -530263,7 +530326,8 @@
       "analysis_status": "pending",
       "analysis": null,
       "attempts": 0,
-      "source_url": "https://www.aoe2insights.com/match/49428463/"
+      "source_url": "https://www.aoe2insights.com/match/49428463/",
+      "civ_choice_tries": 1
     }
   ]
 }
