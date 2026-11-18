@@ -234,7 +234,20 @@ def income(lines, own_number, opponent_number, offset=0.0):
     eaten = animals(lines, own_number, opponent_number, until, offset)
     if eaten:
         result['animals'] = eaten
+    version = engine_version()
+    if version:
+        result['engine_version'] = version
     return result
+
+
+def engine_version(env=None):
+    """Which engine made the result: the research branch commit and the patch's sha256 (short), from the
+    collection workflow's environment; None outside it."""
+    env = os.environ if env is None else env
+    commit = env.get('ENGINE_RESEARCH_COMMIT', '').strip()[:7]
+    patch = env.get('ENGINE_PATCH_SHA', '').strip()[:12]
+    version = {k: v for k, v in (('research_commit', commit), ('patch_sha256', patch)) if v}
+    return version or None
 
 
 def _switches(path):

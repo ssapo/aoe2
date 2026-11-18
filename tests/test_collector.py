@@ -194,6 +194,26 @@ class CollectorTests(unittest.TestCase):
             saved=json.loads(path.read_text(encoding='utf-8'))['matches'][0]
             self.assertEqual(saved['analysis']['analysis_revision'],4)
 
+    def test_upgrade_limit_only_brings_outdated_analyses_up_to_date(self):
+        payload={'result':{'code':0},'profiles':[],'matchHistoryStats':[]}
+        rows=[{'id':i,'started_at':i,'players_count':2,'analysis_status':'complete','map':'Old',
+               'analysis':{'analysis_revision':4,'map':'Old','opponents':[]}} for i in (1,2,3)]
+        newer={'analysis_revision':collect.ANALYSIS_REVISION,'map':'Arabia','opponents':[]}
+        asked=[]
+        def fetch(url,limit=None):
+            if 'getRecentMatchHistory' in url:
+                return json.dumps(payload).encode()
+            asked.append(url)
+            return b'replay'
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/'report.json'
+            collect.write_json(path,{'schema_version':1,'profile':{'id':1234},'matches':rows})
+            with patch.object(sys,'argv',['collect','--profile-id','1234','--limit','0','--upgrade-limit','2','--header-limit','0','--output',str(path)]),patch.object(collect,'fetch',side_effect=fetch),patch.object(collect,'analyze_replay',return_value=newer),patch('review.enrich_report'):
+                collect.main()
+            saved={m['id']:m for m in json.loads(path.read_text(encoding='utf-8'))['matches']}
+            self.assertEqual(len(asked),2)
+            self.assertEqual([saved[i]['analysis']['analysis_revision'] for i in (3,2,1)],[collect.ANALYSIS_REVISION,collect.ANALYSIS_REVISION,4])
+
     def test_kept_rows_outside_the_api_window_are_upgraded_within_the_budget(self):
         payload={'result':{'code':0},'profiles':[],'matchHistoryStats':[]}
         def kept(match_id,started,revision):

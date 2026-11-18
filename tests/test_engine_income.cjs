@@ -75,3 +75,8 @@ test('animals: absent or empty data keeps the block with why, and the rest as it
   assert.ok(income.renderAnimals({animals:{own:[{kind:'sheep',eaten:5}]}}).includes('data-section="animals"'));
   assert.ok(income.render(withSources).includes('data-section="animals"'));
 });
+test('the verified span names the engine that made it, when the result carries it',()=>{
+  assert.ok(income.render({...curve,engine_version:{research_commit:'6780a04',patch_sha256:'26c6a1700ef1'}}).includes('0:20까지 확인됨 · 엔진 6780a04'));
+  assert.ok(!income.render(curve).includes('엔진 '));
+  assert.ok(income.render({...curve,engine_version:{research_commit:'<b>'}}).includes('엔진 &lt;b&gt;'));
+});

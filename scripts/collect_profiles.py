@@ -39,6 +39,7 @@ def benchmark_target(now=None):
     return pid,ROOT/f'site/data/profiles/{pid}/report.json',1
 
 ANALYSED_PER_RUN=4  # featured players whose replays are analysed in one run; the others are only listed
+UPGRADES_PER_RUN=3  # outdated stored analyses each profile may bring up to date per run (collect.has_time bounds the run)
 
 def analysed_now(featured=FEATURED,now=None,per_run=ANALYSED_PER_RUN):
     """Featured players that get replay analysis in this run, in turn by 30-minute slot.
@@ -65,7 +66,7 @@ def main():
     if extra[0] not in listed:jobs.append(extra)
     elif jobs[listed[extra[0]]][2]==0:jobs[listed[extra[0]]]=(extra[0],jobs[listed[extra[0]]][1],1)
     for pid,path,limit in jobs:
-        result=subprocess.run([sys.executable,str(ROOT/'scripts/collect.py'),'--profile-id',str(pid),'--output',str(path),'--limit',str(limit)])
+        result=subprocess.run([sys.executable,str(ROOT/'scripts/collect.py'),'--profile-id',str(pid),'--output',str(path),'--limit',str(limit),'--upgrade-limit',str(UPGRADES_PER_RUN)])
         if result.returncode:
             if pid in required:failed.append(pid)
             else:print(f'Optional benchmark collection failed, prior data retained: {pid}')

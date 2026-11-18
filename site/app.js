@@ -5,6 +5,15 @@
   const repo = 'ssapo/aoe2';
   let report = {profile:null, matches:[]}, filter = 'all', visible = 12;
   let rankedData=null,rankedLoad=null,rankedLoadedAt=0;
+  // Which site code, analysis revision and engine made the published data (scripts/site_version.py).
+  const versionText=v=>!v||v.schema_version!==1?'':[` · 분석 개정 ${Number(v.analysis_revision)||'?'}`,
+    v.engine&&v.engine.research_commit?` · 엔진 ${v.engine.research_commit}`:'',v.site_commit?` · 사이트 ${v.site_commit}`:''].join('');
+  async function loadVersion(){
+    try{
+      const response=await fetch('data/version.json',{cache:'no-store',signal:AbortSignal.timeout(5000)});
+      if(response.ok)$('#site-version').textContent=versionText(await response.json());
+    }catch{}
+  }
   async function loadRankedBenchmarks(){
     if(rankedLoad)return rankedLoad;
     if(Date.now()-rankedLoadedAt<120000)return rankedData;
@@ -761,4 +770,5 @@
   document.addEventListener('visibilitychange',()=>{if(!document.hidden){load();collectionWatch.check();}});
   setInterval(()=>{if(!document.hidden)load();},120000);
   selectProfile(selectedProfile,selectedName,false);
+  loadVersion();
 })();

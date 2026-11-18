@@ -18,6 +18,7 @@ on:
       - 'requirements.txt'
       - '.github/workflows/update.yml'
 permissions:
+  actions: write
   contents: write
   pages: write
   id-token: write
@@ -46,6 +47,8 @@ jobs:
         run: |
           python -m pip install -r requirements.txt
           python scripts/patch_parser.py
+      - name: Outdated analyses before collecting
+        run: echo "BACKLOG_BEFORE=$(python scripts/backlog.py)" >> "$GITHUB_ENV"
       - name: Check collector behavior
         run: |
           python -m unittest discover -s tests -v
@@ -55,6 +58,7 @@ jobs:
         continue-on-error: true
         run: |
           git fetch --depth 1 origin research/genie-188329
+          echo "ENGINE_SOURCE_COMMIT=$(git rev-parse FETCH_HEAD)" >> "$GITHUB_ENV"
           git show FETCH_HEAD:research/genie/sorted-lists-and-truth-trace.patch | tr -d '\r' > "$RUNNER_TEMP/engine.patch"
           git clone https://github.com/librematch/genie.git "$RUNNER_TEMP/genie"
           cd "$RUNNER_TEMP/genie"
@@ -84,6 +88,8 @@ jobs:
           echo "d0aefd92428e2215d6f4d9b1d544901e6f171e19183f9e0b88218de5153a337f  $RUNNER_TEMP/aoe2-data/188329/empires2_x2_p1.dat" | sha256sum --check --quiet
           echo "AOE2_ENGINE_BIN=$RUNNER_TEMP/engine-bin/census" >> "$GITHUB_ENV"
           echo "AOE2_ENGINE_DATA=$RUNNER_TEMP/aoe2-data/188329/empires2_x2_p1.dat" >> "$GITHUB_ENV"
+          # stamped on each engine result and in site/data/version.json (scripts/engine_income.engine_version)
+          echo "ENGINE_RESEARCH_COMMIT=$ENGINE_SOURCE_COMMIT" >> "$GITHUB_ENV"
       - name: Collect public matches
         id: collect
         continue-on-error: true
@@ -96,6 +102,8 @@ jobs:
         run: python scripts/player_index.py
       - name: Build ranked benchmarks
         run: python scripts/ranked_benchmarks.py
+      - name: Record versions
+        run: python scripts/site_version.py
       - name: Keep report history
         run: |
           git config user.name 'github-actions[bot]'
@@ -122,6 +130,17 @@ jobs:
         uses: actions/deploy-pages@v4
         with:
           artifact_name: github-pages-${{ github.run_attempt }}
+      - name: Continue while outdated analyses remain
+        # GitHub's schedule often fires only every few hours: while this run brought some stored matches
+        # up to the current analysis revision and others remain, start the next run now. It stops by itself
+        # when a run makes no progress (scripts/backlog.py).
+        if: steps.collect.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          after=$(python scripts/backlog.py)
+          echo "outdated analyses: $BACKLOG_BEFORE -> $after"
+          if [ "$after" -gt 0 ] && [ "$after" -lt "${BACKLOG_BEFORE:-0}" ]; then gh workflow run update.yml --ref main; fi
       - name: Report collection failure
         if: steps.collect.outcome == 'failure'
         run: |

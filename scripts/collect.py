@@ -509,6 +509,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--profile-id', default='')
     parser.add_argument('--limit', type=int, default=5)
+    parser.add_argument('--upgrade-limit', type=int, default=0,
+                        help='extra stored matches per run brought up to the current analysis revision (0-10)')
     parser.add_argument('--header-limit', type=int, default=4,
                         help='stored matches per run whose replay header is read for the civ choice (0-60)')
     parser.add_argument('--replay', help='개발·검증용 로컬 리플 경로')
@@ -542,6 +544,7 @@ def main():
     old = {m['id']: m for m in previous.get('matches', [])} if same_profile else {}
     pending = sorted(payload['matchHistoryStats'], key=lambda m: m.get('startgametime', 0), reverse=True)
     budget = max(0, min(args.limit, 10))
+    spare = max(0, min(args.upgrade_limit, 10))  # used only to bring outdated analyses up to date
     listed = set()
     for match in pending:
         if config.get('only_1v1') and len(match.get('matchhistoryreportresults', [])) != 2:
@@ -558,9 +561,12 @@ def main():
         if existing.get('analysis_status') == 'complete':
             # Keep analysis, but refresh finalized outcome and rating.
             row.update({k: existing[k] for k in ('analysis', 'analysis_status', 'attempts', 'analysis_upgrade') if k in existing})
-            if budget and has_time() and (existing.get('analysis') or {}).get('analysis_revision', 0) < ANALYSIS_REVISION:
+            if (budget or spare) and has_time() and (existing.get('analysis') or {}).get('analysis_revision', 0) < ANALYSIS_REVISION:
                 if upgrade_analysis(row, existing, match, own_id):
-                    budget -= 1
+                    if spare:
+                        spare -= 1
+                    else:
+                        budget -= 1
         elif budget and has_time() and existing.get('attempts', 0) < 3:
             budget -= 1
             row['attempts'] = existing.get('attempts', 0) + 1
@@ -587,14 +593,17 @@ def main():
     # Kept rows the API no longer lists: their replay is asked for by match id alone, so an
     # outdated analysis is brought up to date with what is left of this run's budget, newest first.
     for row in sorted(old.values(), key=lambda m: m.get('started_at') or 0, reverse=True):
-        if not budget or not has_time():
+        if not (budget or spare) or not has_time():
             break
         if row['id'] in listed or row.get('analysis_status') != 'complete':
             continue
         if (row.get('analysis') or {}).get('analysis_revision', 0) >= ANALYSIS_REVISION:
             continue
         if upgrade_analysis(row, row, {'id': row['id']}, own_id):
-            budget -= 1
+            if spare:
+                spare -= 1
+            else:
+                budget -= 1
             if row.get('analysis'):
                 row['map'] = row['analysis'].get('map', row.get('map'))
     civ_choices(old.values(), own_id, max(0, min(args.header_limit, 60)))
