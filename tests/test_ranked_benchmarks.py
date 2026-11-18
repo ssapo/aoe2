@@ -1,12 +1,15 @@
 import copy
+import json
 import sys
+import tempfile
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'scripts'))
 from ranked_benchmarks import build, food_sources, resource_mean, stage_at, tc_band
-from collect_profiles import benchmark_target
+from collect import ANALYSIS_REVISION
+from collect_profiles import BENCHMARK_PROFILES, benchmark_target
 
 
 class RankedBenchmarkTests(unittest.TestCase):
@@ -47,9 +50,18 @@ class RankedBenchmarkTests(unittest.TestCase):
         self.assertEqual(stage_at(m, 600), '봉건')
         self.assertEqual(tc_band(m, 600), 'single')
         self.assertEqual(tc_band(m, 900), 'expansion')
-        jobs = [benchmark_target(datetime.fromtimestamp(t, timezone.utc)) for t in (0, 1800, 3600)]
-        self.assertEqual(len({j[0] for j in jobs}), 3)
-        self.assertTrue(all(j[2] == 1 for j in jobs))
+        with tempfile.TemporaryDirectory() as folder:
+            jobs = [benchmark_target(datetime.fromtimestamp(t, timezone.utc), folder) for t in (0, 1800, 3600)]
+            self.assertEqual(len({j[0] for j in jobs}), 3)
+            self.assertTrue(all(j[2] == 1 for j in jobs))
+            # A player with outdated analyses gets every turn until they are up to date.
+            behind = BENCHMARK_PROFILES[1]
+            (Path(folder)/f'profiles/{behind}').mkdir(parents=True)
+            (Path(folder)/f'profiles/{behind}/report.json').write_text(json.dumps({'matches': [
+                {'analysis_status': 'complete', 'analysis': {'analysis_revision': ANALYSIS_REVISION - 1}}]}), encoding='utf-8')
+            jobs = [benchmark_target(datetime.fromtimestamp(t, timezone.utc), folder) for t in (0, 1800, 3600)]
+            self.assertEqual({j[0] for j in jobs}, {behind})
+            self.assertEqual(jobs[0][1], Path(folder)/f'profiles/{behind}/report.json')
 
 
 class FoodSampleTests(unittest.TestCase):

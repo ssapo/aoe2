@@ -1,6 +1,8 @@
 """Collect default, featured and explicitly requested profiles into separate files."""
 import json,os,subprocess,sys
 from datetime import datetime,timezone
+from pathlib import Path
+from backlog import outdated
 from collect import ROOT,profile_id
 DEFAULT_PROFILE=26260702
 
@@ -32,11 +34,18 @@ def write_featured(path=None,profiles=None,data_root=None):
     return rows
 BENCHMARK_PROFILES=(251265,198035,1224481)  # MbL, DauT, KASVA: verified server profile IDs.
 
-def benchmark_target(now=None):
-    # One additional replay per run; each player is revisited about every 90 min.
+def benchmark_target(now=None,data_root=None):
+    # One additional replay per run; each player is revisited about every 90 min. While some of them
+    # still hold analyses below the current revision, the turn goes only to those: otherwise a run that
+    # lands on an up-to-date player brings nothing up to date and the workflow stops continuing itself.
     now=now or datetime.now(timezone.utc)
-    pid=BENCHMARK_PROFILES[int(now.timestamp()//1800)%len(BENCHMARK_PROFILES)]
-    return pid,ROOT/f'site/data/profiles/{pid}/report.json',1
+    root=Path(data_root or ROOT/'site/data')
+    def behind(pid):
+        try:return outdated(json.loads((root/f'profiles/{pid}/report.json').read_text(encoding='utf-8')))>0
+        except (OSError,ValueError):return False
+    pool=[pid for pid in BENCHMARK_PROFILES if behind(pid)] or list(BENCHMARK_PROFILES)
+    pid=pool[int(now.timestamp()//1800)%len(pool)]
+    return pid,root/f'profiles/{pid}/report.json',1
 
 ANALYSED_PER_RUN=4  # featured players whose replays are analysed in one run; the others are only listed
 UPGRADES_PER_RUN=3  # outdated stored analyses each profile may bring up to date per run (collect.has_time bounds the run)
