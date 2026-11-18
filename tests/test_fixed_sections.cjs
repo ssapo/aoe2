@@ -31,7 +31,9 @@ async function loadSite(){
 const main=json('data/report.json');
 const byId=(r,id)=>r.matches.find(m=>m.id===id);
 const old=json('data/profiles/199325/report.json');
-const oldest=old.matches.filter(m=>m.analysis).sort((a,b)=>(a.analysis.analysis_revision||0)-(b.analysis.analysis_revision||0))[0];
+// An analysis of an old revision (7), kept as a fixture: the published data is re-analysed whenever the
+// revision goes up, so no old row may be left in site/data (518336528 of profile 199325 as of revision 31).
+const oldest=JSON.parse(fs.readFileSync(path.join(__dirname,'fixtures/old_revision_match.json'),'utf8'));
 const unanalysed=old.matches.find(m=>!m.analysis);
 const cases=[
   ['no analysis',unanalysed],
