@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-18T09:21:49.274132+00:00",
-  "last_checked_at": "2026-11-18T09:21:48.936983+00:00",
+  "updated_at": "2026-11-18T09:48:40.634009+00:00",
+  "last_checked_at": "2026-11-18T09:46:48.415513+00:00",
   "sync_error": null,
   "profile": {
     "id": 347269,
@@ -133605,7 +133605,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 31,
+        "analysis_revision": 32,
         "duration_game_seconds": 1037.26,
         "civilization": "Romans",
         "random_civ": true,
@@ -167751,18 +167751,29 @@
               1332,
               0,
               0
+            ],
+            [
+              730.0,
+              2127,
+              1488,
+              0,
+              0,
+              2265,
+              1392,
+              0,
+              0
             ]
           ],
-          "verified_until_seconds": 723.9,
+          "verified_until_seconds": 730.4,
           "own_total": [
-            2102,
-            1427,
+            2127,
+            1498,
             0,
             0
           ],
           "opponent_total": [
-            2215,
-            1377,
+            2275,
+            1392,
             0,
             0
           ],
@@ -169300,11 +169311,32 @@
                 0,
                 0,
                 0
+              ],
+              [
+                730.0,
+                859,
+                596,
+                331,
+                320,
+                30,
+                0,
+                0,
+                0,
+                0,
+                794,
+                673,
+                381,
+                284,
+                0,
+                0,
+                0,
+                0,
+                0
               ]
             ]
           },
           "animals": {
-            "until_seconds": 720.0,
+            "until_seconds": 730.0,
             "own": [
               {
                 "id": 3379,
@@ -169477,8 +169509,19 @@
                 "eaten": 154.9,
                 "first_seconds": 670.0,
                 "last_seconds": 710.0
+              },
+              {
+                "id": 3383,
+                "kind": "sheep",
+                "eaten": 50.0,
+                "first_seconds": 730.0,
+                "last_seconds": 730.0
               }
             ]
+          },
+          "engine_version": {
+            "research_commit": "9f76e74",
+            "patch_sha256": "26c6a1700ef1"
           }
         },
         "game_build": 188329,
@@ -169764,7 +169807,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 31,
+        "analysis_revision": 32,
         "duration_game_seconds": 3394.75,
         "civilization": "Japanese",
         "random_civ": true,
@@ -248571,6 +248614,10 @@
                 "full": 100.0
               }
             ]
+          },
+          "engine_version": {
+            "research_commit": "9f76e74",
+            "patch_sha256": "26c6a1700ef1"
           }
         },
         "game_build": 188329,
@@ -249073,7 +249120,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 31,
+        "analysis_revision": 32,
         "duration_game_seconds": 2121.74,
         "civilization": "Maya",
         "random_civ": true,
@@ -269260,10 +269307,7 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 42,
-              "units": {
-                "Villager": 1
-              }
+              "group": 42
             },
             {
               "x": 46.001,
@@ -269272,10 +269316,7 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 1,
-              "group": 24,
-              "units": {
-                "Town Center": 1
-              }
+              "group": 24
             },
             {
               "x": 45.979,
@@ -269283,10 +269324,7 @@
               "seconds": 277.97,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null,
-              "units": {
-                "Town Center": 1
-              }
+              "selected_count": null
             },
             {
               "x": 46.122,
@@ -269295,10 +269333,7 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 1,
-              "group": 42,
-              "units": {
-                "Villager": 1
-              }
+              "group": 42
             },
             {
               "x": 91.802,
@@ -269306,10 +269341,7 @@
               "seconds": 280.01,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null,
-              "units": {
-                "Livestock": 5
-              }
+              "selected_count": null
             },
             {
               "x": 11.286,
@@ -297505,7 +297537,7 @@
               "selected_count": null
             }
           ],
-          "command_units_until": 281.9
+          "command_units_until": 275.4
         },
         "metrics": {
           "age_commands": {

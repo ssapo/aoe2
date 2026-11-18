@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-18T09:25:41.747162+00:00",
-  "last_checked_at": "2026-11-18T09:22:54.106348+00:00",
+  "updated_at": "2026-11-18T09:59:22.888309+00:00",
+  "last_checked_at": "2026-11-18T09:56:34.172571+00:00",
   "sync_error": null,
   "profile": {
     "id": 199325,
@@ -213085,7 +213085,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 31,
+        "analysis_revision": 32,
         "duration_game_seconds": 2902.13,
         "civilization": "Turks",
         "random_civ": true,
@@ -287833,6 +287833,10 @@
                 "last_seconds": 630.0
               }
             ]
+          },
+          "engine_version": {
+            "research_commit": "9f76e74",
+            "patch_sha256": "26c6a1700ef1"
           }
         },
         "game_build": 188329,
@@ -288366,7 +288370,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 31,
+        "analysis_revision": 32,
         "duration_game_seconds": 1889.56,
         "civilization": "Japanese",
         "random_civ": true,
@@ -348406,6 +348410,10 @@
                 "last_seconds": 490.0
               }
             ]
+          },
+          "engine_version": {
+            "research_commit": "9f76e74",
+            "patch_sha256": "26c6a1700ef1"
           }
         },
         "game_build": 188329,
@@ -348798,7 +348806,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 31,
+        "analysis_revision": 32,
         "duration_game_seconds": 2159.21,
         "civilization": "Saracens",
         "random_civ": true,
@@ -375516,7 +375524,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 103
+              "group": 103,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 25.0,
@@ -375524,7 +375535,10 @@
               "seconds": 633.33,
               "side": "mine",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 78.896,
@@ -375533,7 +375547,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 3,
-              "group": 101
+              "group": 101,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 100.167,
@@ -375542,7 +375559,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 3,
-              "group": 104
+              "group": 104,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 27.458,
@@ -375551,7 +375571,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 92
+              "group": 92,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 100.104,
@@ -375559,7 +375582,10 @@
               "seconds": 635.36,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 27.0,
@@ -406986,7 +407012,7 @@
               "group": 337
             }
           ],
-          "command_units_until": 630.5
+          "command_units_until": 637.0
         },
         "metrics": {
           "age_commands": {
@@ -415646,16 +415672,16 @@
               0
             ]
           ],
-          "verified_until_seconds": 630.5,
+          "verified_until_seconds": 637.0,
           "own_total": [
-            1850,
+            1870,
             858,
             50,
             0
           ],
           "opponent_total": [
             1978,
-            871,
+            919,
             0,
             0
           ],
@@ -417195,6 +417221,10 @@
                 "last_seconds": 620.0
               }
             ]
+          },
+          "engine_version": {
+            "research_commit": "9f76e74",
+            "patch_sha256": "26c6a1700ef1"
           }
         },
         "game_build": 188329,
