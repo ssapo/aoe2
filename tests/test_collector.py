@@ -149,6 +149,21 @@ class CollectorTests(unittest.TestCase):
             self.assertEqual(status['schema_version'],1)
             self.assertEqual(status['last_checked_at'],json.loads(path.read_text(encoding='utf-8'))['last_checked_at'])
 
+    def test_write_json_retries_a_briefly_held_file(self):
+        real=collect.os.replace
+        calls=[]
+        def flaky(src,dst):
+            calls.append(dst)
+            if len(calls)<3:
+                raise PermissionError('held')
+            return real(src,dst)
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/'report.json'
+            with patch.object(collect.os,'replace',side_effect=flaky),patch.object(collect.time,'sleep'):
+                collect.write_json(path,{'a':1})
+            self.assertEqual(json.loads(path.read_text(encoding='utf-8')),{'a':1})
+            self.assertEqual(len(calls),3)
+
     def test_analysis_deadline(self):
         with patch.dict('os.environ',{},clear=False) as env:
             env.pop('AOE2_ANALYSIS_DEADLINE',None)

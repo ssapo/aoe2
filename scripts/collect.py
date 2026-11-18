@@ -48,7 +48,15 @@ def write_json(path, data):
         json.dump(data, h, ensure_ascii=False, indent=2, allow_nan=False)
         h.write('\n')
         temporary = h.name
-    os.replace(temporary, path)
+    for attempt in range(10):
+        try:
+            os.replace(temporary, path)
+            return
+        except PermissionError:
+            # Windows: a virus scanner or indexer can hold the just-written file for a moment.
+            if attempt == 9:
+                raise
+            time.sleep(0.05 * (attempt + 1))
 
 
 def write_report(path, data):
