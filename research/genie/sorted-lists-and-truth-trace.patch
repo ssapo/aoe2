@@ -11307,6 +11307,94 @@ index 7e435e73..81690f9c 100644
 +    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
 +    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_WAYGROUP_188329").is_some())
 +}
+diff --git a/crates/engine/genie-core/src/unit_ai/best_target/choice.rs b/crates/engine/genie-core/src/unit_ai/best_target/choice.rs
+index 57aa6315..a7169db7 100644
+--- a/crates/engine/genie-core/src/unit_ai/best_target/choice.rs
++++ b/crates/engine/genie-core/src/unit_ai/best_target/choice.rs
+@@ -528,12 +528,13 @@ fn rank_entries(
+     Ok(ranked)
+ }
+ 
+-/// The choice over the sorted entries: the current target when it holds
+-/// ([`current_holds`]); the first three by the quick path (a moving one, or with nothing
+-/// moving or a unit of another rank rule); more than 5 moving entries outside an idle check:
+-/// the closest moving one by its path; in an attack work state a current target on top;
+-/// without path checks the top; else the first three by their paths, each one that fails
+-/// ignored for 1 s (moving) or 2 s; last `last_resort`.
++/// The choice over the sorted entries (188329 `0xd1ec40`, `0xd21b4d`..`0xd21ffc`): the current
++/// target when it holds ([`current_holds`]); in an attack work state a current target on top;
++/// without path checks the top; else the first three by their paths (slot 0x408), each one
++/// that fails ignored for 1 s (moving) or 2 s; last `last_resort`. 188329 has neither 158041's
++/// quick paths of the first three (slot 0x3e0) nor its closest moving entry past 5 moving
++/// ones (findings 175: 522023194 671.110 s, scout 8629 takes 8612, whose quick path 2088
++/// blocks, by its full path).
+ fn choose(
+     me: &Searcher,
+     ask: &Ask,
+@@ -543,23 +544,12 @@ fn choose(
+     world: &mut AttackField<'_, '_>,
+     last_resort: Option<ObjectId>,
+ ) -> Result<Choice, crate::GenieError> {
+-    let range = me.range;
++    let _ = ranked;
+     let mut choice = Choice::default();
+     choice.target = if let Some(target) = current_holds(me, ask, current, st, world)? {
+         Some(target)
+-    } else if let Some(id) = quick_pick(st, ranked, range, world)? {
+-        Some(id)
+     } else {
+-        let mut tried = None;
+-        if !ask.idle && FEW_MOVING < st.moving {
+-            // none at the largest float: a gone target's path fails (slot 0x3d0)
+-            let closest = st.closest_moving.1;
+-            if ask.paths == 0 || closest.map_or(Ok(false), |c| world.path(c, range))? {
+-                choice.target = closest;
+-                return Ok(choice);
+-            }
+-            tried = closest;
+-        }
++        let tried = None;
+         let top = st.entries.checked(*st.order.checked(0)?)?.id;
+         // the game's two branches: the unit's own target when it is the top, else the top
+         // without paths; either is the top
+@@ -594,25 +584,6 @@ fn current_holds(
+     Ok(holds.then_some(target))
+ }
+ 
+-/// The first of the first three entries with a quick path: a moving one, or any with nothing
+-/// moving or for a unit of another rank rule.
+-fn quick_pick(
+-    st: &Statistics,
+-    ranked: bool,
+-    range: Distance,
+-    world: &mut AttackField<'_, '_>,
+-) -> Result<Option<ObjectId>, crate::GenieError> {
+-    for &i in st.order.iter().take(3) {
+-        let e = *st.entries.checked(i)?;
+-        if (e.moving || st.moving < EntryCount::new(1) || !ranked)
+-            && world.quick_path(e.id, range)?
+-        {
+-            return Ok(Some(e.id));
+-        }
+-    }
+-    Ok(None)
+-}
+-
+ /// The first of the first three entries but `tried` with a path; each one before it that
+ /// fails is ignored for 1 s (moving) or 2 s from now (`retries`, in order).
+ fn path_pick(
+diff --git a/crates/engine/genie-core/src/unit_ai/best_target/world_view.rs b/crates/engine/genie-core/src/unit_ai/best_target/world_view.rs
+index b6187bc3..cad3800e 100644
+--- a/crates/engine/genie-core/src/unit_ai/best_target/world_view.rs
++++ b/crates/engine/genie-core/src/unit_ai/best_target/world_view.rs
+@@ -238,6 +238,7 @@ impl AttackField<'_, '_> {
+     /// # Errors
+     ///
+     /// What the path does not model.
++    #[allow(dead_code)]
+     pub(crate) fn quick_path(&mut self, id: ObjectId, range: Distance) -> Result<bool, GenieError> {
+         self.picker.quick_path(self.world, id, range)
+     }
 diff --git a/crates/engine/genie-core/src/unit_ai/damaged.rs b/crates/engine/genie-core/src/unit_ai/damaged.rs
 index 0a0c9d88..e6685468 100644
 --- a/crates/engine/genie-core/src/unit_ai/damaged.rs
