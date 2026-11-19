@@ -3,6 +3,7 @@ services:
     name: ssapo-aoe2-collect
     runtime: python
     plan: free
+    branch: main  # the Blueprint itself is linked to feature/direct-collection; the service deploys main
     buildCommand: pip install -r requirements.txt && python scripts/patch_parser.py
     startCommand: python server/collect_service.py
     healthCheckPath: /health
