@@ -6,6 +6,13 @@ services:
     buildCommand: pip install -r requirements.txt && python scripts/patch_parser.py
     startCommand: python server/collect_service.py
     healthCheckPath: /health
+    # Build only when the service's own code changes, not on the half-hourly match report commits to main.
+    buildFilter:
+      paths:
+        - server/**
+        - scripts/**
+        - requirements.txt
+        - render.yaml
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.11
