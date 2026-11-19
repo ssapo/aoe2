@@ -270,6 +270,108 @@ index d89aa138..6f4c2f59 100644
          for (kind, amount) in adds {
              self.players
                  .player_mut(owner)?
+diff --git a/crates/engine/genie-core/src/combat/attack/constructor.rs b/crates/engine/genie-core/src/combat/attack/constructor.rs
+index b72cec52..c119d62c 100644
+--- a/crates/engine/genie-core/src/combat/attack/constructor.rs
++++ b/crates/engine/genie-core/src/combat/attack/constructor.rs
+@@ -7,7 +7,7 @@ use crate::combat::abilities::Look;
+ use crate::combat::attack::AttackState;
+ use crate::combat::attack::TARGET_GONE;
+ use crate::combat::attack::{
+-    Arms, Attack, AttackCommand, AttackReads, Begun, Engagement, Fight, Ground, NONE, Posted,
++    Arms, Attack, AttackCommand, AttackReads, Begun, Engagement, Fight, Ground, NONE, Posted, ReadyReads,
+     Posts, face_target,
+ };
+ use crate::map::Distance;
+@@ -40,6 +40,7 @@ use crate::players::PlayerId;
+ use crate::unit_ai::UnitStance;
+ use crate::unit_ai::{NotifyKind, UnitAi};
+ use crate::world::ATTACKER_UNMOVING;
++use crate::world::NO_STANDING_SPRITE;
+ use crate::world::Seconds;
+ use crate::world::WorldTime;
+ use crate::world::index::ObjectsRef;
+@@ -201,6 +202,80 @@ impl Attack {
+         Ok((attack, begun, posted))
+     }
+ 
++    /// The end of the Attack's slot 0x48 (188329 `0xb755c0`) once it took a new target: the unit
++    /// shows the Attack's `+0x80` sprite (slot 0x70: [`Arms::idle_sprite`], the start's), then
++    /// `set_state(4)` for a unit that may move to it (`walks`: its top speed not 0 and
++    /// canMoveToAttack, `0xd227a0`), whose old sub-actions go first ([`Attack::set_move`]: a state
++    /// without a `MoveTo` does not stop the unit, so its own ignore list stays) and whose `MoveTo`
++    /// that starts arrived shows the arrived sprite; else `set_state(6)` with `ready`
++    /// ([`Attack::enter_ready`]). The notifies `set_state(6)` posted, in order.
++    ///
++    /// # Errors
++    ///
++    /// A unit without its movement state or sprite, and a ready end on a target the world does
++    /// not hold live.
++    pub(crate) fn retaken(
++        &mut self,
++        c: &mut Step<'_>,
++        unit: &mut Unit,
++        (e, walks): (&Engagement, bool),
++        ready: Option<&ReadyReads>,
++        roles: &Roles,
++    ) -> Result<Vec<Posted>, GenieError> {
++        let standing = self.arms.idle_sprite.ok_or(NO_STANDING_SPRITE)?;
++        new_sprite(
++            &mut unit.sprite,
++            c.w.parts.move_stats_mut(unit.id),
++            standing,
++            c.w.streams.get(Stream::Sprite),
++            c.w.model.tuning.sprite,
++        );
++        let mut posted = Vec::new();
++        if walks {
++            let reads = unit.move_to_reads(
++                c.w.parts.motion.mover(unit.id),
++                MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
++                c.player,
++                (
++                    &c.w.model.graphics,
++                    c.w.parts.combat_of(unit.id).abilities.look.as_ref(),
++                ),
++                roles,
++            )?;
++            let move_to_tuning = c.w.model.tuning.move_to;
++            let (mover, _) =
++                c.w.parts
++                    .lend_mover(unit.id, (&c.w.players, &c.w.index, &c.w.model));
++            let mover = mover.ok_or(ATTACKER_UNMOVING)?;
++            if self.set_move(e, mover, &reads, &move_to_tuning)? == MoveStart::Arrived {
++                self.arrived_sprite(
++                    unit,
++                    c.w.parts.motion_mut(unit.id),
++                    c.w.streams.get(Stream::Sprite),
++                    c.w.model.tuning.sprite,
++                )?;
++            }
++            return Ok(posted);
++        }
++        let ready = ready.ok_or(GenieError::unsupported(
++            "an attack's target the slice does not hold live",
++        ))?;
++        let (motion, by_id) =
++            c.w.parts
++                .lend_motion(unit.id, (&c.w.players, &c.w.index, &c.w.model));
++        let mut g = Ground {
++            map: &c.w.spatial,
++            sprite_rng: c.w.streams.get(Stream::Sprite),
++            object_rng: None,
++            posts: Posts::Held(&mut posted),
++            graphics: &c.w.model.graphics,
++            by_id,
++            motion,
++        };
++        self.enter_ready(unit, &mut g, &ready.fight, &ready.reads)?;
++        Ok(posted)
++    }
++
+     /// The attack command's Attack of `unit` (the step's, out of the world): the constructor and
+     /// readyToAttack with the start's `set_state(4)` ([`Attack::own_start`]), then the start's
+     /// other ends at once (`0x140a7f8c0`): readyToAttack's `set_state(13)` before the
 diff --git a/crates/engine/genie-core/src/combat/attack/hits.rs b/crates/engine/genie-core/src/combat/attack/hits.rs
 index d8cbc980..7b95dc90 100644
 --- a/crates/engine/genie-core/src/combat/attack/hits.rs
@@ -8238,6 +8340,167 @@ index 00aaf602..9d2e97f2 100644
              return Err(GenieError::unsupported(
                  "a master change that changes the damage sprites (FUN_1411859a0)",
              ));
+diff --git a/crates/engine/genie-core/src/orders/attack.rs b/crates/engine/genie-core/src/orders/attack.rs
+index 92f21437..3a924e03 100644
+--- a/crates/engine/genie-core/src/orders/attack.rs
++++ b/crates/engine/genie-core/src/orders/attack.rs
+@@ -24,7 +24,10 @@ use crate::unit_ai::Notifies;
+ use crate::world::WorldTime;
+ use crate::world::slots::PlayerSlots;
+ 
+-use crate::combat::attack::{AttackCommand, ReadyReads, arms, engagement, show_arrived};
++use crate::combat::attack::{AttackCommand, Mark, ReadyReads, Wielder, arms, engagement, show_arrived};
++use crate::map::spatial::Placed;
++use crate::unit_ai::Answer;
++use crate::unit_ai::UnitStance;
+ use crate::combat::victims::victim_of;
+ use crate::combat::{AttackCount, AttackTargetId};
+ use crate::gathering::HuntTargetId;
+@@ -384,6 +387,144 @@ impl World {
+         Ok(())
+     }
+ 
++    /// The Attack's slot 0x48 (188329 `0xb755c0`) on the work command's `target` for the unit at
++    /// `idx` of `player`, its top action an Attack: [`Attack::work`] (an area effect's building
++    /// annex aims at its main building; its own target in states 4 to 7 or 11 changes nothing;
++    /// a unit that may not move to it, its top speed 0 or canMoveToAttack (`0xd227a0`: an order,
++    /// or stance 0 or 1) false, takes it only within its reach); a new target is let go of and
++    /// taken (slot 0x68), then [`Attack::retaken`]: the `+0x80` sprite and `set_state(4)` for a
++    /// unit that may move, `set_state(6)` for one that may not. Its notifies go to the unit AI.
++    /// Not taken: the work goes on (findings 177: 522023194 672.124 s, scout 8629 in a swing keeps
++    /// its Attack and its ignore list; scout 2088 of stance 2 goes ready).
++    pub(super) fn retake_attack(
++        &mut self,
++        player: PlayerId,
++        idx: ListIndex,
++        target: ObjectId,
++    ) -> Result<Answer, GenieError> {
++        let id = self.players.live(player, idx)?.id;
++        if self.parts.actions_of(id).list.attack().is_none() {
++            return Ok(Answer::NotTaken);
++        }
++        let mark = |w: &World, at: ObjectId| -> Result<Option<(Mark, Placed)>, GenieError> {
++            let Some(p) = w.spatial.get_known(at)?.copied() else {
++                return Ok(None);
++            };
++            let Some((q, u)) = w.object(at) else {
++                return Ok(None);
++            };
++            let m = u.master(w.master_tables(), q)?;
++            Ok(Some((
++                Mark {
++                    id: at,
++                    kind: m.kind,
++                    class: m.class,
++                    state: u.life.state,
++                    position: p.position,
++                    radius: p.radius,
++                },
++                p,
++            )))
++        };
++        let Some((t_mark, _)) = mark(self, target)? else {
++            return Ok(Answer::NotTaken);
++        };
++        let main = match self.object(target).and_then(|(_, u)| self.parts.building_of(u.id).annex_of) {
++            Some(m) => mark(self, m.id())?.map(|(k, _)| k),
++            None => None,
++        };
++        let master = self
++            .players
++            .live(player, idx)?
++            .master(self.master_tables(), player)?
++            .clone();
++        let me_at = *self.spatial.get(id).ok_or(ATTACKER_UNPLACED)?;
++        let speed = self.parts.mover_of(id).map_or(Speed::ZERO, |m| m.stats.speed);
++        let wielder = Wielder {
++            area_effect: master.combat_part().area_effect,
++            speed,
++            position: self.players.live(player, idx)?.position(),
++            radius: master.radius,
++        };
++        let can_move = self
++            .parts
++            .unit_ai
++            .get(id)
++            .is_some_and(|ai| ai.current_order.is_some() || ai.stance <= UnitStance::Defensive);
++        let roles = self.model.roles.clone();
++        let attack = self
++            .parts
++            .actions_mut(id)?
++            .list
++            .attack_mut()
++            .ok_or(GenieError::unreachable("unreachable: no Attack"))?;
++        let aimed_id = if Distance::ZERO < wielder.area_effect && t_mark.kind == MasterKind::BUILDING {
++            main.map_or(t_mark.id, |m| m.id)
++        } else {
++            t_mark.id
++        };
++        let kept = attack.target.map(AttackTargetId::id) == Some(aimed_id)
++            && attack.state.keeps_target();
++        let w = attack.work(Some(t_mark), main, &wielder, |_| can_move, &roles);
++        if !w.kept {
++            return Ok(Answer::NotTaken);
++        }
++        if kept {
++            return Ok(Answer::Taken);
++        }
++        let aimed = attack.target.map(AttackTargetId::id);
++        if w.clears_count {
++            self.parts.combat_mut(id)?.attack_count = AttackCount::ZERO;
++        }
++        let by = self.releaser(player, idx)?;
++        if let Some(old) = w.lets_go {
++            self.release(old, by)?;
++        }
++        if let Some(new) = w.takes {
++            self.take(new, by)?;
++        }
++        let Some(aimed) = aimed else {
++            return Err(GenieError::unsupported(
++                "an Attack's slot 0x48 left without a target",
++            ));
++        };
++        let Some((_, aimed_at)) = mark(self, aimed)? else {
++            return Err(GenieError::unsupported(
++                "an Attack's slot 0x48 on a target the world does not place",
++            ));
++        };
++        let world_time = self.world_time;
++        let e = engagement(
++            self.parts.unit_ai.get(id),
++            speed,
++            &master,
++            &me_at,
++            &aimed_at,
++            world_time,
++        )?;
++        let walks = speed != Speed::ZERO && can_move;
++        let ready = if walks {
++            None
++        } else {
++            self.attack_ready(player, idx, aimed, (&master, world_time))?
++        };
++        let posted = self.run_on_step(player, idx, |unit, actions, c| {
++            let attack = actions
++                .list
++                .attack_mut()
++                .ok_or(GenieError::unreachable("unreachable: no Attack"))?;
++            attack.retaken(c, unit, (&e, walks), ready.as_ref(), &roles)
++        })?;
++        let unit = self.players.live(player, idx)?;
++        let (uid, state) = (unit.id, unit.life.state);
++        for (kind, p) in posted {
++            if let Some(ai) = self.parts.unit_ai.get_mut(uid) {
++                ai.post(Notify::own(uid, kind, p), state)?;
++            }
++        }
++        Ok(Answer::Taken)
++    }
++
+     /// An action's slot 0x68 base (`FUN_140a7a230`) for the unit at `idx`: its target `old`
+     /// becomes `new`. The same target changes nothing. A different old target the
+     /// world still holds is let go (slot 0x180, [`World::release`]) unless the action is a
 diff --git a/crates/engine/genie-core/src/orders/commands.rs b/crates/engine/genie-core/src/orders/commands.rs
 index 3ac3e455..0466c505 100644
 --- a/crates/engine/genie-core/src/orders/commands.rs
@@ -8984,7 +9247,7 @@ index 72090fb3..3f1a775d 100644
                      source: OrderSource::Queued,
                  },
 diff --git a/crates/engine/genie-core/src/orders/work.rs b/crates/engine/genie-core/src/orders/work.rs
-index 9e2d36cf..366ff44f 100644
+index 9e2d36cf..153e95bb 100644
 --- a/crates/engine/genie-core/src/orders/work.rs
 +++ b/crates/engine/genie-core/src/orders/work.rs
 @@ -33,6 +33,9 @@ use crate::orders::OrderSource;
@@ -9006,7 +9269,7 @@ index 9e2d36cf..366ff44f 100644
          &mut self,
          player: PlayerId,
          idx: ListIndex,
-@@ -381,11 +384,60 @@ impl World {
+@@ -381,11 +384,75 @@ impl World {
              _ if top == Some(TRANSPORT) && task.action_kind == TRANSPORT => {
                  self.retake_transport((player, idx), (target, point), task, notifies)?
              }
@@ -9051,6 +9314,21 @@ index 9e2d36cf..366ff44f 100644
 +                }
 +                Answer::Taken
 +            }
++            // 188329 work command 0x1140670 (0x1140ad4..0x1140b5f): a top action of type 7 or 9
++            // and a task of action type 7 or 9 hear the target through the top action's slot
++            // 0x48 (0x140b89040 -> the Attack's 0xb755c0, [`World::retake_attack`]); taken, the
++            // unit AI hears of it (slot 0x8e8). The same target's check below (0x1140c4b, the
++            // keep) runs after it as before (findings 177)
++            _ if top == Some(ATTACK) && matches!(task.action_kind, ATTACK_TASK | ATTACK) => {
++                let Some(target) = target else {
++                    return Ok(Answer::NotTaken);
++                };
++                let taken = self.retake_attack(player, idx, target)?;
++                if taken == Answer::Taken {
++                    self.tell_of_attack(player, idx, (Some(target), point), notifies)?;
++                }
++                taken
++            }
 +            // 188329 the conversion's slot 0x48 (0xbaa500) answers 1 (findings 162)
 +            _ if top == Some(CONVERT) && task.action_kind == CONVERT => {
 +                self.retake_convert(player, idx, (target.ok_or(TERRAIN_TASK)?, point), notifies)?;
@@ -9068,7 +9346,7 @@ index 9e2d36cf..366ff44f 100644
                  _ => {
                      return Err(GenieError::unsupported(
                          "a work command on the unit's current task",
-@@ -496,12 +548,90 @@ impl World {
+@@ -496,14 +563,92 @@ impl World {
              // the factory makes no action of a mule cart's task: the move without one
              CART_TASK => self.work_move(player, idx, target, point, (notifies, source)),
              TRANSPORT => self.start_transport((player, idx), (target, point), task, notifies),
@@ -9099,9 +9377,9 @@ index 9e2d36cf..366ff44f 100644
 +                eprintln!("UNMODELLED_TASK kind={:#x} task={:?}", kind.get(), task.id);
 +                Err(UNMODELLED_FACTORY)
 +            }
-+        }
-+    }
-+
+         }
+     }
+ 
 +    /// The factory's relic pick-up (188329 0xbb8c30 case 0x84, constructor 0xbc2f60): the
 +    /// action takes the relic (0xb6ba50, slot 0x178); the unit AI takes the order 0x2db (its
 +    /// history recorded) and the action 0x277 (0xd40990, 0xd40980; its `+0x1b0` flag, 0xd1bdb0,
@@ -9149,7 +9427,7 @@ index 9e2d36cf..366ff44f 100644
 +        if let Some(ai) = self.parts.unit_ai.get_mut(id) {
 +            ai.set_order(Some(OrderKind::OnTarget), self.streams.get(Stream::Ai));
 +            ai.set_action(Some(AiAction::OnTarget));
-         }
++        }
 +        self.clear_actions(player, idx)?;
 +        self.relic_deposit_start(player, idx, &mut action)?;
 +        self.parts
@@ -9157,10 +9435,12 @@ index 9e2d36cf..366ff44f 100644
 +            .list
 +            .set_relic_deposit(Some(action));
 +        Ok(())
-     }
- 
++    }
++
      /// [`World::start_task`]'s actions on an object: the Enter, Attack, Hunt, Build, Repair or
-@@ -537,7 +667,11 @@ impl World {
+     /// Gather on `target` starts.
+     fn start_object_task(
+@@ -537,7 +682,11 @@ impl World {
              ActionKind::BUILD => self.start_build(player, idx, target, task, point, notifies),
              REPAIR => self.start_repair(player, idx, target, task, point, notifies),
              GATHER => self.start_gather(player, idx, target, task, Some((point, notifies))),
