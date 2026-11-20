@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-20T15:30:12.423493+00:00",
-  "last_checked_at": "2026-11-20T15:25:13.022059+00:00",
+  "updated_at": "2026-11-20T15:46:15.682915+00:00",
+  "last_checked_at": "2026-11-20T15:43:53.508938+00:00",
   "sync_error": null,
   "profile": {
     "id": 251265,
@@ -9,6 +9,42 @@
     "name": "TAG_MbL_"
   },
   "matches": [
+    {
+      "id": 522447955,
+      "started_at": 1795187813,
+      "finished_at": 1795189109,
+      "map": "Arabian Desert",
+      "civilization": "Varangians",
+      "result": "loss",
+      "rating_before": 2989,
+      "rating_after": 2974,
+      "match_type_id": 6,
+      "players_count": 2,
+      "players": [
+        {
+          "profile_id": 251265,
+          "name": "TAG_MbL_",
+          "is_self": true,
+          "civilization": "Varangians",
+          "rating_before": 2989
+        },
+        {
+          "profile_id": 347269,
+          "name": "wR.ACCM",
+          "is_self": false,
+          "civilization": "Sicilians",
+          "rating_before": 3013
+        }
+      ],
+      "analysis_status": "pending",
+      "analysis": null,
+      "attempts": 0,
+      "source_url": "https://www.aoe2insights.com/match/522447955/",
+      "civ_choice": {
+        "251265": true,
+        "347269": true
+      }
+    },
     {
       "id": 522438893,
       "started_at": 1795184819,
@@ -93566,7 +93602,6 @@
       },
       "attempts": 1,
       "source_url": "https://www.aoe2insights.com/match/522438893/",
-      "analysis_note": "명령 기록 분석 완료",
       "civ_choice": {
         "251265": true,
         "347269": true
@@ -162477,8 +162512,7 @@
       "civ_choice": {
         "251265": true,
         "347269": true
-      },
-      "analysis_note": "명령 기록 분석 완료"
+      }
     },
     {
       "id": 522432389,
@@ -375753,7 +375787,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 38,
+        "analysis_revision": 39,
         "duration_game_seconds": 1485.82,
         "civilization": "Goths",
         "random_civ": true,
@@ -422977,8 +423011,8 @@
             ]
           },
           "engine_version": {
-            "research_commit": "c13513a",
-            "patch_sha256": "87925d27e6e7"
+            "research_commit": "4b1f2fc",
+            "patch_sha256": "23b783c7e2d5"
           }
         },
         "game_build": 188329,
@@ -423360,7 +423394,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 38,
+        "analysis_revision": 39,
         "duration_game_seconds": 2317.13,
         "civilization": "Bohemians",
         "random_civ": true,
@@ -477121,8 +477155,8 @@
             ]
           },
           "engine_version": {
-            "research_commit": "c13513a",
-            "patch_sha256": "87925d27e6e7"
+            "research_commit": "4b1f2fc",
+            "patch_sha256": "23b783c7e2d5"
           }
         },
         "game_build": 188329,
@@ -477536,7 +477570,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 38,
+        "analysis_revision": 39,
         "duration_game_seconds": 2400.83,
         "civilization": "Vikings",
         "random_civ": true,
@@ -533751,8 +533785,8 @@
             ]
           },
           "engine_version": {
-            "research_commit": "c13513a",
-            "patch_sha256": "87925d27e6e7"
+            "research_commit": "4b1f2fc",
+            "patch_sha256": "23b783c7e2d5"
           }
         },
         "game_build": 188329,
