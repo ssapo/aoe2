@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-20T16:23:41.461681+00:00",
-  "last_checked_at": "2026-11-20T16:18:34.660145+00:00",
+  "updated_at": "2026-11-20T16:57:41.383974+00:00",
+  "last_checked_at": "2026-11-20T16:54:02.982022+00:00",
   "sync_error": null,
   "profile": {
     "id": 347269,
@@ -53544,7 +53544,6 @@
       },
       "attempts": 1,
       "source_url": "https://www.aoe2insights.com/match/522447955/",
-      "analysis_note": "명령 기록 분석 완료",
       "civ_choice": {
         "347269": true,
         "251265": true
@@ -147116,8 +147115,7 @@
       "civ_choice": {
         "251265": true,
         "347269": true
-      },
-      "analysis_note": "명령 기록 분석 완료"
+      }
     },
     {
       "id": 522433446,
@@ -301357,7 +301355,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 39,
+        "analysis_revision": 41,
         "duration_game_seconds": 1442.06,
         "civilization": "Khmer",
         "random_civ": false,
@@ -341195,7 +341193,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 39,
+        "analysis_revision": 41,
         "duration_game_seconds": 2591.16,
         "civilization": "Mongols",
         "random_civ": false,
@@ -406428,8 +406426,8 @@
             ]
           },
           "engine_version": {
-            "research_commit": "7377216",
-            "patch_sha256": "9b634f922c95"
+            "research_commit": "4b1f2fc",
+            "patch_sha256": "23b783c7e2d5"
           }
         },
         "game_build": 188329,
@@ -406909,7 +406907,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 39,
+        "analysis_revision": 41,
         "duration_game_seconds": 2008.28,
         "civilization": "Bengalis",
         "random_civ": false,
@@ -417537,7 +417535,10 @@
               "seconds": 51.9,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 88.458,
@@ -417546,7 +417547,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 13
+              "group": 13,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 88.469,
@@ -417555,7 +417559,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 13
+              "group": 13,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 88.5,
@@ -417563,7 +417570,10 @@
               "seconds": 52.94,
               "side": "mine",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 88.5,
@@ -417572,7 +417582,10 @@
               "side": "mine",
               "kind": "ORDER",
               "selected_count": 2,
-              "group": 10
+              "group": 10,
+              "units": {
+                "Villager": 2
+              }
             },
             {
               "x": 62.156,
@@ -417581,7 +417594,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 17
+              "group": 17,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 75.815,
@@ -417589,7 +417605,10 @@
               "seconds": 54.6,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 82.625,
@@ -417597,7 +417616,10 @@
               "seconds": 54.81,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 85.302,
@@ -417605,7 +417627,10 @@
               "seconds": 55.02,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 85.979,
@@ -417613,7 +417638,10 @@
               "seconds": 55.22,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 72.0,
@@ -417622,7 +417650,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 3,
-              "group": 7
+              "group": 7,
+              "units": {
+                "Villager": 3
+              }
             },
             {
               "x": 91.5,
@@ -417630,7 +417661,10 @@
               "seconds": 60.22,
               "side": "mine",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 2
+              }
             },
             {
               "x": 72.0,
@@ -417639,7 +417673,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 3,
-              "group": 4
+              "group": 4,
+              "units": {
+                "Villager": 3
+              }
             },
             {
               "x": 72.5,
@@ -417648,7 +417685,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 3,
-              "group": 4
+              "group": 4,
+              "units": {
+                "Villager": 3
+              }
             },
             {
               "x": 72.0,
@@ -417657,7 +417697,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 3,
-              "group": 7
+              "group": 7,
+              "units": {
+                "Villager": 3
+              }
             },
             {
               "x": 75.5,
@@ -417666,7 +417709,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 3,
-              "group": 7
+              "group": 7,
+              "units": {
+                "Villager": 3
+              }
             },
             {
               "x": 72.0,
@@ -417674,7 +417720,10 @@
               "seconds": 64.17,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 3
+              }
             },
             {
               "x": 75.5,
@@ -417683,7 +417732,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 3,
-              "group": 7
+              "group": 7,
+              "units": {
+                "Villager": 3
+              }
             },
             {
               "x": 28.0,
@@ -417692,7 +417744,10 @@
               "side": "mine",
               "kind": "ORDER",
               "selected_count": 3,
-              "group": 8
+              "group": 8,
+              "units": {
+                "Villager": 3
+              }
             },
             {
               "x": 71.938,
@@ -417701,7 +417756,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 17
+              "group": 17,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 69.427,
@@ -417709,7 +417767,10 @@
               "seconds": 67.81,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 78.781,
@@ -417717,7 +417778,10 @@
               "seconds": 68.02,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 83.906,
@@ -417725,7 +417789,10 @@
               "seconds": 68.43,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 86.042,
@@ -417733,7 +417800,10 @@
               "seconds": 68.43,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 81.948,
@@ -417741,7 +417811,10 @@
               "seconds": 69.06,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 75.38,
@@ -417750,7 +417823,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 14
+              "group": 14,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 75.245,
@@ -417758,7 +417834,10 @@
               "seconds": 70.93,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 59.948,
@@ -417766,7 +417845,10 @@
               "seconds": 71.34,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 51.854,
@@ -417774,7 +417856,10 @@
               "seconds": 71.55,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 46.917,
@@ -417782,7 +417867,10 @@
               "seconds": 71.76,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 43.75,
@@ -417790,7 +417878,10 @@
               "seconds": 71.97,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 71.5,
@@ -417799,7 +417890,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 2,
-              "group": 18
+              "group": 18,
+              "units": {
+                "Villager": 2
+              }
             },
             {
               "x": 66.792,
@@ -417808,7 +417902,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 15
+              "group": 15,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 62.99,
@@ -417816,7 +417913,10 @@
               "seconds": 78.31,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 62.896,
@@ -417824,7 +417924,10 @@
               "seconds": 78.52,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 62.542,
@@ -417832,7 +417935,10 @@
               "seconds": 78.73,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 62.052,
@@ -417840,7 +417946,10 @@
               "seconds": 79.14,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 61.906,
@@ -417848,7 +417957,10 @@
               "seconds": 79.35,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 61.896,
@@ -417856,7 +417968,10 @@
               "seconds": 79.56,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 62.0,
@@ -417864,7 +417979,10 @@
               "seconds": 82.06,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 61.948,
@@ -417872,7 +417990,10 @@
               "seconds": 82.26,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 61.948,
@@ -417880,7 +418001,10 @@
               "seconds": 82.47,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 61.875,
@@ -417888,7 +418012,10 @@
               "seconds": 83.3,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 61.875,
@@ -417896,7 +418023,10 @@
               "seconds": 83.51,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 61.854,
@@ -417904,7 +418034,10 @@
               "seconds": 83.72,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 61.365,
@@ -417912,7 +418045,10 @@
               "seconds": 84.76,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 61.365,
@@ -417920,7 +418056,10 @@
               "seconds": 84.97,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 61.365,
@@ -417928,7 +418067,10 @@
               "seconds": 85.18,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 61.458,
@@ -417936,7 +418078,10 @@
               "seconds": 86.01,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 61.448,
@@ -417944,7 +418089,10 @@
               "seconds": 86.22,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 61.552,
@@ -417952,7 +418100,10 @@
               "seconds": 88.3,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 61.552,
@@ -417960,7 +418111,10 @@
               "seconds": 88.71,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 61.552,
@@ -417968,7 +418122,10 @@
               "seconds": 88.92,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 61.552,
@@ -417976,7 +418133,10 @@
               "seconds": 89.13,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 61.552,
@@ -417984,7 +418144,10 @@
               "seconds": 89.54,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 62.3,
@@ -417992,7 +418155,10 @@
               "seconds": 90.69,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 61.562,
@@ -418001,7 +418167,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 15
+              "group": 15,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 61.479,
@@ -418010,7 +418179,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 15
+              "group": 15,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 61.469,
@@ -418018,7 +418190,10 @@
               "seconds": 92.56,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 61.708,
@@ -418026,7 +418201,10 @@
               "seconds": 92.77,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 61.802,
@@ -418034,7 +418212,10 @@
               "seconds": 93.18,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 61.812,
@@ -418042,7 +418223,10 @@
               "seconds": 93.39,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 61.958,
@@ -418050,7 +418234,10 @@
               "seconds": 94.02,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 61.958,
@@ -418058,7 +418245,10 @@
               "seconds": 94.22,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 61.958,
@@ -418066,7 +418256,10 @@
               "seconds": 94.43,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 64.177,
@@ -418074,7 +418267,10 @@
               "seconds": 99.01,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 64.281,
@@ -418082,7 +418278,10 @@
               "seconds": 99.22,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 64.292,
@@ -418090,7 +418289,10 @@
               "seconds": 99.42,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 26.5,
@@ -418099,7 +418301,10 @@
               "side": "mine",
               "kind": "ORDER",
               "selected_count": 1,
-              "group": 19
+              "group": 19,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 65.812,
@@ -418107,7 +418312,10 @@
               "seconds": 104.1,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 66.083,
@@ -418115,7 +418323,10 @@
               "seconds": 104.31,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 66.156,
@@ -418123,7 +418334,10 @@
               "seconds": 104.73,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 24.5,
@@ -418132,7 +418346,10 @@
               "side": "mine",
               "kind": "ORDER",
               "selected_count": 1,
-              "group": 20
+              "group": 20,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 24.5,
@@ -418141,7 +418358,10 @@
               "side": "mine",
               "kind": "ORDER",
               "selected_count": 1,
-              "group": 20
+              "group": 20,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 67.724,
@@ -418149,7 +418369,10 @@
               "seconds": 105.35,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 68.492,
@@ -418158,7 +418381,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 1,
-              "group": 16
+              "group": 16,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 71.5,
@@ -418167,7 +418393,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 2,
-              "group": 21
+              "group": 21,
+              "units": {
+                "Villager": 2
+              }
             },
             {
               "x": 69.055,
@@ -418175,7 +418404,10 @@
               "seconds": 108.47,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 2
+              }
             },
             {
               "x": 69.055,
@@ -418184,7 +418416,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 1,
-              "group": 15
+              "group": 15,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 69.055,
@@ -418192,7 +418427,10 @@
               "seconds": 109.72,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 69.055,
@@ -418201,7 +418439,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 3,
-              "group": 3
+              "group": 3,
+              "units": {
+                "Villager": 3
+              }
             },
             {
               "x": 69.055,
@@ -418209,7 +418450,10 @@
               "seconds": 110.76,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 3
+              }
             },
             {
               "x": 85.698,
@@ -418218,7 +418462,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 17
+              "group": 17,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 89.062,
@@ -418226,7 +418473,10 @@
               "seconds": 114.09,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 98.052,
@@ -418234,7 +418484,10 @@
               "seconds": 114.3,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 93.958,
@@ -418242,7 +418495,10 @@
               "seconds": 114.92,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 88.062,
@@ -418250,7 +418506,10 @@
               "seconds": 115.13,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 79.19,
@@ -418258,7 +418517,10 @@
               "seconds": 115.34,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 68.115,
@@ -418266,7 +418528,10 @@
               "seconds": 115.54,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 60.531,
@@ -418275,7 +418540,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 14
+              "group": 14,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 57.854,
@@ -418283,7 +418551,10 @@
               "seconds": 119.18,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 50.656,
@@ -418291,7 +418562,10 @@
               "seconds": 120.22,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 45.385,
@@ -418299,7 +418573,10 @@
               "seconds": 120.43,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 32.729,
@@ -418307,7 +418584,10 @@
               "seconds": 120.64,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 8.312,
@@ -418315,7 +418595,10 @@
               "seconds": 121.26,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 5.708,
@@ -418323,7 +418606,10 @@
               "seconds": 121.47,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 97.375,
@@ -418332,7 +418618,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 17
+              "group": 17,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 101.385,
@@ -418340,7 +418629,10 @@
               "seconds": 133.02,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 93.094,
@@ -418348,7 +418640,10 @@
               "seconds": 133.22,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 81.792,
@@ -418356,7 +418651,10 @@
               "seconds": 133.64,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 74.219,
@@ -418364,7 +418662,10 @@
               "seconds": 134.06,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 86.5,
@@ -418373,7 +418674,10 @@
               "side": "mine",
               "kind": "ORDER",
               "selected_count": 2,
-              "group": 10
+              "group": 10,
+              "units": {
+                "Villager": 2
+              }
             },
             {
               "x": 88.5,
@@ -418382,7 +418686,10 @@
               "side": "mine",
               "kind": "ORDER",
               "selected_count": 2,
-              "group": 10
+              "group": 10,
+              "units": {
+                "Villager": 2
+              }
             },
             {
               "x": 92.039,
@@ -418390,7 +418697,10 @@
               "seconds": 137.8,
               "side": "mine",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 2
+              }
             },
             {
               "x": 29.906,
@@ -418399,7 +418709,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 22
+              "group": 22,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 73.188,
@@ -418408,7 +418721,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 23
+              "group": 23,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 75.5,
@@ -418417,7 +418733,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 1,
-              "group": 23
+              "group": 23,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 101.229,
@@ -418426,7 +418745,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 17
+              "group": 17,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 93.781,
@@ -418434,7 +418756,10 @@
               "seconds": 156.94,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 31.177,
@@ -418442,7 +418767,10 @@
               "seconds": 157.14,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 67.76,
@@ -418450,7 +418778,10 @@
               "seconds": 157.56,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 44.427,
@@ -418458,7 +418789,10 @@
               "seconds": 157.98,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 29.229,
@@ -418466,7 +418800,10 @@
               "seconds": 159.85,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 28.865,
@@ -418474,7 +418811,10 @@
               "seconds": 160.06,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 73.5,
@@ -418483,7 +418823,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 1,
-              "group": 24
+              "group": 24,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 74.24,
@@ -418492,7 +418835,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 25
+              "group": 25,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 74.5,
@@ -418500,7 +418846,10 @@
               "seconds": 168.17,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 56.958,
@@ -418509,7 +418858,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 17
+              "group": 17,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 56.958,
@@ -418517,7 +418869,10 @@
               "seconds": 176.8,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 56.958,
@@ -418525,7 +418880,10 @@
               "seconds": 177.01,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 16.698,
@@ -418534,7 +418892,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 22
+              "group": 22,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 8.281,
@@ -418543,7 +418904,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 22
+              "group": 22,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 75.5,
@@ -418552,7 +418916,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 1,
-              "group": 23
+              "group": 23,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 75.5,
@@ -418560,7 +418927,10 @@
               "seconds": 184.39,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 75.5,
@@ -418568,7 +418938,10 @@
               "seconds": 184.81,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 87.208,
@@ -418577,7 +418950,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 23
+              "group": 23,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 87.927,
@@ -418586,7 +418962,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 23
+              "group": 23,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 88.146,
@@ -418594,7 +418973,10 @@
               "seconds": 185.85,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 25.125,
@@ -418602,7 +418984,10 @@
               "seconds": 188.14,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 18.604,
@@ -418610,7 +418995,10 @@
               "seconds": 188.76,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 17.635,
@@ -418618,7 +419006,10 @@
               "seconds": 188.97,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 93.99,
@@ -418626,7 +419017,10 @@
               "seconds": 191.05,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 16.094,
@@ -418634,7 +419028,10 @@
               "seconds": 192.09,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 17.042,
@@ -418642,7 +419039,10 @@
               "seconds": 192.92,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 26.104,
@@ -418650,7 +419050,10 @@
               "seconds": 193.34,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 29.052,
@@ -418658,7 +419061,10 @@
               "seconds": 195.73,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 29.427,
@@ -418666,7 +419072,10 @@
               "seconds": 195.94,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 31.635,
@@ -418674,7 +419083,10 @@
               "seconds": 196.56,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 71.5,
@@ -418683,7 +419095,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 3,
-              "group": 3
+              "group": 3,
+              "units": {
+                "Villager": 3
+              }
             },
             {
               "x": 71.573,
@@ -418692,7 +419107,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 3,
-              "group": 3
+              "group": 3,
+              "units": {
+                "Villager": 3
+              }
             },
             {
               "x": 71.5,
@@ -418700,7 +419118,10 @@
               "seconds": 198.64,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 3
+              }
             },
             {
               "x": 34.01,
@@ -418708,7 +419129,10 @@
               "seconds": 198.85,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 65.354,
@@ -418716,7 +419140,10 @@
               "seconds": 200.3,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 3
+              }
             },
             {
               "x": 61.564,
@@ -418724,7 +419151,10 @@
               "seconds": 200.72,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 3
+              }
             },
             {
               "x": 61.564,
@@ -418732,7 +419162,10 @@
               "seconds": 200.93,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 3
+              }
             },
             {
               "x": 30.198,
@@ -418740,7 +419173,10 @@
               "seconds": 201.97,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 31.667,
@@ -418748,7 +419184,10 @@
               "seconds": 202.38,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 32.479,
@@ -418756,7 +419195,10 @@
               "seconds": 202.59,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 31.427,
@@ -418764,7 +419206,10 @@
               "seconds": 203.01,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 20.802,
@@ -418772,7 +419217,10 @@
               "seconds": 203.63,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 90.906,
@@ -418781,7 +419229,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 23
+              "group": 23,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 91.177,
@@ -418789,7 +419240,10 @@
               "seconds": 205.09,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 91.021,
@@ -418797,7 +419251,10 @@
               "seconds": 206.13,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 89.125,
@@ -418806,7 +419263,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 2,
-              "group": 10
+              "group": 10,
+              "units": {
+                "Villager": 2
+              }
             },
             {
               "x": 90.99,
@@ -418814,7 +419274,10 @@
               "seconds": 206.34,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 91.052,
@@ -418822,7 +419285,10 @@
               "seconds": 206.54,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 86.5,
@@ -418830,7 +419296,10 @@
               "seconds": 206.54,
               "side": "mine",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 2
+              }
             },
             {
               "x": 91.073,
@@ -418838,7 +419307,10 @@
               "seconds": 206.75,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 92.26,
@@ -418846,7 +419318,10 @@
               "seconds": 208.31,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 88.5,
@@ -418855,7 +419330,10 @@
               "side": "mine",
               "kind": "ORDER",
               "selected_count": 2,
-              "group": 10
+              "group": 10,
+              "units": {
+                "Villager": 2
+              }
             },
             {
               "x": 92.24,
@@ -418863,7 +419341,10 @@
               "seconds": 208.52,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 92.24,
@@ -418871,7 +419352,10 @@
               "seconds": 208.73,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 89.044,
@@ -418879,7 +419363,10 @@
               "seconds": 209.14,
               "side": "mine",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 2
+              }
             },
             {
               "x": 84.365,
@@ -418887,7 +419374,10 @@
               "seconds": 212.26,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 84.365,
@@ -418895,7 +419385,10 @@
               "seconds": 212.47,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 30.646,
@@ -418904,7 +419397,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 22
+              "group": 22,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 84.365,
@@ -418912,7 +419408,10 @@
               "seconds": 212.68,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 30.208,
@@ -418920,7 +419419,10 @@
               "seconds": 212.89,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 80.719,
@@ -418928,7 +419430,10 @@
               "seconds": 213.3,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 80.698,
@@ -418936,7 +419441,10 @@
               "seconds": 213.51,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 20.906,
@@ -418945,7 +419453,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 22
+              "group": 22,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 85.021,
@@ -418954,7 +419465,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 17
+              "group": 17,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 100.0,
@@ -418962,7 +419476,10 @@
               "seconds": 216.01,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 110.0,
@@ -418970,7 +419487,10 @@
               "seconds": 216.22,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 111.0,
@@ -418978,7 +419498,10 @@
               "seconds": 216.42,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 111.0,
@@ -418986,7 +419509,10 @@
               "seconds": 216.63,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 111.0,
@@ -418994,7 +419520,10 @@
               "seconds": 216.84,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 81.833,
@@ -419003,7 +419532,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 23
+              "group": 23,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 81.344,
@@ -419011,7 +419543,10 @@
               "seconds": 218.71,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 81.344,
@@ -419019,7 +419554,10 @@
               "seconds": 218.92,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 78.927,
@@ -419027,7 +419565,10 @@
               "seconds": 224.22,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 79.281,
@@ -419035,7 +419576,10 @@
               "seconds": 226.1,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 79.25,
@@ -419043,7 +419587,10 @@
               "seconds": 226.3,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 83.294,
@@ -419051,7 +419598,10 @@
               "seconds": 226.72,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 69.5,
@@ -419060,7 +419610,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 1,
-              "group": 23
+              "group": 23,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 70.396,
@@ -419069,7 +419622,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 23
+              "group": 23,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 70.469,
@@ -419078,7 +419634,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 23
+              "group": 23,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 67.594,
@@ -419087,7 +419646,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 26
+              "group": 26,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 67.594,
@@ -419096,7 +419658,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 26
+              "group": 26,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 71.24,
@@ -419105,7 +419670,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 23
+              "group": 23,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 70.542,
@@ -419113,7 +419681,10 @@
               "seconds": 236.39,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 71.583,
@@ -419121,7 +419692,10 @@
               "seconds": 238.68,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 71.458,
@@ -419129,7 +419703,10 @@
               "seconds": 239.72,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 71.438,
@@ -419137,7 +419714,10 @@
               "seconds": 239.93,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 74.882,
@@ -419145,7 +419725,10 @@
               "seconds": 240.55,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 71.781,
@@ -419154,7 +419737,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 23
+              "group": 23,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 71.656,
@@ -419163,7 +419749,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 23
+              "group": 23,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 71.562,
@@ -419171,7 +419760,10 @@
               "seconds": 241.8,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 71.406,
@@ -419179,7 +419771,10 @@
               "seconds": 242.01,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 73.089,
@@ -419187,7 +419782,10 @@
               "seconds": 242.63,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 18.229,
@@ -419195,7 +419793,10 @@
               "seconds": 243.88,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 16.25,
@@ -419203,7 +419804,10 @@
               "seconds": 244.09,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 71.5,
@@ -419212,7 +419816,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 1,
-              "group": 27
+              "group": 27,
+              "units": {
+                "Town Center": 1
+              }
             },
             {
               "x": 15.427,
@@ -419220,7 +419827,10 @@
               "seconds": 244.5,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 10.656,
@@ -419228,7 +419838,10 @@
               "seconds": 245.34,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 8.938,
@@ -419236,7 +419849,10 @@
               "seconds": 245.75,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 71.5,
@@ -419244,7 +419860,10 @@
               "seconds": 247.1,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Town Center": 1
+              }
             },
             {
               "x": 106.688,
@@ -419253,7 +419872,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 17
+              "group": 17,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 119.5,
@@ -419261,7 +419883,10 @@
               "seconds": 256.05,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 119.5,
@@ -419269,7 +419894,10 @@
               "seconds": 256.26,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 119.5,
@@ -419277,7 +419905,10 @@
               "seconds": 256.46,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 66.0,
@@ -419286,7 +419917,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 1,
-              "group": 26
+              "group": 26,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 95.958,
@@ -419295,7 +419929,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 26
+              "group": 26,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 13.177,
@@ -419303,7 +419940,10 @@
               "seconds": 263.22,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 12.875,
@@ -419311,7 +419951,10 @@
               "seconds": 263.64,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 10.698,
@@ -419319,7 +419962,10 @@
               "seconds": 264.06,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 5.021,
@@ -419327,7 +419973,10 @@
               "seconds": 265.1,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 4.958,
@@ -419335,7 +419984,10 @@
               "seconds": 265.3,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 13.708,
@@ -419343,7 +419995,10 @@
               "seconds": 270.09,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 13.75,
@@ -419351,7 +420006,10 @@
               "seconds": 270.3,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 14.01,
@@ -419359,7 +420017,10 @@
               "seconds": 270.5,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 9.469,
@@ -419368,7 +420029,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 28
+              "group": 28,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 6.479,
@@ -419376,7 +420040,10 @@
               "seconds": 272.17,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 12.083,
@@ -419384,7 +420051,10 @@
               "seconds": 272.69,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 10.406,
@@ -419392,7 +420062,10 @@
               "seconds": 273.31,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 19.115,
@@ -419400,7 +420073,10 @@
               "seconds": 273.73,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 42.104,
@@ -419408,7 +420084,10 @@
               "seconds": 274.35,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 52.99,
@@ -419416,7 +420095,10 @@
               "seconds": 274.56,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 32.5,
@@ -419425,7 +420107,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 14
+              "group": 14,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 57.385,
@@ -419433,7 +420118,10 @@
               "seconds": 274.77,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 10.5,
@@ -419441,7 +420129,10 @@
               "seconds": 274.98,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 12.5,
@@ -419449,7 +420140,10 @@
               "seconds": 275.39,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 12.5,
@@ -419457,7 +420151,10 @@
               "seconds": 275.6,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 87.135,
@@ -419466,7 +420163,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 26
+              "group": 26,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 101.562,
@@ -419474,7 +420174,10 @@
               "seconds": 277.68,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 101.677,
@@ -419482,7 +420185,10 @@
               "seconds": 277.89,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 101.75,
@@ -419490,7 +420196,10 @@
               "seconds": 278.3,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 101.75,
@@ -419498,7 +420207,10 @@
               "seconds": 278.51,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 86.5,
@@ -419507,7 +420219,10 @@
               "side": "mine",
               "kind": "ORDER",
               "selected_count": 1,
-              "group": 13
+              "group": 13,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 86.5,
@@ -419516,7 +420231,10 @@
               "side": "mine",
               "kind": "ORDER",
               "selected_count": 1,
-              "group": 13
+              "group": 13,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 88.5,
@@ -419525,7 +420243,10 @@
               "side": "mine",
               "kind": "ORDER",
               "selected_count": 1,
-              "group": 13
+              "group": 13,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 81.062,
@@ -419533,7 +420254,10 @@
               "seconds": 281.01,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 15.5,
@@ -419542,7 +420266,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 14
+              "group": 14,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 13.5,
@@ -419550,7 +420277,10 @@
               "seconds": 288.39,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 13.5,
@@ -419558,7 +420288,10 @@
               "seconds": 288.6,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 78.51,
@@ -419566,7 +420299,10 @@
               "seconds": 288.6,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 73.875,
@@ -419574,7 +420310,10 @@
               "seconds": 289.02,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 73.594,
@@ -419582,7 +420321,10 @@
               "seconds": 289.43,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 90.0,
@@ -419591,7 +420333,10 @@
               "side": "mine",
               "kind": "ORDER",
               "selected_count": 2,
-              "group": 29
+              "group": 29,
+              "units": {
+                "Fishing Ship": 2
+              }
             },
             {
               "x": 73.521,
@@ -419600,7 +420345,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 13
+              "group": 13,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 71.177,
@@ -419608,7 +420356,10 @@
               "seconds": 293.59,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 71.5,
@@ -419617,7 +420368,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 3,
-              "group": 3
+              "group": 3,
+              "units": {
+                "Villager": 3
+              }
             },
             {
               "x": 17.26,
@@ -419626,7 +420380,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 28
+              "group": 28,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 71.5,
@@ -419635,7 +420392,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 3,
-              "group": 3
+              "group": 3,
+              "units": {
+                "Villager": 3
+              }
             },
             {
               "x": 18.854,
@@ -419643,7 +420403,10 @@
               "seconds": 300.35,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 19.802,
@@ -419651,7 +420414,10 @@
               "seconds": 300.56,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 58.743,
@@ -419659,7 +420425,10 @@
               "seconds": 301.39,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 3
+              }
             },
             {
               "x": 18.115,
@@ -419667,7 +420436,10 @@
               "seconds": 302.22,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 18.75,
@@ -419675,7 +420447,10 @@
               "seconds": 302.43,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 11.979,
@@ -419683,7 +420458,10 @@
               "seconds": 303.26,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 99.812,
@@ -419692,7 +420470,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 26
+              "group": 26,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 13.604,
@@ -419700,7 +420481,10 @@
               "seconds": 303.89,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 100.448,
@@ -419708,7 +420492,10 @@
               "seconds": 304.1,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 100.448,
@@ -419716,7 +420503,10 @@
               "seconds": 304.3,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 13.677,
@@ -419724,7 +420514,10 @@
               "seconds": 304.3,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 69.125,
@@ -419733,7 +420526,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 30
+              "group": 30,
+              "units": {
+                "Fishing Ship": 1
+              }
             },
             {
               "x": 69.198,
@@ -419741,7 +420537,10 @@
               "seconds": 306.18,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Fishing Ship": 1
+              }
             },
             {
               "x": 74.115,
@@ -419750,7 +420549,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 13
+              "group": 13,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 73.792,
@@ -419758,7 +420560,10 @@
               "seconds": 306.8,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 69.073,
@@ -419766,7 +420571,10 @@
               "seconds": 307.22,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Fishing Ship": 1
+              }
             },
             {
               "x": 74.0,
@@ -419774,7 +420582,10 @@
               "seconds": 307.63,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Fishing Ship": 1
+              }
             },
             {
               "x": 77.104,
@@ -419782,7 +420593,10 @@
               "seconds": 311.17,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 77.396,
@@ -419790,7 +420604,10 @@
               "seconds": 311.48,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 77.292,
@@ -419798,7 +420615,10 @@
               "seconds": 311.69,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 100.219,
@@ -419807,7 +420627,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 26
+              "group": 26,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 100.198,
@@ -419815,7 +420638,10 @@
               "seconds": 312.73,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 100.188,
@@ -419823,7 +420649,10 @@
               "seconds": 312.94,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 100.188,
@@ -419831,7 +420660,10 @@
               "seconds": 313.14,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 98.5,
@@ -419839,7 +420671,10 @@
               "seconds": 313.98,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 98.5,
@@ -419847,7 +420682,10 @@
               "seconds": 314.18,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 98.5,
@@ -419855,7 +420693,10 @@
               "seconds": 314.39,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 12.927,
@@ -419864,7 +420705,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 28
+              "group": 28,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 15.438,
@@ -419872,7 +420716,10 @@
               "seconds": 315.64,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 15.49,
@@ -419880,7 +420727,10 @@
               "seconds": 315.85,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 74.417,
@@ -419889,7 +420739,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 13
+              "group": 13,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 71.344,
@@ -419897,7 +420750,10 @@
               "seconds": 318.34,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 68.115,
@@ -419905,7 +420761,10 @@
               "seconds": 318.55,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 66.698,
@@ -419913,7 +420772,10 @@
               "seconds": 318.76,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 72.667,
@@ -419921,7 +420783,10 @@
               "seconds": 325.38,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 72.771,
@@ -419929,7 +420794,10 @@
               "seconds": 325.79,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 58.743,
@@ -419938,7 +420806,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 3,
-              "group": 3
+              "group": 3,
+              "units": {
+                "Villager": 3
+              }
             },
             {
               "x": 72.031,
@@ -419946,7 +420817,10 @@
               "seconds": 325.99,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 58.743,
@@ -419954,7 +420828,10 @@
               "seconds": 326.2,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 3
+              }
             },
             {
               "x": 71.625,
@@ -419962,7 +420839,10 @@
               "seconds": 326.4,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 73.552,
@@ -419970,7 +420850,10 @@
               "seconds": 327.61,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 75.344,
@@ -419978,7 +420861,10 @@
               "seconds": 327.82,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 86.5,
@@ -419986,7 +420872,10 @@
               "seconds": 329.85,
               "side": "mine",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 88.5,
@@ -419995,7 +420884,10 @@
               "side": "mine",
               "kind": "ORDER",
               "selected_count": 1,
-              "group": 11
+              "group": 11,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 107.562,
@@ -420003,7 +420895,10 @@
               "seconds": 331.07,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 107.854,
@@ -420011,7 +420906,10 @@
               "seconds": 331.28,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 98.5,
@@ -420020,7 +420918,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 1,
-              "group": 26
+              "group": 26,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 34.896,
@@ -420029,7 +420930,11 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 2,
-              "group": 31
+              "group": 31,
+              "units": {
+                "Livestock": 1,
+                "Villager": 1
+              }
             },
             {
               "x": 31.01,
@@ -420037,7 +420942,11 @@
               "seconds": 335.33,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1,
+                "Villager": 1
+              }
             },
             {
               "x": 12.729,
@@ -420046,7 +420955,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 32
+              "group": 32,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 58.743,
@@ -420055,7 +420967,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 3,
-              "group": 3
+              "group": 3,
+              "units": {
+                "Villager": 3
+              }
             },
             {
               "x": 28.5,
@@ -420063,7 +420978,10 @@
               "seconds": 338.18,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 100.5,
@@ -420071,7 +420989,10 @@
               "seconds": 338.38,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 72.099,
@@ -420080,7 +421001,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 1,
-              "group": 33
+              "group": 33,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 29.219,
@@ -420089,7 +421013,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 28
+              "group": 28,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 72.099,
@@ -420097,7 +421024,10 @@
               "seconds": 340.21,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 33.25,
@@ -420105,7 +421035,10 @@
               "seconds": 340.42,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 39.604,
@@ -420113,7 +421046,10 @@
               "seconds": 340.61,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 92.792,
@@ -420122,7 +421058,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 11
+              "group": 11,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 92.146,
@@ -420130,7 +421069,10 @@
               "seconds": 346.5,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 105.458,
@@ -420138,7 +421080,10 @@
               "seconds": 347.53,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 108.708,
@@ -420146,7 +421091,10 @@
               "seconds": 347.93,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 75.698,
@@ -420155,7 +421103,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 12
+              "group": 12,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 81.906,
@@ -420163,7 +421114,10 @@
               "seconds": 350.36,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 88.583,
@@ -420171,7 +421125,10 @@
               "seconds": 351.18,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 88.927,
@@ -420179,7 +421136,10 @@
               "seconds": 351.38,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 58.743,
@@ -420188,7 +421148,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 3,
-              "group": 3
+              "group": 3,
+              "units": {
+                "Villager": 3
+              }
             },
             {
               "x": 86.5,
@@ -420196,7 +421159,10 @@
               "seconds": 351.99,
               "side": "mine",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 86.5,
@@ -420204,7 +421170,10 @@
               "seconds": 353.21,
               "side": "mine",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 86.5,
@@ -420212,7 +421181,10 @@
               "seconds": 353.42,
               "side": "mine",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 58.743,
@@ -420220,7 +421192,10 @@
               "seconds": 354.43,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 3
+              }
             },
             {
               "x": 40.292,
@@ -420229,7 +421204,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 32
+              "group": 32,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 40.417,
@@ -420237,7 +421215,10 @@
               "seconds": 358.7,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 42.385,
@@ -420245,7 +421226,10 @@
               "seconds": 358.9,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 51.99,
@@ -420253,7 +421237,10 @@
               "seconds": 359.1,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 61.406,
@@ -420261,7 +421248,10 @@
               "seconds": 359.71,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 57.729,
@@ -420269,7 +421259,10 @@
               "seconds": 360.32,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 48.812,
@@ -420277,7 +421270,10 @@
               "seconds": 360.72,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 109.5,
@@ -420286,7 +421282,11 @@
               "side": "mine",
               "kind": "ORDER",
               "selected_count": 2,
-              "group": 34
+              "group": 34,
+              "units": {
+                "Livestock": 1,
+                "Villager": 1
+              }
             },
             {
               "x": 109.677,
@@ -420295,7 +421295,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 35
+              "group": 35,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 108.323,
@@ -420303,7 +421306,10 @@
               "seconds": 366.21,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 85.5,
@@ -420311,7 +421317,10 @@
               "seconds": 367.22,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 53.5,
@@ -420319,7 +421328,10 @@
               "seconds": 367.43,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 68.5,
@@ -420327,7 +421339,10 @@
               "seconds": 368.04,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 40.5,
@@ -420335,7 +421350,10 @@
               "seconds": 368.24,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 39.969,
@@ -420344,7 +421362,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 28
+              "group": 28,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 43.458,
@@ -420352,7 +421373,10 @@
               "seconds": 370.07,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 59.177,
@@ -420360,7 +421384,10 @@
               "seconds": 370.47,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 107.333,
@@ -420369,7 +421396,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 17
+              "group": 17,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 102.573,
@@ -420377,7 +421407,10 @@
               "seconds": 373.93,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 91.083,
@@ -420385,7 +421418,10 @@
               "seconds": 374.54,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 82.865,
@@ -420393,7 +421429,10 @@
               "seconds": 374.95,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 22.812,
@@ -420402,7 +421441,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 36
+              "group": 36,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 109.208,
@@ -420410,7 +421452,10 @@
               "seconds": 387.33,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 103.177,
@@ -420418,7 +421463,10 @@
               "seconds": 388.35,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 93.083,
@@ -420426,7 +421474,10 @@
               "seconds": 388.56,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 78.031,
@@ -420434,7 +421485,10 @@
               "seconds": 388.96,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 51.276,
@@ -420443,7 +421497,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 32
+              "group": 32,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 48.844,
@@ -420451,7 +421508,10 @@
               "seconds": 392.42,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 48.385,
@@ -420459,7 +421519,10 @@
               "seconds": 392.82,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 44.547,
@@ -420467,7 +421530,10 @@
               "seconds": 393.22,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 50.188,
@@ -420475,7 +421541,10 @@
               "seconds": 393.43,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 52.146,
@@ -420483,7 +421552,10 @@
               "seconds": 393.83,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 40.083,
@@ -420491,7 +421563,10 @@
               "seconds": 394.04,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 30.604,
@@ -420499,7 +421574,10 @@
               "seconds": 394.24,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 20.031,
@@ -420507,7 +421585,10 @@
               "seconds": 395.06,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 29.802,
@@ -420516,7 +421597,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 36
+              "group": 36,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 29.365,
@@ -420524,7 +421608,10 @@
               "seconds": 397.08,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 28.5,
@@ -420533,7 +421620,10 @@
               "side": "mine",
               "kind": "ORDER",
               "selected_count": 1,
-              "group": 22
+              "group": 22,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 21.497,
@@ -420542,7 +421632,10 @@
               "side": "mine",
               "kind": "ORDER",
               "selected_count": 1,
-              "group": 36
+              "group": 36,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 22.5,
@@ -420550,7 +421643,10 @@
               "seconds": 399.72,
               "side": "mine",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 21.497,
@@ -420558,7 +421654,10 @@
               "seconds": 400.13,
               "side": "mine",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 29.427,
@@ -420567,7 +421666,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 36
+              "group": 36,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 51.24,
@@ -420576,7 +421678,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 37
+              "group": 37,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 35.885,
@@ -420584,7 +421689,10 @@
               "seconds": 406.03,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 40.0,
@@ -420592,7 +421700,10 @@
               "seconds": 406.22,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 46.698,
@@ -420600,7 +421711,10 @@
               "seconds": 406.63,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 53.323,
@@ -420608,7 +421722,10 @@
               "seconds": 406.83,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Livestock": 1
+              }
             },
             {
               "x": 25.681,
@@ -420617,7 +421734,10 @@
               "side": "mine",
               "kind": "ORDER",
               "selected_count": 1,
-              "group": 38
+              "group": 38,
+              "units": {
+                "Town Center": 1
+              }
             },
             {
               "x": 29.885,
@@ -420626,7 +421746,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 36
+              "group": 36,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 84.198,
@@ -420635,7 +421758,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 2,
-              "group": 39
+              "group": 39,
+              "units": {
+                "Fishing Ship": 2
+              }
             },
             {
               "x": 29.865,
@@ -420643,7 +421769,10 @@
               "seconds": 416.79,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 69.833,
@@ -420652,7 +421781,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 40
+              "group": 40,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 73.042,
@@ -420660,7 +421792,10 @@
               "seconds": 417.6,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 72.099,
@@ -420668,7 +421803,10 @@
               "seconds": 417.81,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 89.25,
@@ -420677,7 +421815,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 2,
-              "group": 39
+              "group": 39,
+              "units": {
+                "Fishing Ship": 2
+              }
             },
             {
               "x": 85.99,
@@ -420686,7 +421827,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 41
+              "group": 41,
+              "units": {
+                "Fishing Ship": 1
+              }
             },
             {
               "x": 92.646,
@@ -420695,7 +421839,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 6,
-              "group": 42
+              "group": 42,
+              "units": {
+                "Fishing Ship": 6
+              }
             },
             {
               "x": 85.0,
@@ -420704,7 +421851,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 1,
-              "group": 43
+              "group": 43,
+              "units": {
+                "Fishing Ship": 1
+              }
             },
             {
               "x": 88.302,
@@ -420713,7 +421863,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 41
+              "group": 41,
+              "units": {
+                "Fishing Ship": 1
+              }
             },
             {
               "x": 85.354,
@@ -420721,7 +421874,10 @@
               "seconds": 423.08,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Fishing Ship": 1
+              }
             },
             {
               "x": 109.5,
@@ -420730,7 +421886,10 @@
               "side": "mine",
               "kind": "ORDER",
               "selected_count": 2,
-              "group": 10
+              "group": 10,
+              "units": {
+                "Villager": 2
+              }
             },
             {
               "x": 88.229,
@@ -420738,7 +421897,10 @@
               "seconds": 425.32,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Fishing Ship": 1
+              }
             },
             {
               "x": 87.479,
@@ -420746,7 +421908,10 @@
               "seconds": 425.72,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Fishing Ship": 1
+              }
             },
             {
               "x": 87.635,
@@ -420754,7 +421919,10 @@
               "seconds": 425.93,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Fishing Ship": 1
+              }
             },
             {
               "x": 87.677,
@@ -420762,7 +421930,10 @@
               "seconds": 426.13,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Fishing Ship": 1
+              }
             },
             {
               "x": 87.76,
@@ -420770,7 +421941,10 @@
               "seconds": 426.33,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Fishing Ship": 1
+              }
             },
             {
               "x": 88.0,
@@ -420779,7 +421953,10 @@
               "side": "mine",
               "kind": "ORDER",
               "selected_count": 6,
-              "group": 42
+              "group": 42,
+              "units": {
+                "Fishing Ship": 6
+              }
             },
             {
               "x": 88.448,
@@ -420787,7 +421964,10 @@
               "seconds": 427.35,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Fishing Ship": 1
+              }
             },
             {
               "x": 88.74,
@@ -420795,7 +421975,10 @@
               "seconds": 427.56,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Fishing Ship": 1
+              }
             },
             {
               "x": 99.438,
@@ -420804,7 +421987,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 44
+              "group": 44,
+              "units": {
+                "Fishing Ship": 1
+              }
             },
             {
               "x": 88.0,
@@ -420812,7 +421998,10 @@
               "seconds": 428.36,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Fishing Ship": 1
+              }
             },
             {
               "x": 72.099,
@@ -420821,7 +422010,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 2,
-              "group": 45
+              "group": 45,
+              "units": {
+                "Villager": 2
+              }
             },
             {
               "x": 32.49,
@@ -420830,7 +422022,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 22
+              "group": 22,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 32.062,
@@ -420838,7 +422033,10 @@
               "seconds": 436.08,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 54.229,
@@ -439070,7 +440268,7 @@
               "selected_count": null
             }
           ],
-          "command_units_until": 51.9
+          "command_units_until": 439.4
         },
         "metrics": {
           "age_commands": {
@@ -446889,7 +448087,1497 @@
           "own": null,
           "opponent": null
         },
-        "engine_income": null,
+        "engine_income": {
+          "source": "engine_resimulation",
+          "columns": [
+            "seconds",
+            "own_food",
+            "own_wood",
+            "own_gold",
+            "own_stone",
+            "opponent_food",
+            "opponent_wood",
+            "opponent_gold",
+            "opponent_stone"
+          ],
+          "points": [
+            [
+              0.0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              10.0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              20.0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              30.0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              40.0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            [
+              50.0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              25,
+              0,
+              0
+            ],
+            [
+              60.0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              25,
+              0,
+              0
+            ],
+            [
+              70.0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              25,
+              0,
+              0
+            ],
+            [
+              80.0,
+              10,
+              0,
+              0,
+              0,
+              10,
+              25,
+              1,
+              0
+            ],
+            [
+              90.0,
+              10,
+              0,
+              0,
+              0,
+              10,
+              25,
+              1,
+              0
+            ],
+            [
+              100.0,
+              21,
+              0,
+              0,
+              0,
+              10,
+              25,
+              1,
+              0
+            ],
+            [
+              110.0,
+              21,
+              0,
+              0,
+              0,
+              33,
+              25,
+              3,
+              0
+            ],
+            [
+              120.0,
+              21,
+              0,
+              0,
+              0,
+              33,
+              25,
+              3,
+              0
+            ],
+            [
+              130.0,
+              31,
+              30,
+              0,
+              0,
+              33,
+              65,
+              3,
+              0
+            ],
+            [
+              140.0,
+              58,
+              60,
+              0,
+              0,
+              33,
+              100,
+              3,
+              0
+            ],
+            [
+              150.0,
+              96,
+              60,
+              0,
+              0,
+              33,
+              116,
+              3,
+              0
+            ],
+            [
+              160.0,
+              96,
+              109,
+              0,
+              0,
+              33,
+              133,
+              3,
+              0
+            ],
+            [
+              170.0,
+              106,
+              109,
+              0,
+              0,
+              33,
+              133,
+              3,
+              0
+            ],
+            [
+              180.0,
+              106,
+              129,
+              0,
+              0,
+              33,
+              187,
+              3,
+              0
+            ],
+            [
+              190.0,
+              106,
+              179,
+              0,
+              0,
+              33,
+              205,
+              3,
+              0
+            ],
+            [
+              200.0,
+              116,
+              194,
+              0,
+              0,
+              137,
+              229,
+              14,
+              0
+            ],
+            [
+              210.0,
+              116,
+              224,
+              0,
+              0,
+              137,
+              269,
+              14,
+              0
+            ],
+            [
+              220.0,
+              176,
+              244,
+              0,
+              0,
+              152,
+              273,
+              14,
+              0
+            ],
+            [
+              230.0,
+              176,
+              264,
+              0,
+              0,
+              152,
+              331,
+              14,
+              0
+            ],
+            [
+              240.0,
+              201,
+              314,
+              0,
+              0,
+              152,
+              341,
+              14,
+              0
+            ],
+            [
+              250.0,
+              201,
+              334,
+              0,
+              0,
+              152,
+              380,
+              14,
+              0
+            ],
+            [
+              260.0,
+              201,
+              374,
+              0,
+              0,
+              182,
+              410,
+              16,
+              0
+            ],
+            [
+              270.0,
+              211,
+              424,
+              0,
+              0,
+              199,
+              410,
+              18,
+              0
+            ],
+            [
+              280.0,
+              226,
+              434,
+              0,
+              0,
+              199,
+              461,
+              18,
+              0
+            ],
+            [
+              290.0,
+              276,
+              494,
+              0,
+              0,
+              239,
+              471,
+              21,
+              0
+            ],
+            [
+              300.0,
+              276,
+              534,
+              0,
+              0,
+              280,
+              510,
+              23,
+              0
+            ],
+            [
+              310.0,
+              301,
+              564,
+              0,
+              0,
+              315,
+              564,
+              27,
+              0
+            ],
+            [
+              320.0,
+              301,
+              624,
+              0,
+              0,
+              384,
+              564,
+              34,
+              0
+            ],
+            [
+              330.0,
+              316,
+              667,
+              0,
+              0,
+              399,
+              604,
+              35,
+              0
+            ],
+            [
+              340.0,
+              340,
+              687,
+              0,
+              0,
+              429,
+              674,
+              36,
+              0
+            ],
+            [
+              350.0,
+              371,
+              783,
+              0,
+              0,
+              429,
+              676,
+              36,
+              0
+            ],
+            [
+              360.0,
+              371,
+              807,
+              0,
+              0,
+              459,
+              726,
+              38,
+              0
+            ],
+            [
+              370.0,
+              371,
+              832,
+              0,
+              0,
+              474,
+              786,
+              38,
+              0
+            ],
+            [
+              380.0,
+              406,
+              923,
+              0,
+              0,
+              495,
+              816,
+              40,
+              0
+            ],
+            [
+              390.0,
+              464,
+              925,
+              0,
+              0,
+              565,
+              876,
+              47,
+              0
+            ],
+            [
+              400.0,
+              464,
+              946,
+              0,
+              0,
+              627,
+              906,
+              52,
+              0
+            ],
+            [
+              410.0,
+              509,
+              1087,
+              0,
+              0,
+              672,
+              936,
+              54,
+              0
+            ],
+            [
+              420.0,
+              539,
+              1103,
+              0,
+              0,
+              672,
+              996,
+              54,
+              0
+            ],
+            [
+              430.0,
+              559,
+              1113,
+              0,
+              0,
+              682,
+              1037,
+              55,
+              0
+            ]
+          ],
+          "verified_until_seconds": 439.4,
+          "own_total": [
+            569,
+            1173,
+            0,
+            0
+          ],
+          "opponent_total": [
+            682,
+            1037,
+            55,
+            0
+          ],
+          "by_source": {
+            "columns": [
+              "seconds",
+              "own_sheep",
+              "own_boar",
+              "own_deer",
+              "own_berries",
+              "own_farm",
+              "own_fish",
+              "own_food_other",
+              "own_gold_mine",
+              "own_gold_other",
+              "opponent_sheep",
+              "opponent_boar",
+              "opponent_deer",
+              "opponent_berries",
+              "opponent_farm",
+              "opponent_fish",
+              "opponent_food_other",
+              "opponent_gold_mine",
+              "opponent_gold_other"
+            ],
+            "points": [
+              [
+                10.0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                20.0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                30.0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                40.0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                50.0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                60.0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                70.0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                80.0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                10,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                10,
+                0,
+                0,
+                1
+              ],
+              [
+                90.0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                10,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                10,
+                0,
+                0,
+                1
+              ],
+              [
+                100.0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                20,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                10,
+                0,
+                0,
+                1
+              ],
+              [
+                110.0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                20,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                33,
+                0,
+                0,
+                3
+              ],
+              [
+                120.0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                20,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                33,
+                0,
+                0,
+                3
+              ],
+              [
+                130.0,
+                0,
+                0,
+                0,
+                1,
+                0,
+                30,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                33,
+                0,
+                0,
+                3
+              ],
+              [
+                140.0,
+                0,
+                0,
+                28,
+                1,
+                0,
+                30,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                33,
+                0,
+                0,
+                3
+              ],
+              [
+                150.0,
+                0,
+                0,
+                55,
+                1,
+                0,
+                40,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                33,
+                0,
+                0,
+                3
+              ],
+              [
+                160.0,
+                0,
+                0,
+                55,
+                1,
+                0,
+                40,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                33,
+                0,
+                0,
+                3
+              ],
+              [
+                170.0,
+                0,
+                0,
+                55,
+                1,
+                0,
+                50,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                33,
+                0,
+                0,
+                3
+              ],
+              [
+                180.0,
+                0,
+                0,
+                55,
+                1,
+                0,
+                50,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                33,
+                0,
+                0,
+                3
+              ],
+              [
+                190.0,
+                0,
+                0,
+                55,
+                1,
+                0,
+                50,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                33,
+                0,
+                0,
+                3
+              ],
+              [
+                200.0,
+                0,
+                0,
+                55,
+                1,
+                0,
+                60,
+                0,
+                0,
+                0,
+                0,
+                0,
+                105,
+                0,
+                0,
+                33,
+                0,
+                0,
+                14
+              ],
+              [
+                210.0,
+                0,
+                0,
+                55,
+                1,
+                0,
+                60,
+                0,
+                0,
+                0,
+                0,
+                0,
+                105,
+                0,
+                0,
+                33,
+                0,
+                0,
+                14
+              ],
+              [
+                220.0,
+                0,
+                0,
+                105,
+                1,
+                0,
+                70,
+                0,
+                0,
+                0,
+                0,
+                0,
+                105,
+                0,
+                0,
+                48,
+                0,
+                0,
+                14
+              ],
+              [
+                230.0,
+                0,
+                0,
+                105,
+                1,
+                0,
+                70,
+                0,
+                0,
+                0,
+                0,
+                0,
+                105,
+                0,
+                0,
+                48,
+                0,
+                0,
+                14
+              ],
+              [
+                240.0,
+                0,
+                0,
+                105,
+                1,
+                0,
+                95,
+                0,
+                0,
+                0,
+                0,
+                0,
+                105,
+                0,
+                0,
+                48,
+                0,
+                0,
+                14
+              ],
+              [
+                250.0,
+                0,
+                0,
+                105,
+                1,
+                0,
+                95,
+                0,
+                0,
+                0,
+                0,
+                0,
+                105,
+                0,
+                0,
+                48,
+                0,
+                0,
+                14
+              ],
+              [
+                260.0,
+                0,
+                0,
+                105,
+                1,
+                0,
+                95,
+                0,
+                0,
+                0,
+                0,
+                0,
+                105,
+                0,
+                0,
+                78,
+                0,
+                0,
+                16
+              ],
+              [
+                270.0,
+                0,
+                0,
+                105,
+                1,
+                0,
+                105,
+                0,
+                0,
+                0,
+                0,
+                16,
+                105,
+                0,
+                0,
+                78,
+                0,
+                0,
+                18
+              ],
+              [
+                280.0,
+                0,
+                0,
+                105,
+                1,
+                0,
+                120,
+                0,
+                0,
+                0,
+                0,
+                16,
+                105,
+                0,
+                0,
+                78,
+                0,
+                0,
+                18
+              ],
+              [
+                290.0,
+                0,
+                0,
+                130,
+                1,
+                0,
+                145,
+                0,
+                0,
+                0,
+                0,
+                42,
+                105,
+                0,
+                0,
+                93,
+                0,
+                0,
+                21
+              ],
+              [
+                300.0,
+                0,
+                0,
+                130,
+                1,
+                0,
+                145,
+                0,
+                0,
+                0,
+                0,
+                52,
+                105,
+                0,
+                0,
+                123,
+                0,
+                0,
+                23
+              ],
+              [
+                310.0,
+                0,
+                0,
+                130,
+                1,
+                0,
+                170,
+                0,
+                0,
+                0,
+                0,
+                52,
+                140,
+                0,
+                0,
+                123,
+                0,
+                0,
+                27
+              ],
+              [
+                320.0,
+                0,
+                0,
+                130,
+                1,
+                0,
+                170,
+                0,
+                0,
+                0,
+                0,
+                52,
+                210,
+                0,
+                0,
+                123,
+                0,
+                0,
+                34
+              ],
+              [
+                330.0,
+                0,
+                0,
+                130,
+                1,
+                0,
+                185,
+                0,
+                0,
+                0,
+                0,
+                52,
+                210,
+                0,
+                0,
+                138,
+                0,
+                0,
+                35
+              ],
+              [
+                340.0,
+                0,
+                0,
+                130,
+                1,
+                0,
+                209,
+                0,
+                0,
+                0,
+                0,
+                52,
+                210,
+                0,
+                0,
+                168,
+                0,
+                0,
+                36
+              ],
+              [
+                350.0,
+                0,
+                0,
+                130,
+                1,
+                0,
+                240,
+                0,
+                0,
+                0,
+                0,
+                52,
+                210,
+                0,
+                0,
+                168,
+                0,
+                0,
+                36
+              ],
+              [
+                360.0,
+                0,
+                0,
+                130,
+                1,
+                0,
+                240,
+                0,
+                0,
+                0,
+                0,
+                52,
+                210,
+                0,
+                0,
+                198,
+                0,
+                0,
+                38
+              ],
+              [
+                370.0,
+                0,
+                0,
+                130,
+                1,
+                0,
+                240,
+                0,
+                0,
+                0,
+                0,
+                52,
+                210,
+                0,
+                0,
+                213,
+                0,
+                0,
+                38
+              ],
+              [
+                380.0,
+                0,
+                0,
+                130,
+                1,
+                0,
+                275,
+                0,
+                0,
+                0,
+                0,
+                52,
+                210,
+                0,
+                0,
+                233,
+                0,
+                0,
+                40
+              ],
+              [
+                390.0,
+                0,
+                0,
+                165,
+                1,
+                0,
+                298,
+                0,
+                0,
+                0,
+                0,
+                122,
+                210,
+                0,
+                0,
+                233,
+                0,
+                0,
+                47
+              ],
+              [
+                400.0,
+                0,
+                0,
+                165,
+                1,
+                0,
+                298,
+                0,
+                0,
+                0,
+                0,
+                145,
+                210,
+                0,
+                0,
+                273,
+                0,
+                0,
+                52
+              ],
+              [
+                410.0,
+                0,
+                0,
+                165,
+                1,
+                0,
+                343,
+                0,
+                0,
+                0,
+                0,
+                145,
+                210,
+                0,
+                0,
+                318,
+                0,
+                0,
+                54
+              ],
+              [
+                420.0,
+                0,
+                0,
+                165,
+                1,
+                0,
+                373,
+                0,
+                0,
+                0,
+                0,
+                145,
+                210,
+                0,
+                0,
+                318,
+                0,
+                0,
+                54
+              ],
+              [
+                430.0,
+                0,
+                0,
+                165,
+                1,
+                0,
+                393,
+                0,
+                0,
+                0,
+                0,
+                145,
+                210,
+                0,
+                0,
+                328,
+                0,
+                0,
+                55
+              ]
+            ]
+          },
+          "animals": {
+            "until_seconds": 430.0,
+            "own": [
+              {
+                "id": 2083,
+                "kind": "deer",
+                "eaten": 105.4,
+                "first_seconds": 140.0,
+                "last_seconds": 220.0,
+                "full": 140.0
+              },
+              {
+                "id": 2081,
+                "kind": "deer",
+                "eaten": 59.8,
+                "first_seconds": 290.0,
+                "last_seconds": 390.0,
+                "full": 140.0
+              }
+            ],
+            "opponent": [
+              {
+                "id": 2079,
+                "kind": "deer",
+                "eaten": 104.7,
+                "first_seconds": 200.0,
+                "last_seconds": 200.0,
+                "full": 140.0
+              },
+              {
+                "id": 2107,
+                "kind": "boar",
+                "eaten": 144.6,
+                "first_seconds": 270.0,
+                "last_seconds": 400.0
+              },
+              {
+                "id": 2080,
+                "kind": "deer",
+                "eaten": 104.8,
+                "first_seconds": 310.0,
+                "last_seconds": 320.0,
+                "full": 140.0
+              }
+            ]
+          },
+          "engine_version": {
+            "research_commit": "4b1f2fc",
+            "patch_sha256": "23b783c7e2d5"
+          }
+        },
         "game_build": 188329,
         "insights": [
           {
