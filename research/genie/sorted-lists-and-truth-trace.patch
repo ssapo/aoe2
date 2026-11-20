@@ -8931,10 +8931,25 @@ index acb205d8..056541f9 100644
          if waits && old[0] != Some(target) {
              self.take(target, by)?;
 diff --git a/crates/engine/genie-core/src/orders/interact.rs b/crates/engine/genie-core/src/orders/interact.rs
-index 77933740..32fbb3c8 100644
+index 77933740..f8503001 100644
 --- a/crates/engine/genie-core/src/orders/interact.rs
 +++ b/crates/engine/genie-core/src/orders/interact.rs
-@@ -328,8 +328,9 @@ impl World {
+@@ -318,7 +318,13 @@ impl World {
+                 self.groups.count_command();
+                 return Ok(());
+             }
+-            &[id] if !order.control.is_held() => {
++            // 188329 0x16ebc20 always runs the splitter (0x10b6b40) with the command's queued
++            // byte (`+0x13`) as its `param_6`, which keeps a lone member's world group
++            // (findings 182: 516995133 7.007 s, P2 scout 3489's shift-queued move in its Ctrl
++            // group of one goes to the group); a lone unit not queued goes loose as here
++            &[id]
++                if !order.control.is_held() && !order.flags.contains(OrderFlags::QUEUED) =>
++            {
+                 self.groups.count_command();
+                 // a gone unit (the check's none) leaves no group and takes no move
+                 let Some(id) = id else {
+@@ -328,8 +334,9 @@ impl World {
                  return self.move_unit(player, id, &[], None, order);
              }
              _ => {
