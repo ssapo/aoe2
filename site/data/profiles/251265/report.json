@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-20T14:01:40.128966+00:00",
-  "last_checked_at": "2026-11-20T14:01:38.075064+00:00",
+  "updated_at": "2026-11-20T14:28:21.341658+00:00",
+  "last_checked_at": "2026-11-20T14:26:33.934846+00:00",
   "sync_error": null,
   "profile": {
     "id": 251265,
@@ -9,6 +9,42 @@
     "name": "TAG_MbL_"
   },
   "matches": [
+    {
+      "id": 522433446,
+      "started_at": 1795182967,
+      "finished_at": 1795184677,
+      "map": "Arabian Desert",
+      "civilization": "Bohemians",
+      "result": "win",
+      "rating_before": 2949,
+      "rating_after": 2970,
+      "match_type_id": 6,
+      "players_count": 2,
+      "players": [
+        {
+          "profile_id": 251265,
+          "name": "TAG_MbL_",
+          "is_self": true,
+          "civilization": "Bohemians",
+          "rating_before": 2949
+        },
+        {
+          "profile_id": 347269,
+          "name": "wR.ACCM",
+          "is_self": false,
+          "civilization": "Romans",
+          "rating_before": 3053
+        }
+      ],
+      "analysis_status": "pending",
+      "analysis": null,
+      "attempts": 0,
+      "source_url": "https://www.aoe2insights.com/match/522433446/",
+      "civ_choice": {
+        "251265": true,
+        "347269": true
+      }
+    },
     {
       "id": 522432389,
       "started_at": 1795182625,
@@ -111,7 +147,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 38,
+        "analysis_revision": 39,
         "duration_game_seconds": 1139.02,
         "civilization": "Vikings",
         "random_civ": true,
@@ -38396,8 +38432,8 @@
             ]
           },
           "engine_version": {
-            "research_commit": "c13513a",
-            "patch_sha256": "87925d27e6e7"
+            "research_commit": "7377216",
+            "patch_sha256": "9b634f922c95"
           }
         },
         "game_build": 188329,
@@ -38618,7 +38654,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 38,
+        "analysis_revision": 39,
         "duration_game_seconds": 3113.42,
         "civilization": "Wei",
         "random_civ": true,
@@ -111291,8 +111327,8 @@
             ]
           },
           "engine_version": {
-            "research_commit": "c13513a",
-            "patch_sha256": "87925d27e6e7"
+            "research_commit": "7377216",
+            "patch_sha256": "9b634f922c95"
           }
         },
         "game_build": 188329,
@@ -111763,7 +111799,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 38,
+        "analysis_revision": 39,
         "duration_game_seconds": 1277.3,
         "civilization": "Byzantines",
         "random_civ": true,
@@ -145264,8 +145300,8 @@
             ]
           },
           "engine_version": {
-            "research_commit": "c13513a",
-            "patch_sha256": "87925d27e6e7"
+            "research_commit": "7377216",
+            "patch_sha256": "9b634f922c95"
           }
         },
         "game_build": 188329,
