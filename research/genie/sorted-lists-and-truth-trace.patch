@@ -4736,7 +4736,7 @@ index 398a973c..8fe3628e 100644
              self.stop_all_units(group, StopScope::Busy)?;
          }
 diff --git a/crates/engine/genie-core/src/groups/place.rs b/crates/engine/genie-core/src/groups/place.rs
-index 51f6a791..4cff9082 100644
+index 51f6a791..5ef1b44b 100644
 --- a/crates/engine/genie-core/src/groups/place.rs
 +++ b/crates/engine/genie-core/src/groups/place.rs
 @@ -16,6 +16,8 @@ use crate::map::DistanceSquared;
@@ -5060,7 +5060,7 @@ index 51f6a791..4cff9082 100644
      /// The terrain classes master `master` of player `p` lets its objects stand on: its
      /// restriction (`+0x606`) in the map's table (`FUN_141054630`).
      ///
-@@ -870,3 +1140,61 @@ mod tests {
+@@ -870,3 +1140,79 @@ mod tests {
          );
      }
  }
@@ -5101,10 +5101,30 @@ index 51f6a791..4cff9082 100644
 +    BVector::new(x / len, h / len, y / len)
 +}
 +
++/// 188329 movePositionToFront's W (`0x10ef53c`..`0x10ef60f`, findings 179): the walk of 10 along
++/// the next level runs only when the head level is the walked one (`+0x14` 0) and the next is a
++/// top level's plan (`+0x14` 1) holding a path (`+0x18`); else W is the head level's last point
++/// (`0x106f250`: fewer than two points, the origin) - 520024027 4.147 s, scout 4232's walked
++/// level (Partial, ending at (80.60416, 17.05)) under its top level (2), not the top's goal
 +fn front_goal_188329(g: &crate::groups::UnitGroup, at: Option<BVector>) -> Option<BVector> {
-+    match g.motion.paths.first() {
-+        Some(l) if l.level.get() != 0 => l.points.last().copied(),
-+        Some(_) => g.motion.paths.get(1).and_then(|p| {
++    let head = g.motion.paths.first()?;
++    let walks = head.level.get() == 0
++        && g
++            .motion
++            .paths
++            .get(1)
++            .is_some_and(|n| n.level == crate::movement::WaypointLevel::Planned && n.has_path);
++    if !walks {
++        if !head.has_path {
++            return None;
++        }
++        return Some(if head.points.len() < 2 {
++            BVector::ZERO
++        } else {
++            head.points.last().copied().unwrap_or(BVector::ZERO)
++        });
++    }
++    g.motion.paths.get(1).and_then(|p| {
 +            let mut i = usize::try_from(p.waypoint.get()).ok()?;
 +            let mut acc = 0.0_f32;
 +            if let (Some(at), Some(a)) = (at, p.points.get(i)) {
@@ -5118,9 +5138,7 @@ index 51f6a791..4cff9082 100644
 +                i += 1;
 +            }
 +            p.points.get(i).copied()
-+        }),
-+        None => None,
-+    }
++        })
 +}
 diff --git a/crates/engine/genie-core/src/groups/stats.rs b/crates/engine/genie-core/src/groups/stats.rs
 index e101e2d0..f7de2eaa 100644
@@ -8585,7 +8603,7 @@ index d65b2d84..ecf8ab20 100644
              return Ok(());
          };
 diff --git a/crates/engine/genie-core/src/orders/follow.rs b/crates/engine/genie-core/src/orders/follow.rs
-index dd70f0f4..d877a874 100644
+index dd70f0f4..84ef3b55 100644
 --- a/crates/engine/genie-core/src/orders/follow.rs
 +++ b/crates/engine/genie-core/src/orders/follow.rs
 @@ -77,6 +77,9 @@ impl World {
@@ -8598,11 +8616,24 @@ index dd70f0f4..d877a874 100644
          };
          let cap = if self.players.player(player)?.kind.is_computer() {
              500
-@@ -260,12 +263,13 @@ impl World {
+@@ -260,12 +263,26 @@ impl World {
          }
          let (p, idx) = self.follower_start(loose, i)?;
          let (x, y) = (followed.place.x(), followed.place.y());
 -        let taken = self.move_to_object_with(
++        // 188329 (findings 179): FOLLOW is the unit AI's order 0x2c8 (slot 0x30 -> 0x28 =
++        // 0xd31210), whose immediate branch stops the unit (slot 0xb0 with 1, after
++        // 0xd38f90) before the follow (slot 0x230) asks for a move; a unit that follows itself
++        // gets no move (slot 0x138 `0x113b510`: the target is the unit), so it stands at once
++        // (518230441 127.439 s, scout 2944 `Follow(2944)`: no action, no step that update)
++        if *loose.checked(i)? == followed.id {
++            let class = self
++                .players
++                .live(p, idx)?
++                .master(self.master_tables(), p)?
++                .class;
++            self.unit_ai_stop_now(p, idx, Some(class))?;
++        }
 +        let taken = self.move_to_object_within(
              p,
              idx,
@@ -8613,7 +8644,7 @@ index dd70f0f4..d877a874 100644
          )?;
          let rng = self.streams.get(Stream::Ai);
          if let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(p, idx)?.id) {
-@@ -277,6 +281,11 @@ impl World {
+@@ -277,6 +294,11 @@ impl World {
                  .class
                  .map_or((None, None), |c| (Some(followed.id), c.or_none()));
              ai.set_target(t, class, Position::new(x, y, 0.0));
@@ -8625,12 +8656,38 @@ index dd70f0f4..d877a874 100644
          }
          Ok(())
      }
-@@ -366,6 +375,21 @@ impl World {
+@@ -366,6 +388,47 @@ impl World {
          target: ObjectId,
          point: Position,
          source: OrderSource,
 +    ) -> Result<Answer, GenieError> {
 +        self.move_to_object_within(player, idx, target, point, source, Distance::ZERO)
++    }
++
++    /// The unit AI's stop (slot 0xb0 with 1, `0xd40e40`: the order ends, the unit's stopAction,
++    /// slot 0x3f8, at once; [`crate::unit_ai::UnitAi::stop_with`]) for the unit at `idx` of
++    /// master class `class`; a unit without a unit AI does nothing.
++    fn unit_ai_stop_now(
++        &mut self,
++        player: PlayerId,
++        idx: ListIndex,
++        class: Option<crate::objects::masters::ClassId>,
++    ) -> Result<(), GenieError> {
++        let unit = self.players.live(player, idx)?;
++        if !self.parts.unit_ai.contains(unit.id) {
++            return Ok(());
++        }
++        let place = (unit.position().ground(), class);
++        let roles = self.model.roles.clone();
++        self.run_ai_calls((player, idx), |ai, side, rng| {
++            ai.stop_with(
++                crate::unit_ai::StopOrder::Keep,
++                Some(place),
++                side,
++                rng,
++                &roles,
++            )
++        })
 +    }
 +
 +    /// [`World::move_to_object_with`] within `range` of the target (0: the MoveTo's own range,
@@ -8647,7 +8704,7 @@ index dd70f0f4..d877a874 100644
      ) -> Result<Answer, GenieError> {
          let world_time = self.world_time;
          let class = self
-@@ -436,7 +460,7 @@ impl World {
+@@ -436,7 +499,7 @@ impl World {
              self.take(target, self.releaser(player, idx)?)?;
          }
          self.clear_actions(player, idx)?;
@@ -8656,7 +8713,7 @@ index dd70f0f4..d877a874 100644
          Ok(Answer::NotTaken)
      }
  
-@@ -453,12 +477,13 @@ impl World {
+@@ -453,12 +516,13 @@ impl World {
          idx: ListIndex,
          (target, target_state): (ObjectId, ObjectState),
          livestock: bool,
@@ -8894,6 +8951,24 @@ index 29f5d776..5e243a42 100644
          if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
              ai.orders.clear();
          }
+diff --git a/crates/engine/genie-core/src/orders/patrol.rs b/crates/engine/genie-core/src/orders/patrol.rs
+index a3a31d36..72d6fb48 100644
+--- a/crates/engine/genie-core/src/orders/patrol.rs
++++ b/crates/engine/genie-core/src/orders/patrol.rs
+@@ -179,7 +179,12 @@ impl World {
+             self.reset_for_attack_move(ids);
+         }
+         self.start_patrol_timers(ids, patrols);
+-        let mut split = self.split(ids, &|_| true, ControlKey::Up)?;
++        // 188329 0x16e7740 (ATTACK_MOVE 0xf4f6a0 and PATROL): the splitter (0x10b6b40 -> 0x10b4480)
++        // gets its `param_6` = (no target) = 1 here, so a unit alone in a group the world holds
++        // keeps that group (0x10b4677..0x10b46a9) instead of moving loose, as a queued order's
++        // does ([`Split::queued`]; findings 179: 520789671 4.758 s, scout 3676 in its Ctrl-move
++        // group of one takes the attack move as a group command, its unit AI order stays -1)
++        let mut split = self.split_aimed(ids, &|_| true, ControlKey::Up, None, true)?;
+         let mut listed: Vec<GroupId> = Vec::new();
+         for units in split.groups.clone() {
+             let common = common_group(&units, |id| self.object(id).map(|(_, u)| u.group));
 diff --git a/crates/engine/genie-core/src/orders/split.rs b/crates/engine/genie-core/src/orders/split.rs
 index b8bda6ff..71c767ab 100644
 --- a/crates/engine/genie-core/src/orders/split.rs
