@@ -2234,7 +2234,7 @@ index cdd56c6d..98b73d04 100644
      /// found (its `+0x48`): the top action's slot 0x48 ([`TransportAction::work`] at the work's
      /// point, from the unit itself when the target is the unit), then the unit AI's notify as
 diff --git a/crates/engine/genie-core/src/garrison/unit.rs b/crates/engine/genie-core/src/garrison/unit.rs
-index d8742d52..2d7472fd 100644
+index d8742d52..b08f125f 100644
 --- a/crates/engine/genie-core/src/garrison/unit.rs
 +++ b/crates/engine/genie-core/src/garrison/unit.rs
 @@ -351,8 +351,18 @@ impl Unit {
@@ -2274,6 +2274,22 @@ index d8742d52..2d7472fd 100644
 +        };
 +        self.enter_town_bell((&mut bell, ai), recorded, at, state, (me, bm), roles)?;
          c.w.parts.set_town_bell(id, bell);
+         Ok(())
+     }
+@@ -502,6 +523,15 @@ impl Unit {
+             b.garrison.push(self.id);
+             let id = b.id;
+             c.w.parts.combat_mut(id)?.firepower += firepower;
++            // 188329 the building's slot 0x1d8 (`0x1283ba0`, findings 180): livestock (class
++            // 0x3a) whose owner's `+0x88` is set adds its master's first storage amount
++            // (`[master+0xb0]`) to the building's livestock sum (`+0x8d8`), which the mills'
++            // food reads ([`crate::players::world_player`]); the leave (`0x128e450`) takes it off
++            // again (a livestock's leave is not modelled, `garrison/let_out.rs`)
++            if bm.kind == MasterKind::BUILDING && roles.of_class(me.class).contains(ClassRoles::LIVESTOCK) {
++                let storage = me.storage.first().map_or(Amount::ZERO, |s| s.1);
++                c.w.parts.building_mut(id)?.livestock_summation += storage;
++            }
+         }
          Ok(())
      }
 diff --git a/crates/engine/genie-core/src/garrison/unload.rs b/crates/engine/genie-core/src/garrison/unload.rs
@@ -2737,7 +2753,7 @@ index 40398a75..697d377b 100644
      }
  
 diff --git a/crates/engine/genie-core/src/gathering/gather/mod.rs b/crates/engine/genie-core/src/gathering/gather/mod.rs
-index 88cd0044..5c297957 100644
+index 88cd0044..b248e3dd 100644
 --- a/crates/engine/genie-core/src/gathering/gather/mod.rs
 +++ b/crates/engine/genie-core/src/gathering/gather/mod.rs
 @@ -14,6 +14,7 @@
@@ -2748,7 +2764,7 @@ index 88cd0044..5c297957 100644
  use crate::gathering::FarmStops;
  use crate::gathering::StopIndex;
  use crate::gathering::hunt::{HuntSprites, HuntTask};
-@@ -52,7 +53,7 @@ mod work;
+@@ -52,11 +53,12 @@ mod work;
  pub use self::gather_state::GatherState;
  pub use self::point_walks::waits_for_farm;
  pub use self::start::{
@@ -2757,7 +2773,12 @@ index 88cd0044..5c297957 100644
  };
  pub use self::walks::Walks;
  #[cfg(test)]
-@@ -97,7 +98,7 @@ pub const GATHER: ActionKind = ActionKind::named(5);
+ use crate::GenieError;
++use crate::players::attribute::AttributeId;
+ #[cfg(test)]
+ use crate::combat::damage::Victim;
+ #[cfg(test)]
+@@ -97,7 +99,7 @@ pub const GATHER: ActionKind = ActionKind::named(5);
  /// immediate in `0x140a8cd40`).
  const SEARCH_WAIT: Seconds = Seconds::new(-10.0);
  /// `set_state(0xf3)`'s timer: a second (`0xbf800000`, an immediate in `0x140a8cd40`).
@@ -2766,7 +2787,7 @@ index 88cd0044..5c297957 100644
  /// `mGatherX` of none (`DAT_14330ec20`, −1.0, read at `0x140a8d1c6`).
  const NO_GATHER_POINT: f32 = GATHER_NO_GATHER_POINT;
  
-@@ -169,6 +170,29 @@ impl GatherAction {
+@@ -169,6 +171,29 @@ impl GatherAction {
      }
  }
  
@@ -2796,7 +2817,7 @@ index 88cd0044..5c297957 100644
  /// What the gather reads of its target when it takes it.
  #[derive(Clone, Copy, Debug, PartialEq)]
  pub struct Resource {
-@@ -218,6 +242,8 @@ pub(crate) struct GatherReads {
+@@ -218,6 +243,8 @@ pub(crate) struct GatherReads {
      pub(crate) capacity: Amount,
      /// The player's attribute the task's `attribute_type2` names, when above 0; else 1.
      pub(crate) productivity: Amount,
@@ -2805,6 +2826,21 @@ index 88cd0044..5c297957 100644
      /// The sprites the gather shows.
      pub(crate) sprites: HuntSprites,
      /// The unit's master's class: a villager's `MoveTo` waits once when the motion step gives up.
+@@ -240,8 +267,13 @@ pub(crate) struct GatherReads {
+     /// The player's attribute the task's `attribute_type2` names (none: 1.0), as the time per
+     /// stop reads it.
+     pub(crate) stop_productivity: Amount,
+-    /// The player's attribute 96: a farm's food is sold at once.
++    /// The player's attribute 96: a farm's food is sold at once (158041; 188329 reads it no more).
+     pub(crate) food_sold: Amount,
++    /// 188329: the live task's `+0x15` bit 0 (`combat_level_flag`): the load goes to the player
++    /// at each gain (`0xb8191c`), and a farmer's stop count stays (`0xb814ed`).
++    pub(crate) deposits_at_once: bool,
++    /// The live task's `resource_out` (`attribute_type3`, `+0x24`), none below 0.
++    pub(crate) resource_out: Option<AttributeId>,
+ }
+ 
+ /// What an update asks of the caller.
 diff --git a/crates/engine/genie-core/src/gathering/gather/start.rs b/crates/engine/genie-core/src/gathering/gather/start.rs
 index 01be8685..8dedc539 100644
 --- a/crates/engine/genie-core/src/gathering/gather/start.rs
@@ -2935,7 +2971,7 @@ index 01be8685..8dedc539 100644
  
      /// `set_state(4)` (`0x140a8cd40` case 4) with its target at `position` (its master's radii
 diff --git a/crates/engine/genie-core/src/gathering/gather/tests.rs b/crates/engine/genie-core/src/gathering/gather/tests.rs
-index 5226b21a..cf93d62b 100644
+index 5226b21a..dadc3952 100644
 --- a/crates/engine/genie-core/src/gathering/gather/tests.rs
 +++ b/crates/engine/genie-core/src/gathering/gather/tests.rs
 @@ -56,6 +56,7 @@ fn reads() -> GatherReads {
@@ -2946,8 +2982,36 @@ index 5226b21a..cf93d62b 100644
          sprites: HuntSprites::default(),
          class: class::VILLAGER,
          defaults: MoveDefaults::default(),
+@@ -65,6 +66,8 @@ fn reads() -> GatherReads {
+         player_kind: PlayerKind::Human,
+         stop_productivity: Amount::new(1.0),
+         food_sold: Amount::ZERO,
++        deposits_at_once: false,
++        resource_out: None,
+     }
+ }
+ 
+@@ -500,7 +503,7 @@ fn past_its_time_per_stop_farmer_walks_to_the_next_stop() {
+ }
+ 
+ #[test]
+-fn farm_food_sold_at_once_goes_to_the_player_and_the_gathering_goes_on() {
++fn load_given_at_once_goes_to_the_player_and_the_gathering_goes_on() {
+     let g = GatherAction {
+         state: GatherState::Work,
+         ..GatherAction::new(task(), &farm(), FarmMode::Fixed, rate(), &roles()).unwrap()
+@@ -514,7 +517,8 @@ fn farm_food_sold_at_once_goes_to_the_player_and_the_gathering_goes_on() {
+     };
+     let r = GatherReads {
+         work_rate: WorkRate::new(0.5),
+-        food_sold: Amount::new(1.0),
++        deposits_at_once: true,
++        resource_out: Some(AttributeId::named(0)),
+         ..reads()
+     };
+     let gathered = rig.run(GatherState::Work, 500, |c, u, _, _| {
 diff --git a/crates/engine/genie-core/src/gathering/gather/unit.rs b/crates/engine/genie-core/src/gathering/gather/unit.rs
-index a7e36539..da49f055 100644
+index a7e36539..f722b6e5 100644
 --- a/crates/engine/genie-core/src/gathering/gather/unit.rs
 +++ b/crates/engine/genie-core/src/gathering/gather/unit.rs
 @@ -1,5 +1,6 @@
@@ -2957,7 +3021,16 @@ index a7e36539..da49f055 100644
  use crate::GenieError;
  use crate::combat::abilities::Look;
  use crate::combat::victims::file_kill;
-@@ -177,6 +178,7 @@ impl Unit {
+@@ -168,6 +169,8 @@ impl Unit {
+         let g = |id: Option<SpriteId>| id.and_then(|s| c.w.model.graphics.get(s).copied());
+         let task = gather.task;
+         let attributes = &c.w.players.player(c.player)?.attributes;
++        // the action's task pointer (`+0x48`) reads the master's task as it is now
++        let live = master.action_part().tasks.iter().find(|t| t.id == task.id);
+         Ok(GatherReads {
+             work_rate: c.w.parts.combat_of(self.id).work_rate_powerup
+                 + master.action_part().work_rate,
+@@ -177,6 +180,7 @@ impl Unit {
                  .copied()
                  .filter(|&v| Amount::ZERO < v)
                  .unwrap_or(Amount::new(1.0)),
@@ -2965,7 +3038,17 @@ index a7e36539..da49f055 100644
              sprites: HuntSprites {
                  moving: g(task.sprites.moving),
                  working: g(task.sprites.working),
-@@ -301,6 +303,15 @@ impl Unit {
+@@ -207,6 +211,9 @@ impl Unit {
+                 .get(FARM_FOOD_SOLD)
+                 .copied()
+                 .unwrap_or(Amount::ZERO),
++            deposits_at_once: live
++                .is_some_and(|t| t.combat_level_flag.bits() & 1 != 0),
++            resource_out: live.and_then(|t| t.attribute_kind3),
+         })
+     }
+ 
+@@ -301,6 +308,15 @@ impl Unit {
          roles: &Roles,
      ) -> Result<HeadCode, GenieError> {
          c.give_load(kind, amount)?;
@@ -2982,7 +3065,7 @@ index a7e36539..da49f055 100644
          if gather.target.is_none() {
              return self.gather_after_drop(actions, c, roles);
 diff --git a/crates/engine/genie-core/src/gathering/gather/update.rs b/crates/engine/genie-core/src/gathering/gather/update.rs
-index 3ab90215..b2721a8b 100644
+index 3ab90215..e4a3fe71 100644
 --- a/crates/engine/genie-core/src/gathering/gather/update.rs
 +++ b/crates/engine/genie-core/src/gathering/gather/update.rs
 @@ -240,7 +240,7 @@ impl GatherAction {
@@ -2994,7 +3077,7 @@ index 3ab90215..b2721a8b 100644
      fn update_face(
          &mut self,
          c: &mut Step<'_>,
-@@ -279,9 +279,11 @@ impl GatherAction {
+@@ -279,14 +279,16 @@ impl GatherAction {
              self.time_at_stop = Seconds::ZERO;
              return Ok(Next::Stay);
          }
@@ -3009,8 +3092,24 @@ index 3ab90215..b2721a8b 100644
      }
  
      /// Case 6, the work: on a farm's stops (the game's `+0xc14` being 0) the time at the stop
+     /// runs; past the time per stop with a stop left the farmer walks to the next (its count
+-    /// stays when the food is sold at once, attribute 96). Else it gathers
++    /// stays for a task that gives its load at once). Else it gathers
+     /// ([`GatherAction::gather`]).
+     fn update_work(
+         &mut self,
+@@ -301,7 +303,8 @@ impl GatherAction {
+             self.time_at_stop += dt;
+             if self.time_per_stop <= self.time_at_stop && self.current_stop.before_last(self.stops)
+             {
+-                if r.food_sold <= Amount::ZERO {
++                // 188329 0xb814ed: the stop count stays for a task that gives its load at once
++                if !r.deposits_at_once {
+                     self.current_stop = self.current_stop.next();
+                 }
+                 let walks = r.walks(&c.w.model.graphics, (unit, c.w.parts.mover_of(unit.id)));
 diff --git a/crates/engine/genie-core/src/gathering/gather/work.rs b/crates/engine/genie-core/src/gathering/gather/work.rs
-index b1ab9a1e..fa462bea 100644
+index b1ab9a1e..f91549ff 100644
 --- a/crates/engine/genie-core/src/gathering/gather/work.rs
 +++ b/crates/engine/genie-core/src/gathering/gather/work.rs
 @@ -64,6 +64,26 @@ impl GatherAction {
@@ -3049,7 +3148,19 @@ index b1ab9a1e..fa462bea 100644
          }
          Self::show(c, unit, r.sprites.working.or(r.sprites.standing));
      }
-@@ -146,10 +168,15 @@ impl GatherAction {
+@@ -110,9 +132,8 @@ impl GatherAction {
+     /// target holds, times the productivity. A load that would pass the capacity ends the
+     /// gathering ([`Next::Drop`]); else the target loses the work, its last bit (above 0, below
+     /// 0.1) going with a thousandth of its master's first storage amount, the unit gains, and a
+-    /// remainder below 0.1 of the capacity rounds the load up. A farm's food under the player's
+-    /// attribute 96 is sold at once: the player gains it as food (slot 0xf8 with 1,
+-    /// [`Step::give_load`]); else a full load, or an empty target that cannot be gathered empty
++    /// remainder below 0.1 of the capacity rounds the load up. A task that gives its load at once
++    /// (188329, its `+0x15` bit 0) gives it to the player ([`Step::give_load`]); else a full load, or an empty target that cannot be gathered empty
+     /// (the combat object's slot 0x2b8), ends it. The game's `+0xc14` (`FUN_140c884c0`) is 0,
+     /// as the tick oracle holds it.
+     ///
+@@ -146,20 +167,39 @@ impl GatherAction {
              target.amount = Amount::ZERO;
          }
          *held += gain;
@@ -3063,13 +3174,38 @@ index b1ab9a1e..fa462bea 100644
 +            (r.extras).gain(&mut unit.extra, over, target.master_id, target.class);
 +            crate::gain_trace::grew(unit.id.get(), target.id.get(), i16::from(target.master_id), target.class.get(), target.storage.get(), over.get(), held.get());
          }
-         // a farm's food sold at once (attribute 96): the load goes to the player as food (slot
-         // 0xf8 with 1), the unit holds none, and the gathering goes on
-@@ -160,6 +187,7 @@ impl GatherAction {
-         {
-             let sold = mem_take(&mut unit.life.amount);
-             c.give_load(c.w.model.slots.attribute.food, sold)?;
-+            crate::gain_trace::dropped(c.player.index(), unit.id.get(), i16::from(c.w.model.slots.attribute.food), sold.get(), false);
+-        // a farm's food sold at once (attribute 96): the load goes to the player as food (slot
+-        // 0xf8 with 1), the unit holds none, and the gathering goes on
+-        if Amount::ZERO < r.food_sold
+-            && roles.of_class(target.class).contains(ClassRoles::FARM)
+-            // The food kind a farm holds (`+0x308` 16): the food sold at once.
+-            && roles.of_some_attribute(unit.life.attribute_kind).contains(AttributeRoles::FARM_FOOD)
+-        {
+-            let sold = mem_take(&mut unit.life.amount);
+-            c.give_load(c.w.model.slots.attribute.food, sold)?;
++        // 188329 0xb8191c..0xb819fc (findings 181): a task whose `+0x15` has bit 0 (the
++        // Khmer farmers') gives the whole load at once, the task's `resource_out` (`+0x24`) or,
++        // below 0, the unit's resource (`+0x160`): the player's slot 0xf8 with 1 and 1 (its
++        // statistics, slot 0xb8, not held), the unit holds none (slot 0x110 with 0), and the
++        // gathering goes on (no full-load or empty-target drop: 0xb81a86). 158041's attribute
++        // 96 (a farm's food sold at once) is no longer read
++        if r.deposits_at_once {
++            let kind = r.resource_out.or(unit.life.attribute_kind).ok_or(
++                GenieError::unsupported("a load given at once without a resource kind"),
++            )?;
++            let given = mem_take(&mut unit.life.amount);
++            c.give_load(kind, given)?;
++            crate::gain_trace::dropped(c.player.index(), unit.id.get(), i16::from(kind), given.get(), false);
++            if target.amount <= Amount::ZERO
++                && !roles.of_class(target.class).contains(ClassRoles::FARM)
++                && !roles
++                    .of_master(target.master_id)
++                    .contains(MasterRoles::REGATHERED)
++            {
++                return Err(GenieError::unsupported(
++                    "an emptied target of a task that gives its load at once (0xb69210)",
++                ));
++            }
              return Ok(Next::Stay);
          }
          let empty = target.amount <= Amount::ZERO
@@ -10383,7 +10519,7 @@ index 2294f68c..8843f690 100644
      #[must_use]
      pub const fn pending(self) -> Self {
 diff --git a/crates/engine/genie-core/src/players/world_player/income.rs b/crates/engine/genie-core/src/players/world_player/income.rs
-index e920970d..e2a0a10a 100644
+index e920970d..c1d20089 100644
 --- a/crates/engine/genie-core/src/players/world_player/income.rs
 +++ b/crates/engine/genie-core/src/players/world_player/income.rs
 @@ -6,6 +6,7 @@ use crate::map::Tile;
@@ -10394,7 +10530,44 @@ index e920970d..e2a0a10a 100644
  use crate::objects::masters::MasterKind;
  use crate::players::AllyTest;
  use crate::players::Amount;
-@@ -97,6 +98,54 @@ impl World {
+@@ -61,7 +62,19 @@ impl World {
+     /// 0); food grows by attribute 254 over 60 times (`time` times logf(sum / 200 + 1))
+     /// ([`crate::math::fmath::log`]), with its statistic and its sharing ([`World::add_resource`]),
+     /// also when that is 0. `time` is the update time before the loop's step.
++    ///
++    /// 188329 (`0x170f99b`..`0x170fa3b`, findings 180): only when attribute 254 is not 0
++    /// (`UCOMISS`, `JP`/`JE`: a NaN goes on); the sum is the buildings' `+0x8d8`, and the food is
++    /// `logf(sum / 200 + 1) * time * (rate / 60)` in that order.
+     pub fn mill_food(&mut self, p: PlayerId, time: Seconds) -> Result<(), GenieError> {
++        let rate = get(
++            &self.players.player(p)?.attributes,
++            self.model.slots.attribute.mill_food,
++        )
++        .get();
++        if rate == 0.0 {
++            return Ok(());
++        }
+         let mut sum = 0.0;
+         for &id in self
+             .players
+@@ -81,22 +94,64 @@ impl World {
+             }
+         }
+         let grows = log(sum / self.model.tuning.world_player.livestock_scale + SECOND);
+-        let rate = get(
+-            &self.players.player(p)?.attributes,
+-            self.model.slots.attribute.mill_food,
+-        )
+-        .get()
+-            / MINUTE;
+         self.add_resource(
+             p,
+             self.model.slots.attribute.food,
+-            Amount::new(rate * (time * grows)),
++            Amount::new((rate / MINUTE) * (time * grows)),
+             ResourceStat::Gathered,
+             ResourceShare::Shared,
+         )?;
          Ok(())
      }
  
