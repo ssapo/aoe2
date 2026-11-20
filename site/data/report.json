@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-20T02:50:01.490977+00:00",
-  "last_checked_at": "2026-11-20T02:38:03.363123+00:00",
+  "updated_at": "2026-11-20T03:20:54.289109+00:00",
+  "last_checked_at": "2026-11-20T03:06:02.702725+00:00",
   "sync_error": null,
   "profile": {
     "id": 26260702,
@@ -601845,7 +601845,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 32,
+        "analysis_revision": 33,
         "duration_game_seconds": 1808.14,
         "civilization": "Franks",
         "random_civ": false,
@@ -645129,6 +645129,10 @@
                 "last_seconds": 560.0
               }
             ]
+          },
+          "engine_version": {
+            "research_commit": "9d49053",
+            "patch_sha256": "e11c9f70c837"
           }
         },
         "game_build": 188329,
@@ -645598,7 +645602,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 32,
+        "analysis_revision": 33,
         "duration_game_seconds": 1978.96,
         "civilization": "Franks",
         "random_civ": false,
@@ -666325,7 +666329,11 @@
               "seconds": 717.53,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 1,
+                "Villager": 1
+              }
             },
             {
               "x": 60.521,
@@ -666333,7 +666341,11 @@
               "seconds": 717.94,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 1,
+                "Villager": 1
+              }
             },
             {
               "x": 54.729,
@@ -666342,7 +666354,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 85
+              "group": 85,
+              "units": {
+                "Scout Cavalry": 1
+              }
             },
             {
               "x": 56.333,
@@ -666350,7 +666365,10 @@
               "seconds": 719.37,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 1
+              }
             },
             {
               "x": 57.812,
@@ -666359,7 +666377,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 4,
-              "group": 84
+              "group": 84,
+              "units": {
+                "Scout Cavalry": 4
+              }
             },
             {
               "x": 52.823,
@@ -676230,7 +676251,7 @@
               "selected_count": null
             }
           ],
-          "command_units_until": 717.4
+          "command_units_until": 723.9
         },
         "metrics": {
           "age_commands": {
@@ -684572,6 +684593,10 @@
                 "last_seconds": 720.0
               }
             ]
+          },
+          "engine_version": {
+            "research_commit": "9d49053",
+            "patch_sha256": "e11c9f70c837"
           }
         },
         "game_build": 188329,
@@ -685069,7 +685094,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 32,
+        "analysis_revision": 33,
         "duration_game_seconds": 1858.0,
         "civilization": "Franks",
         "random_civ": false,
@@ -712685,7 +712710,11 @@
               "seconds": 815.03,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 28.376,
@@ -712694,7 +712723,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 4,
-              "group": 103
+              "group": 103,
+              "units": {
+                "Villager": 4
+              }
             },
             {
               "x": 28.712,
@@ -712703,7 +712735,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 4,
-              "group": 103
+              "group": 103,
+              "units": {
+                "Villager": 4
+              }
             },
             {
               "x": 28.301,
@@ -712712,7 +712747,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 4,
-              "group": 103
+              "group": 103,
+              "units": {
+                "Villager": 4
+              }
             },
             {
               "x": 28.301,
@@ -712721,7 +712759,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 4,
-              "group": 103
+              "group": 103,
+              "units": {
+                "Villager": 4
+              }
             },
             {
               "x": 38.0,
@@ -712730,7 +712771,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 6,
-              "group": 104
+              "group": 104,
+              "units": {
+                "Villager": 6
+              }
             },
             {
               "x": 38.0,
@@ -712739,7 +712783,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 6,
-              "group": 104
+              "group": 104,
+              "units": {
+                "Villager": 6
+              }
             },
             {
               "x": 79.5,
@@ -712748,7 +712795,10 @@
               "side": "mine",
               "kind": "ORDER",
               "selected_count": 1,
-              "group": 105
+              "group": 105,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 29.343,
@@ -712757,7 +712807,10 @@
               "side": "mine",
               "kind": "ORDER",
               "selected_count": 4,
-              "group": 93
+              "group": 93,
+              "units": {
+                "Scout Cavalry": 4
+              }
             },
             {
               "x": 29.364,
@@ -712766,7 +712819,10 @@
               "side": "mine",
               "kind": "ORDER",
               "selected_count": 4,
-              "group": 93
+              "group": 93,
+              "units": {
+                "Scout Cavalry": 4
+              }
             },
             {
               "x": 25.375,
@@ -712775,7 +712831,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 4,
-              "group": 93
+              "group": 93,
+              "units": {
+                "Scout Cavalry": 4
+              }
             },
             {
               "x": 29.323,
@@ -712783,7 +712842,10 @@
               "seconds": 830.47,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 4
+              }
             },
             {
               "x": 29.933,
@@ -712791,7 +712853,10 @@
               "seconds": 831.69,
               "side": "mine",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 4
+              }
             },
             {
               "x": 29.933,
@@ -712799,7 +712864,10 @@
               "seconds": 832.7,
               "side": "mine",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 4
+              }
             },
             {
               "x": 27.74,
@@ -712808,7 +712876,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 2,
-              "group": 106
+              "group": 106,
+              "units": {
+                "Scout Cavalry": 2
+              }
             },
             {
               "x": 27.156,
@@ -712817,7 +712888,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 2,
-              "group": 106
+              "group": 106,
+              "units": {
+                "Scout Cavalry": 2
+              }
             },
             {
               "x": 26.771,
@@ -712826,7 +712900,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 107
+              "group": 107,
+              "units": {
+                "Scout Cavalry": 1
+              }
             },
             {
               "x": 26.573,
@@ -712834,7 +712911,10 @@
               "seconds": 835.15,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 1
+              }
             },
             {
               "x": 26.281,
@@ -712842,7 +712922,10 @@
               "seconds": 835.55,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 1
+              }
             },
             {
               "x": 29.625,
@@ -712851,7 +712934,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 3,
-              "group": 92
+              "group": 92,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 25.865,
@@ -712859,7 +712945,10 @@
               "seconds": 837.59,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 24.99,
@@ -712867,7 +712956,10 @@
               "seconds": 838.01,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 24.802,
@@ -712875,7 +712967,10 @@
               "seconds": 838.21,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 24.375,
@@ -712883,7 +712978,10 @@
               "seconds": 838.4,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 23.865,
@@ -712891,7 +712989,10 @@
               "seconds": 839.44,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 23.844,
@@ -712899,7 +713000,10 @@
               "seconds": 839.64,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 22.958,
@@ -712907,7 +713011,10 @@
               "seconds": 840.3,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 22.646,
@@ -712915,7 +713022,10 @@
               "seconds": 840.72,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 28.294,
@@ -712923,7 +713033,10 @@
               "seconds": 846.18,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 30.938,
@@ -712931,7 +713044,10 @@
               "seconds": 846.58,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 28.281,
@@ -712939,7 +713055,10 @@
               "seconds": 847.61,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 29.281,
@@ -712947,7 +713066,10 @@
               "seconds": 848.01,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 31.354,
@@ -712955,7 +713077,10 @@
               "seconds": 848.21,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 32.625,
@@ -712963,7 +713088,10 @@
               "seconds": 848.62,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 33.562,
@@ -712971,7 +713099,10 @@
               "seconds": 848.82,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 33.688,
@@ -712979,7 +713110,10 @@
               "seconds": 849.24,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 33.698,
@@ -712987,7 +713121,10 @@
               "seconds": 850.04,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 35.927,
@@ -712996,7 +713133,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 7,
-              "group": 108
+              "group": 108,
+              "units": {
+                "Villager": 7
+              }
             },
             {
               "x": 32.948,
@@ -713004,7 +713144,10 @@
               "seconds": 850.25,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 30.594,
@@ -713012,7 +713155,10 @@
               "seconds": 850.65,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 7
+              }
             },
             {
               "x": 29.406,
@@ -713020,7 +713166,10 @@
               "seconds": 851.06,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 7
+              }
             },
             {
               "x": 28.5,
@@ -713028,7 +713177,10 @@
               "seconds": 851.26,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 7
+              }
             },
             {
               "x": 35.542,
@@ -713036,7 +713188,10 @@
               "seconds": 851.46,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 28.5,
@@ -713044,7 +713199,10 @@
               "seconds": 851.67,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 7
+              }
             },
             {
               "x": 28.5,
@@ -713052,7 +713210,10 @@
               "seconds": 851.88,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 7
+              }
             },
             {
               "x": 35.521,
@@ -713060,7 +713221,10 @@
               "seconds": 851.88,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 35.521,
@@ -713068,7 +713232,10 @@
               "seconds": 852.07,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 30.0,
@@ -713077,7 +713244,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 1,
-              "group": 21
+              "group": 21,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 31.707,
@@ -713085,7 +713255,10 @@
               "seconds": 853.08,
               "side": "mine",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 30.0,
@@ -713094,7 +713267,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 1,
-              "group": 21
+              "group": 21,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 30.0,
@@ -713102,7 +713278,10 @@
               "seconds": 853.5,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 33.0,
@@ -713110,7 +713289,10 @@
               "seconds": 855.53,
               "side": "mine",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 31.527,
@@ -713118,7 +713300,10 @@
               "seconds": 855.93,
               "side": "mine",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 28.0,
@@ -713127,7 +713312,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 4,
-              "group": 109
+              "group": 109,
+              "units": {
+                "Villager": 4
+              }
             },
             {
               "x": 32.0,
@@ -713136,7 +713324,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 7,
-              "group": 108
+              "group": 108,
+              "units": {
+                "Villager": 7
+              }
             },
             {
               "x": 32.0,
@@ -713145,7 +713336,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 7,
-              "group": 108
+              "group": 108,
+              "units": {
+                "Villager": 7
+              }
             },
             {
               "x": 31.25,
@@ -713154,7 +713348,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 7,
-              "group": 108
+              "group": 108,
+              "units": {
+                "Villager": 7
+              }
             },
             {
               "x": 31.115,
@@ -713163,7 +713360,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 5,
-              "group": 110
+              "group": 110,
+              "units": {
+                "Villager": 5
+              }
             },
             {
               "x": 31.236,
@@ -713172,7 +713372,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 5,
-              "group": 110
+              "group": 110,
+              "units": {
+                "Villager": 5
+              }
             },
             {
               "x": 34.219,
@@ -713181,7 +713384,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 3,
-              "group": 92
+              "group": 92,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 30.449,
@@ -713190,7 +713396,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 5,
-              "group": 110
+              "group": 110,
+              "units": {
+                "Villager": 5
+              }
             },
             {
               "x": 35.25,
@@ -713199,7 +713408,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 3,
-              "group": 92
+              "group": 92,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 30.0,
@@ -713208,7 +713420,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 5,
-              "group": 110
+              "group": 110,
+              "units": {
+                "Villager": 5
+              }
             },
             {
               "x": 38.708,
@@ -713216,7 +713431,10 @@
               "seconds": 861.21,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 38.729,
@@ -713224,7 +713442,10 @@
               "seconds": 861.62,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 30.0,
@@ -713233,7 +713454,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 8,
-              "group": 111
+              "group": 111,
+              "units": {
+                "Villager": 8
+              }
             },
             {
               "x": 47.5,
@@ -713241,7 +713465,10 @@
               "seconds": 862.24,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 30.0,
@@ -713249,7 +713476,10 @@
               "seconds": 862.64,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 8
+              }
             },
             {
               "x": 46.177,
@@ -713257,7 +713487,10 @@
               "seconds": 862.64,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 32.0,
@@ -713266,7 +713499,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 8,
-              "group": 111
+              "group": 111,
+              "units": {
+                "Villager": 8
+              }
             },
             {
               "x": 46.146,
@@ -713274,7 +713510,10 @@
               "seconds": 863.04,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 32.0,
@@ -713283,7 +713522,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 8,
-              "group": 111
+              "group": 111,
+              "units": {
+                "Villager": 8
+              }
             },
             {
               "x": 51.646,
@@ -713291,7 +713533,10 @@
               "seconds": 863.65,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 32.0,
@@ -713300,7 +713545,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 8,
-              "group": 111
+              "group": 111,
+              "units": {
+                "Villager": 8
+              }
             },
             {
               "x": 35.969,
@@ -713309,7 +713557,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 7,
-              "group": 108
+              "group": 108,
+              "units": {
+                "Villager": 7
+              }
             },
             {
               "x": 35.969,
@@ -713318,7 +713569,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 7,
-              "group": 108
+              "group": 108,
+              "units": {
+                "Villager": 7
+              }
             },
             {
               "x": 35.625,
@@ -713326,7 +713580,10 @@
               "seconds": 866.7,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 7
+              }
             },
             {
               "x": 85.823,
@@ -713335,7 +713592,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 112
+              "group": 112,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 81.927,
@@ -713343,7 +713603,10 @@
               "seconds": 866.9,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 33.0,
@@ -713352,7 +713615,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 8,
-              "group": 111
+              "group": 111,
+              "units": {
+                "Villager": 8
+              }
             },
             {
               "x": 33.0,
@@ -713361,7 +713627,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 8,
-              "group": 111
+              "group": 111,
+              "units": {
+                "Villager": 8
+              }
             },
             {
               "x": 53.583,
@@ -713370,7 +713639,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 3,
-              "group": 92
+              "group": 92,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 51.091,
@@ -713378,7 +713650,10 @@
               "seconds": 872.39,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 47.0,
@@ -713386,7 +713661,10 @@
               "seconds": 872.58,
               "side": "mine",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 103.495,
@@ -713395,7 +713673,11 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 5,
-              "group": 102
+              "group": 102,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 45.706,
@@ -713403,7 +713685,10 @@
               "seconds": 873.0,
               "side": "mine",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 45.706,
@@ -713411,7 +713696,10 @@
               "seconds": 873.2,
               "side": "mine",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 97.724,
@@ -713419,7 +713707,11 @@
               "seconds": 873.4,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 45.706,
@@ -713427,7 +713719,10 @@
               "seconds": 873.61,
               "side": "mine",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 96.818,
@@ -713435,7 +713730,11 @@
               "seconds": 873.81,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 96.922,
@@ -713443,7 +713742,11 @@
               "seconds": 874.01,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 96.922,
@@ -713451,7 +713754,11 @@
               "seconds": 874.21,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 54.885,
@@ -713459,7 +713766,10 @@
               "seconds": 874.42,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 97.568,
@@ -713467,7 +713777,11 @@
               "seconds": 874.62,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 58.695,
@@ -713475,7 +713789,10 @@
               "seconds": 875.03,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 60.083,
@@ -713483,7 +713800,10 @@
               "seconds": 875.83,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 53.521,
@@ -713491,7 +713811,10 @@
               "seconds": 876.04,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 50.927,
@@ -713499,7 +713822,10 @@
               "seconds": 877.06,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 35.401,
@@ -713508,7 +713834,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 7,
-              "group": 108
+              "group": 108,
+              "units": {
+                "Villager": 7
+              }
             },
             {
               "x": 35.5,
@@ -713516,7 +713845,10 @@
               "seconds": 879.7,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 7
+              }
             },
             {
               "x": 93.901,
@@ -713525,7 +713857,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 113
+              "group": 113,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 35.5,
@@ -713533,7 +713868,10 @@
               "seconds": 879.9,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 7
+              }
             },
             {
               "x": 37.217,
@@ -713542,7 +713880,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 7,
-              "group": 108
+              "group": 108,
+              "units": {
+                "Villager": 7
+              }
             },
             {
               "x": 88.469,
@@ -713550,7 +713891,10 @@
               "seconds": 880.71,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 37.217,
@@ -713559,7 +713903,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 7,
-              "group": 108
+              "group": 108,
+              "units": {
+                "Villager": 7
+              }
             },
             {
               "x": 71.938,
@@ -713567,7 +713914,10 @@
               "seconds": 882.14,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 28.5,
@@ -713576,7 +713926,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 7,
-              "group": 108
+              "group": 108,
+              "units": {
+                "Villager": 7
+              }
             },
             {
               "x": 28.5,
@@ -713585,7 +713938,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 7,
-              "group": 108
+              "group": 108,
+              "units": {
+                "Villager": 7
+              }
             },
             {
               "x": 73.917,
@@ -713593,7 +713949,10 @@
               "seconds": 882.75,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 28.5,
@@ -713601,7 +713960,10 @@
               "seconds": 882.95,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 7
+              }
             },
             {
               "x": 75.5,
@@ -713609,7 +713971,10 @@
               "seconds": 883.96,
               "side": "mine",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 85.599,
@@ -713618,7 +713983,11 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 5,
-              "group": 102
+              "group": 102,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 86.661,
@@ -713626,7 +713995,11 @@
               "seconds": 885.79,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 87.797,
@@ -713634,7 +714007,11 @@
               "seconds": 886.0,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 88.318,
@@ -713642,7 +714019,11 @@
               "seconds": 886.2,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 88.557,
@@ -713650,7 +714031,11 @@
               "seconds": 886.61,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 55.615,
@@ -713659,7 +714044,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 3,
-              "group": 92
+              "group": 92,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 54.779,
@@ -713667,7 +714055,10 @@
               "seconds": 887.42,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 105.641,
@@ -713676,7 +714067,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 2,
-              "group": 114
+              "group": 114,
+              "units": {
+                "Archer": 2
+              }
             },
             {
               "x": 101.51,
@@ -713684,7 +714078,10 @@
               "seconds": 888.43,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 2
+              }
             },
             {
               "x": 92.828,
@@ -713693,7 +714090,11 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 5,
-              "group": 102
+              "group": 102,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 90.443,
@@ -713701,7 +714102,11 @@
               "seconds": 889.45,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 81.531,
@@ -713710,7 +714115,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 5,
-              "group": 115
+              "group": 115,
+              "units": {
+                "Villager": 5
+              }
             },
             {
               "x": 80.938,
@@ -713719,7 +714127,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 5,
-              "group": 115
+              "group": 115,
+              "units": {
+                "Villager": 5
+              }
             },
             {
               "x": 73.135,
@@ -713727,7 +714138,10 @@
               "seconds": 892.9,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 5
+              }
             },
             {
               "x": 29.5,
@@ -713736,7 +714150,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 8,
-              "group": 111
+              "group": 111,
+              "units": {
+                "Villager": 8
+              }
             },
             {
               "x": 71.5,
@@ -713744,7 +714161,10 @@
               "seconds": 893.71,
               "side": "mine",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 5
+              }
             },
             {
               "x": 29.5,
@@ -713753,7 +714173,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 8,
-              "group": 111
+              "group": 111,
+              "units": {
+                "Villager": 8
+              }
             },
             {
               "x": 29.5,
@@ -713762,7 +714185,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 8,
-              "group": 111
+              "group": 111,
+              "units": {
+                "Villager": 8
+              }
             },
             {
               "x": 71.5,
@@ -713770,7 +714196,10 @@
               "seconds": 894.12,
               "side": "mine",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 5
+              }
             },
             {
               "x": 71.5,
@@ -713778,7 +714207,10 @@
               "seconds": 894.32,
               "side": "mine",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 5
+              }
             },
             {
               "x": 29.5,
@@ -713786,7 +714218,10 @@
               "seconds": 894.74,
               "side": "theirs",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 8
+              }
             },
             {
               "x": 71.5,
@@ -713794,7 +714229,10 @@
               "seconds": 894.74,
               "side": "mine",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 5
+              }
             },
             {
               "x": 71.021,
@@ -713802,7 +714240,10 @@
               "seconds": 894.93,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 5
+              }
             },
             {
               "x": 73.812,
@@ -713811,7 +714252,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 3,
-              "group": 92
+              "group": 92,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 64.375,
@@ -713819,7 +714263,10 @@
               "seconds": 901.24,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 3
+              }
             },
             {
               "x": 92.635,
@@ -713828,7 +714275,11 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 5,
-              "group": 102
+              "group": 102,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 94.292,
@@ -713836,7 +714287,11 @@
               "seconds": 901.83,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 68.896,
@@ -713845,7 +714300,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 4,
-              "group": 116
+              "group": 116,
+              "units": {
+                "Scout Cavalry": 4
+              }
             },
             {
               "x": 94.104,
@@ -713853,7 +714311,11 @@
               "seconds": 902.04,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 93.906,
@@ -713861,7 +714323,11 @@
               "seconds": 902.25,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 90.021,
@@ -713869,7 +714335,11 @@
               "seconds": 902.65,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 89.469,
@@ -713877,7 +714347,11 @@
               "seconds": 902.86,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 88.521,
@@ -713885,7 +714359,11 @@
               "seconds": 903.06,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 88.521,
@@ -713893,7 +714371,11 @@
               "seconds": 903.26,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 88.646,
@@ -713901,7 +714383,11 @@
               "seconds": 903.67,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 79.292,
@@ -713909,7 +714395,10 @@
               "seconds": 903.67,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 4
+              }
             },
             {
               "x": 75.698,
@@ -713917,7 +714406,10 @@
               "seconds": 904.07,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 4
+              }
             },
             {
               "x": 75.75,
@@ -713925,7 +714417,10 @@
               "seconds": 904.28,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 4
+              }
             },
             {
               "x": 92.458,
@@ -713934,7 +714429,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 2,
-              "group": 114
+              "group": 114,
+              "units": {
+                "Archer": 2
+              }
             },
             {
               "x": 91.885,
@@ -713942,7 +714440,10 @@
               "seconds": 904.89,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 2
+              }
             },
             {
               "x": 91.938,
@@ -713950,7 +714451,10 @@
               "seconds": 905.08,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 2
+              }
             },
             {
               "x": 80.271,
@@ -713958,7 +714462,10 @@
               "seconds": 905.29,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 4
+              }
             },
             {
               "x": 79.49,
@@ -713966,7 +714473,10 @@
               "seconds": 905.5,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 4
+              }
             },
             {
               "x": 85.938,
@@ -713975,7 +714485,11 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 5,
-              "group": 102
+              "group": 102,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 79.583,
@@ -713983,7 +714497,10 @@
               "seconds": 905.9,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 4
+              }
             },
             {
               "x": 85.188,
@@ -713991,7 +714508,11 @@
               "seconds": 906.11,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 77.583,
@@ -713999,7 +714520,10 @@
               "seconds": 906.11,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 4
+              }
             },
             {
               "x": 84.969,
@@ -714007,7 +714531,11 @@
               "seconds": 906.31,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 84.958,
@@ -714015,7 +714543,11 @@
               "seconds": 906.51,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 63.052,
@@ -714023,7 +714555,10 @@
               "seconds": 906.51,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 4
+              }
             },
             {
               "x": 84.979,
@@ -714031,7 +714566,11 @@
               "seconds": 906.92,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 85.073,
@@ -714039,7 +714578,11 @@
               "seconds": 907.12,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 72.25,
@@ -714047,7 +714590,10 @@
               "seconds": 907.12,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 4
+              }
             },
             {
               "x": 85.198,
@@ -714056,7 +714602,11 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 5,
-              "group": 102
+              "group": 102,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 84.542,
@@ -714064,7 +714614,11 @@
               "seconds": 909.36,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 83.958,
@@ -714072,7 +714626,11 @@
               "seconds": 909.56,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 83.156,
@@ -714080,7 +714638,11 @@
               "seconds": 909.76,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 83.156,
@@ -714088,7 +714650,11 @@
               "seconds": 910.17,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 83.156,
@@ -714096,7 +714662,11 @@
               "seconds": 910.38,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 82.656,
@@ -714104,7 +714674,11 @@
               "seconds": 910.57,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 82.646,
@@ -714112,7 +714686,11 @@
               "seconds": 910.99,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 82.688,
@@ -714120,7 +714698,11 @@
               "seconds": 911.18,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 82.771,
@@ -714128,7 +714710,11 @@
               "seconds": 911.58,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 82.792,
@@ -714136,7 +714722,11 @@
               "seconds": 911.79,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 82.885,
@@ -714144,7 +714734,11 @@
               "seconds": 912.2,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 82.885,
@@ -714152,7 +714746,11 @@
               "seconds": 912.4,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 82.885,
@@ -714160,7 +714758,11 @@
               "seconds": 912.61,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 82.885,
@@ -714168,7 +714770,11 @@
               "seconds": 913.01,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 82.979,
@@ -714176,7 +714782,11 @@
               "seconds": 913.21,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 90.219,
@@ -714185,7 +714795,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 2,
-              "group": 114
+              "group": 114,
+              "units": {
+                "Archer": 2
+              }
             },
             {
               "x": 89.052,
@@ -714193,7 +714806,10 @@
               "seconds": 914.43,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 2
+              }
             },
             {
               "x": 83.551,
@@ -714201,7 +714817,10 @@
               "seconds": 914.64,
               "side": "mine",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 4
+              }
             },
             {
               "x": 77.125,
@@ -714210,7 +714829,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 4,
-              "group": 116
+              "group": 116,
+              "units": {
+                "Scout Cavalry": 4
+              }
             },
             {
               "x": 76.844,
@@ -714219,7 +714841,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 4,
-              "group": 116
+              "group": 116,
+              "units": {
+                "Scout Cavalry": 4
+              }
             },
             {
               "x": 77.062,
@@ -714228,7 +714853,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 4,
-              "group": 116
+              "group": 116,
+              "units": {
+                "Scout Cavalry": 4
+              }
             },
             {
               "x": 81.239,
@@ -714237,7 +714865,11 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 5,
-              "group": 102
+              "group": 102,
+              "units": {
+                "Archer": 4,
+                "Spearman": 1
+              }
             },
             {
               "x": 76.188,
@@ -714246,7 +714878,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 8,
-              "group": 117
+              "group": 117,
+              "units": {
+                "Villager": 8
+              }
             },
             {
               "x": 73.5,
@@ -714255,7 +714890,10 @@
               "side": "mine",
               "kind": "ORDER",
               "selected_count": 8,
-              "group": 117
+              "group": 117,
+              "units": {
+                "Villager": 8
+              }
             },
             {
               "x": 73.5,
@@ -714263,7 +714901,10 @@
               "seconds": 918.5,
               "side": "mine",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 8
+              }
             },
             {
               "x": 73.5,
@@ -714271,7 +714912,10 @@
               "seconds": 918.7,
               "side": "mine",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 8
+              }
             },
             {
               "x": 73.5,
@@ -714279,7 +714923,10 @@
               "seconds": 919.11,
               "side": "mine",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 8
+              }
             },
             {
               "x": 73.5,
@@ -714287,7 +714934,10 @@
               "seconds": 919.71,
               "side": "mine",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 8
+              }
             },
             {
               "x": 81.802,
@@ -728770,7 +729420,7 @@
               "selected_count": null
             }
           ],
-          "command_units_until": 814.9
+          "command_units_until": 921.2
         },
         "metrics": {
           "age_commands": {
@@ -734942,19 +735592,129 @@
               1630,
               530,
               0
+            ],
+            [
+              830.0,
+              2416,
+              1560,
+              0,
+              0,
+              1783,
+              1670,
+              530,
+              0
+            ],
+            [
+              840.0,
+              2446,
+              1600,
+              0,
+              0,
+              1783,
+              1690,
+              560,
+              0
+            ],
+            [
+              850.0,
+              2495,
+              1610,
+              0,
+              0,
+              1783,
+              1720,
+              580,
+              0
+            ],
+            [
+              860.0,
+              2555,
+              1690,
+              0,
+              0,
+              1783,
+              1745,
+              590,
+              0
+            ],
+            [
+              870.0,
+              2575,
+              1730,
+              0,
+              0,
+              1783,
+              1745,
+              630,
+              0
+            ],
+            [
+              880.0,
+              2645,
+              1760,
+              0,
+              0,
+              1783,
+              1745,
+              640,
+              0
+            ],
+            [
+              890.0,
+              2685,
+              1830,
+              0,
+              0,
+              1783,
+              1745,
+              650,
+              0
+            ],
+            [
+              900.0,
+              2715,
+              1840,
+              0,
+              0,
+              1783,
+              1745,
+              700,
+              0
+            ],
+            [
+              910.0,
+              2795,
+              1870,
+              0,
+              0,
+              1783,
+              1745,
+              700,
+              0
+            ],
+            [
+              920.0,
+              2815,
+              1900,
+              0,
+              0,
+              1783,
+              1765,
+              720,
+              0
             ]
           ],
-          "verified_until_seconds": 827.9,
+          "verified_until_seconds": 927.7,
           "own_total": [
-            2406,
-            1519,
+            2865,
+            1900,
             0,
             0
           ],
           "opponent_total": [
-            1784,
-            1670,
-            530,
+            1803,
+            1806,
+            760,
             0
           ],
           "by_source": {
@@ -736701,11 +737461,221 @@
                 0,
                 430,
                 0
+              ],
+              [
+                830.0,
+                899,
+                524,
+                0,
+                653,
+                190,
+                0,
+                0,
+                0,
+                0,
+                862,
+                553,
+                234,
+                20,
+                14,
+                0,
+                0,
+                430,
+                0
+              ],
+              [
+                840.0,
+                899,
+                524,
+                0,
+                653,
+                220,
+                0,
+                0,
+                0,
+                0,
+                862,
+                553,
+                234,
+                20,
+                14,
+                0,
+                0,
+                460,
+                0
+              ],
+              [
+                850.0,
+                899,
+                524,
+                0,
+                666,
+                256,
+                0,
+                0,
+                0,
+                0,
+                862,
+                553,
+                234,
+                20,
+                14,
+                0,
+                0,
+                480,
+                0
+              ],
+              [
+                860.0,
+                899,
+                524,
+                0,
+                676,
+                306,
+                0,
+                0,
+                0,
+                0,
+                862,
+                553,
+                234,
+                20,
+                14,
+                0,
+                0,
+                490,
+                0
+              ],
+              [
+                870.0,
+                899,
+                524,
+                0,
+                676,
+                326,
+                0,
+                0,
+                0,
+                0,
+                862,
+                553,
+                234,
+                20,
+                14,
+                0,
+                0,
+                530,
+                0
+              ],
+              [
+                880.0,
+                899,
+                524,
+                0,
+                696,
+                376,
+                0,
+                0,
+                0,
+                0,
+                862,
+                553,
+                234,
+                20,
+                14,
+                0,
+                0,
+                540,
+                0
+              ],
+              [
+                890.0,
+                899,
+                524,
+                0,
+                696,
+                416,
+                0,
+                0,
+                0,
+                0,
+                862,
+                553,
+                234,
+                20,
+                14,
+                0,
+                0,
+                550,
+                0
+              ],
+              [
+                900.0,
+                899,
+                524,
+                0,
+                706,
+                436,
+                0,
+                0,
+                0,
+                0,
+                862,
+                553,
+                234,
+                20,
+                14,
+                0,
+                0,
+                600,
+                0
+              ],
+              [
+                910.0,
+                899,
+                524,
+                0,
+                726,
+                496,
+                0,
+                0,
+                0,
+                0,
+                862,
+                553,
+                234,
+                20,
+                14,
+                0,
+                0,
+                600,
+                0
+              ],
+              [
+                920.0,
+                899,
+                524,
+                0,
+                726,
+                516,
+                0,
+                0,
+                0,
+                0,
+                862,
+                553,
+                234,
+                20,
+                14,
+                0,
+                0,
+                620,
+                0
               ]
             ]
           },
           "animals": {
-            "until_seconds": 820.0,
+            "until_seconds": 920.0,
             "own": [
               {
                 "id": 4281,
@@ -736861,11 +737831,16 @@
               {
                 "id": 4286,
                 "kind": "sheep",
-                "eaten": 80.0,
+                "eaten": 108.1,
                 "first_seconds": 770.0,
-                "last_seconds": 810.0
+                "last_seconds": 830.0,
+                "full": 150.0
               }
             ]
+          },
+          "engine_version": {
+            "research_commit": "9d49053",
+            "patch_sha256": "e11c9f70c837"
           }
         },
         "game_build": 188329,
@@ -737320,7 +738295,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 32,
+        "analysis_revision": 33,
         "duration_game_seconds": 2801.2,
         "civilization": "Vikings",
         "random_civ": false,
@@ -794328,8 +795303,8 @@
             ]
           },
           "engine_version": {
-            "research_commit": "9f76e74",
-            "patch_sha256": "26c6a1700ef1"
+            "research_commit": "9d49053",
+            "patch_sha256": "e11c9f70c837"
           }
         },
         "game_build": 188329,
@@ -794869,7 +795844,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 32,
+        "analysis_revision": 33,
         "duration_game_seconds": 2497.19,
         "civilization": "Britons",
         "random_civ": false,
@@ -845716,8 +846691,8 @@
             ]
           },
           "engine_version": {
-            "research_commit": "9f76e74",
-            "patch_sha256": "26c6a1700ef1"
+            "research_commit": "9d49053",
+            "patch_sha256": "e11c9f70c837"
           }
         },
         "game_build": 188329,
@@ -846265,7 +847240,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 32,
+        "analysis_revision": 33,
         "duration_game_seconds": 2714.76,
         "civilization": "Franks",
         "random_civ": false,
@@ -915098,8 +916073,8 @@
             ]
           },
           "engine_version": {
-            "research_commit": "9f76e74",
-            "patch_sha256": "26c6a1700ef1"
+            "research_commit": "9d49053",
+            "patch_sha256": "e11c9f70c837"
           }
         },
         "game_build": 188329,
@@ -915637,7 +916612,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 32,
+        "analysis_revision": 33,
         "duration_game_seconds": 2427.93,
         "civilization": "Franks",
         "random_civ": false,
@@ -966414,8 +967389,8 @@
             ]
           },
           "engine_version": {
-            "research_commit": "9f76e74",
-            "patch_sha256": "26c6a1700ef1"
+            "research_commit": "9d49053",
+            "patch_sha256": "e11c9f70c837"
           }
         },
         "game_build": 188329,
@@ -966857,7 +967832,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 32,
+        "analysis_revision": 33,
         "duration_game_seconds": 2191.44,
         "civilization": "Franks",
         "random_civ": false,
