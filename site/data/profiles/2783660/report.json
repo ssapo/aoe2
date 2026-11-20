@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-20T03:31:38.975013+00:00",
-  "last_checked_at": "2026-11-20T03:31:38.829437+00:00",
+  "updated_at": "2026-11-20T03:59:45.960056+00:00",
+  "last_checked_at": "2026-11-20T03:56:21.878364+00:00",
   "sync_error": null,
   "profile": {
     "id": 2783660,
@@ -57099,7 +57099,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 32,
+        "analysis_revision": 33,
         "duration_game_seconds": 2254.51,
         "civilization": "Mapuche",
         "random_civ": true,
@@ -106708,6 +106708,10 @@
                 "full": 100.0
               }
             ]
+          },
+          "engine_version": {
+            "research_commit": "9d49053",
+            "patch_sha256": "e11c9f70c837"
           }
         },
         "game_build": 188329,
@@ -107242,7 +107246,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 32,
+        "analysis_revision": 33,
         "duration_game_seconds": 2574.09,
         "civilization": "Danes",
         "random_civ": false,
@@ -150672,7 +150676,7 @@
               "group": 426
             }
           ],
-          "command_units_until": 658.9
+          "command_units_until": 665.4
         },
         "metrics": {
           "age_commands": {
@@ -161476,18 +161480,29 @@
               956,
               231,
               70
+            ],
+            [
+              660.0,
+              2263,
+              763,
+              150,
+              0,
+              1651,
+              966,
+              231,
+              80
             ]
           ],
-          "verified_until_seconds": 658.9,
+          "verified_until_seconds": 665.4,
           "own_total": [
-            2263,
+            2268,
             763,
             150,
             0
           ],
           "opponent_total": [
-            1651,
-            966,
+            1681,
+            976,
             231,
             80
           ],
@@ -162878,11 +162893,32 @@
                 0,
                 181,
                 0
+              ],
+              [
+                660.0,
+                844,
+                600,
+                360,
+                309,
+                0,
+                0,
+                0,
+                150,
+                0,
+                540,
+                573,
+                354,
+                183,
+                0,
+                0,
+                0,
+                181,
+                0
               ]
             ]
           },
           "animals": {
-            "until_seconds": 650.0,
+            "until_seconds": 660.0,
             "own": [
               {
                 "id": 9508,
@@ -163001,14 +163037,15 @@
                 "kind": "sheep",
                 "eaten": 86.3,
                 "first_seconds": 620.0,
-                "last_seconds": 650.0
+                "last_seconds": 650.0,
+                "full": 100.0
               },
               {
                 "id": 9511,
                 "kind": "sheep",
-                "eaten": 51.1,
+                "eaten": 70.6,
                 "first_seconds": 650.0,
-                "last_seconds": 650.0
+                "last_seconds": 660.0
               }
             ],
             "opponent": [
@@ -163109,6 +163146,10 @@
                 "full": 100.0
               }
             ]
+          },
+          "engine_version": {
+            "research_commit": "9d49053",
+            "patch_sha256": "e11c9f70c837"
           }
         },
         "game_build": 188329,
@@ -163595,7 +163636,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 32,
+        "analysis_revision": 33,
         "duration_game_seconds": 2002.3,
         "civilization": "Danes",
         "random_civ": false,
@@ -216274,6 +216315,10 @@
                 "last_seconds": 670.0
               }
             ]
+          },
+          "engine_version": {
+            "research_commit": "9d49053",
+            "patch_sha256": "e11c9f70c837"
           }
         },
         "game_build": 188329,
