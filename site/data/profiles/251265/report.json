@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-20T16:57:53.100151+00:00",
-  "last_checked_at": "2026-11-20T16:57:51.438382+00:00",
+  "updated_at": "2026-11-20T17:23:41.085356+00:00",
+  "last_checked_at": "2026-11-20T17:21:04.616315+00:00",
   "sync_error": null,
   "profile": {
     "id": 251265,
@@ -9,6 +9,42 @@
     "name": "TAG_MbL_"
   },
   "matches": [
+    {
+      "id": 522464434,
+      "started_at": 1795193137,
+      "finished_at": 1795194960,
+      "map": "goldenpit.rms2",
+      "civilization": "Spanish",
+      "result": "win",
+      "rating_before": 2984,
+      "rating_after": 2992,
+      "match_type_id": 6,
+      "players_count": 2,
+      "players": [
+        {
+          "profile_id": 10748832,
+          "name": "CC",
+          "is_self": false,
+          "civilization": "Hindustanis",
+          "rating_before": 2779
+        },
+        {
+          "profile_id": 251265,
+          "name": "TAG_MbL_",
+          "is_self": true,
+          "civilization": "Spanish",
+          "rating_before": 2984
+        }
+      ],
+      "analysis_status": "pending",
+      "analysis": null,
+      "attempts": 0,
+      "source_url": "https://www.aoe2insights.com/match/522464434/",
+      "civ_choice": {
+        "10748832": true,
+        "251265": true
+      }
+    },
     {
       "id": 522457920,
       "started_at": 1795191080,
@@ -183,7 +219,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 39,
+        "analysis_revision": 41,
         "duration_game_seconds": 4582.34,
         "civilization": "Wei",
         "random_civ": true,
@@ -93745,7 +93781,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 39,
+        "analysis_revision": 41,
         "duration_game_seconds": 2770.59,
         "civilization": "Bohemians",
         "random_civ": true,
@@ -162724,7 +162760,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 39,
+        "analysis_revision": 41,
         "duration_game_seconds": 1139.02,
         "civilization": "Vikings",
         "random_civ": true,
@@ -201009,8 +201045,8 @@
             ]
           },
           "engine_version": {
-            "research_commit": "7377216",
-            "patch_sha256": "9b634f922c95"
+            "research_commit": "4b1f2fc",
+            "patch_sha256": "23b783c7e2d5"
           }
         },
         "game_build": 188329,
