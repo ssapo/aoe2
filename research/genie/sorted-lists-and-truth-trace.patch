@@ -2145,10 +2145,42 @@ index 92c1f195..59410b34 100644
  /// annex to its second (`+0xbc0`, `+0xbc8`) with flags 0x10, the gate and its annexes ignored
  /// (`FUN_1410562e0`), every record and the query grown by `TurnTuning::gate_grow` (`FUN_1410562d0`), any
 diff --git a/crates/engine/genie-core/src/garrison/let_out.rs b/crates/engine/genie-core/src/garrison/let_out.rs
-index e526db7f..d4937d04 100644
+index e526db7f..2cd8b58f 100644
 --- a/crates/engine/genie-core/src/garrison/let_out.rs
 +++ b/crates/engine/genie-core/src/garrison/let_out.rs
-@@ -132,7 +132,10 @@ impl World {
+@@ -22,6 +22,7 @@ use crate::objects::masters::PlayersMasters;
+ use crate::orders::OrderSource;
+ use crate::orders::Work;
+ use crate::orders::set_stance;
++use crate::players::Amount;
+ use crate::players::PlayerId;
+ use crate::production::spawn::FinderUse;
+ use crate::unit_ai::StopOrder;
+@@ -112,19 +113,17 @@ impl World {
+         {
+             return Err(SIEGE_UNLOAD);
+         }
++        // a relic's leave (class 42) lowers its building's relic count (`+0x8d0`), its owner's
++        // attribute 7 and may take back the techs it enabled (0x128e529..0x128e83a): not modelled;
++        // livestock's is ([`World::leave_container`])
+         if self
+             .model
+             .roles
+             .of_class(made.class)
+             .contains(ClassRoles::WHOLE_GARRISON_SHARE)
+-            || self
+-                .model
+-                .roles
+-                .of_class(made.class)
+-                .contains(ClassRoles::LIVESTOCK)
+         {
+             return Err(GenieError::unsupported(
+-                "a class 42 or livestock unit leaving a building (its player's counts)",
++                "a class 42 unit leaving a building (its player's counts)",
+             ));
+         }
+         if !unit.garrison.is_empty() {
+@@ -132,7 +131,10 @@ impl World {
                  "a unit with units inside leaving a building",
              ));
          }
@@ -2160,6 +2192,29 @@ index e526db7f..d4937d04 100644
              return Err(GenieError::unsupported(
                  "an unload whose unit finds no spot (its later rings)",
              ));
+@@ -183,6 +185,22 @@ impl World {
+         if let Some(k) = b.garrison.iter().position(|&g| g == id) {
+             let _ = b.garrison.swap_remove(k);
+         }
++        // 188329 the building's slot 0x1e0 (`0x128e450`, 0x128e841..0x128e88c): livestock
++        // (class 0x3a) whose owner's `+0x88` is set takes its master's first storage amount
++        // (`[master+0xb0]`) off the building's livestock sum (`+0x8d8`, SUBSS), the inverse of
++        // the join (`0x1283ba0`, [`crate::objects::unit::Unit`]'s `join_building`, which reads
++        // the owner's byte the same way)
++        if bm.kind == MasterKind::BUILDING
++            && self
++                .model
++                .roles
++                .of_class(made.class)
++                .contains(ClassRoles::LIVESTOCK)
++        {
++            let storage = made.storage.first().map_or(Amount::ZERO, |s| s.1);
++            let sum = &mut self.parts.building_mut(bid)?.livestock_summation;
++            *sum = Amount::new(sum.get() - storage.get());
++        }
+         // COMISS volley, firepower; JBE keeps it: a NaN firepower stays
+         if b.garrison.is_empty()
+             || self.parts.combat_of(b.id).firepower < bm.creatable_part().volley_fire
 diff --git a/crates/engine/genie-core/src/garrison/tests.rs b/crates/engine/genie-core/src/garrison/tests.rs
 index 88cdc0ef..02d0b5d2 100644
 --- a/crates/engine/genie-core/src/garrison/tests.rs
@@ -2293,7 +2348,7 @@ index d8742d52..b08f125f 100644
          Ok(())
      }
 diff --git a/crates/engine/genie-core/src/garrison/unload.rs b/crates/engine/genie-core/src/garrison/unload.rs
-index 0f3076d6..2f75756b 100644
+index 0f3076d6..705ddab1 100644
 --- a/crates/engine/genie-core/src/garrison/unload.rs
 +++ b/crates/engine/genie-core/src/garrison/unload.rs
 @@ -9,6 +9,7 @@ use crate::garrison::WorkReturn;
@@ -2304,7 +2359,44 @@ index 0f3076d6..2f75756b 100644
  use crate::objects::HitPoints;
  use crate::objects::ListIndex;
  use crate::objects::ObjectId;
-@@ -372,6 +373,11 @@ impl World {
+@@ -182,16 +183,19 @@ impl World {
+         sound: bool,
+     ) -> Result<(), GenieError> {
+         let unit = self.players.live(player, idx)?;
+-        if self
++        // 188329 0x12a1530 (0x12a15ba..0x12a15f9): a building whose unit AI (`+0x1f0`) holds a
++        // command queue (slot 0x218) lets each unit out toward the queue's first location (slot
++        // 0x220 with 0) instead of the point, and (0x12a1659..0x12a1667) after the unit's orders
++        // went hands the queue to it (the AI's slot 0x200, as for a new unit:
++        // [`World::hand_queue`])
++        let queue = self
+             .parts
+             .unit_ai
+             .get(unit.id)
+-            .is_some_and(|ai| !ai.building_orders.is_empty())
+-        {
+-            return Err(GenieError::unsupported(
+-                "an unload toward a building's command queue location",
+-            ));
+-        }
++            .map(|ai| ai.building_orders.clone())
++            .unwrap_or_default();
++        let z = unit.position().z();
++        let point = queue.first().map_or(point, |q| q.point.ground());
+         let mut i = unit.garrison.len();
+         while 0 < i {
+             i -= 1;
+@@ -219,6 +223,9 @@ impl World {
+             }
+             if let Some(ai) = self.parts.unit_ai.get_mut(u.id) {
+                 ai.orders.clear();
++                if !queue.is_empty() {
++                    self.hand_queue(up, ui, &queue, z)?;
++                }
+             }
+         }
+         Ok(())
+@@ -372,6 +379,11 @@ impl World {
              if b.master(self.master_tables(), p)?.kind != MasterKind::BUILDING {
                  continue;
              }
@@ -2316,7 +2408,7 @@ index 0f3076d6..2f75756b 100644
              let mut i = b.garrison.len();
              while 0 < i {
                  i -= 1;
-@@ -403,6 +409,55 @@ impl World {
+@@ -403,6 +415,55 @@ impl World {
          Ok(())
      }
  
@@ -2372,7 +2464,7 @@ index 0f3076d6..2f75756b 100644
      /// `FUN_1412081e0` for the unit `id`, `from` the building it is inside (player `p`'s object
      /// at an index) or outside (None): the work to go back to ([`TownBell::back_to_work`]: the
      /// town-bell records' object the world holds); with none but a record of an action and a
-@@ -446,7 +501,54 @@ impl World {
+@@ -446,7 +507,54 @@ impl World {
          };
          let (found, record) = bell.back_to_work(&lookup, &self.model.roles)?;
          self.parts.set_town_bell(id, bell);
@@ -10673,8 +10765,38 @@ index e920970d..c1d20089 100644
      /// The world player's attribute add (slot 0xf8, `FUN_141616820`) of `amount` to resource `kind`
      /// (food, wood, stone, gold: 0 to 3) of player `p`, with `stat` (its fourth argument) and
      /// `share` (its fifth, [`ResourceShare`]): with `stat` 1 the gathered total grows first (166 to
+diff --git a/crates/engine/genie-core/src/production/spawn/gather_walk.rs b/crates/engine/genie-core/src/production/spawn/gather_walk.rs
+index 8f8edb17..4a98956f 100644
+--- a/crates/engine/genie-core/src/production/spawn/gather_walk.rs
++++ b/crates/engine/genie-core/src/production/spawn/gather_walk.rs
+@@ -79,9 +79,22 @@ impl World {
+             m.waiting = 1;
+         }
+         if self.parts.actions_of(unit.id).top_action_kind().is_some() {
+-            return Err(GenieError::unsupported(
+-                "a gather point's move of a unit with an action",
+-            ));
++            // a unit that still holds an action (an Enter it came in by, a failed Attack): slot
++            // 0x128 then slot 0x7e8 run the work command whole ([`World::give_work`]: no task,
++            // so the move's notify and slot 0x138 -> `FUN_14106d340`, whose head action may take
++            // the point or else gives way to the `MoveTo`, [`World::move_to_point`]); the inline
++            // path below is that command for a unit without an action
++            let id = unit.id;
++            return self.give_work(
++                id,
++                &Work {
++                    target: None,
++                    point,
++                    carry_test: false,
++                    filter: None,
++                    source,
++                },
++            );
+         }
+         // a unit without speed takes nothing; one not in state 2 would notify without moving
+         if self
 diff --git a/crates/engine/genie-core/src/production/spawn/new_unit.rs b/crates/engine/genie-core/src/production/spawn/new_unit.rs
-index 21b51dda..05c35daf 100644
+index 21b51dda..7953e6ce 100644
 --- a/crates/engine/genie-core/src/production/spawn/new_unit.rs
 +++ b/crates/engine/genie-core/src/production/spawn/new_unit.rs
 @@ -37,6 +37,11 @@ use crate::vision::SightShape;
@@ -10701,6 +10823,15 @@ index 21b51dda..05c35daf 100644
          let new = self.combat_object(p, master, &made, point.with_height(position.z()))?;
          let class = self.tracker_key(p, master).class;
          let owner = self.players.player_mut(p)?;
+@@ -174,7 +182,7 @@ impl World {
+     /// kind; on another object the unit may enter (`FUN_14118cd80`: type 70 and up with a
+     /// capacity, `FUN_14120eb10` with its room) it would become an enter order (`0x2cd`), not
+     /// modelled. The shown point (the game passes stack bytes there) is not held.
+-    pub(super) fn hand_queue(
++    pub(crate) fn hand_queue(
+         &mut self,
+         p: PlayerId,
+         new: ListIndex,
 @@ -357,9 +365,8 @@ impl World {
                  )
              })
@@ -12103,9 +12234,18 @@ index b388f155..d2925c47 100644
      /// it ([`cared_classes`]), within its search radius, the line of sight plus 1 if that is
      /// farther, plus its growth (`+0x1e8`, `FUN_140c2e080`'s fourth argument: 7 for the villager
 diff --git a/crates/engine/genie-core/src/unit_ai/handle.rs b/crates/engine/genie-core/src/unit_ai/handle.rs
-index 21df231c..4df86d30 100644
+index 21df231c..f26b7122 100644
 --- a/crates/engine/genie-core/src/unit_ai/handle.rs
 +++ b/crates/engine/genie-core/src/unit_ai/handle.rs
+@@ -14,7 +14,7 @@ use crate::unit_ai::OrderKind;
+ use crate::unit_ai::StopOrder;
+ use crate::unit_ai::UnitAiKind;
+ use crate::unit_ai::{
+-    ARTIFACT_CARED, Effect, GO_ON, Memory, Notify, Pick, Search, Surroundings, UnitAi, UnitSide,
++    ARTIFACT_CARED, BREAK, Effect, GO_ON, Memory, Notify, Pick, Search, Surroundings, UnitAi, UnitSide,
+     search_radius,
+ };
+ use crate::world::Millis;
 @@ -47,12 +47,13 @@ impl UnitAi {
              UnitAiKind::Building => self.building_notify(n, time, at, player_kind, ai_rng, side),
              UnitAiKind::Livestock => self.livestock_notify(n, time, at, player_kind, ai_rng, side),
@@ -12126,7 +12266,78 @@ index 21df231c..4df86d30 100644
          }
      }
  
-@@ -230,6 +231,14 @@ impl UnitAi {
+@@ -174,6 +175,60 @@ impl UnitAi {
+         Ok(())
+     }
+ 
++    /// The base handler's case 0x202 on the build action (`0x25a`; 188329 0xd35a9d -> 0xd35d28,
++    /// a soldier that builds, the Serjeant): a master without [`ObjectFlags::BUILDS`]
++    /// (`[master+0xf4]` bit 2) goes on (2, 0xd36fe1). Else processIdle with 1 (slot 0x240); one
++    /// that acted (6) breaks (3, 0xd36798). Then `ClosestObject` (0xd22c20: any class, relation 3,
++    /// state 0, the master of its trait piece `+0xf6`, reach on) for another foundation, which
++    /// reads the table of the last look-around (not modelled: a player holding such a
++    /// foundation anywhere stops here); with none found, a human player's unit (a computer's
++    /// owner hears 0x1fa with 0x25a, slot 0x358, not modelled) stops its actions (unit slot
++    /// 0x3f8: the combat unit's 0x115b6b0, the action list's 0xb89e60 and the standing sprite of
++    /// a unit in state 2, [`Effect::Stop`]), forgets its target (0xd38f90), its action becomes the
++    /// last (`+0x68`) and goes; a patrol or attack-move order (`0x2c7`, `0x2dd`) adjusts its
++    /// patrol timers (not modelled); the order becomes the last (`+0x64`) and goes; it goes on (2).
++    ///
++    /// [`ObjectFlags::BUILDS`]: crate::objects::masters::ObjectFlags::BUILDS
++    fn builder_unit_search(
++        &mut self,
++        at: &Surroundings,
++        player_kind: PlayerKind,
++        ai_rng: &mut Well512,
++        side: &mut dyn UnitSide,
++    ) -> Result<u32, GenieError> {
++        let Some((_piece, held)) = side.own_piece_foundations()? else {
++            return Ok(GO_ON);
++        };
++        if self.process_idle(at, player_kind, ai_rng, side)? == IdleOutcome::Acted {
++            return Ok(BREAK);
++        }
++        if held {
++            return Err(GenieError::unsupported(
++                "a builder unit's search for another foundation of its piece (0xd22c20's table)",
++            ));
++        }
++        if player_kind.is_computer() {
++            return Err(GenieError::unsupported(
++                "a computer player's builder unit that found no foundation (slot 0x358)",
++            ));
++        }
++        side.effect_now(Effect::Stop, self, ai_rng)?;
++        self.remove_target();
++        self.last_action = self.current_action;
++        self.current_action = None;
++        if matches!(
++            self.current_order,
++            Some(OrderKind::Patrol | OrderKind::AttackMove)
++        ) {
++            return Err(GenieError::unsupported(
++                "a builder unit's patrol timers after its build (0xd36028..0xd36060)",
++            ));
++        }
++        self.last_order = self.current_order;
++        self.current_order = None;
++        Ok(GO_ON)
++    }
++
+     /// The base handler (`FUN_140c589c0`) for the kinds the slice posts: a completed action
+     /// ([`UnitAi::action_completed`]), an ownership change (stopAction, `FUN_140c5e1e0`, slot 0xb0
+     /// with 1, `FUN_140c5dc10` with the handler's time, the order queue emptied), the kinds it
+@@ -198,6 +253,9 @@ impl UnitAi {
+             NotifyKind::REQUIRES_SEARCH if self.explorer() => {
+                 self.seek_unexplored(n, at, player_kind, ai_rng, side)
+             }
++            NotifyKind::REQUIRES_SEARCH if self.current_action == Some(AiAction::Build) => {
++                self.builder_unit_search(at, player_kind, ai_rng, side)
++            }
+             NotifyKind::OWNER_CHANGED => {
+                 side.effect_now(Effect::Stop, self, ai_rng)?;
+                 self.remove_target();
+@@ -230,6 +288,14 @@ impl UnitAi {
              NotifyKind::DAMAGED | NotifyKind::MISSILE_WARNING => {
                  self.damaged(n, time, at, player_kind, ai_rng, side)
              }
@@ -12513,7 +12724,7 @@ index d0cbfb72..5adf364c 100644
          let held = roles.of_class(class);
          if held.intersects(
 diff --git a/crates/engine/genie-core/src/unit_ai/kind_notifies.rs b/crates/engine/genie-core/src/unit_ai/kind_notifies.rs
-index 48ac7e77..d028e01d 100644
+index 48ac7e77..2d072b4d 100644
 --- a/crates/engine/genie-core/src/unit_ai/kind_notifies.rs
 +++ b/crates/engine/genie-core/src/unit_ai/kind_notifies.rs
 @@ -75,6 +75,57 @@ impl UnitAi {
@@ -12574,11 +12785,34 @@ index 48ac7e77..d028e01d 100644
      /// The lion's handler (`FUN_140c266f0`): its completed attack sets its idle timeout
      /// (`FUN_140c41bc0` with 1000, then slot 0x1a8), drops the target and stops; a moved target
      /// is [`UnitAi::lion_target_moved`]'s. Both cases, and any other notify, go on to the base
+@@ -405,7 +456,13 @@ impl UnitAi {
+         side: &mut dyn UnitSide,
+     ) -> Result<u32, GenieError> {
+         match n.kind {
+-            NotifyKind::TOO_CLOSE => back_up(),
++            // 188329 0xd05f80 case 0x1fe: the back-up 0xd1e420 on the notify's object (p[0]),
++            // else the AI's target, at the unit's least range (slot 600), forced (findings 187)
++            NotifyKind::TOO_CLOSE => {
++                let target = ObjectId::of_field(n.p[0]).or(self.current_target);
++                self.back_up_188329(target, at, ai_rng, side)?;
++                Ok(GO_ON)
++            }
+             NotifyKind::ACTION_EXECUTED | NotifyKind::MISSILE_WARNING
+                 if player_kind.is_computer() =>
+             {
 diff --git a/crates/engine/genie-core/src/unit_ai/mod.rs b/crates/engine/genie-core/src/unit_ai/mod.rs
-index ea0ee786..8cec0469 100644
+index ea0ee786..cf7d97e2 100644
 --- a/crates/engine/genie-core/src/unit_ai/mod.rs
 +++ b/crates/engine/genie-core/src/unit_ai/mod.rs
-@@ -34,11 +34,12 @@ mod handle;
+@@ -16,6 +16,7 @@
+ //! does to its unit comes back as [`Effect`]s, in order.
+ 
+ mod actions;
++mod back_up;
+ mod ai_action;
+ mod ai_kind;
+ pub mod ai_kinds;
+@@ -34,11 +35,12 @@ mod handle;
  mod idle;
  mod idle_animals;
  mod idle_part;
@@ -12770,7 +13004,7 @@ index 516e920b..93e14d2f 100644
          }
          Ok(MiscEnd::GoesOn)
 diff --git a/crates/engine/genie-core/src/unit_ai/side.rs b/crates/engine/genie-core/src/unit_ai/side.rs
-index 7fd24514..b8592b56 100644
+index 7fd24514..50c39236 100644
 --- a/crates/engine/genie-core/src/unit_ai/side.rs
 +++ b/crates/engine/genie-core/src/unit_ai/side.rs
 @@ -19,6 +19,7 @@ use crate::objects::{ObjectState, WorkerCount};
@@ -12839,7 +13073,30 @@ index 7fd24514..b8592b56 100644
      /// The unit's slot 0x2d0 as it stands now: its top action may be interrupted
      /// ([`SurroundingFlags::INTERRUPTIBLE`] at the update's start).
      ///
-@@ -196,6 +241,33 @@ pub trait UnitSide {
+@@ -176,6 +221,22 @@ pub trait UnitSide {
+     /// the waypoint of its top level (`+0x24`); None without one.
+     fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)>;
+ 
++    /// A unit that builds a building of its own (its master's [`ObjectFlags::BUILDS`], 188329
++    /// `[master+0xf4]` bit 2, the Serjeant): its trait piece (`+0xf6`, the master it builds) and
++    /// whether its player holds a foundation (state 0) of that master anywhere. None for a master
++    /// without the trait (or without a piece).
++    ///
++    /// # Errors
++    ///
++    /// A side without its unit.
++    ///
++    /// [`ObjectFlags::BUILDS`]: crate::objects::masters::ObjectFlags::BUILDS
++    fn own_piece_foundations(&self) -> Result<Option<(MasterId, bool)>, GenieError> {
++        Err(GenieError::unsupported(
++            "a builder unit's piece without the world",
++        ))
++    }
++
+     /// The builder's search for another foundation (`FUN_140c1c7c0`), None when it finds none.
+     ///
+     /// # Errors
+@@ -196,6 +257,33 @@ pub trait UnitSide {
          Err(GenieError::unsupported("a reach test without the world"))
      }
  
@@ -12873,7 +13130,24 @@ index 7fd24514..b8592b56 100644
      /// What the base handler's case 0x216 reads ([`OffFootprint`]) for a unit sent off the
      /// footprint of `site` (its master's radii `radius`).
      ///
-@@ -240,6 +312,19 @@ pub trait UnitSide {
+@@ -212,6 +300,16 @@ pub trait UnitSide {
+         ))
+     }
+ 
++    /// 188329 `0x12426a0` for the unit: `tile` is on the map, its terrain class is in the unit's
++    /// terrain mask (its restriction's, `0x111f580`) and no static record blocks it.
++    ///
++    /// # Errors
++    ///
++    /// What the test does not model.
++    fn tile_standable(&mut self, _tile: crate::map::Tile) -> Result<bool, GenieError> {
++        Err(GenieError::unsupported("a tile test without the world"))
++    }
++
+     /// The unit's slot 0x278: whether it could stand at `point`.
+     ///
+     /// # Errors
+@@ -240,6 +338,19 @@ pub trait UnitSide {
          Err(GenieError::unsupported("a call for help without the world"))
      }
  
@@ -12893,7 +13167,7 @@ index 7fd24514..b8592b56 100644
      /// The object `id` as the unit AI reads it ([`UnitSeen`]): None when the world does not
      /// hold it (`FUN_1415417a0`).
      ///
-@@ -381,6 +466,31 @@ pub trait UnitSide {
+@@ -381,6 +492,31 @@ pub trait UnitSide {
              "a soldier's attack in a group without its unit",
          ))
      }
@@ -13624,7 +13898,7 @@ index ea0838e3..fa603b75 100644
          return Ok(Some(first));
      }
 diff --git a/crates/engine/genie-core/src/unit_ai/world_view/side.rs b/crates/engine/genie-core/src/unit_ai/world_view/side.rs
-index 77dc93ea..59cc443e 100644
+index 77dc93ea..ed1e535a 100644
 --- a/crates/engine/genie-core/src/unit_ai/world_view/side.rs
 +++ b/crates/engine/genie-core/src/unit_ai/world_view/side.rs
 @@ -29,6 +29,7 @@ use crate::objects::ObjectState;
@@ -13843,10 +14117,52 @@ index 77dc93ea..59cc443e 100644
  impl UnitSide for UnitView<'_, '_> {
      fn table_drop_site(&mut self) -> Result<Option<DropSiteId>, GenieError> {
          let class = self
-@@ -129,10 +331,50 @@ impl UnitSide for UnitView<'_, '_> {
+@@ -90,6 +292,22 @@ impl UnitSide for UnitView<'_, '_> {
+     /// restriction's terrain classes, could stand at `point`.
+     ///
+     /// [`Spatial::point_clear`]: crate::map::spatial::Spatial::point_clear
++    fn tile_standable(&mut self, tile: crate::map::Tile) -> Result<bool, GenieError> {
++        let mover = self
++            .c
++            .w
++            .parts
++            .mover_of(self.unit.id)
++            .ok_or(GenieError::unsupported(
++                "a tile test of a unit without movement state",
++            ))?;
++        Ok(self
++            .c
++            .w
++            .spatial
++            .standable(tile, mover.stats.restriction_mask))
++    }
++
+     fn can_stand(&mut self, point: Point) -> Result<bool, GenieError> {
+         let unit = &*self.unit;
+         let mover = self
+@@ -129,10 +347,69 @@ impl UnitSide for UnitView<'_, '_> {
          self.own_foundation_near()
      }
  
++    fn own_piece_foundations(&self) -> Result<Option<(MasterId, bool)>, GenieError> {
++        let flags = self
++            .unit
++            .master(self.c.w.master_tables(), self.player)?
++            .object_flags;
++        let Some(piece) = flags.piece().filter(|_| flags.contains(ObjectFlags::BUILDS)) else {
++            return Ok(None);
++        };
++        let held = self
++            .c
++            .w
++            .players
++            .player(self.player)?
++            .objects
++            .iter()
++            .any(|u| u.life.master_id == piece && u.life.state == ObjectState::Foundation);
++        Ok(Some((piece, held)))
++    }
++
 +    fn plan_reaches(&mut self, target: ObjectId, range: Distance) -> Result<bool, GenieError> {
 +        // 0x1116d20: the target's radius (its master's +0x78) plus the unit's, both places
 +        // plain (slot 0x568), the planner of the unit's master
@@ -13894,7 +14210,7 @@ index 77dc93ea..59cc443e 100644
          let roles = &self.c.w.model.roles.clone();
          let lists = self.c.w.spatial.searched().ok_or(GenieError::unsupported(
              "a search that reads the registry's last answer (before any query)",
-@@ -219,6 +461,21 @@ impl UnitSide for UnitView<'_, '_> {
+@@ -219,6 +496,21 @@ impl UnitSide for UnitView<'_, '_> {
          self.picker(None)?.nearest_attacker_of(target)
      }
  
@@ -13916,7 +14232,7 @@ index 77dc93ea..59cc443e 100644
      fn seen_unit(&mut self, id: ObjectId) -> Result<Option<UnitSeen>, GenieError> {
          let Some(p) = self.c.w.spatial.get(id) else {
              return Ok(None);
-@@ -258,6 +515,7 @@ impl UnitSide for UnitView<'_, '_> {
+@@ -258,6 +550,7 @@ impl UnitSide for UnitView<'_, '_> {
                  owner,
                  AllyTest::WithRelation4,
              ),
@@ -13924,7 +14240,7 @@ index 77dc93ea..59cc443e 100644
          }))
      }
  
-@@ -286,6 +544,80 @@ impl UnitSide for UnitView<'_, '_> {
+@@ -286,6 +579,80 @@ impl UnitSide for UnitView<'_, '_> {
          Ok(class)
      }
  
@@ -14005,7 +14321,7 @@ index 77dc93ea..59cc443e 100644
      fn reaches(&mut self, target: ObjectId, range: Distance) -> Result<bool, GenieError> {
          let mut plan = Planning {
              pathing: &mut self.c.w.pathing,
-@@ -322,6 +654,31 @@ impl UnitSide for UnitView<'_, '_> {
+@@ -322,6 +689,31 @@ impl UnitSide for UnitView<'_, '_> {
          )
      }
  
@@ -14037,7 +14353,7 @@ index 77dc93ea..59cc443e 100644
      fn closest(&mut self, search: &Search<'_>) -> Result<Found, GenieError> {
          let roles = &self.c.w.model.roles.clone();
          let seeker = match search.pick {
-@@ -505,6 +862,14 @@ impl UnitSide for UnitView<'_, '_> {
+@@ -505,6 +897,14 @@ impl UnitSide for UnitView<'_, '_> {
          done
      }
  
@@ -14052,7 +14368,7 @@ index 77dc93ea..59cc443e 100644
      fn busy_now(&mut self) -> Result<bool, GenieError> {
          Ok(
              self.actions.top_action_kind().is_some()
-@@ -522,6 +887,7 @@ impl UnitSide for UnitView<'_, '_> {
+@@ -522,6 +922,7 @@ impl UnitSide for UnitView<'_, '_> {
          ai: &UnitAi,
          rng: &mut Well512,
      ) -> Result<Option<Tile>, GenieError> {
@@ -14060,7 +14376,7 @@ index 77dc93ea..59cc443e 100644
          let tc = town_centre(
              owner_view(
                  &self.c.w.players,
-@@ -530,6 +896,7 @@ impl UnitSide for UnitView<'_, '_> {
+@@ -530,6 +931,7 @@ impl UnitSide for UnitView<'_, '_> {
                  self.new_owner,
              )?,
              self.c.w.model.slots.master,
@@ -23140,6 +23456,267 @@ index 00000000..886df08f
 +                Ok(())
 +            }
 +        }
++    }
++}
+diff --git a/crates/engine/genie-core/src/unit_ai/back_up.rs b/crates/engine/genie-core/src/unit_ai/back_up.rs
+new file mode 100644
+index 00000000..51391382
+--- /dev/null
++++ b/crates/engine/genie-core/src/unit_ai/back_up.rs
+@@ -0,0 +1,255 @@
++//! 188329's soldier back-up from a target under its least range (findings 187): the soldier's
++//! handler `0xd05f80` case 0x1fe calls `0xd1e420`, which queues an attack in front and moves
++//! the unit back through the unit AI's slot 0x158 (`0xd27d70`).
++
++use crate::GenieError;
++use crate::map::Distance;
++use crate::map::Point;
++use crate::map::Position;
++use crate::map::Tile;
++use crate::math::fmath::sqrt;
++use crate::math::rng::Well512;
++use crate::objects::ObjectId;
++use crate::unit_ai::Answer;
++use crate::unit_ai::Effect;
++use crate::unit_ai::Issuer;
++use crate::unit_ai::OrderForce;
++use crate::unit_ai::OrderKind;
++use crate::unit_ai::OrderPriority;
++use crate::unit_ai::OrderTargetKind;
++use crate::unit_ai::Pace;
++use crate::unit_ai::QueuedOrder;
++use crate::unit_ai::Surroundings;
++use crate::unit_ai::UnitAi;
++use crate::unit_ai::UnitSide;
++use crate::unit_ai::UnitStance;
++use crate::orders::Dispatch;
++use crate::unit_ai::{AiMove, QueueEnd};
++
++/// `[0x3201490]`: the shortest back-up.
++const LEAST_BACK_UP: f32 = 1.5;
++/// `[0x369ff98]`: a not-a-number coordinate at or below this goes up a tile, else down.
++const NEAR_EDGE: f32 = 5.0;
++/// `[0x369ff64]`.
++const ONE: f32 = 1.0;
++/// `[0x31b1420]`: the tile's centre.
++const HALF: f32 = 0.5;
++/// The back-up's queued attack's priority (`0x32`: below 100, it waits while the AI has an
++/// action).
++const BACK_UP_PRIORITY: i32 = 0x32;
++
++impl UnitAi {
++    /// `0xd1e420(ai, target, least, 1)` from the soldier's case 0x1fe (`0xd05f80`; the target
++    /// the notify's `p[0]`, else the AI's target; least the unit's slot 600, its least range).
++    /// Nothing for a unit that does not move (slot 0x220 at 0), a target that is the unit or that
++    /// the world does not hold, an allied target (`0x1732cd0` with 1) or a stand-ground stance
++    /// (2). Else the back-up length is `max(1.5, least − gap)` (gap: `0x124d8d0`, the boxes'
++    /// ground gap); slot 0x30 queues an attack (700) on the target in front of the queue
++    /// (`0xd1cd90` with 1), priority 0x32, from the unit itself, at the target's place within the
++    /// least range, shown at its x and y, ready; then the unit moves (slot 0x158,
++    /// [`UnitAi::move_back_to`]) from its place against the sum of the vectors to the target and
++    /// to each of its attackers but the target (`+0xc8`), normalized, times the length; a move
++    /// not taken drops the queue's first order (`0xd39030` with 0) when the attack was queued.
++    ///
++    /// # Errors
++    ///
++    /// What the move's search does not model, a target the AI's view lacks.
++    pub(super) fn back_up_188329(
++        &mut self,
++        target: Option<ObjectId>,
++        at: &Surroundings,
++        ai: &mut Well512,
++        side: &mut dyn UnitSide,
++    ) -> Result<(), GenieError> {
++        // slot 0x220 (the master's speed times its sprite's factor): 0 only when the master
++        // does not move, as slot 0x208's top speed
++        if at.speed.get() == 0.0 {
++            return Ok(());
++        }
++        let Some(t) = target.filter(|&t| t != at.id) else {
++            return Ok(());
++        };
++        let Some((tp, tr)) = side.object_box(t) else {
++            return Ok(());
++        };
++        // the target's owner, master and alliance as the world holds them
++        let Some(seen) = side.seen_unit(t)? else {
++            return Ok(());
++        };
++        if seen.allied || self.stance == UnitStance::StandGround {
++            return Ok(());
++        }
++        let least = at.min_range.get();
++        let u = at.position;
++        // 0x124d8d0: the boxes' ground gap (|dx| less both x radii, at least 0; the same on y)
++        let gx = {
++            let g = (tp.x() - u.x()).abs() - (tr.x() + at.size.x());
++            if g <= 0.0 { 0.0 } else { g }
++        };
++        let gy = {
++            let g = (tp.y() - u.y()).abs() - (tr.y() + at.size.y());
++            if g <= 0.0 { 0.0 } else { g }
++        };
++        let gap = sqrt(gx * gx + gy * gy);
++        let back = {
++            let d = least - gap;
++            if LEAST_BACK_UP <= d { d } else { LEAST_BACK_UP }
++        };
++        let order = QueuedOrder {
++            issuer: Some(Issuer::Object(at.id)),
++            order: OrderKind::Attack,
++            priority: OrderPriority::of_data(BACK_UP_PRIORITY),
++            target: Some(t),
++            target_owner: Some(seen.owner),
++            point: tp,
++            range: at.min_range,
++            shown: Point::new(tp.x(), tp.y()),
++            ready: true,
++            target_kind: Some(OrderTargetKind::of_master(seen.master)),
++        };
++        let queued = self.queue_order(at.state, order, Dispatch::Queued, QueueEnd::Front)?;
++        let (mut vx, mut vy) = (tp.x() - u.x(), tp.y() - u.y());
++        let attackers: Vec<ObjectId> = self.attackers.iter().flatten().collect();
++        for a in attackers {
++            if a == t {
++                continue;
++            }
++            let Some((ap, _)) = side.object_box(a) else {
++                continue;
++            };
++            vx += ap.x() - u.x();
++            vy += ap.y() - u.y();
++        }
++        let n = sqrt(vy * vy + vx * vx);
++        let x = u.x() - (vx / n) * back;
++        let y = u.y() - (vy / n) * back;
++        let moved = self.move_back_to(Position::new(x, y, u.z()), at, ai, side)?;
++        if !moved && queued == Answer::Taken && !self.orders.is_empty() {
++            let _ = self.orders.remove(0);
++        }
++        Ok(())
++    }
++
++    /// The unit AI's slot 0x158 (`0xd27d70`) with arguments 5 and 6 0 and 1: a coordinate that
++    /// is not a number becomes the unit's own plus one (minus one above 5); the point is held on
++    /// the map (below 0 at 0, from the edge on one less); its tile (`CVTTSS2SI`) passes the
++    /// terrain test (`0x12426a0`: on the map, its class in the unit's terrain mask, not blocked)
++    /// and the point reach test to the tile's corner (slot 0x410 = `0x1210060` -> `0x107a5e0`,
++    /// range 0, no target) -> the unit's move (slot 0x370, as `evasiveMoveTo`'s: forced,
++    /// running, range 0) to the tile's centre at its height; taken, the AI holds the move action
++    /// (0x262) and the point, not the tile's centre, without a target (`0xd40b90` with −1).
++    /// A tile that fails the terrain test makes it search the ring of steps of 2 around it (the
++    /// switch at `0xd28182`, held on the map, a tile nearer the unit than the point passed
++    /// over, `0xb75ce0`) for the first that passes both tests; none: not moved. A tile that
++    /// passes the terrain test but not the reach test is not modelled (`0x1064460` counts the
++    /// objects that test met). Whether it moved.
++    ///
++    /// # Errors
++    ///
++    /// The tests' and the search's.
++    fn move_back_to(
++        &mut self,
++        point: Position,
++        at: &Surroundings,
++        ai: &mut Well512,
++        side: &mut dyn UnitSide,
++    ) -> Result<bool, GenieError> {
++        let own = at.position;
++        let near = |p: f32, o: f32| {
++            if !p.is_nan() {
++                p
++            } else if o <= NEAR_EDGE {
++                o + ONE
++            } else {
++                o - ONE
++            }
++        };
++        let held = |v: f32, size: i32| {
++            if 0.0 <= v {
++                if size as f32 <= v { size as f32 - ONE } else { v }
++            } else {
++                0.0
++            }
++        };
++        let x = held(near(point.x(), own.x()), at.map.width());
++        let y = held(near(point.y(), own.y()), at.map.height());
++        let (mut tx, mut ty) = (x as i32, y as i32);
++        // 0x1065510 clears the obstruction collector (`+0x380`) the reach test fills
++        if side.tile_standable(Tile::new(tx, ty))? {
++            if side
++                .reach_length(Point::new(tx as f32, ty as f32), Distance::ZERO)?
++                .is_none()
++            {
++                // 0x1064460 then counts the objects the failed test met; above 3 it gives up
++                return Err(GenieError::unsupported(
++                    "a back-up whose tile's reach test fails (0x1064460's count)",
++                ));
++            }
++        } else {
++            // no reach test ran: 0x1064460 counts none, the search runs (0xd280c5..0xd284bf)
++            // 0xb75ce0: the squared ground gap from the unit's box to the point
++            let gap2 = |px: f32, py: f32| {
++                let gx = (px - own.x()).abs() - at.size.x();
++                let gx = if 0.0 <= gx { gx } else { 0.0 };
++                let gy = (py - own.y()).abs() - at.size.y();
++                let gy = if 0.0 <= gy { gy } else { 0.0 };
++                gy * gy + gx * gx
++            };
++            let limit = gap2(x, y);
++            let (w, h) = (at.map.width(), at.map.height());
++            let mut found = false;
++            // the switch at 0xd28182 (table 0xd28624): a ring of steps of 2 around the tile
++            for i in 0..8u8 {
++                match i {
++                    0 => {
++                        tx -= 2;
++                        ty -= 2;
++                    }
++                    1 | 2 => tx += 2,
++                    3 | 4 => ty += 2,
++                    5 | 6 => tx -= 2,
++                    _ => ty -= 2,
++                }
++                tx = if tx < 0 { 0 } else if tx >= w { w - 1 } else { tx };
++                ty = if ty < 0 { 0 } else if ty >= h { h - 1 } else { ty };
++                // argument 5 is 0: a tile nearer the unit than the point is passed over
++                // (COMISS limit, gap / JBE: tested when the limit is not above it)
++                let (cx, cy) = (tx as f32 + HALF, ty as f32 + HALF);
++                let c = {
++                    let gx = (cx - own.x()).abs() - at.size.x();
++                    let gx = if 0.0 < gx { gx } else { 0.0 };
++                    let gy = (cy - own.y()).abs() - at.size.y();
++                    let gy = if 0.0 < gy { gy } else { 0.0 };
++                    gy * gy + gx * gx
++                };
++                if limit > c {
++                    continue;
++                }
++                if side.tile_standable(Tile::new(tx, ty))?
++                    && side
++                        .reach_length(Point::new(tx as f32, ty as f32), Distance::ZERO)?
++                        .is_some()
++                {
++                    found = true;
++                    break;
++                }
++            }
++            if !found {
++                return Ok(false);
++            }
++        }
++        let m = self.move_to(AiMove {
++            point: Position::new(tx as f32 + HALF, ty as f32 + HALF, point.z()),
++            range: Distance::ZERO,
++            force: OrderForce::Forced,
++            pace: Pace::Run,
++        });
++        let Some(m) = m else {
++            return Ok(false);
++        };
++        side.effect_now(Effect::Move(m), self, ai)?;
++        // 0xd40b90 with -1: the point the unit was sent to, not the tile's centre
++        self.target_at(None, None, Position::new(x, y, point.z()));
++        Ok(true)
 +    }
 +}
 diff --git a/crates/engine/genie-core/src/unit_ai/idle_priest.rs b/crates/engine/genie-core/src/unit_ai/idle_priest.rs
