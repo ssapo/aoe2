@@ -5355,9 +5355,18 @@ index e101e2d0..f7de2eaa 100644
      /// index it has then, and the objects of their searches.
      fn member_views(
 diff --git a/crates/engine/genie-core/src/groups/steer/detour.rs b/crates/engine/genie-core/src/groups/steer/detour.rs
-index 22a83675..6dfc95c5 100644
+index 22a83675..f8600d96 100644
 --- a/crates/engine/genie-core/src/groups/steer/detour.rs
 +++ b/crates/engine/genie-core/src/groups/steer/detour.rs
+@@ -58,7 +58,7 @@ impl World {
+     ///    pather (as in 1, the result kept only for a path of 2 points longer than [`EPSILON`])
+     ///    or the tile planner.
+     /// 4. Blocked or off the map: the long pather from where it last moved to toward the slot's
+-    ///    tile; a path of more than 2 points serves, its last point the goal.
++    ///    tile; a path found with at least 2 points serves, its last point the goal.
+     ///
+     /// Any other result (in range, none) or a failed long path releases the record. A served way
+     /// that would end farther from the slot than `gap` while the group neither moves nor waits
 @@ -93,9 +93,35 @@ impl World {
              .transform_position;
          let [place, forward, _, _] = g.motion.position;
@@ -5618,7 +5627,34 @@ index 22a83675..6dfc95c5 100644
          {
              way.result = planned_as_short(found);
              way.planned = true;
-@@ -411,7 +593,7 @@ impl World {
+@@ -348,8 +530,8 @@ impl World {
+     }
+ 
+     /// The way round's last try ([`World::way_round`]'s 4, blocked or off the map): the long
+-    /// pather from where the member last moved to toward the slot's tile; a path of more than 2
+-    /// points serves, its last point the goal. Whether it serves.
++    /// pather from where the member last moved to toward the slot's tile; a path found with at
++    /// least 2 points serves, its last point the goal. Whether it serves.
+     fn round_long_way(
+         &self,
+         r: &Rounder<'_>,
+@@ -357,9 +539,13 @@ impl World {
+         way: &mut Way,
+     ) -> Result<bool, GenieError> {
+         way.record.points.clear();
+-        let (_, path) = self.round_long(r.id, r.at.ground(), to)?;
++        let (found, path) = self.round_long(r.id, r.at.ground(), to)?;
+         way.record.points = path.points;
+-        if 2 < way.record.points.len()
++        // 188329 0x10f13fd..0x10f1446 (findings 183): a long path found (`TEST BL`) with at
++        // least 2 points (`CMP EAX, 2` / `JL`) serves, its last point the goal (521359668
++        // 364.416 s: Champi Scout 3751's 2-point path (42.5, 46.5), (42.5, 47.5))
++        if found
++            && 2 <= way.record.points.len()
+             && let Some(&last) = way.record.points.last()
+         {
+             way.goal = last;
+@@ -411,7 +597,7 @@ impl World {
      /// The way round's long pather (`FUN_140f9eb70` with the record) for member `id` from the
      /// tile of `from` to the tile of `to`, range 0, no target: whether it reached the goal, and
      /// the path.
@@ -5627,7 +5663,7 @@ index 22a83675..6dfc95c5 100644
          &self,
          id: ObjectId,
          from: Point,
-@@ -529,6 +711,21 @@ pub(super) const fn planned_as_short(found: Found) -> ShortFound {
+@@ -529,6 +715,21 @@ pub(super) const fn planned_as_short(found: Found) -> ShortFound {
  /// The way round found so far: the record's path (a new path record, `FUN_14152eea0`), the
  /// pather's result (the tile planner's read as the short pather's, [`planned_as_short`]),
  /// whether the tile planner made it, and where the member goes.
