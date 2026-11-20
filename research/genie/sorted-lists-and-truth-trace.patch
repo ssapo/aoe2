@@ -12575,10 +12575,10 @@ index 48ac7e77..d028e01d 100644
      /// (`FUN_140c41bc0` with 1000, then slot 0x1a8), drops the target and stops; a moved target
      /// is [`UnitAi::lion_target_moved`]'s. Both cases, and any other notify, go on to the base
 diff --git a/crates/engine/genie-core/src/unit_ai/mod.rs b/crates/engine/genie-core/src/unit_ai/mod.rs
-index ea0ee786..7113e836 100644
+index ea0ee786..8cec0469 100644
 --- a/crates/engine/genie-core/src/unit_ai/mod.rs
 +++ b/crates/engine/genie-core/src/unit_ai/mod.rs
-@@ -34,6 +34,7 @@ mod handle;
+@@ -34,11 +34,12 @@ mod handle;
  mod idle;
  mod idle_animals;
  mod idle_part;
@@ -12586,6 +12586,45 @@ index ea0ee786..7113e836 100644
  mod ids;
  mod issuer;
  mod kind_notifies;
+ mod life;
+-mod notifies;
++pub(crate) mod notifies;
+ mod notify_kind;
+ mod order_kind;
+ mod order_kinds;
+diff --git a/crates/engine/genie-core/src/unit_ai/notifies.rs b/crates/engine/genie-core/src/unit_ai/notifies.rs
+index bf299a83..5761f4ab 100644
+--- a/crates/engine/genie-core/src/unit_ai/notifies.rs
++++ b/crates/engine/genie-core/src/unit_ai/notifies.rs
+@@ -19,6 +19,14 @@ use crate::world::layer::generated::UnitAiTuning;
+ use crate::world::slots::CheckedIndex;
+ use std::mem::take;
+ 
++thread_local! {
++    /// The unit whose AI a stand-in holds while a world routine the AI's side called runs on it
++    /// (`Step::lend`): the notifies posted to it then go to [`STAND_IN_POSTS`].
++    pub(crate) static STAND_IN: std::cell::Cell<Option<ObjectId>> = const { std::cell::Cell::new(None) };
++    /// The notifies posted to the [`STAND_IN`] unit, with its state, in order.
++    pub(crate) static STAND_IN_POSTS: std::cell::RefCell<Vec<(Notify, ObjectState)>> = const { std::cell::RefCell::new(Vec::new()) };
++}
++
+ /// What a unit AI's call from outside its full update reads of the build layer
+ /// ([`UnitAi::clear_notifies_at`], [`UnitAi::take_order_now`]; its orders' run passes it on): the
+ /// roles, the slots and the unit AI's tuning values (FD-046-D45, D49).
+@@ -200,6 +208,13 @@ impl UnitAi {
+     /// `0x2bf`, `0x2c0`) is ignored, answering 1 without joining the queue; any other joins the
+     /// queue (`FUN_140c42470`, whose 0 on a failed allocation cannot happen) and answers 1.
+     pub fn accept(&mut self, n: Notify, unit_state: ObjectState) -> Answer {
++        // a notify for a unit whose AI is out with its side while a world routine runs on the
++        // unit (`Step::lend`): it goes to the side's buffer as posted, for the AI itself to take
++        // or leave when the side returns ([`STAND_IN`])
++        if STAND_IN.with(std::cell::Cell::get) == Some(n.recipient) {
++            STAND_IN_POSTS.with(|v| v.borrow_mut().push((n, unit_state)));
++            return Answer::Taken;
++        }
+         if unit_state != ObjectState::Alive {
+             return Answer::NotTaken;
+         }
 diff --git a/crates/engine/genie-core/src/unit_ai/order_kinds.rs b/crates/engine/genie-core/src/unit_ai/order_kinds.rs
 index 281192de..6d860161 100644
 --- a/crates/engine/genie-core/src/unit_ai/order_kinds.rs
@@ -14265,10 +14304,31 @@ index 9912d9e7..a645c607 100644
      }
  }
 diff --git a/crates/engine/genie-core/src/world/step.rs b/crates/engine/genie-core/src/world/step.rs
-index ba6fdc83..d00f9c03 100644
+index ba6fdc83..8e0bc965 100644
 --- a/crates/engine/genie-core/src/world/step.rs
 +++ b/crates/engine/genie-core/src/world/step.rs
-@@ -242,6 +242,17 @@ impl Step<'_> {
+@@ -170,7 +170,20 @@ impl Step<'_> {
+         }
+         let lent = replace(me, Unit::taken_out());
+         self.w.parts.put_actions(self.me, take(actions));
++        // 188329 has no stand-in: a notify the routine posts to the unit (its old actions'
++        // ends, an Enter replacing them) joins its AI's queue at once. Here it waits in the
++        // side's buffer, which the AI takes when the side returns (as `Step::notify_own`)
++        let outer = side.then(|| {
++            crate::unit_ai::notifies::STAND_IN.with(|c| c.replace(Some(self.me)))
++        });
+         let answer = self.w.put_back_own(p, lent).and_then(|_| f(self.w));
++        if let Some(outer) = outer {
++            crate::unit_ai::notifies::STAND_IN.with(|c| c.set(outer));
++            let posts = crate::unit_ai::notifies::STAND_IN_POSTS.with(|v| take(&mut *v.borrow_mut()));
++            if let Some(own) = self.side_notifies.as_mut() {
++                own.extend(posts);
++            }
++        }
+         let i = self.w.live_index(p, self.me).ok_or_else(|| {
+             GenieError::unreachable("a lent object left its list").with("object", self.me)
+         })?;
+@@ -242,6 +255,17 @@ impl Step<'_> {
          kind: AttributeId,
          amount: Amount,
      ) -> Result<(), GenieError> {
