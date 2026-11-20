@@ -12587,10 +12587,22 @@ index ea0ee786..7113e836 100644
  mod issuer;
  mod kind_notifies;
 diff --git a/crates/engine/genie-core/src/unit_ai/order_kinds.rs b/crates/engine/genie-core/src/unit_ai/order_kinds.rs
-index 281192de..2c1492fa 100644
+index 281192de..6d860161 100644
 --- a/crates/engine/genie-core/src/unit_ai/order_kinds.rs
 +++ b/crates/engine/genie-core/src/unit_ai/order_kinds.rs
-@@ -163,8 +163,7 @@ impl UnitAi {
+@@ -26,8 +26,9 @@ use crate::unit_ai::TakenAs;
+ use crate::unit_ai::UnitAiKind;
+ use crate::unit_ai::attack_orders::OrderNow;
+ use crate::unit_ai::{
+-    AiMove, Effect, Gatherable, QueuedOrder, ResourceSearch, Seen, Surroundings, UnitAi,
+-    UnitCommand, UnitSide, civilian_kind,
++    AiMove, CIVILIAN_CARED, Effect, Gatherable, Memory, Pick, QueuedOrder, ResourceSearch,
++    Search, Seen, Surroundings, UnitAi, UnitCommand, UnitSide, civilian_kind,
++    civilian_search_radius,
+ };
+ use crate::world::layer::ClassRoles;
+ use crate::world::layer::Roles;
+@@ -163,8 +164,7 @@ impl UnitAi {
              },
              side,
              rng,
@@ -12600,7 +12612,7 @@ index 281192de..2c1492fa 100644
      }
  
      /// `HuntObject` (slot 0xc8, `FUN_140c4e220`) forced on the order's `target`: the action stops
-@@ -186,8 +185,7 @@ impl UnitAi {
+@@ -186,8 +186,7 @@ impl UnitAi {
              self.stop_current(StopOrder::Keep, at, side, rng)?;
              return Ok(Answer::NotTaken);
          };
@@ -12610,13 +12622,68 @@ index 281192de..2c1492fa 100644
      }
  
      /// Slot 0x168 (`FUN_140c4dab0`, "GOT A FOLLOW ORDER"), the follow of object `target` within
-@@ -397,6 +395,10 @@ impl UnitAi {
+@@ -397,6 +396,65 @@ impl UnitAi {
                  },
              };
              let Some(kind) = self.resource_kind(class, roles) else {
-+                // ENG-25 diagnostic (item 5, session B): 188329 searches 0xd22c20 here
-+                if std::env::var_os("GENIE_TRACE_ITEM5").is_some() {
-+                    eprintln!("ITEM5 B_GONE class={class:?}");
++                // 188329 0xd37140 case 0x2db (0xd3797a..): no kind of resource (slot 0x1b0 −1) ->
++                // ClosestObject 0xd22c20 on the target's class, any relation and state, no
++                // master or worker cap (class 0x31 alone asks 199 and 1), the reach test on,
++                // from the unit; a found object the unit works (slot 0x8a8), the order not taken
++                // (findings 185: 521124160 builder 4446's Shift-queued Interact on a pig gone by
++                // the end of its build: the original hunts the next livestock)
++                // Gate (findings 185b): only an order with a shown point (`+0x24`, `+0x28`), as a
++                // player's INTERACT queues it (`orders/interact.rs`: its type the target's
++                // master). A building command queue's order (shown −1, its type kept as a class,
++                // `commands/building_commands.rs`, handed to a new unit by `hand_queue`) keeps the
++                // old result, not taken: there the original's choice is not pinned (521379784
++                // update 26803: the original did not send the new villager to its own TC)
++                if o.shown.x() == -1.0 && o.shown.y() == -1.0 {
++                    if std::env::var_os("GENIE_TRACE_ITEM5").is_some() {
++                        eprintln!("ITEM5 B_GONE class={class:?}");
++                    }
++                    return Ok(OrderOutcome::NotTaken);
++                }
++                if class.get() == 0x31 {
++                    return Err(GenieError::unsupported(
++                        "an order on a gone farm's type (0xd22c20 with 199, 1)",
++                    ));
++                }
++                if self.ai_kind != UnitAiKind::Civilian {
++                    return Err(GenieError::unsupported(
++                        "an order on a gone target without a kind of a unit AI not a civilian's",
++                    ));
++                }
++                let search = Search {
++                    at: at.position.ground(),
++                    radius: civilian_search_radius(at.los, at.search_radius),
++                    classes: &CIVILIAN_CARED,
++                    size: at.size,
++                    pick: Pick::Closest {
++                        group: Some(class),
++                        relation: None,
++                        state: None,
++                        master: None,
++                        workers: WorkerCount::NO_CAP,
++                        spared: None,
++                        reach: true,
++                    },
++                    memory: Memory::default(),
++                };
++                let found = side.closest(&search)?;
++                self.alert(found, at.dt_seconds);
++                match (found.id, found.position) {
++                    (Some(target), Some(point)) => {
++                        side.effect_now(
++                            Effect::Command(AiCommand::WorkOn { target, point }),
++                            self,
++                            ai,
++                        )?;
++                    }
++                    (Some(_), None) => {
++                        return Err(GenieError::unsupported("a found object without its place"));
++                    }
++                    (None, _) => {}
 +                }
                  return Ok(OrderOutcome::NotTaken);
              };
@@ -18487,7 +18554,7 @@ index 90a8616f..77c5309d 100644
      let masters = install_read(dat.as_ref())?;
      let run = census_run(&recording, Some(&masters), limit)?;
 diff --git a/crates/tools/genie-oracle/src/census.rs b/crates/tools/genie-oracle/src/census.rs
-index 99849470..2db8af15 100644
+index 99849470..5d5b9b7e 100644
 --- a/crates/tools/genie-oracle/src/census.rs
 +++ b/crates/tools/genie-oracle/src/census.rs
 @@ -112,7 +112,20 @@ pub fn census_run(
@@ -18512,7 +18579,7 @@ index 99849470..2db8af15 100644
      let sections = header.players();
      let (syncs, checkpoints) = recorded_checkpoints(&chapter)?;
      let total = limit.map_or(syncs, |l| l.min(syncs));
-@@ -124,10 +137,152 @@ pub fn census_run(
+@@ -124,10 +137,162 @@ pub fn census_run(
      } else {
          CensusEnd::Recording
      };
@@ -18649,7 +18716,7 @@ index 99849470..2db8af15 100644
 +                    let (look, limit) = turns.parts.unit_ai.get(u.id).map(|ai| (ai.look_around_timer.get(), ai.look_around_timeout.get())).unwrap_or((0, 0));
 +                    let a = crate::header_runs::checkpoint_action(turns.parts.actions_of(u.id), turns.parts.production.get(u.id));
 +                    let timer = turns.parts.unit_ai.get(u.id).map(|ai| ai.retarget_timer.get()).unwrap_or(0);
-+                    let ai_trace = turns.parts.unit_ai.get(u.id).map(|ai| format!("{:?} idle={}/{} order={:?} action={:?} target={:?}", ai.ai_kind, ai.idle_timer.get(), ai.adjusted_idle_timeout.get(), ai.current_order, ai.current_action, ai.current_target));
++                    let ai_trace = turns.parts.unit_ai.get(u.id).map(|ai| format!("{:?} idle={}/{} order={:?} action={:?} target={:?}", ai.ai_kind, ai.idle_timer.get(), ai.adjusted_idle_timeout.get(), ai.current_order, ai.current_action, ai.current_target) + &(if std::env::var_os("GENIE_TRACE_ORDERS").is_some() { format!(" orders={:?}", ai.orders) } else { String::new() }));
 +                    let kind = a.and_then(|a| a.kind).map(|k| k.get());
 +                    let action_state = a.map(|a| a.state.get()).unwrap_or(0);
 +                    eprintln!("OBJECT {}", serde_json::json!({"ms":turns.world_time.millis(),"tick":census.updates,"player":p,"id":u.id.get(),"held":u.life.amount.get(),"state":u.life.state as u8,"master":u.life.master_id.get(),"position":u.position().get(),"action_kind":kind,"action_state":action_state,"retarget_ms":timer,"look":look,"limit":limit,"ai":ai_trace}));
@@ -18664,10 +18731,38 @@ index 99849470..2db8af15 100644
 +            eprintln!("TIMING update={} initial_ms={} elapsed_ms={} actual_ms={}", census.updates, initial_time, elapsed_ms, turns.world_time.millis());
 +        }
 +        if std::env::var_os("GENIE_NO_STOP").is_none() && census.players.iter().all(CensusPlayer::done) {
++            end = CensusEnd::AllDone;
++            break;
++        }
++        // the survey's early stop: once both players' site words (1, 6, 10) have differed at a
++        // checkpoint, its numbers (first mismatch, site span) cannot change any more
++        if std::env::var_os("GENIE_STOP_AFTER_SITE_BREAK").is_some()
++            && census.site_bad.get(1).copied().unwrap_or(false)
++            && census.site_bad.get(2).copied().unwrap_or(false)
++        {
++            eprintln!("SITE_BREAK_STOP update={}", census.updates);
              end = CensusEnd::AllDone;
              break;
          }
-@@ -193,6 +348,8 @@ impl Census {
+@@ -170,6 +335,9 @@ struct Census {
+     next: usize,
+     updates: usize,
+     compared: usize,
++    /// Per player, whether a checkpoint's site words (1, 6 and 10, the survey's `cp.py`) have
++    /// differed (`GENIE_STOP_AFTER_SITE_BREAK`).
++    site_bad: Vec<bool>,
+ }
+ 
+ impl Census {
+@@ -181,6 +349,7 @@ impl Census {
+             next: 0,
+             updates: 0,
+             compared: 0,
++            site_bad: vec![false; players],
+         }
+     }
+ 
+@@ -193,6 +362,8 @@ impl Census {
                  && let Some((tick, object, why)) =
                      turns.players.get(p).and_then(|q| q.unsupported.as_ref())
              {
@@ -18676,10 +18771,18 @@ index 99849470..2db8af15 100644
                  player.stop = Some(CensusStop::of(tick.get(), *object, why));
              }
          }
-@@ -221,6 +378,15 @@ impl Census {
+@@ -221,6 +392,23 @@ impl Census {
              ) else {
                  continue;
              };
++            if std::env::var_os("GENIE_STOP_AFTER_SITE_BREAK").is_some() {
++                let block = lane_block(section, lane[8], state, &turns.parts);
++                if [1, 6, 10].iter().any(|&w| block[w] != lane[w])
++                    && let Some(bad) = self.site_bad.get_mut(p)
++                {
++                    *bad = true;
++                }
++            }
 +            if std::env::var_os("GENIE_PRINT_CHECKPOINTS").is_some() {
 +                let block = lane_block(section, lane[8], state, &turns.parts);
 +                eprintln!(
