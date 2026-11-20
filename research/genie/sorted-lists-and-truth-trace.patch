@@ -2584,18 +2584,10 @@ index 0f3076d6..705ddab1 100644
              if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
                  ai.set_action(record.action);
 diff --git a/crates/engine/genie-core/src/gathering/closest_resource.rs b/crates/engine/genie-core/src/gathering/closest_resource.rs
-index 9510abdd..624411b8 100644
+index 9510abdd..5a329898 100644
 --- a/crates/engine/genie-core/src/gathering/closest_resource.rs
 +++ b/crates/engine/genie-core/src/gathering/closest_resource.rs
-@@ -3,7 +3,6 @@
- 
- use crate::GenieError;
- use crate::gathering::DropSiteId;
--use crate::map::Distance;
- use crate::map::Point;
- use crate::map::Position;
- use crate::map::Tile;
-@@ -145,6 +144,8 @@ pub(crate) fn closest_resource_of(
+@@ -145,6 +145,8 @@ pub(crate) fn closest_resource_of(
              amount: u.life.amount,
              auto_gather: m.auto_gather.is_on(),
              gather_group: m.gather_group,
@@ -2604,7 +2596,7 @@ index 9510abdd..624411b8 100644
          })
      };
      let me = candidate(me_id, player, unit, unit.position())?;
-@@ -177,11 +178,33 @@ pub(crate) fn closest_resource_of(
+@@ -177,11 +179,33 @@ pub(crate) fn closest_resource_of(
      let master_id = unit.life.master_id;
      let plan = &mut c.plan;
      let blocked = mask.blocked() | BLOCKED;
@@ -2643,7 +2635,7 @@ index 9510abdd..624411b8 100644
          ResourceWorld {
              map: c.spatial.map,
              world: c.spatial,
-@@ -194,11 +217,27 @@ pub(crate) fn closest_resource_of(
+@@ -194,11 +218,27 @@ pub(crate) fn closest_resource_of(
                      (spatial, by_id),
                      plan,
                      id,
@@ -2673,8 +2665,142 @@ index 9510abdd..624411b8 100644
          gather_search_tuning,
      )
  }
+@@ -367,3 +407,133 @@ impl Unit {
+         .map(|(id, _)| id)
+     }
+ }
++
++/// The fishing ship's class (`0x15`): 0xcf9140's own branch (`0xcf974d`).
++const FISHING_SHIP_CLASS: i16 = 0x15;
++/// The shore fish's class (`0x21`), which the search keeps only as a fallback (`0xcf98bb`).
++const SHORE_FISH_CLASS: i16 = 0x21;
++/// What a kept shore fish's distance gains with the world's `+0x6b4` at 2 (`DAT_143218e70`).
++const SHORE_FISH_PENALTY: f32 = 14.0;
++/// The records the search looks at, at most (`cmp r13d, 0x64`).
++const FISHING_TESTED: u32 = 100;
++/// The records it turns down after looking closer, at most (`cmp r14d, 0x1e`).
++const FISHING_REJECTED: u32 = 30;
++
++impl Unit {
++    /// The fishing ship's unit AI slot 0x80 (188329 `0xcf9140`, vtable 0x32462a0; findings 193)
++    /// with no drop site and no workers cap (the Gather's search after its drop, 0xb81fd8..0xb82010:
++    /// −1, −1): its mode 3, from the unit. Its player's visible resources of group `kind`
++    /// (player `+0x220`, [`VisibleResources::closest`] = `0x1355850` from the unit's x and y,
++    /// passing over the records looked at) give the nearest record until 100 records were looked
++    /// at or 30 turned down. A record whose object the world does not hold (`0xd303e0`), is past
++    /// state 6, or lies at or past the master's search radius (slot 0x2e0, master `+0x234`) is
++    /// passed over. Else (the unit of class `0x15`, at state 2 or more) the unit's reach test
++    /// (slot 0x408 = `0x120ff70`, range 0, its last argument 1 after a failed test) decides: a
++    /// reached object other than a shore fish (class `0x21`) is the answer; the first reached
++    /// shore fish is kept with its distance (14 more with the world's `+0x6b4` at 2) and is the
++    /// answer once a later record lies farther, or at the end; an unreached one is turned down.
++    ///
++    /// [`VisibleResources::closest`]: crate::vision::visibility::VisibleResources::closest
++    pub(crate) fn fishing_resource_search(
++        &self,
++        actions: &Action,
++        c: &mut Step<'_>,
++        kind: GatherGroup,
++    ) -> Result<Option<ObjectId>, GenieError> {
++        let by_id = ObjectsRef::new(
++            &c.w.players,
++            &c.w.index,
++            &c.w.model.masters,
++            &c.w.parts,
++            &c.w.model.roles,
++            &c.w.model.tuning,
++        );
++        let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
++        let every = MasterTables::new(&c.w.model.masters, &c.w.parts.own_master);
++        let master = self.master(every, c.player)?;
++        let fishing_ship = master.class.get() == FISHING_SHIP_CLASS;
++        let far = master.action_part().search_radius;
++        let master_id = master.id;
++        let mover = c.w.parts.mover_of(self.id).ok_or(GenieError::unsupported(
++            "a resource search without movement state",
++        ))?;
++        let me_walk = self.me(actions);
++        let me_at = self.position();
++        let penalty = c.w.mode_680.get() == 2;
++        let mut plan = Planning {
++            pathing: &mut c.w.pathing,
++            now: c.w.world_time,
++            player_kind: c.w.players.player(c.player)?.kind,
++            object: c.w.streams.get(Stream::Object),
++            groups: &c.w.groups,
++        };
++        let spatial: &mut Spatial = &mut c.w.spatial;
++        let mut skip: Vec<ObjectId> = Vec::new();
++        let (mut tested, mut rejected) = (0_u32, 0_u32);
++        let mut keep = false;
++        let mut shore: Option<(ObjectId, f32)> = None;
++        while tested < FISHING_TESTED && rejected < FISHING_REJECTED {
++            let resources = spatial
++                .sight
++                .as_mut()
++                .and_then(|v| v.resources.get_mut(c.player.index()))
++                .ok_or(GenieError::unsupported(
++                    "a fishing ship's search without its player's visible resources",
++                ))?;
++            let Some(i) = resources.closest(me_at.ground(), kind, &skip) else {
++                break;
++            };
++            let record = *resources
++                .lists
++                .get(kind.index())
++                .and_then(|l| l.get(i))
++                .ok_or(GenieError::unsupported("a visible resource record past its list"))?;
++            let d = record.distance.get();
++            // 0xcf954e..0xcf9562: a kept shore fish nearer than this record is the answer
++            if let Some((id, sd)) = shore
++                && sd < d
++            {
++                return Ok(Some(id));
++            }
++            let target = others.find(record.id);
++            let held = match target {
++                // COMISS d, far; JAE: at or past the search radius (a NaN passes)
++                Some((owner, t)) if t.life.state < ObjectState::Removed && !(far.get() <= d) => {
++                    Some(t.master(every, owner)?.class.get())
++                }
++                _ => None,
++            };
++            if let Some(class) = held {
++                if !fishing_ship {
++                    return Err(GenieError::unsupported(
++                        "a fishing ship unit AI's resource search for a unit of another class (0xcf9753)",
++                    ));
++                }
++                if self.life.state < ObjectState::Alive {
++                    rejected += 1;
++                } else if mover.reaches_object_keeping(
++                    (me_at, &me_walk),
++                    (spatial, by_id),
++                    &mut plan,
++                    record.id,
++                    Distance::ZERO,
++                    (master_id, keep),
++                )? {
++                    if class != SHORE_FISH_CLASS {
++                        return Ok(Some(record.id));
++                    }
++                    if shore.is_none() {
++                        shore = Some((record.id, if penalty { d + SHORE_FISH_PENALTY } else { d }));
++                    }
++                    rejected += 1;
++                } else {
++                    keep = true;
++                    rejected += 1;
++                }
++            }
++            skip.push(record.id);
++            tested += 1;
++        }
++        Ok(shore.map(|(id, _)| id))
++    }
++}
 diff --git a/crates/engine/genie-core/src/gathering/drop_off.rs b/crates/engine/genie-core/src/gathering/drop_off.rs
-index 1e001e13..5730a1b4 100644
+index 1e001e13..1cbff77b 100644
 --- a/crates/engine/genie-core/src/gathering/drop_off.rs
 +++ b/crates/engine/genie-core/src/gathering/drop_off.rs
 @@ -8,9 +8,10 @@ use crate::gathering::drop_sites::SitePlace;
@@ -2776,7 +2902,40 @@ index 1e001e13..5730a1b4 100644
          self.after_drop_retarget(actions, c, found, by, roles)
              .map(|()| HeadCode::Keeps)
      }
-@@ -128,7 +182,9 @@ impl Unit {
+@@ -116,19 +170,34 @@ impl Unit {
+             return Ok(None);
+         };
+         let class = ai.target_class.or(gather.target_class);
+-        if ai.ai_kind != UnitAiKind::Civilian {
+-            return Err(GenieError::unsupported(
+-                "slot 0x1b0 of another unit AI than the civilian's",
+-            ));
++        // 188329 0xb81f8c..0xb82010 (findings 193): the unit AI's slot 0x1b0, then its slot 0x80
++        // with no drop site and no cap; the fishing ship's (vtable 0x32462a0) are 0xcf9d00 and
++        // 0xcf9140
++        match ai.ai_kind {
++            UnitAiKind::Civilian => {
++                let Some(kind) = class.and_then(|class| civilian_kind(class, &c.w.model.roles))
++                else {
++                    return Ok(None);
++                };
++                self.resource_search(actions, c, kind, WorkerCount::NO_CAP)
++            }
++            UnitAiKind::Fishing => {
++                let Some(kind) = class.and_then(|class| ai.resource_kind(class, &c.w.model.roles))
++                else {
++                    return Ok(None);
++                };
++                self.fishing_resource_search(actions, c, kind)
++            }
++            _ => Err(GenieError::unsupported(
++                "slot 0x1b0 of another unit AI than the civilian's or the fishing ship's",
++            )),
+         }
+-        let Some(kind) = class.and_then(|class| civilian_kind(class, &c.w.model.roles)) else {
+-            return Ok(None);
+-        };
+-        self.resource_search(actions, c, kind, WorkerCount::NO_CAP)
      }
  
      /// Nothing found after the drop: a Gather with its point walks there to search again
@@ -2787,7 +2946,7 @@ index 1e001e13..5730a1b4 100644
      /// (`LAB_140a8ed55`) a computer player's Gather is done (its code; its deletion lets the drop
      /// site go), a human's idles (`set_state(2)`: its targets and point cleared, its sprite
      /// [`Unit::idle_sprite`]'s) and lets its drop site go.
-@@ -139,11 +195,9 @@ impl Unit {
+@@ -139,11 +208,9 @@ impl Unit {
          by: Releaser,
          roles: &Roles,
      ) -> Result<HeadCode, GenieError> {
@@ -2802,7 +2961,7 @@ index 1e001e13..5730a1b4 100644
          let walks = self.move_walks(
              c.w.parts.mover_of(self.id),
              MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
-@@ -157,9 +211,22 @@ impl Unit {
+@@ -157,9 +224,22 @@ impl Unit {
          let gather = actions.list.gather_mut().ok_or(NO_GATHER)?;
          if gather.point.x() != -1.0 && gather.point.y() != -1.0 {
              if farm_waits {
@@ -2828,7 +2987,7 @@ index 1e001e13..5730a1b4 100644
              }
              // set_state(11) without a target: to the point within the task's range
              let mover =
-@@ -265,7 +332,7 @@ impl Unit {
+@@ -265,7 +345,7 @@ impl Unit {
          };
          let old = gather.targets();
          let rng = c.w.streams.get(Stream::Action);
@@ -2837,7 +2996,7 @@ index 1e001e13..5730a1b4 100644
              GatherRetarget {
                  target: &resource,
                  player: c.player,
-@@ -280,6 +347,15 @@ impl Unit {
+@@ -280,6 +360,15 @@ impl Unit {
              &c.w.model.tuning,
          )?;
          let new = gather.targets();
@@ -2853,7 +3012,7 @@ index 1e001e13..5730a1b4 100644
          for (old, new) in old.into_iter().zip(new) {
              if old == new {
                  continue;
-@@ -398,11 +474,14 @@ impl Unit {
+@@ -398,11 +487,14 @@ impl Unit {
          }
          let gather = actions.list.gather().ok_or(NO_GATHER)?;
          let (carry_to, state) = (gather.carry_to, gather.state);
@@ -2869,7 +3028,7 @@ index 1e001e13..5730a1b4 100644
              ActionState::new(state.get()),
              by_id,
          )?;
-@@ -448,11 +527,12 @@ impl Unit {
+@@ -448,11 +540,12 @@ impl Unit {
          }
          let hunt = actions.list.hunt().ok_or(NO_HUNT)?;
          let (carry_to, state) = (hunt.carry_to, hunt.state);
@@ -2883,7 +3042,7 @@ index 1e001e13..5730a1b4 100644
              ActionState::new(state.get()),
              by_id,
          )?;
-@@ -485,14 +565,14 @@ impl Unit {
+@@ -485,14 +578,14 @@ impl Unit {
      /// The drop site a gatherer's (with its mover `mover`) `set_state(8)` walks to, its second
      /// target `carry_to` or, with
      /// none and a master with drop sites (`+0x7a0`), the closest of them (`FUN_1411671e0`: first
@@ -2901,7 +3060,7 @@ index 1e001e13..5730a1b4 100644
          state: ActionState,
          by_id: ObjectsRef<'_>,
      ) -> Result<(Option<DropSiteId>, Distance), GenieError> {
-@@ -504,14 +584,25 @@ impl Unit {
+@@ -504,14 +597,25 @@ impl Unit {
                  "a drop-off of a player without masters",
              ))?;
              let sites = &master.action_part().drop_sites;
@@ -7513,7 +7672,7 @@ index 8ae7fee5..35ac2065 100644
              return MoveTo::Failed;
          }
 diff --git a/crates/engine/genie-core/src/movement/new_path.rs b/crates/engine/genie-core/src/movement/new_path.rs
-index 1f873756..5b3a08f6 100644
+index 1f873756..1a2d063d 100644
 --- a/crates/engine/genie-core/src/movement/new_path.rs
 +++ b/crates/engine/genie-core/src/movement/new_path.rs
 @@ -2,6 +2,7 @@
@@ -7623,7 +7782,45 @@ index 1f873756..5b3a08f6 100644
                  {
                      continue;
                  }
-@@ -463,6 +497,109 @@ impl Mover {
+@@ -401,6 +435,7 @@ impl Mover {
+             target: None,
+             range,
+             master,
++            keep: false,
+         };
+         self.reach_test(at, me, world, plan, ask, by_id)
+     }
+@@ -416,6 +451,21 @@ impl Mover {
+         target: ObjectId,
+         range: Distance,
+         master: MasterId,
++    ) -> Result<bool, GenieError> {
++        self.reaches_object_keeping((at, me), (world, by_id), plan, target, range, (master, false))
++    }
++
++    /// [`Mover::reaches_object`] with the test's last argument `keep` (188329 slot 0x408 =
++    /// `0x120ff70` hands its 7th argument to `0x107a5e0`'s 11th): set, a test that reaches the
++    /// short pather stops (its kept area is not modelled).
++    pub fn reaches_object_keeping(
++        &self,
++        (at, me): (Position, &Me),
++        (world, by_id): (&mut Spatial, ObjectsRef<'_>),
++        plan: &mut Planning<'_>,
++        target: ObjectId,
++        range: Distance,
++        (master, keep): (MasterId, bool),
+     ) -> Result<bool, GenieError> {
+         let Some(t) = world.get_known(target)? else {
+             return Ok(false);
+@@ -426,6 +476,7 @@ impl Mover {
+             target: Some(target),
+             range,
+             master,
++            keep,
+         };
+         self.reach_test(at, me, world, plan, ask, by_id)
+     }
+@@ -463,6 +514,109 @@ impl Mover {
          Ok(result.reaches().then(|| path.length()))
      }
  
@@ -7733,7 +7930,7 @@ index 1f873756..5b3a08f6 100644
      /// The length of the tile planner's path (`FUN_140f7c530` with the radii `radii`, range 0, no
      /// closed tiles, the tile search for a human player, no smoothing) from the unit to `to`, and
      /// the planner's result; None without a planner for the unit's restriction.
-@@ -493,3 +630,17 @@ impl Mover {
+@@ -493,3 +647,17 @@ impl Mover {
          Ok(Some((found, path.length)))
      }
  }
@@ -7752,7 +7949,7 @@ index 1f873756..5b3a08f6 100644
 +    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_DROPIGNORE_188329").is_some())
 +}
 diff --git a/crates/engine/genie-core/src/movement/path_end.rs b/crates/engine/genie-core/src/movement/path_end.rs
-index 8dd9623e..c8fce247 100644
+index 8dd9623e..3af45b9f 100644
 --- a/crates/engine/genie-core/src/movement/path_end.rs
 +++ b/crates/engine/genie-core/src/movement/path_end.rs
 @@ -31,7 +31,7 @@ use crate::movement::{
@@ -7764,7 +7961,38 @@ index 8dd9623e..c8fce247 100644
  use crate::pathing::tile_path::{Path, Request};
  use crate::players::PlayerId;
  use crate::players::PlayerSet;
-@@ -222,6 +222,140 @@ impl Mover {
+@@ -51,6 +51,10 @@ pub(super) struct ReachAsk {
+     pub(super) range: Distance,
+     /// The unit's master's id.
+     pub(super) master: MasterId,
++    /// The test's last argument (`0x107a5e0`'s 11th, the short pather's 12th): 1 keeps the short
++    /// pather's last area and hulls. Not modelled for the short pather: a test with it set that
++    /// reaches the short pather stops.
++    pub(super) keep: bool,
+ }
+ 
+ impl Mover {
+@@ -86,6 +90,7 @@ impl Mover {
+             target,
+             range,
+             master,
++            keep,
+         } = ask;
+         // FUN_14114fea0 and FUN_14114ffc0 hand the unit's +0x824 (x, height, y) as the start
+         let (x, y, height_at) = (self.moved_at.x(), self.moved_at.y(), self.moved_at.z());
+@@ -133,6 +138,11 @@ impl Mover {
+         let solid = 0.0 < radius.z() && 0.0 < radius.x() && 0.0 < radius.y();
+         let (dx, dy) = (to.x() - x, to.y() - y);
+         if solid && sqrt(dx * dx + 0.0 + dy * dy) <= movement_tuning.reach_short {
++            if keep {
++                return Err(GenieError::unsupported(
++                    "a reach test keeping the short pather's last area (0x107a5e0's last argument 1)",
++                ));
++            }
+             let goal = BVector::new(to.x(), 0.0, to.y());
+             // FUN_140fa0370 hands the start test both vectors' first two floats: x and the
+             // height, the unit's (`+0x824`) and the target's (slot 0x520), not x and y
+@@ -222,6 +232,140 @@ impl Mover {
          reaches(world.tiles(), world.map, &req, &gates, *long_path_tuning)
      }
  
@@ -7905,7 +8133,7 @@ index 8dd9623e..c8fce247 100644
      /// The test before a non-quiet `MoveTo`'s path end follows its moved target (`0x140aa2a70` in
      /// state 4): the top path (`FUN_140f960f0`) and the walked level's own path, that level being
      /// level 0, are both held, and the level's current waypoint (`FUN_140f9bcd0`) is the top
-@@ -298,7 +432,9 @@ impl Mover {
+@@ -298,7 +442,9 @@ impl Mover {
          now: WorldTime,
          planned: bool,
      ) {
@@ -7915,7 +8143,7 @@ index 8dd9623e..c8fce247 100644
          self.paths = vec![PathData {
              level: if planned {
                  WaypointLevel::Top
-@@ -344,14 +480,37 @@ impl Mover {
+@@ -344,14 +490,37 @@ impl Mover {
      ) {
          let start = from.vector();
          let mut path = Path::default();
@@ -7955,7 +8183,7 @@ index 8dd9623e..c8fce247 100644
              let end = goal.vector();
              let last = point_or_zero(&path, WaypointIndex::last_of(path.points.len()));
              let mut d = end - last;
-@@ -386,6 +545,7 @@ impl Mover {
+@@ -386,6 +555,7 @@ impl Mover {
              path_flags & !PathFlags::BACK_AND_FORTH
          };
          let repath_time = self.paths.first().map_or(Seconds::ZERO, |l| l.repath_time);
@@ -7963,7 +8191,7 @@ index 8dd9623e..c8fce247 100644
          self.paths = vec![PathData {
              level: WaypointLevel::Top,
              points: path.points,
-@@ -545,24 +705,37 @@ impl Mover {
+@@ -545,24 +715,37 @@ impl Mover {
          };
          // the walker's group (FUN_14152ff40 on +0x6d0) and its own move's reason there
          // (FUN_141017590): a member on one of reason 0 keeps buildings, walls and gates alone
@@ -8013,7 +8241,7 @@ index 8dd9623e..c8fce247 100644
              }
              if self.keeps_hit((at, me), player, (id, other), projected, now, by_id)? {
                  kept.push(id);
-@@ -641,3 +814,11 @@ fn target_placed(world: &Spatial, target: Option<ObjectId>) -> Result<Option<&Pl
+@@ -641,3 +824,11 @@ fn target_placed(world: &Spatial, target: Option<ObjectId>) -> Result<Option<&Pl
          })
          .transpose()
  }
@@ -13115,7 +13343,7 @@ index bf299a83..5761f4ab 100644
              return Answer::NotTaken;
          }
 diff --git a/crates/engine/genie-core/src/unit_ai/order_kinds.rs b/crates/engine/genie-core/src/unit_ai/order_kinds.rs
-index 281192de..6d860161 100644
+index 281192de..f5e52419 100644
 --- a/crates/engine/genie-core/src/unit_ai/order_kinds.rs
 +++ b/crates/engine/genie-core/src/unit_ai/order_kinds.rs
 @@ -26,8 +26,9 @@ use crate::unit_ai::TakenAs;
@@ -13216,6 +13444,21 @@ index 281192de..6d860161 100644
                  return Ok(OrderOutcome::NotTaken);
              };
              // slot 0x88 (`FUN_140c4b0f0`): slot 0x80 from the order's shown point, without a
+@@ -441,9 +499,11 @@ impl UnitAi {
+ 
+     /// Slot 0x1b0 by the unit AI's type: the kind of resource of a target class. The civilian's
+     /// (`FUN_140c1c4f0`) and the building's (`FUN_140c1c460`, the same switch,
+-    /// [`civilian_kind`]); the fishing ship's (`FUN_140c1c580`): fish for classes 5, 31 and 33,
+-    /// gold for 63; the base's (`FUN_140c4cc00`) none. None for the byte 0xff.
+-    pub(super) fn resource_kind(&self, class: ClassId, roles: &Roles) -> Option<GatherGroup> {
++    /// [`civilian_kind`]); the fishing ship's (`FUN_140c1c580`; 188329 `0xcf9d00` in vtable
++    /// 0x32462a0: bits 5, 31 and 33 of `0x280000020` -> 2, `0x3f` -> 4, else −1): fish for
++    /// classes 5, 31 and 33, gold for 63; the base's (`FUN_140c4cc00`; 188329 `0xd25d00`) none.
++    /// None for the byte 0xff.
++    pub(crate) fn resource_kind(&self, class: ClassId, roles: &Roles) -> Option<GatherGroup> {
+         match self.ai_kind {
+             UnitAiKind::Civilian | UnitAiKind::Building => civilian_kind(class, roles),
+             UnitAiKind::Fishing => {
 diff --git a/crates/engine/genie-core/src/unit_ai/process_order.rs b/crates/engine/genie-core/src/unit_ai/process_order.rs
 index 6f60bbc2..9d9b867f 100644
 --- a/crates/engine/genie-core/src/unit_ai/process_order.rs
