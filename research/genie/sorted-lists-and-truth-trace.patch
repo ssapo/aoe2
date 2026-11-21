@@ -5314,7 +5314,7 @@ index 398a973c..8fe3628e 100644
              self.stop_all_units(group, StopScope::Busy)?;
          }
 diff --git a/crates/engine/genie-core/src/groups/place.rs b/crates/engine/genie-core/src/groups/place.rs
-index 51f6a791..5ef1b44b 100644
+index 51f6a791..97d7eb86 100644
 --- a/crates/engine/genie-core/src/groups/place.rs
 +++ b/crates/engine/genie-core/src/groups/place.rs
 @@ -16,6 +16,8 @@ use crate::map::DistanceSquared;
@@ -5398,7 +5398,7 @@ index 51f6a791..5ef1b44b 100644
          let g = self.groups.held_mut(group)?;
          g.stored_positions.clear_points();
          g.motion.new_position[0] = at;
-@@ -402,6 +439,239 @@ impl World {
+@@ -402,6 +439,261 @@ impl World {
          Ok(())
      }
  
@@ -5602,8 +5602,30 @@ index 51f6a791..5ef1b44b 100644
 +            closed: Vec::new(),
 +            full: false,
 +        };
++        // 188329 0x10ef5ed..0x10ef65a (findings 194): the smoothing (0x1059760) takes the object of
++        // the group's target (`+0x3c8` through 0x1616cf0; none when the world does not hold it) as
++        // its target: its ignore list holds the lead and the target, and a building target that is
++        // no annex its annexes (0x10597dd..)
++        let target = ObjectId::of_field(g.current_target.target.saved().0)
++            .filter(|&t| self.world_object(t).is_some());
++        let annexes = {
++            let by_id = ObjectsRef::new(
++                &self.players,
++                &self.index,
++                &self.model.masters,
++                &self.parts,
++                &self.model.roles,
++                &self.model.tuning,
++            );
++            target
++                .filter(|&t| by_id.annex_of(t).is_none())
++                .map(|t| by_id.annexes(t).ids().collect::<Vec<_>>())
++                .unwrap_or_default()
++        };
 +        let tuning = &self.model.tuning.tile_path;
-+        let (slots, ignore) = self.pathing.smoothing_ignore(lead_id, None);
++        let (slots, ignore) = self
++            .pathing
++            .smoothing_ignore(lead_id, target.map(|t| (t, annexes.as_slice())));
 +        let tiles = self.spatial.tiles();
 +        let Some(planner) = self.pathing.planner(walker.restriction, tiles) else {
 +            return Ok(None);
@@ -5638,7 +5660,7 @@ index 51f6a791..5ef1b44b 100644
      /// The terrain classes master `master` of player `p` lets its objects stand on: its
      /// restriction (`+0x606`) in the map's table (`FUN_141054630`).
      ///
-@@ -870,3 +1140,79 @@ mod tests {
+@@ -870,3 +1162,79 @@ mod tests {
          );
      }
  }
