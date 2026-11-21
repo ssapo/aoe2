@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-21T15:06:35.313840+00:00",
-  "last_checked_at": "2026-11-21T15:03:28.100714+00:00",
+  "updated_at": "2026-11-21T20:13:13.611108+00:00",
+  "last_checked_at": "2026-11-21T20:08:58.263427+00:00",
   "sync_error": null,
   "profile": {
     "id": 347269,
@@ -9,6 +9,179 @@
     "name": "wR.ACCM"
   },
   "matches": [
+    {
+      "id": 522730536,
+      "started_at": 1795285250,
+      "finished_at": 1795287339,
+      "map": "my map",
+      "civilization": "Turks",
+      "result": "loss",
+      "rating_before": 1573,
+      "rating_after": 1558,
+      "match_type_id": 0,
+      "players_count": 2,
+      "players": [
+        {
+          "profile_id": 347269,
+          "name": "wR.ACCM",
+          "is_self": true,
+          "civilization": "Turks",
+          "rating_before": 1573
+        },
+        {
+          "profile_id": 339835,
+          "name": "DS_StonePleaseAoE",
+          "is_self": false,
+          "civilization": "Vikings",
+          "rating_before": 1596
+        }
+      ],
+      "analysis_status": "pending",
+      "analysis": null,
+      "attempts": 0,
+      "source_url": "https://www.aoe2insights.com/match/522730536/",
+      "civ_choice": {
+        "347269": false,
+        "339835": false
+      }
+    },
+    {
+      "id": 522723844,
+      "started_at": 1795283335,
+      "finished_at": 1795284925,
+      "map": "my map",
+      "civilization": "Koreans",
+      "result": "loss",
+      "rating_before": 1590,
+      "rating_after": 1573,
+      "match_type_id": 0,
+      "players_count": 2,
+      "players": [
+        {
+          "profile_id": 347269,
+          "name": "wR.ACCM",
+          "is_self": true,
+          "civilization": "Koreans",
+          "rating_before": 1590
+        },
+        {
+          "profile_id": 339835,
+          "name": "DS_StonePleaseAoE",
+          "is_self": false,
+          "civilization": "Celts",
+          "rating_before": 1579
+        }
+      ],
+      "analysis_status": "pending",
+      "analysis": null,
+      "attempts": 0,
+      "source_url": "https://www.aoe2insights.com/match/522723844/",
+      "civ_choice": {
+        "347269": false,
+        "339835": false
+      }
+    },
+    {
+      "id": 522715918,
+      "started_at": 1795280995,
+      "finished_at": 1795281591,
+      "map": "my map",
+      "civilization": "Chinese",
+      "result": "win",
+      "rating_before": 1572,
+      "rating_after": 1590,
+      "match_type_id": 0,
+      "players_count": 2,
+      "players": [
+        {
+          "profile_id": 347269,
+          "name": "wR.ACCM",
+          "is_self": true,
+          "civilization": "Chinese",
+          "rating_before": 1572
+        },
+        {
+          "profile_id": 10990866,
+          "name": "Le Stratège",
+          "is_self": false,
+          "civilization": "Vikings",
+          "rating_before": 1617
+        }
+      ],
+      "analysis_status": "pending",
+      "analysis": null,
+      "attempts": 0,
+      "source_url": "https://www.aoe2insights.com/match/522715918/",
+      "civ_choice_tries": 1
+    },
+    {
+      "id": 522708255,
+      "started_at": 1795278750,
+      "finished_at": 1795280096,
+      "map": "Atacama",
+      "civilization": "Sicilians",
+      "result": "win",
+      "rating_before": 3026,
+      "rating_after": 3035,
+      "match_type_id": 6,
+      "players_count": 2,
+      "players": [
+        {
+          "profile_id": 197964,
+          "name": "_LY_Yo",
+          "is_self": false,
+          "civilization": "Britons",
+          "rating_before": 2867
+        },
+        {
+          "profile_id": 347269,
+          "name": "wR.ACCM",
+          "is_self": true,
+          "civilization": "Sicilians",
+          "rating_before": 3026
+        }
+      ],
+      "analysis_status": "pending",
+      "analysis": null,
+      "attempts": 0,
+      "source_url": "https://www.aoe2insights.com/match/522708255/",
+      "civ_choice": {
+        "197964": true,
+        "347269": true
+      }
+    },
+    {
+      "id": 522687567,
+      "started_at": 1795273041,
+      "finished_at": 1795274892,
+      "map": "Arabian Desert",
+      "civilization": "Koreans",
+      "result": "win",
+      "rating_before": 3015,
+      "rating_after": 3026,
+      "match_type_id": 6,
+      "players_count": 2,
+      "players": [
+        {
+          "profile_id": 197964,
+          "name": "_LY_Yo",
+          "is_self": false,
+          "civilization": "Malay",
+          "rating_before": 2903
+        },
+        {
+          "profile_id": 347269,
+          "name": "wR.ACCM",
+          "is_self": true,
+          "civilization": "Koreans",
+          "rating_before": 3015
+        }
+      ],
+      "analysis_status": "pending",
+      "analysis": null,
+      "attempts": 0,
+      "source_url": "https://www.aoe2insights.com/match/522687567/"
+    },
     {
       "id": 522680919,
       "started_at": 1795271193,
@@ -373611,7 +373784,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 41,
+        "analysis_revision": 43,
         "duration_game_seconds": 1442.06,
         "civilization": "Khmer",
         "random_civ": false,
@@ -413449,7 +413622,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 41,
+        "analysis_revision": 43,
         "duration_game_seconds": 2591.16,
         "civilization": "Mongols",
         "random_civ": false,
@@ -438795,7 +438968,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 1,
-              "group": 78
+              "group": 78,
+              "units": {
+                "Spearman": 1
+              }
             },
             {
               "x": 52.398,
@@ -438804,7 +438980,11 @@
               "side": "mine",
               "kind": "ORDER",
               "selected_count": 4,
-              "group": 79
+              "group": 79,
+              "units": {
+                "Militia": 3,
+                "Scout Cavalry": 1
+              }
             },
             {
               "x": 50.406,
@@ -438813,7 +438993,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 4
+              "group": 4,
+              "units": {
+                "Scout Cavalry": 1
+              }
             },
             {
               "x": 40.755,
@@ -438821,7 +439004,10 @@
               "seconds": 606.02,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Scout Cavalry": 1
+              }
             },
             {
               "x": 50.604,
@@ -438830,7 +439016,10 @@
               "side": "mine",
               "kind": "ORDER",
               "selected_count": 3,
-              "group": 73
+              "group": 73,
+              "units": {
+                "Militia": 3
+              }
             },
             {
               "x": 50.793,
@@ -438839,7 +439028,10 @@
               "side": "mine",
               "kind": "ORDER",
               "selected_count": 3,
-              "group": 73
+              "group": 73,
+              "units": {
+                "Militia": 3
+              }
             },
             {
               "x": 51.017,
@@ -438847,7 +439039,10 @@
               "seconds": 606.63,
               "side": "mine",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Militia": 3
+              }
             },
             {
               "x": 48.167,
@@ -438856,7 +439051,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 3,
-              "group": 80
+              "group": 80,
+              "units": {
+                "Villager": 3
+              }
             },
             {
               "x": 54.802,
@@ -438864,7 +439062,10 @@
               "seconds": 610.09,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 3
+              }
             },
             {
               "x": 49.229,
@@ -466329,7 +466530,7 @@
               "selected_count": null
             }
           ],
-          "command_units_until": 603.8
+          "command_units_until": 610.3
         },
         "metrics": {
           "age_commands": {
@@ -477127,18 +477328,73 @@
               853,
               0,
               0
+            ],
+            [
+              630.0,
+              1786,
+              912,
+              130,
+              0,
+              1630,
+              913,
+              0,
+              0
+            ],
+            [
+              640.0,
+              1796,
+              947,
+              140,
+              0,
+              1705,
+              923,
+              0,
+              0
+            ],
+            [
+              650.0,
+              1796,
+              992,
+              150,
+              0,
+              1729,
+              963,
+              0,
+              0
+            ],
+            [
+              660.0,
+              1796,
+              1037,
+              150,
+              0,
+              1733,
+              1032,
+              0,
+              0
+            ],
+            [
+              670.0,
+              1826,
+              1067,
+              160,
+              0,
+              1733,
+              1050,
+              0,
+              0
             ]
           ],
-          "verified_until_seconds": 629.8,
+          "verified_until_seconds": 675.3,
           "own_total": [
-            1786,
-            912,
-            130,
+            1836,
+            1087,
+            170,
             0
           ],
           "opponent_total": [
-            1630,
-            903,
+            1783,
+            1060,
             0,
             0
           ],
@@ -478466,11 +478722,116 @@
                 0,
                 0,
                 0
+              ],
+              [
+                630.0,
+                664,
+                611,
+                485,
+                26,
+                0,
+                0,
+                0,
+                130,
+                0,
+                574,
+                681,
+                225,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                640.0,
+                664,
+                611,
+                485,
+                36,
+                0,
+                0,
+                0,
+                140,
+                0,
+                574,
+                681,
+                301,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                650.0,
+                664,
+                611,
+                485,
+                36,
+                0,
+                0,
+                0,
+                150,
+                0,
+                597,
+                681,
+                301,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                660.0,
+                664,
+                611,
+                485,
+                36,
+                0,
+                0,
+                0,
+                150,
+                0,
+                602,
+                681,
+                301,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                670.0,
+                664,
+                611,
+                485,
+                66,
+                0,
+                0,
+                0,
+                160,
+                0,
+                602,
+                681,
+                301,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
               ]
             ]
           },
           "animals": {
-            "until_seconds": 620.0,
+            "until_seconds": 670.0,
             "own": [
               {
                 "id": 4406,
@@ -478599,6 +478960,14 @@
                 "first_seconds": 570.0,
                 "last_seconds": 570.0,
                 "full": 75.0
+              },
+              {
+                "id": 4552,
+                "kind": "deer",
+                "eaten": 69.5,
+                "first_seconds": 630.0,
+                "last_seconds": 630.0,
+                "full": 75.0
               }
             ],
             "opponent": [
@@ -478668,9 +479037,9 @@
               {
                 "id": 4405,
                 "kind": "sheep",
-                "eaten": 72.7,
+                "eaten": 100.4,
                 "first_seconds": 530.0,
-                "last_seconds": 620.0
+                "last_seconds": 660.0
               },
               {
                 "id": 4562,
@@ -478678,12 +479047,19 @@
                 "eaten": 75.2,
                 "first_seconds": 570.0,
                 "last_seconds": 570.0
+              },
+              {
+                "id": 4560,
+                "kind": "deer",
+                "eaten": 75.2,
+                "first_seconds": 640.0,
+                "last_seconds": 640.0
               }
             ]
           },
           "engine_version": {
-            "research_commit": "4b1f2fc",
-            "patch_sha256": "23b783c7e2d5"
+            "research_commit": "aedccf4",
+            "patch_sha256": "ebd43919f115"
           }
         },
         "game_build": 188329,
@@ -746409,7 +746785,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 41,
+        "analysis_revision": 43,
         "duration_game_seconds": 2776.36,
         "civilization": "Ethiopians",
         "random_civ": true,
@@ -816309,8 +816685,8 @@
             ]
           },
           "engine_version": {
-            "research_commit": "4b1f2fc",
-            "patch_sha256": "23b783c7e2d5"
+            "research_commit": "aedccf4",
+            "patch_sha256": "ebd43919f115"
           }
         },
         "game_build": 188329,
