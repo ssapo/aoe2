@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-21T20:41:58.513061+00:00",
-  "last_checked_at": "2026-11-21T20:35:36.319547+00:00",
+  "updated_at": "2026-11-21T20:52:28.889934+00:00",
+  "last_checked_at": "2026-11-21T20:51:00.592847+00:00",
   "sync_error": null,
   "profile": {
     "id": 9423131,
@@ -88241,8 +88241,7 @@
       "civ_choice": {
         "9423131": true,
         "8793414": true
-      },
-      "analysis_note": "명령 기록 분석 완료"
+      }
     },
     {
       "id": 522734462,
@@ -154741,8 +154740,7 @@
       "civ_choice": {
         "9423131": true,
         "8793414": true
-      },
-      "analysis_note": "명령 기록 분석 완료"
+      }
     },
     {
       "id": 522728184,
@@ -859896,7 +859894,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 41,
+        "analysis_revision": 43,
         "duration_game_seconds": 13.52,
         "civilization": "Bohemians",
         "random_civ": true,
@@ -871782,7 +871780,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 41,
+        "analysis_revision": 43,
         "duration_game_seconds": 4163.63,
         "civilization": "Byzantines",
         "random_civ": true,
@@ -968092,8 +968090,8 @@
             ]
           },
           "engine_version": {
-            "research_commit": "4b1f2fc",
-            "patch_sha256": "23b783c7e2d5"
+            "research_commit": "aedccf4",
+            "patch_sha256": "ebd43919f115"
           }
         },
         "game_build": 188329,
@@ -968643,7 +968641,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 41,
+        "analysis_revision": 43,
         "duration_game_seconds": 2599.08,
         "civilization": "Burmese",
         "random_civ": true,
@@ -996707,7 +996705,11 @@
               "seconds": 704.74,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Militia": 3,
+                "Archer": 2
+              }
             },
             {
               "x": 95.812,
@@ -996716,7 +996718,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 92
+              "group": 92,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 61.292,
@@ -996725,7 +996730,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 88
+              "group": 88,
+              "units": {
+                "Spearman": 1
+              }
             },
             {
               "x": 89.5,
@@ -996733,7 +996741,10 @@
               "seconds": 706.56,
               "side": "mine",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 63.615,
@@ -996742,7 +996753,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 88
+              "group": 88,
+              "units": {
+                "Spearman": 1
+              }
             },
             {
               "x": 89.271,
@@ -996750,7 +996764,10 @@
               "seconds": 706.97,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 69.365,
@@ -996758,7 +996775,10 @@
               "seconds": 707.17,
               "side": "theirs",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Spearman": 1
+              }
             },
             {
               "x": 88.5,
@@ -996767,7 +996787,10 @@
               "side": "mine",
               "kind": "ORDER",
               "selected_count": 1,
-              "group": 92
+              "group": 92,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 88.5,
@@ -996776,7 +996799,10 @@
               "side": "mine",
               "kind": "ORDER",
               "selected_count": 1,
-              "group": 92
+              "group": 92,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 51.922,
@@ -996785,7 +996811,10 @@
               "side": "theirs",
               "kind": "ORDER",
               "selected_count": 1,
-              "group": 2
+              "group": 2,
+              "units": {
+                "Scout Cavalry": 1
+              }
             },
             {
               "x": 70.781,
@@ -996794,7 +996823,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 2,
-              "group": 89
+              "group": 89,
+              "units": {
+                "Archer": 2
+              }
             },
             {
               "x": 58.927,
@@ -1027407,7 +1027439,7 @@
               "selected_count": null
             }
           ],
-          "command_units_until": 704.4
+          "command_units_until": 710.9
         },
         "metrics": {
           "age_commands": {
@@ -1038049,7 +1038081,7 @@
             ],
             [
               690.0,
-              1725,
+              1715,
               1104,
               233,
               0,
@@ -1038060,7 +1038092,7 @@
             ],
             [
               700.0,
-              1783,
+              1782,
               1144,
               233,
               0,
@@ -1038068,19 +1038100,52 @@
               1257,
               174,
               0
+            ],
+            [
+              710.0,
+              1834,
+              1164,
+              243,
+              0,
+              1715,
+              1287,
+              184,
+              0
+            ],
+            [
+              720.0,
+              1844,
+              1213,
+              263,
+              0,
+              1745,
+              1317,
+              184,
+              0
+            ],
+            [
+              730.0,
+              1864,
+              1243,
+              273,
+              0,
+              1775,
+              1347,
+              194,
+              0
             ]
           ],
-          "verified_until_seconds": 704.4,
+          "verified_until_seconds": 736.9,
           "own_total": [
-            1793,
-            1144,
-            243,
+            1927,
+            1273,
+            273,
             0
           ],
           "opponent_total": [
-            1715,
-            1267,
-            174,
+            1821,
+            1367,
+            204,
             0
           ],
           "by_source": {
@@ -1039540,7 +1039605,7 @@
                 651,
                 489,
                 82,
-                30,
+                20,
                 0,
                 0,
                 233,
@@ -1039575,11 +1039640,74 @@
                 0,
                 174,
                 0
+              ],
+              [
+                710.0,
+                543,
+                651,
+                489,
+                112,
+                40,
+                0,
+                0,
+                243,
+                0,
+                547,
+                628,
+                446,
+                95,
+                0,
+                0,
+                0,
+                184,
+                0
+              ],
+              [
+                720.0,
+                543,
+                651,
+                489,
+                112,
+                50,
+                0,
+                0,
+                263,
+                0,
+                547,
+                628,
+                446,
+                125,
+                0,
+                0,
+                0,
+                184,
+                0
+              ],
+              [
+                730.0,
+                543,
+                651,
+                489,
+                132,
+                50,
+                0,
+                0,
+                273,
+                0,
+                567,
+                628,
+                446,
+                135,
+                0,
+                0,
+                0,
+                194,
+                0
               ]
             ]
           },
           "animals": {
-            "until_seconds": 700.0,
+            "until_seconds": 730.0,
             "own": [
               {
                 "id": 3121,
@@ -1039672,9 +1039800,17 @@
               {
                 "id": 3131,
                 "kind": "sheep",
-                "eaten": 87.9,
+                "eaten": 87.6,
                 "first_seconds": 670.0,
-                "last_seconds": 700.0
+                "last_seconds": 700.0,
+                "full": 100.0
+              },
+              {
+                "id": 3119,
+                "kind": "sheep",
+                "eaten": 32.1,
+                "first_seconds": 710.0,
+                "last_seconds": 710.0
               }
             ],
             "opponent": [
@@ -1039757,15 +1039893,15 @@
               {
                 "id": 3129,
                 "kind": "sheep",
-                "eaten": 10.0,
+                "eaten": 79.8,
                 "first_seconds": 700.0,
-                "last_seconds": 700.0
+                "last_seconds": 730.0
               }
             ]
           },
           "engine_version": {
-            "research_commit": "4b1f2fc",
-            "patch_sha256": "23b783c7e2d5"
+            "research_commit": "aedccf4",
+            "patch_sha256": "ebd43919f115"
           }
         },
         "game_build": 188329,
