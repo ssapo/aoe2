@@ -2278,6 +2278,35 @@ index e526db7f..2cd8b58f 100644
          // COMISS volley, firepower; JBE keeps it: a NaN firepower stays
          if b.garrison.is_empty()
              || self.parts.combat_of(b.id).firepower < bm.creatable_part().volley_fire
+diff --git a/crates/engine/genie-core/src/garrison/shelter.rs b/crates/engine/genie-core/src/garrison/shelter.rs
+index fb6cc356..3b44f7e1 100644
+--- a/crates/engine/genie-core/src/garrison/shelter.rs
++++ b/crates/engine/genie-core/src/garrison/shelter.rs
+@@ -381,9 +381,10 @@ impl World {
+     }
+ 
+     /// One shelter's part of [`World::shelter`]: the order splitter (`FUN_140fd9dc0` with
+-    /// command `0x2713`) on its units, which keeps those whose unit AI's test passes
+-    /// ([`World::ai_takes`]); then each loose unit (not in a group, `+0x6d0`; in state 2 or 6 or
+-    /// less, of a type 70 or more) takes slot 0x7e8 on the shelter at its place with task
++    /// command `0x2713`, 188329 0x10d8230 from 0x16f0680) on its units, which keeps those whose
++    /// unit AI's test passes ([`World::ai_takes`]); then each loose unit leaves the world group it
++    /// is in ([`World::leave_group_of`] with the shelter, 188329 0x16f1348..0x16f1379) and, in
++    /// state 2 or 6 or less, of a type 70 or more, takes slot 0x7e8 on the shelter at its place with task
+     /// filter 3, or, with [`Dispatch::Queued`] (`param_7`) and a unit AI, the unit AI's slot 0x30 (into
+     /// slot 0x28, `FUN_140c55c90`: not immediate, behind) queues the enter order (`0x2cd`) on
+     /// the shelter at its place: issued by the unit's own id, of the shelter's owner and master,
+@@ -415,6 +416,10 @@ impl World {
+         let going: Vec<Option<ObjectId>> = going.iter().copied().map(Some).collect();
+         let loose = self.loose_units_kept(&going, &|id| kept.contains(&id))?;
+         for id in loose {
++            // 188329 0x16f1348..0x16f1379: a loose unit in a group the world holds (`+0x210`)
++            // leaves it first, removeUnit (0x10f64b0) with the shelter's id and 0, whatever
++            // follows (the state test 0x1252480, the type, the order)
++            self.leave_group_of(id, Some(building.id()))?;
+             let Some(Place::Live(p, idx)) = self.place(id) else {
+                 return Err(GenieError::unsupported(
+                     "a garrison of a unit the slice does not hold live",
 diff --git a/crates/engine/genie-core/src/garrison/tests.rs b/crates/engine/genie-core/src/garrison/tests.rs
 index 88cdc0ef..02d0b5d2 100644
 --- a/crates/engine/genie-core/src/garrison/tests.rs
@@ -6428,10 +6457,21 @@ index 999d44b5..1edf79c0 100644
      }
  
 diff --git a/crates/engine/genie-core/src/groups/update/attack.rs b/crates/engine/genie-core/src/groups/update/attack.rs
-index 3130ba99..96309f7e 100644
+index 3130ba99..6d74151f 100644
 --- a/crates/engine/genie-core/src/groups/update/attack.rs
 +++ b/crates/engine/genie-core/src/groups/update/attack.rs
-@@ -182,9 +182,9 @@ impl World {
+@@ -144,7 +144,9 @@ impl World {
+             to,
+             MoveTo {
+                 range,
+-                flags: MoveFlags::FORGET_TARGET | MoveFlags::DIRECT,
++                // 188329 0x110c0b8..0x110c0e9 (findings 195): the move's last flag (`[rsp+0x58]`,
++                // 0x10d8ec1..0x10d8edf) is 1
++                flags: MoveFlags::FORGET_TARGET | MoveFlags::DIRECT | MoveFlags::FRESH,
+             },
+         )?;
+         *relayout = true;
+@@ -182,9 +184,9 @@ impl World {
      /// `finished`. With [`GroupFlags::ARRIVED`] the category is released at once; else it is when
      /// one of its units is within its attack range of the target: the footprint gap less a slack,
      /// at most the category's range (negative or unordered: 0). The slack is
@@ -6444,7 +6484,7 @@ index 3130ba99..96309f7e 100644
      /// `GroupTuning::ranged_slack`. A category without one in range ends `finished` (going). A
      /// released category stops the group's walk, clears [`GroupFlags::ATTACKING`] and sends its
      /// units at the target.
-@@ -261,7 +261,8 @@ impl World {
+@@ -261,7 +263,8 @@ impl World {
              if outranged {
                  self.model.tuning.group.chasing_slack
              } else {
@@ -6454,6 +6494,27 @@ index 3130ba99..96309f7e 100644
              }
          } else {
              self.model.tuning.group.contact_slack
+@@ -320,7 +323,8 @@ impl World {
+                 from.ground(),
+                 MoveTo {
+                     range: Distance::ZERO,
+-                    flags: MoveFlags::FORGET_TARGET | MoveFlags::DIRECT,
++                    // 188329 0x110c53e..0x110c568 (findings 195): the last flag is 1
++                    flags: MoveFlags::FORGET_TARGET | MoveFlags::DIRECT | MoveFlags::FRESH,
+                 },
+             )?;
+             return Ok(Some(Progress::Going));
+@@ -346,7 +350,9 @@ impl World {
+             at.ground(),
+             MoveTo {
+                 range,
+-                flags: MoveFlags::DIRECT,
++                // 188329 0x110c4ac..0x110c4e2 (findings 195): the chase's move with its last flag 1
++                // (`[rsp+0x58]`): RELAYOUT_AT_TURN and PLACE_AGAIN (0x10d8eda)
++                flags: MoveFlags::DIRECT | MoveFlags::FRESH,
+             },
+         )?;
+         let g = self.groups.held_mut(group)?;
 diff --git a/crates/engine/genie-core/src/groups/update/awake.rs b/crates/engine/genie-core/src/groups/update/awake.rs
 index 4ce9b2f7..b8899f03 100644
 --- a/crates/engine/genie-core/src/groups/update/awake.rs
