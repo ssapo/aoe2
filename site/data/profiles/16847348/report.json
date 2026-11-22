@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-22T09:45:54.482301+00:00",
-  "last_checked_at": "2026-11-22T09:41:55.186386+00:00",
+  "updated_at": "2026-11-22T15:55:26.505822+00:00",
+  "last_checked_at": "2026-11-22T15:54:44.254124+00:00",
   "sync_error": null,
   "profile": {
     "id": 16847348,
@@ -9,6 +9,114 @@
     "name": "ANKR.Blve"
   },
   "matches": [
+    {
+      "id": 522944165,
+      "started_at": 1795359656,
+      "finished_at": 1795361463,
+      "map": "goldenpit.rms2",
+      "civilization": "Portuguese",
+      "result": "win",
+      "rating_before": 2926,
+      "rating_after": 2944,
+      "match_type_id": 6,
+      "players_count": 2,
+      "players": [
+        {
+          "profile_id": 16847348,
+          "name": "ANKR.Blve",
+          "is_self": true,
+          "civilization": "Portuguese",
+          "rating_before": 2926
+        },
+        {
+          "profile_id": 8793414,
+          "name": "Oni.Lewis",
+          "is_self": false,
+          "civilization": "Bohemians",
+          "rating_before": 2979
+        }
+      ],
+      "analysis_status": "pending",
+      "analysis": null,
+      "attempts": 0,
+      "source_url": "https://www.aoe2insights.com/match/522944165/",
+      "civ_choice": {
+        "16847348": true,
+        "8793414": true
+      }
+    },
+    {
+      "id": 522938407,
+      "started_at": 1795358137,
+      "finished_at": 1795359560,
+      "map": "Arabian Desert",
+      "civilization": "Japanese",
+      "result": "loss",
+      "rating_before": 2941,
+      "rating_after": 2926,
+      "match_type_id": 6,
+      "players_count": 2,
+      "players": [
+        {
+          "profile_id": 16847348,
+          "name": "ANKR.Blve",
+          "is_self": true,
+          "civilization": "Japanese",
+          "rating_before": 2941
+        },
+        {
+          "profile_id": 8793414,
+          "name": "Oni.Lewis",
+          "is_self": false,
+          "civilization": "Maya",
+          "rating_before": 2964
+        }
+      ],
+      "analysis_status": "pending",
+      "analysis": null,
+      "attempts": 0,
+      "source_url": "https://www.aoe2insights.com/match/522938407/",
+      "civ_choice": {
+        "16847348": true,
+        "8793414": true
+      }
+    },
+    {
+      "id": 522932300,
+      "started_at": 1795356432,
+      "finished_at": 1795358032,
+      "map": "Arabian Desert",
+      "civilization": "Georgians",
+      "result": "loss",
+      "rating_before": 2958,
+      "rating_after": 2941,
+      "match_type_id": 6,
+      "players_count": 2,
+      "players": [
+        {
+          "profile_id": 8793414,
+          "name": "Oni.Lewis",
+          "is_self": false,
+          "civilization": "Gurjaras",
+          "rating_before": 2947
+        },
+        {
+          "profile_id": 16847348,
+          "name": "ANKR.Blve",
+          "is_self": true,
+          "civilization": "Georgians",
+          "rating_before": 2958
+        }
+      ],
+      "analysis_status": "pending",
+      "analysis": null,
+      "attempts": 0,
+      "source_url": "https://www.aoe2insights.com/match/522932300/",
+      "civ_choice": {
+        "8793414": true,
+        "16847348": true
+      }
+    },
     {
       "id": 522723868,
       "started_at": 1795283166,
@@ -648437,7 +648545,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 41,
+        "analysis_revision": 43,
         "duration_game_seconds": 2869.66,
         "civilization": "Muisca",
         "random_civ": true,
@@ -714801,8 +714909,8 @@
             ]
           },
           "engine_version": {
-            "research_commit": "4b1f2fc",
-            "patch_sha256": "23b783c7e2d5"
+            "research_commit": "aedccf4",
+            "patch_sha256": "ebd43919f115"
           }
         },
         "game_build": 188329,
