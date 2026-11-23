@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#19251f">
+<title>엔진 재생 · AoE2 리플 분석</title>
+<link rel="icon" href="../icon.svg" type="image/svg+xml">
+<style>
+  :root { --bg: #14161a; --panel: #1e2127; --text: #e6e6e6; --muted: #9aa0a6; --ok: #3fb950; --bad: #f85149; --warn: #d29922; --accent: #58a6ff; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 system-ui, sans-serif; }
+  header { padding: 10px 16px; background: var(--panel); display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  header h1 { font-size: 17px; margin: 0; }
+  header a { color: var(--accent); text-decoration: none; }
+  main { display: flex; flex-wrap: wrap; gap: 16px; padding: 12px 16px; }
+  #setup { width: 100%; background: var(--panel); border-radius: 8px; padding: 10px 14px; }
+  #setup h2 { font-size: 14px; margin: 4px 0 6px; }
+  #setup .step { margin: 8px 0 12px; }
+  #setup code { background: #2d333b; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+  .ok { color: var(--ok); } .bad { color: var(--bad); } .warn { color: var(--warn); }
+  #stage { position: relative; width: min(100%, 820px); aspect-ratio: 1 / 1; max-height: 82vh; }
+  #map { position: absolute; inset: 0; width: 100%; height: 100%; background: #0d0f12; border: 1px solid #333; touch-action: none; cursor: grab; }
+  #map.dragging { cursor: grabbing; }
+  #tip { position: absolute; left: 8px; top: 8px; max-width: 260px; background: rgba(20,22,26,.92); border: 1px solid #444c56; border-radius: 6px; padding: 6px 8px; font-size: 12px; pointer-events: none; display: none; white-space: pre-line; }
+  #reset { position: absolute; right: 8px; top: 8px; }
+  #unverified { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); background: rgba(248,81,73,.9); color: #fff; padding: 2px 10px; border-radius: 10px; font-size: 12px; display: none; pointer-events: none; }
+  #zoomInfo { position: absolute; right: 8px; bottom: 8px; color: var(--muted); font-size: 11px; pointer-events: none; }
+  #side { flex: 1; min-width: 260px; max-width: 440px; }
+  .row { display: flex; align-items: center; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
+  button { background: #2d333b; color: var(--text); border: 1px solid #444c56; border-radius: 6px; padding: 6px 12px; cursor: pointer; font: inherit; }
+  button.primary { background: #238636; border-color: #2ea043; }
+  button:disabled { opacity: .5; cursor: default; }
+  #clock { font: 600 28px/1 ui-monospace, monospace; }
+  #clockMark { font-size: 13px; margin-left: 8px; }
+  #seek { width: 100%; }
+  #span { height: 6px; border-radius: 3px; margin-top: 2px; background: #333; position: relative; overflow: hidden; }
+  #span i { position: absolute; top: 0; bottom: 0; left: 0; }
+  #spanDone { background: rgba(248,81,73,.45); } #spanOk { background: var(--ok); }
+  pre { background: var(--panel); padding: 8px; border-radius: 6px; white-space: pre-wrap; font-size: 12px; max-height: 240px; overflow: auto; }
+  .legend span { margin-right: 10px; white-space: nowrap; }
+  #players div { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
+  #players b { display: inline-block; width: 14px; height: 14px; border-radius: 3px; }
+  small, .note { color: var(--muted); }
+  #player[hidden] { display: none; }
+</style>
+</head>
+<body>
+<header>
+  <a href="../">← 경기 기록</a>
+  <h1>엔진 재생 <small>(PC)</small></h1>
+  <span id="status" role="status"></span>
+</header>
+<main>
+  <section id="setup" aria-label="재생 준비">
+    <p class="note">genie 엔진이 리플의 명령을 그대로 다시 실행해 경기를 재현해요. 아직 완벽하지 않아서, 기록과 맞는지 확인된 구간(초록)이 지나면 "확인 안 됨"으로 표시해요. 게임 데이터는 내 PC의 게임 폴더에서 읽고, 어디로도 보내지 않아요.</p>
+    <div class="step">
+      <h2>1. 게임 데이터 폴더</h2>
+      <div>AoE2 DE 설치 폴더의 <code>resources\_common\dat</code> 폴더를 골라 주세요. 예: <code>C:\Program Files (x86)\Steam\steamapps\common\AoE2DE\resources\_common\dat</code></div>
+      <div class="row"><input type="file" id="fDat" webkitdirectory multiple aria-label="게임 데이터 폴더"><span id="datStatus"></span></div>
+    </div>
+    <div class="step">
+      <h2>2. 리플</h2>
+      <div id="recAuto"></div>
+      <div class="row"><label>리플 파일 직접 고르기 <input type="file" id="fRec" accept=".aoe2record,.zip"></label><span id="recStatus"></span></div>
+    </div>
+    <div class="row"><button class="primary" id="bStart" disabled>재생 시작</button><span class="note">처음 불러올 때 몇 초 걸려요.</span></div>
+  </section>
+  <div id="stage" hidden>
+    <canvas id="map"></canvas>
+    <div id="tip"></div>
+    <div id="unverified">확인 안 됨</div>
+    <button id="reset" title="지도 전체 보기">전체 보기</button>
+    <div id="zoomInfo"></div>
+  </div>
+  <div id="side" hidden>
+    <div><span id="clock">00:00</span><span id="clockMark"></span></div>
+    <div class="row">
+      <button id="bPlay" disabled>재생</button>
+      <label>속도 <select id="speed"><option>1</option><option>2</option><option selected>4</option><option>8</option><option>16</option><option>32</option></select>배</label>
+      <label><input type="checkbox" id="unitLabels"> 유닛 이름 항상</label>
+    </div>
+    <input type="range" id="seek" min="0" max="1000" value="0" disabled aria-label="시간">
+    <div id="span" title="초록: 기록과 맞는지 확인된 구간 · 빨강: 계산했지만 확인 안 됨"><i id="spanDone"></i><i id="spanOk"></i></div>
+    <div id="players"></div>
+    <div class="row legend"><span>■ 건물</span><span>▲ 유닛</span><span>● 일꾼</span><span style="color:#8b7d6b">▲ 가이아 동물</span><span style="color:#2f6b38">■ 나무</span><span style="color:#d4b13a">■ 금</span><span style="color:#9a9a9a">■ 돌</span></div>
+    <small>휠·두 손가락으로 확대, 끌어서 이동, 유닛에 마우스를 올리거나 누르면 정보가 나와요. 건물 이름은 항상, 유닛 이름은 가까이 확대하면 보여요.</small>
+    <pre id="info">-</pre>
+  </div>
+</main>
+<script src="names.js?v=20261123"></script>
+<script src="replay.js?v=20261123"></script>
+</body>
+</html>
