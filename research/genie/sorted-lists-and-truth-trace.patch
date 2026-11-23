@@ -671,7 +671,7 @@ index 655d3f46..73d72b42 100644
  
  /// Slot 0xb8 of a combat object (`FUN_141203be0`) on hit points `hp` with the powerups
 diff --git a/crates/engine/genie-core/src/combat/damage/mod.rs b/crates/engine/genie-core/src/combat/damage/mod.rs
-index ecf1b8b0..e23adbbd 100644
+index ecf1b8b0..63af4273 100644
 --- a/crates/engine/genie-core/src/combat/damage/mod.rs
 +++ b/crates/engine/genie-core/src/combat/damage/mod.rs
 @@ -198,6 +198,20 @@ pub struct Victim {
@@ -688,7 +688,7 @@ index ecf1b8b0..e23adbbd 100644
 +    /// [`crate::combat::hit_effects::drains`]).
 +    pub drains: bool,
 +    /// A loss left it below 1 hit point while it [`Victim::drains`]: its kill credit, which the
-+    /// write-back stops on.
++    /// write-back leaves for the caller ([`crate::world::World::drain_credit`]).
 +    pub drained: bool,
 +    /// The kill bonuses its kills owe (`0x168fc40`, [`KillBonus`]), for the caller.
 +    pub kill_bonus: Vec<KillBonus>,
@@ -1183,7 +1183,7 @@ index 0fb891c7..83511618 100644
  pub mod missile;
  pub(crate) mod victim_reads;
 diff --git a/crates/engine/genie-core/src/combat/victim_reads.rs b/crates/engine/genie-core/src/combat/victim_reads.rs
-index 41187161..8871f887 100644
+index 41187161..765f8cd9 100644
 --- a/crates/engine/genie-core/src/combat/victim_reads.rs
 +++ b/crates/engine/genie-core/src/combat/victim_reads.rs
 @@ -178,6 +178,16 @@ pub(crate) fn victim_of(
@@ -1198,7 +1198,7 @@ index 41187161..8871f887 100644
 +            .copied()
 +            .collect(),
 +        effects: Vec::new(),
-+        drains: crate::combat::hit_effects::drains(&combat.hit_effects),
++        drains: !combat.kill_counted && crate::combat::hit_effects::drains(&combat.hit_effects),
 +        drained: false,
          // a combat object's slot 0xf0 is FUN_141082530 (types 50 and up)
          armored: (MasterKind::RGE_COMBAT <= kind).then(|| Armored {
@@ -1212,7 +1212,7 @@ index 41187161..8871f887 100644
          building: (kind == MasterKind::BUILDING).then(|| DamageBuilding {
              main: building.annex_of,
 diff --git a/crates/engine/genie-core/src/combat/victims.rs b/crates/engine/genie-core/src/combat/victims.rs
-index d29be68b..7cc12c7b 100644
+index d29be68b..9ae19ce9 100644
 --- a/crates/engine/genie-core/src/combat/victims.rs
 +++ b/crates/engine/genie-core/src/combat/victims.rs
 @@ -2,7 +2,7 @@
@@ -1238,55 +1238,56 @@ index d29be68b..7cc12c7b 100644
  use crate::objects::unit::Unit;
  use crate::players::Amount;
  use crate::players::PlayerId;
-@@ -187,6 +193,8 @@ pub(crate) struct KillLeft {
+@@ -187,6 +193,11 @@ pub(crate) struct KillLeft {
      pub(crate) kill: Option<Kill>,
      /// What each hit that left it, a building, below 1 hit point counted.
      pub(crate) razed: Vec<Razed>,
 +    /// The kill bonuses its kills owe ([`World::kill_bonus`]).
 +    pub(crate) bonus: Vec<KillBonus>,
++    /// A loss left it below 1 hit point while it held a draining hit effect record
++    /// ([`World::drain_credit`], `0x12b9ad0`).
++    pub(crate) drained: bool,
  }
  
  impl KillLeft {
-@@ -196,6 +204,7 @@ impl KillLeft {
+@@ -196,6 +207,8 @@ impl KillLeft {
              id,
              kill: Some(kill),
              razed: Vec::new(),
 +            bonus: Vec::new(),
++            drained: false,
          }
      }
  }
-@@ -260,13 +269,21 @@ pub(crate) fn victim(
+@@ -260,13 +273,17 @@ pub(crate) fn victim(
  /// with 0, [`World::wake_sleeper`]) to take the rest. A live one takes its hit points, what it holds,
  /// its sleep flag, its decay, its powerups and charge, a struck building's
  /// `damaged_lately_timer`, the damage notifies (500) to its unit AI, and a struck building's
 -/// annexes take its hit points (`+0xbc0`..). Returns its kill and razings for the caller
 +/// annexes take its hit points (`+0xbc0`..), and it takes the hit effect records its attackers'
 +/// hits put on it ([`crate::combat::hit_effects`]); a loss below 1 hit point while it holds a
-+/// draining record stops (`0x12b9ad0`'s kill credit). Returns its kill and razings for the caller
++/// draining record leaves its kill credit for the caller ([`KillLeft::drained`]). Returns its kill and razings for the caller
  /// ([`KillLeft`]); `v` keeps neither them nor its notifies, so another write-back repeats none.
  ///
  /// # Errors
  ///
  /// A notify its unit AI's queue does not take.
  pub(crate) fn write_back(c: &mut Step<'_>, v: &mut Victim) -> Result<Option<KillLeft>, GenieError> {
-+    if take(&mut v.drained) {
-+        return Err(GenieError::unsupported(
-+            "the death of an object with a draining hit effect: its attackers' kill credit (0x12b9ad0)",
-+        ));
-+    }
++    let drained = take(&mut v.drained);
 +    let effects = take(&mut v.effects);
      let damaged = take(&mut v.damaged);
      let left = KillLeft {
          id: v.id,
-@@ -276,6 +293,7 @@ pub(crate) fn write_back(c: &mut Step<'_>, v: &mut Victim) -> Result<Option<Kill
+@@ -276,6 +293,8 @@ pub(crate) fn write_back(c: &mut Step<'_>, v: &mut Victim) -> Result<Option<Kill
              .as_mut()
              .map(|b| take(&mut b.razed))
              .unwrap_or_default(),
 +        bonus: take(&mut v.kill_bonus),
++        drained,
      };
      let Some((_, _, sleeps)) = c.w.locate(v.id) else {
          return Ok(None);
-@@ -308,6 +326,11 @@ pub(crate) fn write_back(c: &mut Step<'_>, v: &mut Victim) -> Result<Option<Kill
+@@ -308,6 +327,11 @@ pub(crate) fn write_back(c: &mut Step<'_>, v: &mut Victim) -> Result<Option<Kill
      }
      // a shield spends its charge
      combat.charge = v.source.charge;
@@ -1298,9 +1299,30 @@ index d29be68b..7cc12c7b 100644
      // the damage notify (500) to its unit AI
      if let Some(ai) = c.w.parts.unit_ai.get_mut(v.id) {
          for &(attacker, p) in &damaged {
-@@ -346,16 +369,40 @@ pub(crate) fn file_kill(
+@@ -326,7 +350,7 @@ pub(crate) fn write_back(c: &mut Step<'_>, v: &mut Victim) -> Result<Option<Kill
+             x.life.hp = v.hp;
+         }
+     }
+-    Ok((left.kill.is_some() || !left.razed.is_empty()).then_some(left))
++    Ok((left.kill.is_some() || !left.razed.is_empty() || left.drained).then_some(left))
+ }
+ 
+ /// A hit's kill and razings where the hit runs (the damage slot `FUN_1412108e0` kills and counts
+@@ -345,17 +369,52 @@ pub(crate) fn file_kill(
+     k: KillLeft,
      roles: &Roles,
  ) -> Result<(), GenieError> {
++    // 188329 0x12b9ad0: the loss below 1 hit point paid its poisoners first
++    if k.drained {
++        let mine = me.master(c.w.master_tables(), c.player)?.clone();
++        let me_at = (me.id, c.player, &mine);
++        if k.id == c.me {
++            c.w.drain_credit(me_at, Some(me_at))?;
++        } else if let Some((q, u)) = c.w.object(k.id) {
++            let target = u.master(c.w.master_tables(), q)?.clone();
++            c.w.drain_credit((k.id, q, &target), Some(me_at))?;
++        }
++    }
      if k.id != c.me {
 -        return c.w.kill_left(&k);
 +        c.w.kill_left(&k)?;
@@ -1342,7 +1364,7 @@ index d29be68b..7cc12c7b 100644
  }
  
  /// A strike's write-back where it ran ([`write_back`]), each object's kill and razings right
-@@ -464,7 +511,8 @@ impl World {
+@@ -464,7 +523,8 @@ impl World {
      ) -> Result<(), GenieError> {
          let u = &self.players.live(q, j)?;
          let master = u.master(self.master_tables(), q)?.clone();
@@ -1352,7 +1374,7 @@ index d29be68b..7cc12c7b 100644
          if kill.to_gaia {
              self.give_gaia(q, j)?;
          }
-@@ -483,6 +531,7 @@ impl World {
+@@ -483,6 +543,7 @@ impl World {
          q: PlayerId,
          master: &Master,
          kill: Kill,
@@ -1360,13 +1382,78 @@ index d29be68b..7cc12c7b 100644
      ) -> Result<(), GenieError> {
          if self.players.player(q)?.kind.is_computer() {
              return Err(GenieError::unsupported(
-@@ -520,7 +569,203 @@ impl World {
+@@ -520,7 +581,268 @@ impl World {
                      .add_attribute(kind, Amount::new(1.0))?;
              }
          }
 -        self.count_kill_of(q, master, ap)
++        // 188329: the kill record (slot 0x970, 0x12b98d0) runs only while +0x594 is 0; a
++        // poisoner's credit (0x12b9ad0, [`World::drain_credit`]) has set it
++        if self.parts.combat_of(id).kill_counted {
++            return Ok(());
++        }
 +        self.count_kill_of(q, master, ap)?;
 +        self.removal_rewards(q, master, ap, id)
++    }
++
++    /// 188329 `0x12b9ad0`'s kill credit, when a loss left `target` (id, player `q`, master)
++    /// below 1 hit point with `+0x594` (`kill_counted`) still 0: each of its hit effect records
++    /// of kind 109 or 120 with a value below 0, in order, whose attacker the world still holds
++    /// (`0x1616cf0`; `me` is the updating object out of its slot), pays the attacker's player
++    /// once: the first such attacker's kill bonus (`0x168fc40` with the target's player and
++    /// master) and the target's removal rewards to that player (`0x12ba320`); then each paid
++    /// player, in that order, counts the kill (`0x12b2d50`, [`World::count_kill_of`]). With any
++    /// paid, `+0x594` is 1, so the hit's own kill record (slot 0x970) pays nothing more
++    /// ([`World::count_killed`]). Not held: the local player's statistics (`0xb407e0`).
++    ///
++    /// # Errors
++    ///
++    /// What the kill bonus or the rewards do not model, or an attribute a player lacks.
++    pub(crate) fn drain_credit(
++        &mut self,
++        (tid, q, target): (ObjectId, PlayerId, &Master),
++        me: Option<(ObjectId, PlayerId, &Master)>,
++    ) -> Result<(), GenieError> {
++        let combat = self.parts.combat_of(tid);
++        if combat.kill_counted {
++            return Ok(());
++        }
++        let records = combat.hit_effects.clone();
++        let mut paid: Vec<PlayerId> = Vec::new();
++        for r in records
++            .iter()
++            .filter(|r| crate::combat::hit_effects::drains(std::slice::from_ref(*r)))
++        {
++            let (ap, am) = match me {
++                Some((id, p, m)) if id == r.attacker => (p, m.clone()),
++                _ => match self.object(r.attacker) {
++                    Some((p, u)) => (p, u.master(self.master_tables(), p)?.clone()),
++                    None => continue,
++                },
++            };
++            if paid.contains(&ap) {
++                continue;
++            }
++            self.kill_bonus(
++                ap,
++                &am,
++                KillBonus {
++                    killer: r.attacker,
++                    player: q,
++                    master: target.id,
++                    class: target.class,
++                },
++            )?;
++            self.removal_rewards(q, target, ap, tid)?;
++            paid.push(ap);
++        }
++        for &ap in &paid {
++            self.count_kill_of(q, target, ap)?;
++        }
++        if !paid.is_empty() {
++            self.parts.combat_mut(tid)?.kill_counted = true;
++        }
++        Ok(())
 +    }
 +
 +    /// The kill record's removal rewards (188329 `0x12b98d0` -> `0x12ba320`, for a killed object of
@@ -1565,7 +1652,7 @@ index d29be68b..7cc12c7b 100644
      }
  
      /// `FUN_1412005b0` on the object `id` killed for player `killer` (a movement damage's,
-@@ -587,6 +832,33 @@ impl World {
+@@ -587,6 +909,33 @@ impl World {
      }
  }
  
@@ -1865,19 +1952,20 @@ index d2edcddb..227bdaf4 100644
 +        .or(Some(id))
 +}
 diff --git a/crates/engine/genie-core/src/commands/new_building.rs b/crates/engine/genie-core/src/commands/new_building.rs
-index 12e38a35..9d2fb70c 100644
+index 12e38a35..93142f17 100644
 --- a/crates/engine/genie-core/src/commands/new_building.rs
 +++ b/crates/engine/genie-core/src/commands/new_building.rs
-@@ -294,6 +294,8 @@ impl World {
+@@ -294,6 +294,9 @@ impl World {
              regen_timer: Seconds::ZERO,
              regen_powerup: Regeneration::ZERO,
              regen_stinger: Regeneration::ZERO,
 +            hit_effects: Vec::new(),
 +            effect_regen: Regeneration::ZERO,
++            kill_counted: false,
              attack_count: AttackCount::ZERO,
              // the TRIBE combat setup (FUN_14121df60): the master's volley fire
              firepower: player_master(&self.model.masters, player, master)
-@@ -331,6 +333,7 @@ impl World {
+@@ -331,6 +334,7 @@ impl World {
              place: Static::at(position),
              flags: UnitFlags::ATTACKABLE,
              last_human_order: WorldTime::ZERO,
@@ -9355,10 +9443,10 @@ index 8555387e..5d72f241 100644
              | actions::Action::Missile(_)
              | actions::Action::Make(_)
 diff --git a/crates/engine/genie-core/src/objects/layers/combat.rs b/crates/engine/genie-core/src/objects/layers/combat.rs
-index 6f8b2b4c..366fb897 100644
+index 6f8b2b4c..79e38400 100644
 --- a/crates/engine/genie-core/src/objects/layers/combat.rs
 +++ b/crates/engine/genie-core/src/objects/layers/combat.rs
-@@ -78,6 +78,15 @@ pub struct Combat {
+@@ -78,6 +78,19 @@ pub struct Combat {
      ///
      /// [`regeneration_rate`]: crate::objects::hit_points::regeneration_rate
      pub regen_stinger: Regeneration,
@@ -9371,6 +9459,10 @@ index 6f8b2b4c..366fb897 100644
 +    /// rate adds last.
 +    #[diff(gap = "the import does not read the hit effects' regeneration sum (188329 +0x7c4)")]
 +    pub effect_regen: Regeneration,
++    /// 188329 `+0x594`: its kill is counted (a poisoner's credit, `0x12b9ad0`, or its kill
++    /// record, slot 0x970 `0x12b98d0`, has run), so neither runs again.
++    #[diff(gap = "the import does not read the kill-counted flag (188329 +0x594)")]
++    pub kill_counted: bool,
      /// `mReloadStinger` (`+0xb40`), added to its master's reload time.
      pub reload_stinger: Seconds,
      /// `mHitpointsPowerup` and `mHitpointsMaxPowerup` (`+0xa38`, `+0xa3c`), which the task finder
@@ -9443,10 +9535,10 @@ index a4790a15..9dff401e 100644
      pub fn push(&mut self, unit: Unit) {
          self.units.push(unit);
 diff --git a/crates/engine/genie-core/src/objects/release.rs b/crates/engine/genie-core/src/objects/release.rs
-index bd8b67b7..6a379730 100644
+index bd8b67b7..94d33f98 100644
 --- a/crates/engine/genie-core/src/objects/release.rs
 +++ b/crates/engine/genie-core/src/objects/release.rs
-@@ -145,12 +145,49 @@ impl World {
+@@ -145,12 +145,48 @@ impl World {
          }
          let master = master.clone();
          let u = self.players.live_mut(p, i)?;
@@ -9456,17 +9548,16 @@ index bd8b67b7..6a379730 100644
 -            dt_seconds,
 -            &self.model.tuning.turn,
 +        let before = u.life.hp;
-+        let combat = self.parts.combat_mut(u.id)?;
++        let id = u.id;
++        let combat = self.parts.combat_mut(id)?;
 +        u.regenerate(combat, &master, dt_seconds, &self.model.tuning.turn);
 +        // 188329 0x12b9ad0 (slot 0xb8, the regeneration's loss): below 1 hit point with a
-+        // draining hit effect record its attackers are paid the kill, not modelled
++        // draining hit effect record its attackers are paid the kill (World::drain_credit)
 +        if u.life.hp < before
 +            && u.life.hp.get() < 1.0
 +            && crate::combat::hit_effects::drains(&combat.hit_effects)
 +        {
-+            return Err(GenieError::unsupported(
-+                "the death of an object with a draining hit effect: its attackers' kill credit (0x12b9ad0)",
-+            ));
++            self.drain_credit((id, p, &master), None)?;
 +        }
 +        Ok(())
 +    }
@@ -9501,7 +9592,7 @@ index bd8b67b7..6a379730 100644
          Ok(())
      }
  
-@@ -192,8 +229,13 @@ impl World {
+@@ -192,8 +228,13 @@ impl World {
          else {
              return;
          };
@@ -20783,16 +20874,17 @@ index a098b509..d6d9246f 100644
  }
  
 diff --git a/crates/tools/genie-oracle/src/saved_unit.rs b/crates/tools/genie-oracle/src/saved_unit.rs
-index 0c50b9eb..8a6dd3d8 100644
+index 0c50b9eb..b38aef54 100644
 --- a/crates/tools/genie-oracle/src/saved_unit.rs
 +++ b/crates/tools/genie-oracle/src/saved_unit.rs
-@@ -271,6 +271,9 @@ fn row(
+@@ -271,6 +271,10 @@ fn row(
              object.combat().map_or(0.0, |c| c.regeneration_rate_powerup),
          ),
          regen_stinger: Regeneration::new(object.combat().map_or(0.0, |c| c.regeneration_stinger)),
 +        // the save's records (188329 +0x7f0) and their sum (+0x7c4) are not read
 +        hit_effects: Vec::new(),
 +        effect_regen: Regeneration::ZERO,
++        kill_counted: false,
          next_volley: MissileCount::of_data(object.combat().map_or(0, |c| c.next_volley)),
          raider_countdown: RaiderCountdown::of_data(
              object.combat().map_or(0, |c| c.raider_build_countdown),
