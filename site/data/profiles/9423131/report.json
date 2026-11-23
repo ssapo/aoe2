@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-23T02:03:25.392649+00:00",
-  "last_checked_at": "2026-11-23T02:02:31.519823+00:00",
+  "updated_at": "2026-11-23T05:19:33.882077+00:00",
+  "last_checked_at": "2026-11-23T05:15:57.155354+00:00",
   "sync_error": null,
   "profile": {
     "id": 9423131,
@@ -9,6 +9,42 @@
     "name": "wR.Lucho"
   },
   "matches": [
+    {
+      "id": 523084888,
+      "started_at": 1795399020,
+      "finished_at": 1795403518,
+      "map": "Arabia",
+      "civilization": "Italians",
+      "result": "win",
+      "rating_before": 3058,
+      "rating_after": 3072,
+      "match_type_id": 6,
+      "players_count": 2,
+      "players": [
+        {
+          "profile_id": 251265,
+          "name": "TAG_MbL_",
+          "is_self": false,
+          "civilization": "Ethiopians",
+          "rating_before": 3019
+        },
+        {
+          "profile_id": 9423131,
+          "name": "wR.Lucho",
+          "is_self": true,
+          "civilization": "Italians",
+          "rating_before": 3058
+        }
+      ],
+      "analysis_status": "pending",
+      "analysis": null,
+      "attempts": 0,
+      "source_url": "https://www.aoe2insights.com/match/523084888/",
+      "civ_choice": {
+        "251265": true,
+        "9423131": true
+      }
+    },
     {
       "id": 523079712,
       "started_at": 1795397156,
@@ -39,7 +75,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 43,
+        "analysis_revision": 44,
         "duration_game_seconds": 2920.02,
         "civilization": "Ethiopians",
         "random_civ": true,
@@ -29962,7 +29998,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 122
+              "group": 122,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 65.25,
@@ -29971,7 +30010,10 @@
               "side": "theirs",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 136
+              "group": 136,
+              "units": {
+                "Skirmisher": 1
+              }
             },
             {
               "x": 75.5,
@@ -29979,7 +30021,10 @@
               "seconds": 783.76,
               "side": "mine",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 75.5,
@@ -29987,7 +30032,10 @@
               "seconds": 784.16,
               "side": "mine",
               "kind": "ORDER",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 77.0,
@@ -29996,7 +30044,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 1,
-              "group": 122
+              "group": 122,
+              "units": {
+                "Villager": 1
+              }
             },
             {
               "x": 73.203,
@@ -30005,7 +30056,10 @@
               "side": "mine",
               "kind": "MOVE",
               "selected_count": 3,
-              "group": 132
+              "group": 132,
+              "units": {
+                "Archer": 3
+              }
             },
             {
               "x": 72.805,
@@ -30013,7 +30067,10 @@
               "seconds": 785.99,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 3
+              }
             },
             {
               "x": 72.497,
@@ -30021,7 +30078,10 @@
               "seconds": 786.19,
               "side": "mine",
               "kind": "MOVE",
-              "selected_count": null
+              "selected_count": null,
+              "units": {
+                "Archer": 3
+              }
             },
             {
               "x": 77.917,
@@ -63012,7 +63072,7 @@
               "selected_count": null
             }
           ],
-          "command_units_until": 782.4
+          "command_units_until": 788.9
         },
         "metrics": {
           "age_commands": {
@@ -74626,16 +74686,16 @@
               0
             ]
           ],
-          "verified_until_seconds": 782.4,
+          "verified_until_seconds": 788.9,
           "own_total": [
-            2159,
-            1421,
+            2179,
+            1441,
             250,
             0
           ],
           "opponent_total": [
             2035,
-            1495,
+            1545,
             195,
             0
           ],
@@ -76509,8 +76569,8 @@
             ]
           },
           "engine_version": {
-            "research_commit": "aedccf4",
-            "patch_sha256": "ebd43919f115"
+            "research_commit": "6af7e8f",
+            "patch_sha256": "d1980b3c5fd8"
           }
         },
         "game_build": 188329,
@@ -76976,7 +77036,6 @@
       },
       "attempts": 1,
       "source_url": "https://www.aoe2insights.com/match/523079712/",
-      "analysis_note": "명령 기록 분석 완료",
       "civ_choice": {
         "9423131": true,
         "251265": true
@@ -77012,7 +77071,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 43,
+        "analysis_revision": 44,
         "duration_game_seconds": 1881.02,
         "civilization": "Hindustanis",
         "random_civ": true,
@@ -134208,8 +134267,8 @@
             ]
           },
           "engine_version": {
-            "research_commit": "aedccf4",
-            "patch_sha256": "ebd43919f115"
+            "research_commit": "6af7e8f",
+            "patch_sha256": "d1980b3c5fd8"
           }
         },
         "game_build": 188329,
@@ -134602,7 +134661,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 43,
+        "analysis_revision": 44,
         "duration_game_seconds": 1866.47,
         "civilization": "Japanese",
         "random_civ": true,
@@ -186881,8 +186940,8 @@
             ]
           },
           "engine_version": {
-            "research_commit": "aedccf4",
-            "patch_sha256": "ebd43919f115"
+            "research_commit": "6af7e8f",
+            "patch_sha256": "d1980b3c5fd8"
           }
         },
         "game_build": 188329,
