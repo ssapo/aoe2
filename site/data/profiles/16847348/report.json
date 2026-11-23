@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-23T12:48:41.272741+00:00",
-  "last_checked_at": "2026-11-23T12:48:40.745545+00:00",
+  "updated_at": "2026-11-23T13:16:58.709744+00:00",
+  "last_checked_at": "2026-11-23T13:14:05.515863+00:00",
   "sync_error": null,
   "profile": {
     "id": 16847348,
@@ -9,6 +9,42 @@
     "name": "ANKR.Blve"
   },
   "matches": [
+    {
+      "id": 523151719,
+      "started_at": 1795437787,
+      "finished_at": 1795438818,
+      "map": "Atacama",
+      "civilization": "Teutons",
+      "result": "win",
+      "rating_before": 2910,
+      "rating_after": 2919,
+      "match_type_id": 6,
+      "players_count": 2,
+      "players": [
+        {
+          "profile_id": 2309468,
+          "name": "AiM | Whocl",
+          "is_self": false,
+          "civilization": "Slavs",
+          "rating_before": 2737
+        },
+        {
+          "profile_id": 16847348,
+          "name": "ANKR.Blve",
+          "is_self": true,
+          "civilization": "Teutons",
+          "rating_before": 2910
+        }
+      ],
+      "analysis_status": "pending",
+      "analysis": null,
+      "attempts": 0,
+      "source_url": "https://www.aoe2insights.com/match/523151719/",
+      "civ_choice": {
+        "2309468": true,
+        "16847348": true
+      }
+    },
     {
       "id": 522970718,
       "started_at": 1795366693,
@@ -39,7 +75,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 43,
+        "analysis_revision": 45,
         "duration_game_seconds": 3385.71,
         "civilization": "Malay",
         "random_civ": true,
@@ -77015,8 +77051,8 @@
             ]
           },
           "engine_version": {
-            "research_commit": "aedccf4",
-            "patch_sha256": "ebd43919f115"
+            "research_commit": "9201f07",
+            "patch_sha256": "5f703426f8b4"
           }
         },
         "game_build": 188329,
@@ -77544,7 +77580,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 43,
+        "analysis_revision": 45,
         "duration_game_seconds": 2985.22,
         "civilization": "Varangians",
         "random_civ": true,
@@ -150133,8 +150169,8 @@
             ]
           },
           "engine_version": {
-            "research_commit": "aedccf4",
-            "patch_sha256": "ebd43919f115"
+            "research_commit": "9201f07",
+            "patch_sha256": "5f703426f8b4"
           }
         },
         "game_build": 188329,
@@ -150576,7 +150612,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 43,
+        "analysis_revision": 45,
         "duration_game_seconds": 2279.37,
         "civilization": "Persians",
         "random_civ": true,
