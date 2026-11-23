@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-23T11:19:06.744518+00:00",
-  "last_checked_at": "2026-11-23T11:19:06.411730+00:00",
+  "updated_at": "2026-11-23T11:41:20.207448+00:00",
+  "last_checked_at": "2026-11-23T11:37:20.766052+00:00",
   "sync_error": null,
   "profile": {
     "id": 506898,
@@ -214624,7 +214624,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 44,
+        "analysis_revision": 45,
         "duration_game_seconds": 1737.42,
         "civilization": "Khitans",
         "random_civ": true,
@@ -267151,8 +267151,8 @@
             ]
           },
           "engine_version": {
-            "research_commit": "f9d42f1",
-            "patch_sha256": "5eda19e7b276"
+            "research_commit": "9201f07",
+            "patch_sha256": "5f703426f8b4"
           }
         },
         "game_build": 188329,
@@ -267543,7 +267543,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 43,
+        "analysis_revision": 45,
         "duration_game_seconds": 1959.67,
         "civilization": "Byzantines",
         "random_civ": true,
@@ -323526,18 +323526,62 @@
               1887,
               0,
               0
+            ],
+            [
+              750.0,
+              2111,
+              1419,
+              0,
+              0,
+              2023,
+              1957,
+              0,
+              0
+            ],
+            [
+              760.0,
+              2163,
+              1469,
+              0,
+              0,
+              2053,
+              1977,
+              0,
+              0
+            ],
+            [
+              770.0,
+              2233,
+              1509,
+              0,
+              0,
+              2093,
+              2037,
+              0,
+              0
+            ],
+            [
+              780.0,
+              2253,
+              1558,
+              0,
+              0,
+              2173,
+              2087,
+              0,
+              0
             ]
           ],
-          "verified_until_seconds": 743.2,
+          "verified_until_seconds": 782.2,
           "own_total": [
-            2101,
-            1399,
+            2283,
+            1558,
             0,
             0
           ],
           "opponent_total": [
-            2013,
-            1927,
+            2173,
+            2087,
             0,
             0
           ],
@@ -325117,11 +325161,95 @@
                 0,
                 0,
                 0
+              ],
+              [
+                750.0,
+                489,
+                683,
+                353,
+                446,
+                140,
+                0,
+                0,
+                0,
+                0,
+                589,
+                695,
+                354,
+                295,
+                90,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                760.0,
+                521,
+                683,
+                353,
+                456,
+                150,
+                0,
+                0,
+                0,
+                0,
+                589,
+                695,
+                354,
+                295,
+                120,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                770.0,
+                531,
+                683,
+                353,
+                476,
+                190,
+                0,
+                0,
+                0,
+                0,
+                589,
+                695,
+                354,
+                335,
+                120,
+                0,
+                0,
+                0,
+                0
+              ],
+              [
+                780.0,
+                531,
+                683,
+                353,
+                486,
+                200,
+                0,
+                0,
+                0,
+                0,
+                649,
+                695,
+                354,
+                335,
+                140,
+                0,
+                0,
+                0,
+                0
               ]
             ]
           },
           "animals": {
-            "until_seconds": 740.0,
+            "until_seconds": 780.0,
             "own": [
               {
                 "id": 3705,
@@ -325210,6 +325338,20 @@
                 "first_seconds": 640.0,
                 "last_seconds": 730.0,
                 "full": 100.0
+              },
+              {
+                "id": 3703,
+                "kind": "sheep",
+                "eaten": 14.7,
+                "first_seconds": 750.0,
+                "last_seconds": 770.0
+              },
+              {
+                "id": 3707,
+                "kind": "sheep",
+                "eaten": 38.0,
+                "first_seconds": 750.0,
+                "last_seconds": 760.0
               }
             ],
             "opponent": [
@@ -325306,13 +325448,21 @@
                 "kind": "sheep",
                 "eaten": 88.9,
                 "first_seconds": 730.0,
-                "last_seconds": 740.0
+                "last_seconds": 740.0,
+                "full": 100.0
+              },
+              {
+                "id": 3704,
+                "kind": "sheep",
+                "eaten": 60.0,
+                "first_seconds": 780.0,
+                "last_seconds": 780.0
               }
             ]
           },
           "engine_version": {
-            "research_commit": "aedccf4",
-            "patch_sha256": "ebd43919f115"
+            "research_commit": "9201f07",
+            "patch_sha256": "5f703426f8b4"
           }
         },
         "game_build": 188329,
@@ -325638,7 +325788,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 43,
+        "analysis_revision": 45,
         "duration_game_seconds": 3391.59,
         "civilization": "Jurchens",
         "random_civ": true,
@@ -400837,7 +400987,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 43,
+        "analysis_revision": 45,
         "duration_game_seconds": 6387.35,
         "civilization": "Chinese",
         "random_civ": true,
@@ -542811,8 +542961,8 @@
             ]
           },
           "engine_version": {
-            "research_commit": "aedccf4",
-            "patch_sha256": "ebd43919f115"
+            "research_commit": "9201f07",
+            "patch_sha256": "5f703426f8b4"
           }
         },
         "game_build": 188329,
@@ -543386,7 +543536,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 43,
+        "analysis_revision": 45,
         "duration_game_seconds": 1802.86,
         "civilization": "Wei",
         "random_civ": true,
@@ -600022,8 +600172,8 @@
             ]
           },
           "engine_version": {
-            "research_commit": "aedccf4",
-            "patch_sha256": "ebd43919f115"
+            "research_commit": "9201f07",
+            "patch_sha256": "5f703426f8b4"
           }
         },
         "game_build": 188329,
