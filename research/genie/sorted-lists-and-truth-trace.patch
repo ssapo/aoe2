@@ -402,11 +402,48 @@ index d8cbc980..7b95dc90 100644
      let weapons = own.weapons.clone();
      let mut others: Vec<&mut Victim> = blasted.iter_mut().collect();
      take(
+diff --git a/crates/engine/genie-core/src/combat/attack/ready_to_attack.rs b/crates/engine/genie-core/src/combat/attack/ready_to_attack.rs
+index 7dc14390..df758484 100644
+--- a/crates/engine/genie-core/src/combat/attack/ready_to_attack.rs
++++ b/crates/engine/genie-core/src/combat/attack/ready_to_attack.rs
+@@ -48,8 +48,9 @@ impl Attack {
+     /// `set_state(6)` (case 6): with a target or a point (`+0x38` not −1, `UCOMISS`: a NaN one
+     /// is), the range test ([`Attack::ready_to_attack`]); in reach and ready, the swing
+     /// (`set_state` 7). Not ready, a unit whose slot 0x5d8 answers 1 (a master whose move
+-    /// algorithm has bit 0) clears its `+0x958`, the count that picks the second attack sprite,
+-    /// which the slice does not hold ([`Attack::set_swing`]); readyToAttack never answers 2, so
++    /// algorithm has bit 0) clears its `+0x958` (188329 `+0x598`), the flag that picks the second
++    /// attack sprite ([`crate::movement::Mover::attack_alternate`], [`Attack::set_swing`]);
++    /// readyToAttack never answers 2, so
+     /// the `set_state(13)` after it is not reached. Without either a unit's own Attack posts
+     /// 0x1fa with 600 (the action completed) and ends (`set_state` 1, [`Attack::finish`]).
+     pub(super) fn ready(
+@@ -67,7 +68,19 @@ impl Attack {
+             }
+             return self.finish(unit, g.motion.reborrow(), g.sprite_rng, sprite_tuning);
+         }
+-        match self.ready_to_attack(unit, g, f, r, AtOnce::Tested)? {
++        let ready = self.ready_to_attack(unit, g, f, r, AtOnce::Tested)?;
++        // 188329 0xb739d0..0xb739fb (findings 198): not ready, an alternating unit of type 0x32
++        // and up clears its `+0x598` ([`crate::movement::Mover::attack_alternate`])
++        if !matches!(ready, Readiness::Ready) && MasterKind::RGE_COMBAT <= f.own.kind {
++            if let Some(m) = g.motion.mover_mut().filter(|m| {
++                m.stats
++                    .move_algorithm
++                    .contains(crate::movement::MoveAlgorithm::ALTERNATES_SPRITES)
++            }) {
++                m.attack_alternate = false;
++            }
++        }
++        match ready {
+             Readiness::Ready => self.set_swing(unit, g, f, r),
+             Readiness::Waiting => Ok(()),
+             Readiness::Away(gap) => self.follow(unit, g, r, f, gap),
 diff --git a/crates/engine/genie-core/src/combat/attack/tests.rs b/crates/engine/genie-core/src/combat/attack/tests.rs
-index c9d08c60..d116e71b 100644
+index c9d08c60..e479b6ca 100644
 --- a/crates/engine/genie-core/src/combat/attack/tests.rs
 +++ b/crates/engine/genie-core/src/combat/attack/tests.rs
-@@ -598,8 +598,11 @@ fn soldier_mover(speed: f32) -> Mover {
+@@ -598,8 +598,12 @@ fn soldier_mover(speed: f32) -> Mover {
          angle: Angle::ZERO,
          animated: Animated::default(),
          pauses: Vec::new(),
@@ -415,10 +452,11 @@ index c9d08c60..d116e71b 100644
          in_the_way: Vec::new(),
          sprite_facets: None,
 +        future: None,
++        attack_alternate: false,
      }
  }
  
-@@ -965,6 +968,7 @@ fn strike_on_an_annex_hits_its_main_building() {
+@@ -965,6 +969,7 @@ fn strike_on_an_annex_hits_its_main_building() {
          from_z: Some(0.0),
          kind: HitKind::Melee,
          chance: HitChance::of_data(100),
@@ -426,7 +464,7 @@ index c9d08c60..d116e71b 100644
      };
      let struck = strike(
          &mut own,
-@@ -1020,6 +1024,7 @@ fn building_relic_raises_its_missile_hit() {
+@@ -1020,6 +1025,7 @@ fn building_relic_raises_its_missile_hit() {
              from_z: Some(2.0),
              kind: HitKind::Missile,
              chance: HitChance::of_data(100),
@@ -519,6 +557,55 @@ index 13b2a730..1ce6d2c9 100644
          };
          let struck = strike(&mut f.own, &mut f.victim, blasted, hit, object_rng, layer)?;
          Ok(struck.executed)
+diff --git a/crates/engine/genie-core/src/combat/attack/work_slots.rs b/crates/engine/genie-core/src/combat/attack/work_slots.rs
+index fcb9b0f6..1bb23adf 100644
+--- a/crates/engine/genie-core/src/combat/attack/work_slots.rs
++++ b/crates/engine/genie-core/src/combat/attack/work_slots.rs
+@@ -76,8 +76,8 @@ impl Attack {
+     /// attack sprite (`+0x70`) or, with a second one (`+0x78`), a draw of the Object stream
+     /// (`FUN_140810fc0` with 2, [`crate::math::rng::Well512::below_checked`]: 0 the first) for a master
+     /// whose move algorithm lacks [`crate::movement::MoveAlgorithm::ALTERNATES_SPRITES`] (slot
+-    /// 0x5d8); one with it takes the second after a stop
+-    /// (`+0x958`, not held). The unit takes it (without one slot 0x68 shows its master's standing
++    /// 0x5d8); one with it takes the second after a combat object's stop (`+0x958`, 188329
++    /// `+0x598`: [`crate::movement::Mover::attack_alternate`]), else the first. The unit takes it (without one slot 0x68 shows its master's standing
+     /// sprite) from its first frame (`FUN_1413b9f00`); a hit is pending; a reload shorter than
+     /// the sprite speeds the animation up to fit it.
+     ///
+@@ -107,16 +107,28 @@ impl Attack {
+             Some(special)
+         } else if let Some(second) = self.arms.second_sprite {
+             if alternates {
+-                return Err(GenieError::unsupported(
+-                    "an attacker with a second attack sprite (its draw)",
+-                ));
+-            }
+-            let object = g.object_rng.as_deref_mut().ok_or(NO_OBJECT_STREAM)?;
++                // 188329 0xb73c15..0xb73c3c (findings 198): an alternating unit takes its second
++                // attack sprite when its combat object's `+0x598` is set (a stop set it,
++                // `0x115b840`), clearing it, else its first; no draw. Only a combat object's
++                // stop sets it ([`crate::movement::Mover::attack_alternate`])
++                let set = MasterKind::COMBAT <= f.own.kind
++                    && g.motion.mover().is_some_and(|m| m.attack_alternate);
++                if set {
++                    if let Some(m) = g.motion.mover_mut() {
++                        m.attack_alternate = false;
++                    }
++                    Some(second)
++                } else {
++                    self.arms.sprite
++                }
++            } else {
++                let object = g.object_rng.as_deref_mut().ok_or(NO_OBJECT_STREAM)?;
+             if object.below_checked(2) == 0 {
+                 self.arms.sprite
+             } else {
+                 Some(second)
+             }
++            }
+         } else {
+             self.arms.sprite
+         };
 diff --git a/crates/engine/genie-core/src/combat/damage/blasts.rs b/crates/engine/genie-core/src/combat/damage/blasts.rs
 index 82a2e6a1..8c907e18 100644
 --- a/crates/engine/genie-core/src/combat/damage/blasts.rs
@@ -1354,10 +1441,10 @@ index d29be68b..c897b0a3 100644
  /// above 0): a trebuchet, packed or not, whose kill counts as a unit's.
  pub(crate) fn is_trebuchet(master: &Master, roles: &Roles) -> bool {
 diff --git a/crates/engine/genie-core/src/combat/volley/launch.rs b/crates/engine/genie-core/src/combat/volley/launch.rs
-index 9a856bbb..8c31034d 100644
+index 9a856bbb..ef88ada7 100644
 --- a/crates/engine/genie-core/src/combat/volley/launch.rs
 +++ b/crates/engine/genie-core/src/combat/volley/launch.rs
-@@ -130,8 +130,11 @@ impl Unit {
+@@ -130,8 +130,12 @@ impl Unit {
              last_turn: Seconds::ZERO,
              angle,
              pauses: Vec::new(),
@@ -1366,10 +1453,11 @@ index 9a856bbb..8c31034d 100644
              in_the_way: Vec::new(),
              sprite_facets: facets,
 +            future: None,
++            attack_alternate: false,
          };
          let mut position = mover.set_position(shot.at, c.w.spatial.map, &c.w.model.tuning.movement);
          if !flying {
-@@ -238,7 +241,32 @@ impl Unit {
+@@ -238,7 +242,32 @@ impl Unit {
                  &c.w.model.tuning.missile,
              )?
          };
@@ -2207,6 +2295,38 @@ index 92c1f195..59410b34 100644
  /// The units in gate `gate` (`FUN_1411d0570`): the obstruction manager's query from its first
  /// annex to its second (`+0xbc0`, `+0xbc8`) with flags 0x10, the gate and its annexes ignored
  /// (`FUN_1410562e0`), every record and the query grown by `TurnTuning::gate_grow` (`FUN_1410562d0`), any
+diff --git a/crates/engine/genie-core/src/garrison/enter.rs b/crates/engine/genie-core/src/garrison/enter.rs
+index b048cee4..c28b7442 100644
+--- a/crates/engine/genie-core/src/garrison/enter.rs
++++ b/crates/engine/genie-core/src/garrison/enter.rs
+@@ -274,9 +274,24 @@ impl World {
+         }
+         let (tp, t) = self.object(target).ok_or_else(|| object_gone(target))?;
+         if !self.has_room(tp, t, Some(id))? {
+-            return Err(GenieError::unsupported(
+-                "an Enter into a building without room (state 11)",
+-            ));
++            // 188329 Enter start 0xb780f0 (findings 199): a target without room (slot 0x1b0)
++            // gives the interface its message (0xb77720, not held) and set_state(0xb): the
++            // target still held, the point is its place (0xb77190), and a quiet MoveTo walks
++            // there; the Enter is installed as a walking one
++            let place = t.position();
++            let unit = self.players.live(player, idx)?;
++            let reads = MoveToReads::of(
++                (unit, self.parts.mover_of(unit.id)),
++                unit.master(self.master_tables(), player)?,
++                (
++                    &self.model.graphics,
++                    self.parts.combat_of(unit.id).abilities.look.as_ref(),
++                ),
++                &self.model.roles,
++            );
++            action.walk_point(Some(place), &reads, &self.model.tuning.move_to)?;
++            self.parts.actions.of_mut(id)?.place_enter(action, slot);
++            return Ok(None);
+         }
+         let (t, start) = self.entering(player, idx, target, task.work_range)?;
+         let walking = self.enter_walk_again(player, idx, &mut action, &t, start)?;
 diff --git a/crates/engine/genie-core/src/garrison/let_out.rs b/crates/engine/genie-core/src/garrison/let_out.rs
 index e526db7f..2cd8b58f 100644
 --- a/crates/engine/genie-core/src/garrison/let_out.rs
@@ -2308,7 +2428,7 @@ index fb6cc356..3b44f7e1 100644
                  return Err(GenieError::unsupported(
                      "a garrison of a unit the slice does not hold live",
 diff --git a/crates/engine/genie-core/src/garrison/tests.rs b/crates/engine/genie-core/src/garrison/tests.rs
-index 88cdc0ef..02d0b5d2 100644
+index 88cdc0ef..fecdea7c 100644
 --- a/crates/engine/genie-core/src/garrison/tests.rs
 +++ b/crates/engine/genie-core/src/garrison/tests.rs
 @@ -2219,6 +2219,7 @@ fn an_enter_gives_its_load_to_drop_site_and_needs_room() {
@@ -2319,7 +2439,24 @@ index 88cdc0ef..02d0b5d2 100644
                  attribute: Some(AttributeId::named(17)),
              }],
              ..DropSite::default()
-@@ -2513,8 +2514,11 @@ pub(crate) fn walker(t: &mut World, p: PlayerId, id: i32, m: MasterId, at: Point
+@@ -2267,15 +2268,7 @@ fn an_enter_gives_its_load_to_drop_site_and_needs_room() {
+         reason(transforms),
+         "an enter of a master that transforms (task 0x88)"
+     );
+-    let full: fn(&mut World) = |t| {
+-        for m in &mut t.model.masters {
+-            Arc::make_mut(m).get_mut(TC).unwrap().garrison = GarrisonCapacity::of_data(0);
+-        }
+-    };
+-    assert_eq!(
+-        reason(full),
+-        "an Enter into a building without room (state 11)"
+-    );
++    // a building without room is modelled since findings 199 (state 11)
+ }
+ 
+ /// Puts unit `id` of player `p` and master `m` inside the town centre.
+@@ -2513,8 +2506,12 @@ pub(crate) fn walker(t: &mut World, p: PlayerId, id: i32, m: MasterId, at: Point
              angle: Angle::ZERO,
              animated: Animated::default(),
              pauses: Vec::new(),
@@ -2328,6 +2465,7 @@ index 88cdc0ef..02d0b5d2 100644
              in_the_way: Vec::new(),
              sprite_facets: None,
 +            future: None,
++            attack_alternate: false,
          }),
      );
      let _ = t.push_live(p, Object::with_ai(v, villager_ai)).unwrap();
@@ -2612,8 +2750,135 @@ index 0f3076d6..705ddab1 100644
              let unit = self.players.live_mut(up, ui)?;
              if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
                  ai.set_action(record.action);
+diff --git a/crates/engine/genie-core/src/garrison/walk_in.rs b/crates/engine/genie-core/src/garrison/walk_in.rs
+index d834df33..f38d4bc4 100644
+--- a/crates/engine/genie-core/src/garrison/walk_in.rs
++++ b/crates/engine/genie-core/src/garrison/walk_in.rs
+@@ -284,6 +284,31 @@ impl EnterAction {
+         }
+     }
+ 
++    /// `set_state(11)` (188329 Enter `0xb78630` case `0xb`, findings 199; its sub-actions go
++    /// first, the caller's stop): the meeting point (`0xb77190`): with its target still held and
++    /// without room for the unit (slot 0x1b0) the target's place (x and y; with room it is the
++    /// transport's walk, not modelled), with none the action's point as it stands; then a quiet
++    /// `MoveTo` to it within 0 with the task's moving sprite, a moved target left
++    /// ([`MoveToReads::to_point_ignoring`]). `roomless_target` is the place of a target held
++    /// without room; the caller does not come here with a held target that has room.
++    ///
++    /// # Errors
++    ///
++    /// The `MoveTo`'s.
++    pub(crate) fn walk_point(
++        &mut self,
++        roomless_target: Option<Position>,
++        moves: &MoveToReads<'_>,
++        move_to_tuning: &crate::world::layer::generated::MoveToTuning,
++    ) -> Result<(), GenieError> {
++        if let Some(at) = roomless_target {
++            self.point = self.point.with_x(at.x()).with_y(at.y());
++        }
++        let move_to = moves.to_point_ignoring(self.point, self.moving, move_to_tuning)?;
++        self.state = EnterState::WalkPoint { move_to };
++        Ok(())
++    }
++
+     /// `set_state(2)` (`FUN_140a87320` case 2): the wait of [`WAIT_SECONDS`], and the unit shows
+     /// its master's standing sprite at once (slot 0x68 with `+0x470`,
+     /// [`Unit::shows_standing_sprite`]).
+@@ -350,22 +375,36 @@ impl EnterAction {
+         reads: &EnterReads,
+         roles: &Roles,
+     ) -> Result<HeadCode, GenieError> {
+-        let t = Self::held_target(reads.target)?;
+-        match self.state {
++        if matches!(self.state, EnterState::Done | EnterState::Failed) {
+             // state 1 returns 1, state 13 returns 3: either way the list removes the action
+-            // The Enter action's states the slice models: 1 done (inside), 2 waiting to try again, 4
+-            // walking to the target.
+-            // The failed Enter (`set_state(13)`), whose update returns 3.
++            return Ok(HeadCode::Deletes);
++        }
++        // 188329 0xb78d90 (findings 199): a target the world does not hold, one in state 3 or
++        // more or of an unallied player (0xb78dc0..0xb78e3e), or one without room for the unit
++        // (slot 0x1b0, 0xb78e6b..0xb78e98) is let go (slot 0x68 with 0) and the Enter turns to
++        // state 11 (set_state(0xb)), whose update runs in this one
++        if self.target.is_some() && Self::held_target(reads.target).is_err() {
++            self.lose_target(c, unit, reads)?;
++        }
++        match self.state {
+             EnterState::Done | EnterState::Failed => return Ok(HeadCode::Deletes),
+             EnterState::Wait => {
++                let t = Self::held_target(reads.target)?;
+                 self.timer -= c.dt.seconds();
+                 if self.timer <= Seconds::ZERO {
+                     let _ = self.again(c, unit, actions, &t, reads, roles)?;
+                 }
+             }
+-            EnterState::Walk { .. } => self.walk_on(c, unit, actions, me, &t, reads)?,
++            EnterState::Walk { .. } => {
++                let t = Self::held_target(reads.target)?;
++                self.walk_on(c, unit, actions, me, &t, reads)?;
++            }
++            // 0xb78f8e..: the MoveTo's codes 1 to 3 end the Enter (set_state(1)); others go on
+             EnterState::WalkPoint { .. } => {
+-                return Err(GenieError::unsupported("an Enter state not modelled"));
++                let code = self.move_to_update(c, unit, me, reads)?;
++                if (1..=3).contains(&code.get()) {
++                    self.on_unit(unit, actions, |unit, actions| unit.entered(actions, c))?;
++                }
+             }
+         }
+         Ok(HeadCode::Keeps)
+@@ -412,11 +451,45 @@ impl EnterAction {
+                 self.again(c, unit, actions, t, reads, roles).map(|_| ())
+             }
+             1..=3 => self.wait(c, unit),
+-            4 | 5 => Err(ENTER_TARGET_DIED),
++            // 0xb78f7f: the target let go (slot 0x68 with 0) and set_state(0xb); the update
++            // returns
++            4 | 5 => self.lose_target(c, unit, reads),
+             _ => Ok(()),
+         }
+     }
+ 
++    /// The Enter lets its target go (slot 0x68 with 0: slot 0x180 on it, [`release`]) and turns
++    /// to state 11 (`set_state(0xb)`, [`EnterAction::walk_point`] without a target): its walking
++    /// `MoveTo` goes first (its teardown stops the unit).
++    ///
++    /// # Errors
++    ///
++    /// The release's, the stop's and the walk's.
++    ///
++    /// [`release`]: crate::world::lets::release
++    fn lose_target(
++        &mut self,
++        c: &mut Step<'_>,
++        unit: &mut Unit,
++        reads: &EnterReads,
++    ) -> Result<(), GenieError> {
++        let by = unit.releaser(c)?;
++        crate::world::lets::release(c, unit, self.target.map(ContainerId::id), by)?;
++        self.target = None;
++        if self.state.move_to().is_some()
++            && let Some(m) = c.w.parts.mover_mut(unit.id)
++        {
++            m.stop()?;
++        }
++        let w = &mut *c.w;
++        let sprites = SpriteReads {
++            defaults: reads.defaults,
++            graphics: &w.model.graphics,
++        };
++        let moves = MoveToReads::with_sprites(sprites, (&*unit, w.parts.mover_of(unit.id)));
++        self.walk_point(None, &moves, &w.model.tuning.move_to)
++    }
++
+     /// The `MoveTo`'s update ([`MoveToAction::sub_update`]) with the reads' give-up, its start
+     /// showing its sprite; its code, 1 without one.
+     ///
 diff --git a/crates/engine/genie-core/src/gathering/closest_resource.rs b/crates/engine/genie-core/src/gathering/closest_resource.rs
-index 9510abdd..5a329898 100644
+index 9510abdd..12426307 100644
 --- a/crates/engine/genie-core/src/gathering/closest_resource.rs
 +++ b/crates/engine/genie-core/src/gathering/closest_resource.rs
 @@ -145,6 +145,8 @@ pub(crate) fn closest_resource_of(
@@ -2694,7 +2959,7 @@ index 9510abdd..5a329898 100644
          gather_search_tuning,
      )
  }
-@@ -367,3 +407,133 @@ impl Unit {
+@@ -367,3 +407,187 @@ impl Unit {
          .map(|(id, _)| id)
      }
  }
@@ -2711,26 +2976,51 @@ index 9510abdd..5a329898 100644
 +const FISHING_REJECTED: u32 = 30;
 +
 +impl Unit {
-+    /// The fishing ship's unit AI slot 0x80 (188329 `0xcf9140`, vtable 0x32462a0; findings 193)
-+    /// with no drop site and no workers cap (the Gather's search after its drop, 0xb81fd8..0xb82010:
-+    /// −1, −1): its mode 3, from the unit. Its player's visible resources of group `kind`
-+    /// (player `+0x220`, [`VisibleResources::closest`] = `0x1355850` from the unit's x and y,
-+    /// passing over the records looked at) give the nearest record until 100 records were looked
-+    /// at or 30 turned down. A record whose object the world does not hold (`0xd303e0`), is past
-+    /// state 6, or lies at or past the master's search radius (slot 0x2e0, master `+0x234`) is
-+    /// passed over. Else (the unit of class `0x15`, at state 2 or more) the unit's reach test
-+    /// (slot 0x408 = `0x120ff70`, range 0, its last argument 1 after a failed test) decides: a
-+    /// reached object other than a shore fish (class `0x21`) is the answer; the first reached
-+    /// shore fish is kept with its distance (14 more with the world's `+0x6b4` at 2) and is the
-+    /// answer once a later record lies farther, or at the end; an unreached one is turned down.
++    /// The fishing ship's unit AI slot 0x80 (188329 `0xcf9140`, vtable 0x32462a0; findings 193,
++    /// 197) with no workers cap (−1) for player `player`, from the drop site `site` when the
++    /// world holds it and it stands in the unit's zone (`0x124d000` of each: the zone map of the
++    /// object's own master restriction, `0x1251230`, at its place; mode 1), then from the unit
++    /// (mode 3), the two passes sharing their counts and their list of records looked at. Its
++    /// player's visible resources of group `kind` (player `+0x220`, [`VisibleResources::closest`]
++    /// = `0x1355850` from the pass's object's x and y, passing over the records looked at) give
++    /// the nearest record until 100 records were looked at or 30 turned down; an empty list ends
++    /// the pass. A record whose object the world does not hold (`0xd303e0`), is past state 6, or
++    /// lies at or past the master's search radius (slot 0x2e0, master `+0x234`) is passed over.
++    /// Else (the unit of class `0x15`, at state 2 or more) the unit's reach test (slot 0x408 =
++    /// `0x120ff70`, range 0, its last argument 1 after a failed test) decides: a reached object
++    /// other than a shore fish (class `0x21`) is the answer; the first reached shore fish is kept
++    /// with its distance (14 more with the world's `+0x6b4` at 2) and is the answer once a later
++    /// record lies farther, or at the end; an unreached one is turned down.
 +    ///
 +    /// [`VisibleResources::closest`]: crate::vision::visibility::VisibleResources::closest
 +    pub(crate) fn fishing_resource_search(
 +        &self,
 +        actions: &Action,
 +        c: &mut Step<'_>,
-+        kind: GatherGroup,
++        (player, kind, site): (PlayerId, GatherGroup, Option<ObjectId>),
 +    ) -> Result<Option<ObjectId>, GenieError> {
++        let every = MasterTables::new(&c.w.model.masters, &c.w.parts.own_master);
++        let master = self.master(every, player)?;
++        let fishing_ship = master.class.get() == FISHING_SHIP_CLASS;
++        let far = master.action_part().search_radius;
++        let master_id = master.id;
++        let unit_restriction = master.terrain_restriction;
++        // 0xcf92f4..0xcf935a: the site the world holds (0x1616cf0) in the unit's zone (0x124d000
++        // of each) is searched from first (mode 0, with no cap mode 1); else mode 3
++        let site_place = {
++            let others = OthersRef::of(&c.w.players, &c.w.index, player)?;
++            match site.and_then(|id| others.find(id)) {
++                Some((sp, s)) => Some((s.position(), s.master(every, sp)?.terrain_restriction)),
++                None => None,
++            }
++        };
++        let mut from_site: Option<Position> = None;
++        if let Some((site_at, site_restriction)) = site_place {
++            let unit_zone = zone_of(c, self.position(), unit_restriction)?;
++            if unit_zone == zone_of(c, site_at, site_restriction)? {
++                from_site = Some(site_at);
++            }
++        }
 +        let by_id = ObjectsRef::new(
 +            &c.w.players,
 +            &c.w.index,
@@ -2739,12 +3029,8 @@ index 9510abdd..5a329898 100644
 +            &c.w.model.roles,
 +            &c.w.model.tuning,
 +        );
-+        let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
++        let others = OthersRef::of(&c.w.players, &c.w.index, player)?;
 +        let every = MasterTables::new(&c.w.model.masters, &c.w.parts.own_master);
-+        let master = self.master(every, c.player)?;
-+        let fishing_ship = master.class.get() == FISHING_SHIP_CLASS;
-+        let far = master.action_part().search_radius;
-+        let master_id = master.id;
 +        let mover = c.w.parts.mover_of(self.id).ok_or(GenieError::unsupported(
 +            "a resource search without movement state",
 +        ))?;
@@ -2754,7 +3040,7 @@ index 9510abdd..5a329898 100644
 +        let mut plan = Planning {
 +            pathing: &mut c.w.pathing,
 +            now: c.w.world_time,
-+            player_kind: c.w.players.player(c.player)?.kind,
++            player_kind: c.w.players.player(player)?.kind,
 +            object: c.w.streams.get(Stream::Object),
 +            groups: &c.w.groups,
 +        };
@@ -2763,73 +3049,106 @@ index 9510abdd..5a329898 100644
 +        let (mut tested, mut rejected) = (0_u32, 0_u32);
 +        let mut keep = false;
 +        let mut shore: Option<(ObjectId, f32)> = None;
-+        while tested < FISHING_TESTED && rejected < FISHING_REJECTED {
-+            let resources = spatial
-+                .sight
-+                .as_mut()
-+                .and_then(|v| v.resources.get_mut(c.player.index()))
-+                .ok_or(GenieError::unsupported(
-+                    "a fishing ship's search without its player's visible resources",
-+                ))?;
-+            let Some(i) = resources.closest(me_at.ground(), kind, &skip) else {
-+                break;
-+            };
-+            let record = *resources
-+                .lists
-+                .get(kind.index())
-+                .and_then(|l| l.get(i))
-+                .ok_or(GenieError::unsupported("a visible resource record past its list"))?;
-+            let d = record.distance.get();
-+            // 0xcf954e..0xcf9562: a kept shore fish nearer than this record is the answer
-+            if let Some((id, sd)) = shore
-+                && sd < d
-+            {
-+                return Ok(Some(id));
-+            }
-+            let target = others.find(record.id);
-+            let held = match target {
-+                // COMISS d, far; JAE: at or past the search radius (a NaN passes)
-+                Some((owner, t)) if t.life.state < ObjectState::Removed && !(far.get() <= d) => {
-+                    Some(t.master(every, owner)?.class.get())
++        // the passes: from the site (mode 1), then from the unit (mode 3), sharing the counts
++        // and the list (0xcf9a21..0xcf9a40)
++        let passes: Vec<Position> = from_site.into_iter().chain(std::iter::once(me_at)).collect();
++        for origin in passes {
++            while tested < FISHING_TESTED && rejected < FISHING_REJECTED {
++                let resources = spatial
++                    .sight
++                    .as_mut()
++                    .and_then(|v| v.resources.get_mut(player.index()))
++                    .ok_or(GenieError::unsupported(
++                        "a fishing ship's search without its player's visible resources",
++                    ))?;
++                let Some(i) = resources.closest(origin.ground(), kind, &skip) else {
++                    break;
++                };
++                let record = *resources
++                    .lists
++                    .get(kind.index())
++                    .and_then(|l| l.get(i))
++                    .ok_or(GenieError::unsupported("a visible resource record past its list"))?;
++                let d = record.distance.get();
++                // 0xcf954e..0xcf9562: a kept shore fish nearer than this record is the answer
++                if let Some((id, sd)) = shore
++                    && sd < d
++                {
++                    return Ok(Some(id));
 +                }
-+                _ => None,
-+            };
-+            if let Some(class) = held {
-+                if !fishing_ship {
-+                    return Err(GenieError::unsupported(
-+                        "a fishing ship unit AI's resource search for a unit of another class (0xcf9753)",
-+                    ));
-+                }
-+                if self.life.state < ObjectState::Alive {
-+                    rejected += 1;
-+                } else if mover.reaches_object_keeping(
-+                    (me_at, &me_walk),
-+                    (spatial, by_id),
-+                    &mut plan,
-+                    record.id,
-+                    Distance::ZERO,
-+                    (master_id, keep),
-+                )? {
-+                    if class != SHORE_FISH_CLASS {
-+                        return Ok(Some(record.id));
++                let target = others.find(record.id);
++                let held = match target {
++                    // COMISS d, far; JAE: at or past the search radius (a NaN passes)
++                    Some((owner, t))
++                        if t.life.state < ObjectState::Removed && !(far.get() <= d) =>
++                    {
++                        Some(t.master(every, owner)?.class.get())
 +                    }
-+                    if shore.is_none() {
-+                        shore = Some((record.id, if penalty { d + SHORE_FISH_PENALTY } else { d }));
++                    _ => None,
++                };
++                if let Some(class) = held {
++                    if !fishing_ship {
++                        return Err(GenieError::unsupported(
++                            "a fishing ship unit AI's resource search for a unit of another class (0xcf9753)",
++                        ));
 +                    }
-+                    rejected += 1;
-+                } else {
-+                    keep = true;
-+                    rejected += 1;
++                    if self.life.state < ObjectState::Alive {
++                        rejected += 1;
++                    } else if mover.reaches_object_keeping(
++                        (me_at, &me_walk),
++                        (spatial, by_id),
++                        &mut plan,
++                        record.id,
++                        Distance::ZERO,
++                        (master_id, keep),
++                    )? {
++                        if class != SHORE_FISH_CLASS {
++                            return Ok(Some(record.id));
++                        }
++                        if shore.is_none() {
++                            shore = Some((
++                                record.id,
++                                if penalty { d + SHORE_FISH_PENALTY } else { d },
++                            ));
++                        }
++                        rejected += 1;
++                    } else {
++                        keep = true;
++                        rejected += 1;
++                    }
 +                }
++                skip.push(record.id);
++                tested += 1;
 +            }
-+            skip.push(record.id);
-+            tested += 1;
 +        }
 +        Ok(shore.map(|(id, _)| id))
 +    }
 +}
++
++/// `0x124d000`: the zone of an object at `at` in the zone map of its master's terrain restriction
++/// `restriction` (`0x1251230`, then the `[y][x]` lookup `0x14eaf70` of its truncated place). An
++/// object without a restriction (which would give the routine no map, zone 0) is not modelled.
++fn zone_of(
++    c: &mut Step<'_>,
++    at: Position,
++    restriction: Option<crate::map::RestrictionId>,
++) -> Result<crate::pathing::zones::ZoneId, GenieError> {
++    let Some(restriction) = restriction else {
++        return Err(GenieError::unsupported(
++            "a fishing ship's search zone of an object without a terrain restriction",
++        ));
++    };
++    let terrain = c.w.spatial.terrain.as_ref().ok_or(GenieError::unsupported(
++        "the map's zones without its terrain",
++    ))?;
++    let values = terrain
++        .restriction(restriction)
++        .ok_or(UNKNOWN_RESTRICTION)?;
++    let zones = c.w.zones.of(c.w.spatial.map, &terrain.kinds, values)?;
++    Ok(zones.zone(Tile::new(at.x() as i32, at.y() as i32)))
++}
 diff --git a/crates/engine/genie-core/src/gathering/drop_off.rs b/crates/engine/genie-core/src/gathering/drop_off.rs
-index 1e001e13..1cbff77b 100644
+index 1e001e13..e4f7a99c 100644
 --- a/crates/engine/genie-core/src/gathering/drop_off.rs
 +++ b/crates/engine/genie-core/src/gathering/drop_off.rs
 @@ -8,9 +8,10 @@ use crate::gathering::drop_sites::SitePlace;
@@ -2931,7 +3250,7 @@ index 1e001e13..1cbff77b 100644
          self.after_drop_retarget(actions, c, found, by, roles)
              .map(|()| HeadCode::Keeps)
      }
-@@ -116,19 +170,34 @@ impl Unit {
+@@ -116,19 +170,35 @@ impl Unit {
              return Ok(None);
          };
          let class = ai.target_class.or(gather.target_class);
@@ -2955,7 +3274,8 @@ index 1e001e13..1cbff77b 100644
 +                else {
 +                    return Ok(None);
 +                };
-+                self.fishing_resource_search(actions, c, kind)
++                let player = c.player;
++                self.fishing_resource_search(actions, c, (player, kind, None))
 +            }
 +            _ => Err(GenieError::unsupported(
 +                "slot 0x1b0 of another unit AI than the civilian's or the fishing ship's",
@@ -2975,7 +3295,7 @@ index 1e001e13..1cbff77b 100644
      /// (`LAB_140a8ed55`) a computer player's Gather is done (its code; its deletion lets the drop
      /// site go), a human's idles (`set_state(2)`: its targets and point cleared, its sprite
      /// [`Unit::idle_sprite`]'s) and lets its drop site go.
-@@ -139,11 +208,9 @@ impl Unit {
+@@ -139,11 +209,9 @@ impl Unit {
          by: Releaser,
          roles: &Roles,
      ) -> Result<HeadCode, GenieError> {
@@ -2990,7 +3310,7 @@ index 1e001e13..1cbff77b 100644
          let walks = self.move_walks(
              c.w.parts.mover_of(self.id),
              MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
-@@ -157,9 +224,22 @@ impl Unit {
+@@ -157,9 +225,22 @@ impl Unit {
          let gather = actions.list.gather_mut().ok_or(NO_GATHER)?;
          if gather.point.x() != -1.0 && gather.point.y() != -1.0 {
              if farm_waits {
@@ -3016,7 +3336,7 @@ index 1e001e13..1cbff77b 100644
              }
              // set_state(11) without a target: to the point within the task's range
              let mover =
-@@ -265,7 +345,7 @@ impl Unit {
+@@ -265,7 +346,7 @@ impl Unit {
          };
          let old = gather.targets();
          let rng = c.w.streams.get(Stream::Action);
@@ -3025,7 +3345,7 @@ index 1e001e13..1cbff77b 100644
              GatherRetarget {
                  target: &resource,
                  player: c.player,
-@@ -280,6 +360,15 @@ impl Unit {
+@@ -280,6 +361,15 @@ impl Unit {
              &c.w.model.tuning,
          )?;
          let new = gather.targets();
@@ -3041,7 +3361,7 @@ index 1e001e13..1cbff77b 100644
          for (old, new) in old.into_iter().zip(new) {
              if old == new {
                  continue;
-@@ -398,11 +487,14 @@ impl Unit {
+@@ -398,11 +488,14 @@ impl Unit {
          }
          let gather = actions.list.gather().ok_or(NO_GATHER)?;
          let (carry_to, state) = (gather.carry_to, gather.state);
@@ -3057,7 +3377,7 @@ index 1e001e13..1cbff77b 100644
              ActionState::new(state.get()),
              by_id,
          )?;
-@@ -448,11 +540,12 @@ impl Unit {
+@@ -448,11 +541,12 @@ impl Unit {
          }
          let hunt = actions.list.hunt().ok_or(NO_HUNT)?;
          let (carry_to, state) = (hunt.carry_to, hunt.state);
@@ -3071,7 +3391,7 @@ index 1e001e13..1cbff77b 100644
              ActionState::new(state.get()),
              by_id,
          )?;
-@@ -485,14 +578,14 @@ impl Unit {
+@@ -485,14 +579,14 @@ impl Unit {
      /// The drop site a gatherer's (with its mover `mover`) `set_state(8)` walks to, its second
      /// target `carry_to` or, with
      /// none and a master with drop sites (`+0x7a0`), the closest of them (`FUN_1411671e0`: first
@@ -3089,7 +3409,7 @@ index 1e001e13..1cbff77b 100644
          state: ActionState,
          by_id: ObjectsRef<'_>,
      ) -> Result<(Option<DropSiteId>, Distance), GenieError> {
-@@ -504,14 +597,25 @@ impl Unit {
+@@ -504,14 +598,25 @@ impl Unit {
                  "a drop-off of a player without masters",
              ))?;
              let sites = &master.action_part().drop_sites;
@@ -4328,7 +4648,7 @@ index 617e311c..d012669e 100644
      /// (`FUN_140ac44b0`): the player's attribute 292 is 1.
      pub(crate) decay: DecayRule,
 diff --git a/crates/engine/genie-core/src/gathering/hunt/tests.rs b/crates/engine/genie-core/src/gathering/hunt/tests.rs
-index 8ea13ae4..93ec9291 100644
+index 8ea13ae4..6db0127b 100644
 --- a/crates/engine/genie-core/src/gathering/hunt/tests.rs
 +++ b/crates/engine/genie-core/src/gathering/hunt/tests.rs
 @@ -69,6 +69,7 @@ pub(crate) fn hunt_reads() -> HuntReads {
@@ -4339,7 +4659,7 @@ index 8ea13ae4..93ec9291 100644
          decay: DecayRule::Runs,
          has_ai: true,
          ai_class: None,
-@@ -305,8 +306,11 @@ pub(crate) fn walker() -> Mover {
+@@ -305,8 +306,12 @@ pub(crate) fn walker() -> Mover {
          angle: Angle::ZERO,
          animated: Animated::default(),
          pauses: Vec::new(),
@@ -4348,6 +4668,7 @@ index 8ea13ae4..93ec9291 100644
          in_the_way: Vec::new(),
          sprite_facets: None,
 +        future: None,
++        attack_alternate: false,
      }
  }
  
@@ -7679,7 +8000,7 @@ index f6314358..a82d0a1f 100644
          let _ = out.push(p);
      }
 diff --git a/crates/engine/genie-core/src/movement/mod.rs b/crates/engine/genie-core/src/movement/mod.rs
-index 21b160d4..936b15b3 100644
+index 21b160d4..8d6cab01 100644
 --- a/crates/engine/genie-core/src/movement/mod.rs
 +++ b/crates/engine/genie-core/src/movement/mod.rs
 @@ -47,6 +47,7 @@ use genie_model::movement::move_algorithm;
@@ -7705,7 +8026,7 @@ index 21b160d4..936b15b3 100644
      /// The kept hits its walk met of the walked level's target's master, of a player neither
      /// counts an ally: the motion step tells the unit AI of each (its slot 0x38 with
      /// [`crate::unit_ai::NotifyKind::IN_THE_WAY`] and the hit's id), which the caller passes on.
-@@ -255,6 +264,18 @@ pub struct Mover {
+@@ -255,6 +264,26 @@ pub struct Mover {
      /// master's [`MoveStats::facets`] then). Not saved: the update's copy of its sprite's.
      #[diff(unsaved)]
      pub sprite_facets: Option<SpriteFacets>,
@@ -7714,6 +8035,14 @@ index 21b160d4..936b15b3 100644
 +    /// ([`Mover::request_path_asked`], `0x120e560`). Not saved.
 +    #[diff(unsaved)]
 +    pub future: Option<FuturePath>,
++    /// 188329 combat object `+0x598` not 0: the next swing of a unit whose master alternates its
++    /// sprites (move algorithm bit 0) takes its second attack sprite. The combat object's stop
++    /// (slot 0x618 = `0x115b840`, findings 198) sets it after the unit's (`0x1224d50`); the
++    /// Attack's ready state clears it when not ready (`0xb739d0..0xb739fb`), the swing when it
++    /// takes the second sprite (`0xb73c2a..0xb73c32`). The constructors' 0 (`0x1143a79`); not
++    /// saved (a replay starts from the constructors).
++    #[diff(unsaved)]
++    pub attack_alternate: bool,
 +}
 +
 +/// 188329's future path data ([`Mover::future`]) as a horde gives it: level 2, state 2.
@@ -7724,7 +8053,7 @@ index 21b160d4..936b15b3 100644
  }
  
  /// The moving unit, as the motion step needs it besides its [`Mover`], whose place it walks
-@@ -586,3 +607,11 @@ pub(crate) fn stop_mover(mover: Option<&mut Mover>) -> Result<(), GenieError> {
+@@ -586,3 +615,11 @@ pub(crate) fn stop_mover(mover: Option<&mut Mover>) -> Result<(), GenieError> {
  
  #[cfg(test)]
  pub(crate) mod tests;
@@ -7736,6 +8065,42 @@ index 21b160d4..936b15b3 100644
 +pub fn trace_steer() -> bool {
 +    TRACE_STEER_WINDOW.load(std::sync::atomic::Ordering::Relaxed) || std::env::var_os("GENIE_TRACE_STEER").is_some()
 +}
+diff --git a/crates/engine/genie-core/src/movement/move_to/constructors.rs b/crates/engine/genie-core/src/movement/move_to/constructors.rs
+index 7a714172..474720e3 100644
+--- a/crates/engine/genie-core/src/movement/move_to/constructors.rs
++++ b/crates/engine/genie-core/src/movement/move_to/constructors.rs
+@@ -235,6 +235,31 @@ impl<'g> MoveToReads<'g> {
+         ))
+     }
+ 
++    /// The Enter's state-11 `MoveTo` (188329 `0xb78630` case `0xb`: `0xb920a0` to `point` with
++    /// range 0, the task's sprite `given`, then `0xb6b990` with 1 and `+0x61` 2): quiet, to the
++    /// point, a moved target left (`+0x61` 2), as the list adds it: far ([`NO_TARGET_GAP`]).
++    ///
++    /// # Errors
++    ///
++    /// A sprite the table lacks.
++    pub fn to_point_ignoring(
++        &self,
++        point: Position,
++        given: Option<SpriteId>,
++        move_to_tuning: &MoveToTuning,
++    ) -> Result<Option<MoveToAction>, GenieError> {
++        let walk = MoveToAction {
++            on_target_moved: TargetMoved::Ignores,
++            ..MoveToAction::sub_to_point(point, Distance::ZERO, self.sprites.to_point(given)?)
++        };
++        Ok(walk.added(
++            self.state,
++            Distance::new(NO_TARGET_GAP),
++            self.speed,
++            move_to_tuning,
++        ))
++    }
++
+     /// A quiet `MoveTo` to `point` within `range` (`FUN_140aa0d30`, then `FUN_140a7a170` with 1)
+     /// with the sprite `given` (else the constructor's default, [`SpriteReads::to_point`]), as
+     /// the list adds it: far ([`NO_TARGET_GAP`]).
 diff --git a/crates/engine/genie-core/src/movement/move_to/mod.rs b/crates/engine/genie-core/src/movement/move_to/mod.rs
 index 8ae7fee5..35ac2065 100644
 --- a/crates/engine/genie-core/src/movement/move_to/mod.rs
@@ -8428,7 +8793,7 @@ index 8c1a150a..77fd054c 100644
          let blocked = r.fails()
              || length <= EPSILON
 diff --git a/crates/engine/genie-core/src/movement/step.rs b/crates/engine/genie-core/src/movement/step.rs
-index 75476db0..6f8a1d9e 100644
+index 75476db0..558be022 100644
 --- a/crates/engine/genie-core/src/movement/step.rs
 +++ b/crates/engine/genie-core/src/movement/step.rs
 @@ -107,6 +107,12 @@ impl Mover {
@@ -8444,15 +8809,16 @@ index 75476db0..6f8a1d9e 100644
                  // the walked level walks (state 3) and its pause is not above 0 (`COMISS`
                  // then `JA`: a NaN pause walks)
                  let walks = self.paths.first().is_some_and(|l| {
-@@ -197,6 +203,7 @@ impl Mover {
+@@ -197,6 +203,8 @@ impl Mover {
      ) -> Self {
          stats.show(shown);
          Self {
 +            future: None,
++            attack_alternate: false,
              // the animated object's constructor (FUN_141070cf0): animation speed (+0x7b8) 0
              animated: Animated::new(Speed::ZERO),
              forward: BVector::new(1.0, 0.0, 0.0),
-@@ -216,6 +223,8 @@ impl Mover {
+@@ -216,6 +224,8 @@ impl Mover {
              last_turn: Seconds::ZERO,
              angle,
              pauses: Vec::new(),
@@ -8461,7 +8827,7 @@ index 75476db0..6f8a1d9e 100644
              in_the_way: Vec::new(),
              sprite_facets,
          }
-@@ -566,6 +575,15 @@ impl Mover {
+@@ -566,6 +576,15 @@ impl Mover {
          let position = self.moved_at.vector();
          let level = self.paths.walked()?;
          let waypoint = point_or_zero_of(level, level.waypoint);
@@ -8477,7 +8843,7 @@ index 75476db0..6f8a1d9e 100644
          if ground(position, waypoint).get() < EPSILON {
              self.paths.walked_mut()?.flags |= LevelFlags::REACHED | LevelFlags::AT_WAYPOINT;
              return Ok(Next::Again);
-@@ -615,7 +633,7 @@ impl Mover {
+@@ -615,7 +634,7 @@ impl Mover {
                      (now, player_kind),
                  )?;
                  if !avoided.kept.is_empty() {
@@ -8487,10 +8853,10 @@ index 75476db0..6f8a1d9e 100644
                  if avoided.at_target {
                      // FUN_140f9b4d0 three times: bit 0 on and bit 1 off on the walked level, bit 2
 diff --git a/crates/engine/genie-core/src/movement/tests.rs b/crates/engine/genie-core/src/movement/tests.rs
-index eb4f2f5f..c9e4cc82 100644
+index eb4f2f5f..ea4542ae 100644
 --- a/crates/engine/genie-core/src/movement/tests.rs
 +++ b/crates/engine/genie-core/src/movement/tests.rs
-@@ -221,8 +221,11 @@ pub(crate) fn builder_9177() -> Mover {
+@@ -221,8 +221,12 @@ pub(crate) fn builder_9177() -> Mover {
          angle: Angle::ZERO,
          animated: Animated::default(),
          pauses: Vec::new(),
@@ -8499,10 +8865,11 @@ index eb4f2f5f..c9e4cc82 100644
          in_the_way: Vec::new(),
          sprite_facets: None,
 +        future: None,
++        attack_alternate: false,
      }
  }
  
-@@ -885,6 +888,7 @@ fn kept_hits_join_the_include_list_up_to_its_room() {
+@@ -885,6 +889,7 @@ fn kept_hits_join_the_include_list_up_to_its_room() {
          include_kept(
              &w,
              Some(&mut pathing),
@@ -8510,7 +8877,7 @@ index eb4f2f5f..c9e4cc82 100644
              &[object_id(9175), object_id(9177)],
              &mut include
          ),
-@@ -900,7 +904,7 @@ fn kept_hits_join_the_include_list_up_to_its_room() {
+@@ -900,7 +905,7 @@ fn kept_hits_join_the_include_list_up_to_its_room() {
      let mut include = Vec::new();
      let before = shapes(&pathing);
      assert_eq!(
@@ -8519,7 +8886,7 @@ index eb4f2f5f..c9e4cc82 100644
          Ok(())
      );
      assert_eq!((include, shapes(&pathing)), (vec![object_id(9177)], before));
-@@ -3574,6 +3578,15 @@ fn request_spends_try_and_gives_up_or_goes_on_without_more() {
+@@ -3574,6 +3579,15 @@ fn request_spends_try_and_gives_up_or_goes_on_without_more() {
          (m.paths[0].flags, m.paths[0].continue_counter),
          (LevelFlags::REACHED, PlanTries::FULL)
      );
@@ -8603,10 +8970,18 @@ index ff48ae22..d6dfeeae 100644
  
      /// The speed control toward the waypoint (slot 198, `0x141150a80`): a unit whose turn fell
 diff --git a/crates/engine/genie-core/src/movement/waypoint.rs b/crates/engine/genie-core/src/movement/waypoint.rs
-index 54c082c7..13031ea9 100644
+index 54c082c7..033be8d9 100644
 --- a/crates/engine/genie-core/src/movement/waypoint.rs
 +++ b/crates/engine/genie-core/src/movement/waypoint.rs
-@@ -341,6 +341,11 @@ impl Mover {
+@@ -13,7 +13,6 @@ use crate::math::fmath::sqrt;
+ use crate::movement::LevelFlags;
+ use crate::movement::Levels;
+ use crate::movement::LinkedPathKind;
+-use crate::movement::MoveAlgorithm;
+ use crate::movement::PathFlags;
+ use crate::movement::PathState;
+ use crate::movement::Speed;
+@@ -341,6 +340,11 @@ impl Mover {
              return Ok(false);
          }
          let ignore = by_id.query_ignore(&[Some(me.id), target]);
@@ -8618,7 +8993,7 @@ index 54c082c7..13031ea9 100644
          // the query starts at +0x824, where the unit last moved to
          let (from, to) = self.query_ends(self.moved_at.vector(), p, world.map);
          let grow = rx * movement_tuning.straight_grow;
-@@ -387,6 +392,10 @@ impl Mover {
+@@ -387,6 +391,10 @@ impl Mover {
              return Ok(false);
          }
          let ignore = by_id.query_ignore(&[Some(me.id), target]);
@@ -8629,7 +9004,7 @@ index 54c082c7..13031ea9 100644
          // the query starts at +0x824, where the unit last moved to
          let (from, to) = self.query_ends(self.moved_at.vector(), p, world.map);
          let rect = Rect::spanning(from, to);
-@@ -434,6 +443,16 @@ impl Mover {
+@@ -434,6 +442,16 @@ impl Mover {
                  // a looping parent path moves on (FUN_140f98bc0 with 1)
                  if parent.has_path && parent.path_flags.contains(PathFlags::LOOPS) {
                      parent.waypoint = parent.looping_next(parent.waypoint);
@@ -8646,6 +9021,53 @@ index 54c082c7..13031ea9 100644
                  }
              }
              LinkedPathKind::AsksAgain => {
+@@ -496,19 +514,17 @@ impl Mover {
+     /// Slot 0x5d0 (`FUN_14108c2f0` -> `FUN_141161730`): the unit stops: its speed and its
+     /// acceleration along its forward vector go to 0 (slots 0x598 and 0x5a8, on velocity data it
+     /// has), it stops waiting to move (`+0x7f9`, slot 0x2a0), its own ignore list (`+0x678`)
+-    /// empties and its animated layer's speed (`+0x7b8`) is 0 at once. A master whose move
+-    /// algorithm has bit 0 also resets the unit's sprite (`+0x78c`, `+0x958`), which is not
+-    /// modelled.
++    /// empties and its animated layer's speed (`+0x7b8`) is 0 at once. 188329's stop (unit slot
++    /// 0x618 = `0x1224d50`, findings 198): after those, a unit whose slot 0x620 (`0x1218a40`:
++    /// its master's move algorithm, `+0x208`, bit 0) answers 1 and whose master has a second
++    /// standing sprite (`+0x48`) takes 1 as its idle variant (`+0x2cc`, genie's
++    /// [`crate::objects::unit::Unit::idle_variant`]) and its sprite list puts that sprite's node
++    /// back to its first frame (list slot 0x28 with `0x7fff`). Those are the unit's, which the
++    /// mover cannot reach: for such a unit the idle swap draws nothing (it alternates) and
++    /// nothing else shows the second standing sprite but a standing-sprite upgrade by its idle
++    /// variant, which stops on such a unit
++    /// (`World::show_changed_sprite`).
+     pub(crate) fn stop(&mut self) -> Result<(), GenieError> {
+-        if self
+-            .stats
+-            .move_algorithm
+-            .contains(MoveAlgorithm::ALTERNATES_SPRITES)
+-        {
+-            return Err(GenieError::unsupported(
+-                "a stop that resets the sprite (move algorithm bit 0)",
+-            ));
+-        }
+         if let Some(v) = self.velocity.as_mut() {
+             v.velocity = v.velocity.with_y(0.0);
+             v.acceleration = v.acceleration.with_y(0.0);
+@@ -516,6 +532,16 @@ impl Mover {
+         self.waiting = 0;
+         self.ignore_units.clear();
+         self.animated.speed = Speed::ZERO;
++        // the combat object's stop (0x115b840) after the unit's: an alternating master's next
++        // swing takes its second attack sprite (+0x598 = 1); a mover of another type keeps a
++        // flag nothing of it reads
++        if self
++            .stats
++            .move_algorithm
++            .contains(crate::movement::MoveAlgorithm::ALTERNATES_SPRITES)
++        {
++            self.attack_alternate = true;
++        }
+         Ok(())
+     }
+ 
 diff --git a/crates/engine/genie-core/src/objects/actions.rs b/crates/engine/genie-core/src/objects/actions.rs
 index 118ae20f..f8ead826 100644
 --- a/crates/engine/genie-core/src/objects/actions.rs
@@ -11789,6 +12211,31 @@ index e5f89e13..04e9c49d 100644
  /// Where a run's spots lie and which way each tries its next point: above the building (up),
  /// below it (down), left of it or right of it (out).
  #[derive(Clone, Copy)]
+diff --git a/crates/engine/genie-core/src/technology/effect/attribute_modifier.rs b/crates/engine/genie-core/src/technology/effect/attribute_modifier.rs
+index c1078321..55a778ba 100644
+--- a/crates/engine/genie-core/src/technology/effect/attribute_modifier.rs
++++ b/crates/engine/genie-core/src/technology/effect/attribute_modifier.rs
+@@ -198,6 +198,20 @@ impl World {
+                 self.parts.missile.get(u.id),
+             )
+         {
++            // 188329's stop (0x1224d50, findings 198) sets the idle variant of a unit whose
++            // master alternates and has a second standing sprite, which the mover's stop cannot
++            // reach: such a unit's variant is not held
++            if master.standing_sprite_2.is_some()
++                && self.parts.mover_of(u.id).is_some_and(|m| {
++                    m.stats
++                        .move_algorithm
++                        .contains(crate::movement::MoveAlgorithm::ALTERNATES_SPRITES)
++                })
++            {
++                return Err(GenieError::unsupported(
++                    "a standing-sprite upgrade of an alternating unit (its idle variant after a stop)",
++                ));
++            }
+             let sprite = match (attribute, u.idle_variant) {
+                 (MasterAttribute::STANDING_GRAPHIC, 0) => master.standing_sprite,
+                 (MasterAttribute::STANDING_GRAPHIC_2, 1) => master.standing_sprite_2,
 diff --git a/crates/engine/genie-core/src/technology/effect/completion.rs b/crates/engine/genie-core/src/technology/effect/completion.rs
 index 00dffb2a..147bee40 100644
 --- a/crates/engine/genie-core/src/technology/effect/completion.rs
@@ -12056,10 +12503,10 @@ index 1a1bfc98..bdca75be 100644
          pasture_food: AttributeId::named(288),
          pasture_livestock: AttributeId::named(289),
 diff --git a/crates/engine/genie-core/src/testing/scene.rs b/crates/engine/genie-core/src/testing/scene.rs
-index fec0f643..a1dae95a 100644
+index fec0f643..99a71daa 100644
 --- a/crates/engine/genie-core/src/testing/scene.rs
 +++ b/crates/engine/genie-core/src/testing/scene.rs
-@@ -686,8 +686,11 @@ fn standing(stats: MoveStats, at: Position) -> Mover {
+@@ -686,8 +686,12 @@ fn standing(stats: MoveStats, at: Position) -> Mover {
          angle: Angle::ZERO,
          animated: Animated::default(),
          pauses: Vec::new(),
@@ -12068,6 +12515,7 @@ index fec0f643..a1dae95a 100644
          in_the_way: Vec::new(),
          sprite_facets: None,
 +        future: None,
++        attack_alternate: false,
      }
  }
  
@@ -12749,7 +13197,7 @@ index b388f155..d2925c47 100644
      /// it ([`cared_classes`]), within its search radius, the line of sight plus 1 if that is
      /// farther, plus its growth (`+0x1e8`, `FUN_140c2e080`'s fourth argument: 7 for the villager
 diff --git a/crates/engine/genie-core/src/unit_ai/handle.rs b/crates/engine/genie-core/src/unit_ai/handle.rs
-index 21df231c..2deb079b 100644
+index 21df231c..08d53ece 100644
 --- a/crates/engine/genie-core/src/unit_ai/handle.rs
 +++ b/crates/engine/genie-core/src/unit_ai/handle.rs
 @@ -1,20 +1,26 @@
@@ -12800,10 +13248,96 @@ index 21df231c..2deb079b 100644
          }
      }
  
-@@ -174,6 +181,92 @@ impl UnitAi {
+@@ -174,6 +181,178 @@ impl UnitAi {
          Ok(())
      }
  
++    /// The base handler's case 0x202 on the gather action (`0x261`; 188329 0xd35a9d..0xd35d26,
++    /// findings 197), which the fishing ship's handler leaves to it: the class is the AI's target
++    /// class (`+0x4c`), else its last (`+0x70`); its kind of resource is the unit AI's slot 0x1b0
++    /// ([`UnitAi::resource_kind`]). With a kind, the unit AI's `ClosestResourceObject` (slot 0x80
++    /// with the kind, the notify's drop site `p[2]`, no workers cap, state 2, no point): the
++    /// fishing ship's own ([`UnitSide::fishing_resource`], 0xcf9140). Without one, `ClosestObject`
++    /// (0xd22c20, its own look first) of that class, any relation, state, master and workers,
++    /// reach on; for the notify's class 0x31 (`p[1]`) of any class, master `0xc7` and fewer than 1
++    /// worker instead. What it finds the unit gathers (slot 0xd0 with 1, [`UnitAi::gather_object`])
++    /// and the processing breaks (3); a gather not taken, or nothing found for a computer player's
++    /// unit (`0x1728be0` answers 1), loses the target (0xd38f90) and stops the action (0xd356f8:
++    /// slot 0xb0 with 1; slot 0x48 hands the notify to the owner, not held); it goes on (2).
++    fn base_gather_search(
++        &mut self,
++        n: Notify,
++        at: &Surroundings,
++        player_kind: PlayerKind,
++        ai_rng: &mut Well512,
++        side: &mut dyn UnitSide,
++    ) -> Result<u32, GenieError> {
++        let Some(class) = self.target_class.or(self.last_target_class) else {
++            return Err(GenieError::unsupported(
++                "a base gather search without a target class (slot 0x1b0 of -1)",
++            ));
++        };
++        let found = match self.resource_kind(class, &at.roles) {
++            Some(kind) => match self.ai_kind {
++                UnitAiKind::Fishing => side.fishing_resource(kind, ObjectId::of_field(n.p[2]))?,
++                _ => {
++                    return Err(GenieError::unsupported(
++                        "a base gather search's slot 0x80 of another unit AI than the fishing ship's",
++                    ));
++                }
++            },
++            None => {
++                let (classes, radius) = self.search_area(at, player_kind);
++                let farm = n.p[1] == 0x31;
++                let found = side.closest(&Search {
++                    at: at.position.ground(),
++                    radius,
++                    classes,
++                    size: at.size,
++                    pick: Pick::Closest {
++                        group: (!farm).then_some(class),
++                        relation: None,
++                        state: None,
++                        master: farm.then_some(crate::objects::masters::MasterId::named(0xc7)),
++                        workers: if farm {
++                            WorkerCount::of_data(1)
++                        } else {
++                            WorkerCount::NO_CAP
++                        },
++                        spared: None,
++                        reach: true,
++                    },
++                    memory: Memory::default(),
++                })?;
++                self.alert(found, at.dt_seconds);
++                match (found.id, found.position) {
++                    (Some(id), Some(position)) => Some(crate::unit_ai::Gatherable {
++                        id,
++                        position,
++                        class,
++                    }),
++                    (Some(_), None) => {
++                        return Err(GenieError::unsupported("a found object without its place"));
++                    }
++                    (None, _) => None,
++                }
++            }
++        };
++        let Some(found) = found else {
++            if player_kind.is_computer() {
++                self.remove_target();
++                self.stop_current(StopOrder::Keep, at, side, ai_rng)?;
++            }
++            return Ok(GO_ON);
++        };
++        if self.gather_object(found, side, ai_rng)? == Answer::NotTaken {
++            self.remove_target();
++            self.stop_current(StopOrder::Keep, at, side, ai_rng)?;
++            return Ok(GO_ON);
++        }
++        Ok(BREAK)
++    }
++
 +    /// The base handler's case 0x202 on the build action (`0x25a`; 188329 0xd35a9d -> 0xd35d28,
 +    /// a soldier that builds, the Serjeant): a master without [`ObjectFlags::BUILDS`]
 +    /// (`[master+0xf4]` bit 2) goes on (2, 0xd36fe1). Else processIdle with 1 (slot 0x240); one
@@ -12893,17 +13427,20 @@ index 21df231c..2deb079b 100644
      /// The base handler (`FUN_140c589c0`) for the kinds the slice posts: a completed action
      /// ([`UnitAi::action_completed`]), an ownership change (stopAction, `FUN_140c5e1e0`, slot 0xb0
      /// with 1, `FUN_140c5dc10` with the handler's time, the order queue emptied), the kinds it
-@@ -198,6 +291,9 @@ impl UnitAi {
+@@ -198,6 +377,12 @@ impl UnitAi {
              NotifyKind::REQUIRES_SEARCH if self.explorer() => {
                  self.seek_unexplored(n, at, player_kind, ai_rng, side)
              }
++            NotifyKind::REQUIRES_SEARCH if self.current_action == Some(AiAction::Gather) => {
++                self.base_gather_search(n, at, player_kind, ai_rng, side)
++            }
 +            NotifyKind::REQUIRES_SEARCH if self.current_action == Some(AiAction::Build) => {
 +                self.builder_unit_search(at, player_kind, ai_rng, side)
 +            }
              NotifyKind::OWNER_CHANGED => {
                  side.effect_now(Effect::Stop, self, ai_rng)?;
                  self.remove_target();
-@@ -230,6 +326,14 @@ impl UnitAi {
+@@ -230,6 +415,14 @@ impl UnitAi {
              NotifyKind::DAMAGED | NotifyKind::MISSILE_WARNING => {
                  self.damaged(n, time, at, player_kind, ai_rng, side)
              }
@@ -13585,7 +14122,7 @@ index 516e920b..93e14d2f 100644
          }
          Ok(MiscEnd::GoesOn)
 diff --git a/crates/engine/genie-core/src/unit_ai/side.rs b/crates/engine/genie-core/src/unit_ai/side.rs
-index 7fd24514..a7093167 100644
+index 7fd24514..84166f0c 100644
 --- a/crates/engine/genie-core/src/unit_ai/side.rs
 +++ b/crates/engine/genie-core/src/unit_ai/side.rs
 @@ -19,6 +19,7 @@ use crate::objects::{ObjectState, WorkerCount};
@@ -13748,7 +14285,31 @@ index 7fd24514..a7093167 100644
      /// The object `id` as the unit AI reads it ([`UnitSeen`]): None when the world does not
      /// hold it (`FUN_1415417a0`).
      ///
-@@ -381,6 +492,31 @@ pub trait UnitSide {
+@@ -303,6 +414,23 @@ pub trait UnitSide {
+         ))
+     }
+ 
++    /// The fishing ship's `ClosestResourceObject` (188329 unit AI slot 0x80 = `0xcf9140`) for
++    /// gather group `kind` from the drop site `site` (none for −1), no workers cap: what it
++    /// found, None for nothing.
++    ///
++    /// # Errors
++    ///
++    /// What the search does not model.
++    fn fishing_resource(
++        &mut self,
++        _kind: GatherGroup,
++        _site: Option<ObjectId>,
++    ) -> Result<Option<Gatherable>, GenieError> {
++        Err(GenieError::unsupported(
++            "a fishing ship's resource search without the world",
++        ))
++    }
++
+     /// The class of master `master` of player `player` (`FUN_14152fe40`, the player's master
+     /// table `+0x28`): None for a player or master the game does not hold.
+     ///
+@@ -381,6 +509,31 @@ pub trait UnitSide {
              "a soldier's attack in a group without its unit",
          ))
      }
@@ -14479,7 +15040,7 @@ index ea0838e3..fa603b75 100644
          return Ok(Some(first));
      }
 diff --git a/crates/engine/genie-core/src/unit_ai/world_view/side.rs b/crates/engine/genie-core/src/unit_ai/world_view/side.rs
-index 77dc93ea..6c14d484 100644
+index 77dc93ea..fc816c23 100644
 --- a/crates/engine/genie-core/src/unit_ai/world_view/side.rs
 +++ b/crates/engine/genie-core/src/unit_ai/world_view/side.rs
 @@ -29,6 +29,7 @@ use crate::objects::ObjectState;
@@ -14820,7 +15381,38 @@ index 77dc93ea..6c14d484 100644
          }))
      }
  
-@@ -286,6 +578,80 @@ impl UnitSide for UnitView<'_, '_> {
+@@ -268,6 +560,30 @@ impl UnitSide for UnitView<'_, '_> {
+         self.closest_gatherable(search)
+     }
+ 
++    fn fishing_resource(
++        &mut self,
++        kind: crate::objects::masters::GatherGroup,
++        site: Option<ObjectId>,
++    ) -> Result<Option<Gatherable>, GenieError> {
++        let player = self.player;
++        let Some(id) = self
++            .unit
++            .fishing_resource_search(&*self.actions, self.c, (player, kind, site))?
++        else {
++            return Ok(None);
++        };
++        let others = crate::world::others::OthersRef::of(&self.c.w.players, &self.c.w.index, player)?;
++        let (owner, u) = others.find(id).ok_or(GenieError::unsupported(
++            "a resource found that the slice does not hold",
++        ))?;
++        let class = u.master(self.c.w.master_tables(), owner)?.class;
++        Ok(Some(Gatherable {
++            id,
++            position: u.position(),
++            class,
++        }))
++    }
++
+     /// The player's master table (`FUN_14152fe40`, `+0x28`): the masters the slice holds of each
+     /// player.
+     fn master_class(
+@@ -286,6 +602,80 @@ impl UnitSide for UnitView<'_, '_> {
          Ok(class)
      }
  
@@ -14901,7 +15493,7 @@ index 77dc93ea..6c14d484 100644
      fn reaches(&mut self, target: ObjectId, range: Distance) -> Result<bool, GenieError> {
          let mut plan = Planning {
              pathing: &mut self.c.w.pathing,
-@@ -322,6 +688,31 @@ impl UnitSide for UnitView<'_, '_> {
+@@ -322,6 +712,31 @@ impl UnitSide for UnitView<'_, '_> {
          )
      }
  
@@ -14933,7 +15525,7 @@ index 77dc93ea..6c14d484 100644
      fn closest(&mut self, search: &Search<'_>) -> Result<Found, GenieError> {
          let roles = &self.c.w.model.roles.clone();
          let seeker = match search.pick {
-@@ -505,6 +896,14 @@ impl UnitSide for UnitView<'_, '_> {
+@@ -505,6 +920,14 @@ impl UnitSide for UnitView<'_, '_> {
          done
      }
  
@@ -14948,7 +15540,7 @@ index 77dc93ea..6c14d484 100644
      fn busy_now(&mut self) -> Result<bool, GenieError> {
          Ok(
              self.actions.top_action_kind().is_some()
-@@ -522,6 +921,7 @@ impl UnitSide for UnitView<'_, '_> {
+@@ -522,6 +945,7 @@ impl UnitSide for UnitView<'_, '_> {
          ai: &UnitAi,
          rng: &mut Well512,
      ) -> Result<Option<Tile>, GenieError> {
@@ -14956,7 +15548,7 @@ index 77dc93ea..6c14d484 100644
          let tc = town_centre(
              owner_view(
                  &self.c.w.players,
-@@ -530,6 +930,7 @@ impl UnitSide for UnitView<'_, '_> {
+@@ -530,6 +954,7 @@ impl UnitSide for UnitView<'_, '_> {
                  self.new_owner,
              )?,
              self.c.w.model.slots.master,
@@ -19806,10 +20398,10 @@ index d79318cd..9bc800f3 100644
                      // the object's type: the save's factory types 70 and 80, any other below
                      kind: if o.tribe_combat_object.is_some() {
 diff --git a/crates/tools/genie-oracle/src/movers.rs b/crates/tools/genie-oracle/src/movers.rs
-index a098b509..66f208ee 100644
+index a098b509..d6d9246f 100644
 --- a/crates/tools/genie-oracle/src/movers.rs
 +++ b/crates/tools/genie-oracle/src/movers.rs
-@@ -240,9 +240,12 @@ pub(super) fn mover(
+@@ -240,9 +240,13 @@ pub(super) fn mover(
          last_turn: Seconds::new(m.turn_towards_time),
          angle: Angle::new(m.angle),
          pauses: Vec::new(),
@@ -19819,6 +20411,7 @@ index a098b509..66f208ee 100644
          // the current sprite's, which the unit's update takes from its sprite
          sprite_facets: None,
 +        future: None,
++        attack_alternate: false,
      }))
  }
  
