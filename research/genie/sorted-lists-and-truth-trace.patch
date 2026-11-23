@@ -7354,10 +7354,33 @@ index d3230577..bf45bd8b 100644
      /// below its master's hit points (the short at `+0x530`, `CVTDQ2PS`), and its player and
      /// `owner` count each other as allies.
 diff --git a/crates/engine/genie-core/src/groups/update/mod.rs b/crates/engine/genie-core/src/groups/update/mod.rs
-index 0e406949..ed5ae5a2 100644
+index 0e406949..c361f426 100644
 --- a/crates/engine/genie-core/src/groups/update/mod.rs
 +++ b/crates/engine/genie-core/src/groups/update/mod.rs
-@@ -78,7 +78,10 @@ impl UnitGroup {
+@@ -16,6 +16,7 @@ mod awake;
+ mod checks;
+ mod entry;
+ mod moves;
++mod other;
+ mod release;
+ mod send;
+ 
+@@ -66,11 +67,9 @@ enum Shown {
+     Running,
+ }
+ 
+-/// The update of the other commands on a target (`FUN_141040bd0`), and the attack formation's
+-/// refill (`FUN_1410163f0`): not modelled.
+-const OTHER_COMMANDS: GenieError = GenieError::unsupported(
+-    "a group command's update other than a move, a follow or an attack (FUN_141040bd0)",
+-);
++/// The attack formation's refill (`FUN_1410163f0`): not modelled.
++const OTHER_COMMANDS: GenieError =
++    GenieError::unsupported("an attack formation's refill (FUN_1410163f0)");
+ 
+ impl UnitGroup {
+     /// `IsIdle` (`FUN_141017ad0`): idle with [`GroupFlags::MEMBERS_SENT`] (`cConsiderIdle`), or on
+@@ -78,7 +77,10 @@ impl UnitGroup {
      /// moves or waits to move; else idle.
      #[must_use]
      pub fn is_idle(&self) -> bool {
@@ -7370,10 +7393,49 @@ index 0e406949..ed5ae5a2 100644
          }
          if self.current_command == GroupCommandKind::MOVE && self.patrols() {
 diff --git a/crates/engine/genie-core/src/groups/update/moves.rs b/crates/engine/genie-core/src/groups/update/moves.rs
-index a7ba8750..e68ade87 100644
+index a7ba8750..2942648b 100644
 --- a/crates/engine/genie-core/src/groups/update/moves.rs
 +++ b/crates/engine/genie-core/src/groups/update/moves.rs
-@@ -151,6 +151,9 @@ impl World {
+@@ -17,7 +17,7 @@ use crate::groups::command::MOVE_COMMAND;
+ use crate::groups::command::MoveTo;
+ use crate::groups::formation::top_path;
+ use crate::groups::group_list::member_gone;
+-use crate::groups::update::{ATTACK, FOLLOW, IDLE_LIMIT, IDLE_SPAN, NO_COMMAND, OTHER_COMMANDS};
++use crate::groups::update::{ATTACK, FOLLOW, IDLE_LIMIT, IDLE_SPAN, NO_COMMAND};
+ use crate::groups::{SpecificMove, UnitGroup};
+ use crate::map::Distance;
+ use crate::math::fmath::BVector;
+@@ -44,8 +44,8 @@ impl World {
+     /// height left out), and sets [`GroupFlags::FOLLOWED`]; without the target or a lead it ends as
+     /// a finished move. An attack ([`World::attack_update`], `FUN_14103f4e0`) that finished deletes
+     /// the group when no command is queued and its target is no longer pending
+-    /// ([`World::target_pending`]), else hibernates it. The other commands (`FUN_141040bd0`) are
+-    /// not modelled.
++    /// ([`World::target_pending`]), else hibernates it. The other commands (188329 `0x110cbd0`,
++    /// [`World::other_update`]) end as an attack does.
+     pub(super) fn command_update(
+         &mut self,
+         group: GroupId,
+@@ -107,7 +107,17 @@ impl World {
+                 }
+                 return Ok(GroupFate::Kept);
+             }
+-            _ => return Err(OTHER_COMMANDS),
++            // 188329 0x110aa0a: the other commands (0x110cbd0), whose end runs as an attack's
++            _ => {
++                if self.other_update(group, relayout)? == Progress::Finished {
++                    let g = self.groups.held(group)?;
++                    if g.command_queue.is_empty() && !self.target_pending(group)? {
++                        return Ok(GroupFate::Deleted);
++                    }
++                    self.groups.held_mut(group)?.hibernating = 1;
++                }
++                return Ok(GroupFate::Kept);
++            }
+         };
+         if finished == Progress::Finished {
+             if self.groups.held(group)?.command_queue.is_empty() {
+@@ -151,6 +161,9 @@ impl World {
              *relayout = true;
              return Ok(Progress::Going);
          }
@@ -7383,7 +7445,7 @@ index a7ba8750..e68ade87 100644
          let walks = g
              .motion
              .paths
-@@ -221,6 +224,104 @@ impl World {
+@@ -221,6 +234,104 @@ impl World {
          self.move_members_on(group, walks, patrolling)
      }
  
@@ -7488,7 +7550,7 @@ index a7ba8750..e68ade87 100644
      /// [`World::move_update`] of a group whose motion moves: a following group
      /// ([`GroupFlags::FOLLOWED`]) whose top path ends at least `GroupTuning::close` from its target
      /// goes on following; any other asks for a layout anew. The update does not end.
-@@ -456,16 +557,26 @@ impl World {
+@@ -456,16 +567,26 @@ impl World {
                      )
                      .map(|motion| {
                          let pauses = take(&mut mover.pauses);
@@ -22758,6 +22820,180 @@ index 00000000..e8b44cf1
 +            .zip(&b.command_queue)
 +            .all(|(x, y)| x.command == y.command && x.target_id == y.target_id)
 +}
+diff --git a/crates/engine/genie-core/src/groups/update/other.rs b/crates/engine/genie-core/src/groups/update/other.rs
+new file mode 100644
+index 00000000..8f8a70e1
+--- /dev/null
++++ b/crates/engine/genie-core/src/groups/update/other.rs
+@@ -0,0 +1,168 @@
++//! The update of a group's commands on a target besides a move, a follow and an attack (188329
++//! `0x110cbd0`, 158041 `FUN_141040bd0`): the general command's tasks (Enter 3, Gather 5, Build
++//! 0x65, Repair 0x6a and the others of [`crate::groups::order`]'s list), which walk the group
++//! to the target and then hand each member the work on it.
++
++use crate::GenieError;
++use crate::groups::GroupFlags;
++use crate::groups::GroupId;
++use crate::groups::MovePath;
++use crate::groups::MoveReason;
++use crate::groups::Progress;
++use crate::groups::SpecificMove;
++use crate::groups::update::NO_COMMAND;
++use crate::map::Distance;
++use crate::math::fmath::sqrt;
++use crate::objects::{ObjectId, ObjectKey};
++use crate::orders::OrderSource;
++use crate::orders::Work;
++use crate::world::Seconds;
++use crate::world::World;
++use crate::world::index::Place;
++use crate::world::layer::ClassRoles;
++use crate::world::slots::CheckedIndex;
++
++/// The gap without a target (`DAT_14369ffdc`), never within a range.
++const NO_TARGET_GAP: f32 = f32::MAX;
++
++impl World {
++    /// 188329 `0x110cbd0`, the update of group `group`'s other commands. The target is the
++    /// world's object of `+0x3c8` (`0x1616cf0`); its gap is the group's place's (`+8`, `+0x10`)
++    /// to the target's box (`0x124dd10`: `sqrt(max(|dx| − rx, 0)² + max(|dy| − ry, 0)²)`, the
++    /// target master's radii `+0x78`, `+0x7c`). A moving group (`0x110ff90`: its velocity's
++    /// length above 0) without its target asks for a relayout and goes on; one whose target is
++    /// beyond the range (`+0x3dc`, `COMISS`/`JBE`: a NaN gap is within) asks for a relayout and
++    /// goes on, its allied target's moves (a transport's call and the re-command `0x10d8230`
++    /// with `0x2713`, for a target that moved more than 1 from where the command found it) not
++    /// modelled. Else, with the target held, each member the world holds (in the members'
++    /// order, as listed before the loop) is stopped (slot 0x158, [`World::object_stop`]), its
++    /// own move record (`+0xf8`, 0x30 bytes) clears, its walk stops (slot 0x5a8 =
++    /// `0x1224d00`), and it takes the work on the target at the target's place (slot 0x138 =
++    /// `0x12c6590` with `+0xa14` 1, no carried-resource test, any task: [`World::give_work`]);
++    /// the garrison command `0x2713` gives members slot 0x8a8 instead (not modelled). Then a
++    /// group without queued commands whose target is no longer pending (`0x10dd340`,
++    /// [`World::target_pending`]) ends its command: none, its walk stops (`0x11147f0`,
++    /// [`crate::groups::Motion::stop_walk`]) and its target's data resets, the range too.
++    /// [`GroupFlags::LINE`] clears and the update is finished (1).
++    ///
++    /// # Errors
++    ///
++    /// What the members' stops and work commands do not model.
++    pub(super) fn other_update(
++        &mut self,
++        group: GroupId,
++        relayout: &mut bool,
++    ) -> Result<Progress, GenieError> {
++        let g = self.groups.held(group)?;
++        let command = g.current_command;
++        let range = g.current_target.range;
++        let place = g.motion.position[0];
++        let target = g.current_target.target.key();
++        let held = self.world_object(target).map(|t| {
++            (
++                t.id(),
++                t.player(),
++                t.master_id(self.model.slots),
++                t.position(),
++                t.moved_vector(),
++            )
++        });
++        let gap = match held {
++            Some((_, p, m, at, _)) => {
++                let r = self.master(p, m)?.radius;
++                let gx = (place.x() - at.x()).abs() - r.x();
++                let gx = if gx > 0.0 { gx } else { 0.0 };
++                let gy = (place.y() - at.y()).abs() - r.y();
++                let gy = if gy > 0.0 { gy } else { 0.0 };
++                sqrt(gx * gx + gy * gy)
++            }
++            None => NO_TARGET_GAP,
++        };
++        let g = self.groups.held(group)?;
++        if g.motion.moving() {
++            let Some((_, tp, m, _, moved)) = held else {
++                *relayout = true;
++                return Ok(Progress::Going);
++            };
++            if gap > range.get() {
++                *relayout = true;
++                let owner = g.owner_player()?;
++                if self.spatial.allied_with(tp, owner) {
++                    let class = self.master(tp, m)?.class;
++                    if self.model.roles.of_class(class).contains(ClassRoles::TRANSPORT) {
++                        return Err(GenieError::unsupported(
++                            "a group command on an allied transport beyond its range (0x110cbd0)",
++                        ));
++                    }
++                    let d = moved - g.current_target.original_position;
++                    if 1.0 < d.height() * d.height() + d.x() * d.x() + d.y() * d.y() {
++                        return Err(GenieError::unsupported(
++                            "a group command whose allied target moved (0x10d8230 with 0x2713)",
++                        ));
++                    }
++                }
++                return Ok(Progress::Going);
++            }
++        }
++        if let Some((tid, _, _, at, _)) = held {
++            let ids: Vec<ObjectId> = g.members.iter().map(|m| m.id).collect();
++            for id in ids {
++                if self.world_object(id).is_none() {
++                    continue;
++                }
++                // slot 0x158 (0x115b5b0): the unit's stop
++                match self.place(id) {
++                    Some(Place::Live(p, i)) => self.object_stop(p, i)?,
++                    _ => {
++                        return Err(GenieError::unsupported(
++                            "a group command's member the world holds asleep (0x110cbd0)",
++                        ));
++                    }
++                }
++                // its own move record clears (the first member of that id)
++                let g = self.groups.held_mut(group)?;
++                if let Some(k) = g.members.iter().position(|m| m.id == id) {
++                    g.members.checked_mut(k)?.specific_move = SpecificMove {
++                        path_id: MovePath::NONE,
++                        reason: MoveReason::None,
++                        ..SpecificMove::default()
++                    };
++                }
++                // slot 0x5a8 (0x1224d00): the unit's stop (slot 0x618), then its path data
++                // clears (0x1072bb0), the kept pause too
++                if let Some(m) = self.parts.mover_mut(id) {
++                    m.stop()?;
++                }
++                if crate::movement::pauseall_188329()
++                    && let Some(m) = self.parts.mover_mut(id)
++                {
++                    m.rest_pause = Seconds::ZERO;
++                }
++                if command == crate::groups::GroupCommandKind::named(0x2713) {
++                    return Err(GenieError::unsupported(
++                        "a garrison group command's members (slot 0x8a8, 0x110cbd0)",
++                    ));
++                }
++                let work = Work {
++                    target: Some(tid),
++                    point: at,
++                    carry_test: false,
++                    filter: None,
++                    source: OrderSource::Direct,
++                };
++                self.give_work(id, &work)?;
++            }
++        }
++        if self.groups.held(group)?.command_queue.is_empty() && !self.target_pending(group)? {
++            let g = self.groups.held_mut(group)?;
++            g.current_command = NO_COMMAND;
++            g.motion.stop_walk()?;
++            g.forget_target_data();
++            g.current_target.range = Distance::ZERO;
++            // +0x3e6 is -1
++            g.current_target.certain_action = None;
++        }
++        self.groups.held_mut(group)?.flags &= !GroupFlags::LINE;
++        Ok(Progress::Finished)
++    }
++}
 diff --git a/crates/engine/genie-core/src/objects/convert.rs b/crates/engine/genie-core/src/objects/convert.rs
 new file mode 100644
 index 00000000..7c93ea6c
@@ -25374,10 +25610,10 @@ index 00000000..886df08f
 +}
 diff --git a/crates/engine/genie-core/src/unit_ai/back_up.rs b/crates/engine/genie-core/src/unit_ai/back_up.rs
 new file mode 100644
-index 00000000..51391382
+index 00000000..03c10982
 --- /dev/null
 +++ b/crates/engine/genie-core/src/unit_ai/back_up.rs
-@@ -0,0 +1,255 @@
+@@ -0,0 +1,263 @@
 +//! 188329's soldier back-up from a target under its least range (findings 187): the soldier's
 +//! handler `0xd05f80` case 0x1fe calls `0xd1e420`, which queues an attack in front and moves
 +//! the unit back through the unit AI's slot 0x158 (`0xd27d70`).
@@ -25414,6 +25650,9 @@ index 00000000..51391382
 +const ONE: f32 = 1.0;
 +/// `[0x31b1420]`: the tile's centre.
 +const HALF: f32 = 0.5;
++/// The radius above which the short pather's dispatcher (`0x1078690`, `0x31b1420`) runs the
++/// old pather (`0x1060d90` on the collector at the obstruction manager's `+0x380`).
++const OLD_PATHER_RADIUS: f32 = 0.5;
 +/// The back-up's queued attack's priority (`0x32`: below 100, it waits while the AI has an
 +/// action).
 +const BACK_UP_PRIORITY: i32 = 0x32;
@@ -25555,18 +25794,23 @@ index 00000000..51391382
 +        let y = held(near(point.y(), own.y()), at.map.height());
 +        let (mut tx, mut ty) = (x as i32, y as i32);
 +        // 0x1065510 clears the obstruction collector (`+0x380`) the reach test fills
-+        if side.tile_standable(Tile::new(tx, ty))? {
-+            if side
++        let passes = side.tile_standable(Tile::new(tx, ty))? && {
++            let reached = side
 +                .reach_length(Point::new(tx as f32, ty as f32), Distance::ZERO)?
-+                .is_none()
-+            {
-+                // 0x1064460 then counts the objects the failed test met; above 3 it gives up
++                .is_some();
++            // 0x1064460 then counts the objects the collector holds that the world still has;
++            // above 3 no move (0xd280bc). Only the old pather (0x1060d90, which 0x1078690 runs
++            // for a unit wider than half a tile: its radius, master +0x78, above 0.5, with
++            // 0x15fe460 holding) fills the collector; a narrower unit's test leaves it empty
++            if !reached && OLD_PATHER_RADIUS < at.size.x() {
 +                return Err(GenieError::unsupported(
-+                    "a back-up whose tile's reach test fails (0x1064460's count)",
++                    "a back-up whose tile's reach test fails for a unit wider than half a tile (0x1064460's count of the old pather's hulls)",
 +                ));
 +            }
-+        } else {
-+            // no reach test ran: 0x1064460 counts none, the search runs (0xd280c5..0xd284bf)
++            reached
++        };
++        if !passes {
++            // 0x1064460 counted none: the search runs (0xd280c5..0xd284bf)
 +            // 0xb75ce0: the squared ground gap from the unit's box to the point
 +            let gap2 = |px: f32, py: f32| {
 +                let gx = (px - own.x()).abs() - at.size.x();
