@@ -43,6 +43,8 @@
   #players b { display: inline-block; width: 14px; height: 14px; border-radius: 3px; }
   small, .note { color: var(--muted); }
   #player[hidden] { display: none; }
+  .demo { width: 100%; background: #17301f; border: 1px solid #2ea043; border-radius: 8px; padding: 4px 14px; }
+  .demo p { margin: 8px 0; }
 </style>
 </head>
 <body>
@@ -52,6 +54,10 @@
   <span id="status" role="status"></span>
 </header>
 <main>
+  <section id="demoNote" class="demo" hidden>
+    <p><strong>엔진 재현 데모</strong> — 리플에 담긴 건 양쪽의 명령뿐이에요. genie 엔진이 그 명령만으로 경기 전체를 처음부터 다시 계산했고, 그 결과를 그대로 보여 줘요. 유닛 하나하나의 위치·행동·체력이 엔진 계산이에요.</p>
+    <p>리플에는 게임이 약 6.5초마다 남긴 확인 값(선수별 자원·유닛 수·위치 합계 등 11개)이 들어 있어요. 엔진 결과와 비교하면 <strong>10:19까지 96개 중 95개 체크포인트가 완전히 일치</strong>하고, 마지막 10:26에는 한쪽 위치 합계만 조금 달라요. 초록 막대가 확인된 구간이에요.</p>
+  </section>
   <section id="setup" aria-label="재생 준비">
     <p class="note">genie 엔진이 리플의 명령을 그대로 다시 실행해 경기를 재현해요. 아직 완벽하지 않아서, 기록과 맞는지 확인된 구간(초록)이 지나면 "확인 안 됨"으로 표시해요. 게임 데이터는 내 PC의 게임 폴더에서 읽고, 어디로도 보내지 않아요.</p>
     <div class="step">
@@ -88,7 +94,7 @@
     <pre id="info">-</pre>
   </div>
 </main>
-<script src="names.js?v=20261123"></script>
-<script src="replay.js?v=20261123"></script>
+<script src="names.js?v=20261123b"></script>
+<script src="replay.js?v=20261123b"></script>
 </body>
 </html>

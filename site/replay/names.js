@@ -12,7 +12,7 @@ const MASTER_NAMES = {
   74: 'Militia', 75: 'Man-at-Arms', 77: 'Long Swordsman', 93: 'Spearman', 358: 'Pikeman', 38: 'Knight',
   283: 'Cavalier', 329: 'Camel Rider', 39: 'Cavalry Archer', 5: 'Hand Cannoneer', 125: 'Monk',
   280: 'Mangonel', 279: 'Scorpion', 35: 'Battering Ram', 545: 'Transport Ship', 13: 'Fishing Ship',
-  17: 'Trade Cog', 128: 'Trade Cart', 539: 'Galley', 1808: 'Mule Cart',
+  17: 'Trade Cog', 128: 'Trade Cart', 539: 'Galley', 1808: 'Mule Cart', 2550: 'Champi Scout',
   // 건물
   109: 'Town Center', 71: 'Town Center', 141: 'Town Center', 142: 'Town Center', 70: 'House', 12: 'Barracks',
   87: 'Archery Range', 101: 'Stable', 103: 'Blacksmith', 104: 'Monastery', 84: 'Market', 68: 'Mill',

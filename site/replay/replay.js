@@ -49,6 +49,31 @@ async function start(pieces, rec, name) {
   if (!looping) { looping = true; loop(); }
 }
 
+// the public demo (?demo=518363684): the engine's frames of one match, computed beforehand and
+// served as demo-<id>.bin (raw deflate of genie-web's stdout), played without the engine or any
+// game file
+const DEMOS = { 518363684: '프로 경기 · 10분 32초' };
+async function startDemo(id) {
+  $('setup').hidden = true; $('demoNote').hidden = false;
+  document.querySelector('header h1 small').textContent = '(데모)';
+  $('status').textContent = '엔진 출력 불러오는 중…';
+  $('stage').hidden = false; $('side').hidden = false;
+  const packed = await fetch('demo-' + id + '.bin?v=20261123').then(r => { if (!r.ok) throw Error('HTTP ' + r.status); return r.arrayBuffer(); });
+  const bytes = await new Response(new Blob([packed]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer();
+  st = { name: '#' + id, demo: true, frames: [], stills: [], info: null, labels: null, words: 10, playMs: 0, playing: false, done: false, wall: 1, wasmBytes: 0 };
+  cam.fitted = false; hover = selected = null;
+  const v = new DataView(bytes);
+  for (let o = 0; o + 8 <= bytes.byteLength;) {
+    const tag = v.getUint32(o, true), len = v.getUint32(o + 4, true);
+    onMessage({ tag, bytes: bytes.slice(o + 8, o + 8 + len), wall: 1 });
+    o += 8 + len;
+  }
+  st.done = true;
+  $('status').textContent = '#' + id + ' (' + (DEMOS[id] || '') + '): 미리 계산한 엔진 출력이에요';
+  $('bPlay').disabled = false; $('seek').disabled = false;
+  if (!looping) { looping = true; loop(); }
+}
+
 function onMessage(m) {
   if (m.crash) { $('status').textContent = '엔진이 멈췄어요: ' + m.crash; console.error(m); return; }
   if (m.done) {
@@ -71,7 +96,7 @@ function onMessage(m) {
   const f = { u: words[0], ms: words[1], data: words.subarray(2), floats: new Float32Array(m.bytes, 8), ints: new Int32Array(m.bytes, 8) };
   if (m.tag === 2) {
     st.frames.push(f);
-    if (!st.done) $('status').textContent = st.name + ': ' + fmt(f.ms) + '까지 계산 (실제 1초에 게임 ' + (f.ms / m.wall).toFixed(1) + '초)';
+    if (!st.done && !st.demo) $('status').textContent = st.name + ': ' + fmt(f.ms) + '까지 계산 (실제 1초에 게임 ' + (f.ms / m.wall).toFixed(1) + '초)';
   } else if (m.tag === 3) st.stills.push(f);
 }
 
@@ -248,11 +273,16 @@ function panel() {
   const end = endMs(), last = st.frames[st.frames.length - 1];
   $('clock').textContent = fmt(st.playMs) + ' / ' + fmt(end) + (st.done ? '' : '…');
   // the verified span (site words 1, 6, 10 equal at every checkpoint so far): past it, "확인 안 됨"
-  const span = spanMs(), checked = !!(st.info && st.info.players && st.info.players.slice(1).some(p => p.site_checkpoints > 0));
-  const unverified = checked && st.playMs > span;
+  // past the span: "확인 안 됨" when a player's site words differed at a later checkpoint; when
+  // none ever differed, the span ends at the last checkpoint the replay holds (the game ended
+  // before the next), so there is nothing to compare: "확인 값 없음"
+  const span = spanMs(), players = (st.info && st.info.players || []).slice(1);
+  const checked = players.some(p => p.site_checkpoints > 0), broke = players.some(p => p.site_bad_ms != null);
+  const past = checked && st.playMs > span, unverified = past && broke;
   $('unverified').style.display = unverified ? 'block' : 'none';
-  $('clockMark').textContent = !checked ? '확인 전' : unverified ? '확인 안 됨' : '확인됨';
-  $('clockMark').className = !checked ? '' : unverified ? 'bad' : 'ok';
+  $('clockMark').textContent = !checked ? '확인 전' : unverified ? '확인 안 됨' : past ? '확인 값 없음 (마지막 체크포인트 뒤)' : '확인됨';
+  $('clockMark').className = !checked ? '' : unverified ? 'bad' : past ? '' : 'ok';
+  $('spanDone').style.background = broke ? '' : '#555';
   if (!$('seek').matches(':active')) $('seek').value = Math.round(st.playMs / end * 1000);
   $('spanOk').style.width = (spanMs() / end * 100) + '%';
   $('spanDone').style.width = ((last ? last.ms : 0) / end * 100) + '%';
@@ -261,8 +291,8 @@ function panel() {
   const lines = [
     '경기 ' + st.name + (info.map ? ' · 지도 ' + info.map.join('×') : ''),
     '업데이트 ' + (info.updates ?? '-') + ' / ' + (info.total ?? '-'),
-    '엔진: 실제 1초에 게임 ' + (last ? (last.ms / st.wall).toFixed(1) : '-') + '초' + (st.done ? ', 끝까지 ' + (st.wall / 1000).toFixed(1) + '초' : ''),
-    '확인된 구간 ' + fmt(spanMs()) + (st.done ? ' / ' + fmt(end) : ''),
+    st.demo ? '엔진: 미리 계산한 출력 (게임 파일 없이 재생)' : '엔진: 실제 1초에 게임 ' + (last ? (last.ms / st.wall).toFixed(1) : '-') + '초' + (st.done ? ', 끝까지 ' + (st.wall / 1000).toFixed(1) + '초' : ''),
+    '확인된 구간 ' + fmt(spanMs()) + (st.done ? ' / ' + fmt(end) : '') + (st.done && !broke && checked ? ' (리플의 마지막 체크포인트까지 전부, 그 뒤는 비교할 값이 없음)' : ''),
   ];
   (info.players || []).forEach((p, i) => { if (i) lines.push('P' + i + ': 체크포인트 ' + p.held + '개 일치' + (p.mismatch != null ? ', ' + p.mismatch + '동기화 뒤 첫 어긋남' : '') + (p.stop ? ', 엔진이 지원하지 않는 동작에서 멈춤(업데이트 ' + p.stop.update + ')' : '') + (p.site_bad_ms != null ? ', 사이트 수치가 ' + fmt(p.site_bad_ms) + '부터 다름' : '')); });
   $('info').textContent = lines.join('\n');
@@ -418,7 +448,10 @@ $('fRec').onchange = async () => {
   if (f) await takeReplay(await f.arrayBuffer(), '파일').catch(e => { $('recStatus').textContent = ''; note($('recStatus'), 'bad', e.message); });
 };
 
-if (gameId && profileId) {
+const demoId = params.get('demo');
+if (demoId && DEMOS[demoId]) {
+  startDemo(demoId).catch(e => { $('status').textContent = '데모를 불러오지 못했어요: ' + e.message; });
+} else if (gameId && profileId) {
   $('recAuto').textContent = '경기 #' + gameId + ' 리플을 공식 서버에서 받는 중…';
   fetch('https://api.ageofempires.com/api/GameStats/AgeII/GetMatchReplay/?gameId=' + gameId + '&profileId=' + profileId + '&matchId=' + gameId)
     .then(r => { if (!r.ok) throw Error('HTTP ' + r.status); return r.arrayBuffer(); })
