@@ -10173,18 +10173,19 @@ index a3a31d36..72d6fb48 100644
          for units in split.groups.clone() {
              let common = common_group(&units, |id| self.object(id).map(|(_, u)| u.group));
 diff --git a/crates/engine/genie-core/src/orders/split.rs b/crates/engine/genie-core/src/orders/split.rs
-index b8bda6ff..71c767ab 100644
+index b8bda6ff..b2e4a3f8 100644
 --- a/crates/engine/genie-core/src/orders/split.rs
 +++ b/crates/engine/genie-core/src/orders/split.rs
-@@ -3,6 +3,7 @@
+@@ -3,6 +3,8 @@
  use crate::GenieError;
  use crate::map::Distance;
  use crate::map::Point;
++use crate::map::spatial::Spatial;
 +use crate::movement::footprint_gap_squared;
  use crate::math::fmath::{at_most_or_unordered, sqrt};
  use crate::movement::Speed;
  use crate::objects::ObjectId;
-@@ -42,8 +43,11 @@ impl World {
+@@ -42,8 +44,11 @@ impl World {
              &[id] if self.place(id).is_none() => return Ok(()),
              _ => {}
          }
@@ -10197,7 +10198,7 @@ index b8bda6ff..71c767ab 100644
              .and_then(|mut s| self.interact_groups(&mut s, order).map(|()| s.loose));
          self.groups.count_command();
          let loose = loose?;
-@@ -123,6 +127,20 @@ impl World {
+@@ -123,6 +128,20 @@ impl World {
          units: &[Option<ObjectId>],
          kept: &dyn Fn(ObjectId) -> bool,
          control: ControlKey,
@@ -10218,7 +10219,7 @@ index b8bda6ff..71c767ab 100644
      ) -> Result<Split, GenieError> {
          // FUN_140fd9ae0 splits only when the list's first unit exists (its owner): else no unit
          // takes the order
-@@ -141,6 +159,8 @@ impl World {
+@@ -141,6 +160,8 @@ impl World {
          }
          let mut split = Split {
              owner: Some(owner),
@@ -10227,7 +10228,7 @@ index b8bda6ff..71c767ab 100644
              ..Split::default()
          };
          for run in sorted.chunks(60) {
-@@ -159,12 +179,54 @@ impl World {
+@@ -159,12 +180,54 @@ impl World {
          split: &mut Split,
      ) -> Result<(), GenieError> {
          let left = self.splittables(run)?;
@@ -10283,7 +10284,22 @@ index b8bda6ff..71c767ab 100644
          // units above type 69 of formation category 0 stay loose (the dock test FUN_141158210 is
          // 1 only on an `E` tile in game type 12)
          let (loose, rest): (Vec<Splittable>, Vec<Splittable>) = left
-@@ -293,11 +355,18 @@ impl World {
+@@ -244,7 +307,13 @@ impl World {
+                     }
+                 }
+                 if group.len() < 2 {
+-                    split.loose.push(chosen.id);
++                    // 188329 0x10b4480 (LAB_1410b57c0, a31a.c 584-641): a unit left alone joins
++                    // the first group of the split so far (in order) one of whose members' squared
++                    // footprint gap to it (0x124daf0) is below 0.1 (`DAT_143202890`, COMISS/JA:
++                    // a NaN does not join); only else it moves loose (0x10b5960)
++                    if !join_split_group(&self.spatial, split, chosen.id) {
++                        split.loose.push(chosen.id);
++                    }
+                     continue;
+                 }
+             }
+@@ -293,11 +362,18 @@ impl World {
  
      /// The units of `left` in a group the world holds go into `split` with the run's other
      /// members of their group (`FUN_140fd76d0`: one alone is loose); the others are returned.
@@ -10302,7 +10318,7 @@ index b8bda6ff..71c767ab 100644
          // the units in a group the world holds, with the order's other members of their group
          let mut taken = vec![false; left.len()];
          for (i, first) in left.iter().enumerate() {
-@@ -316,7 +385,7 @@ impl World {
+@@ -316,7 +392,7 @@ impl World {
                  }
              }
              match members[..] {
@@ -10311,7 +10327,43 @@ index b8bda6ff..71c767ab 100644
                  _ => split.keep(members),
              }
          }
-@@ -438,3 +507,10 @@ pub(super) fn splits_together(
+@@ -375,6 +451,35 @@ impl World {
+ 
+ /// The splitter groups units of a type above this (`0x45`).
+ pub(super) const MAX_UNGROUPED: MasterKind = MasterKind::of_data(69);
++
++/// [`World::split_run`]'s last step for a unit `id` the formation pass left alone (188329
++/// 0x10b4480 at LAB_1410b57c0): the split's groups so far in order, each member in order
++/// that the world holds; the first member whose squared footprint gap to the unit
++/// (0x124daf0, both places and radii) is below [`JOIN_GAP_SQUARED`] takes the unit into
++/// its group, which grows past the splitter's 60 if it must (the game writes the entry
++/// unchecked). True when the unit joined.
++fn join_split_group(spatial: &Spatial, split: &mut Split, id: ObjectId) -> bool {
++    let Some(me) = spatial.get(id).copied() else {
++        return false;
++    };
++    for group in &mut split.groups {
++        for &member in group.iter() {
++            let Some(m) = spatial.get(member) else {
++                continue;
++            };
++            let gap = footprint_gap_squared(m.position, m.radius, me.position, me.radius);
++            if gap.get() < JOIN_GAP_SQUARED {
++                group.push(id);
++                return true;
++            }
++        }
++    }
++    false
++}
++
++/// The squared footprint gap below which a unit the splitter left alone joins a group of the
++/// split (188329 `DAT_143202890`, 0.1).
++const JOIN_GAP_SQUARED: f32 = 0.1;
+ /// Units nearer than `OrderTuning::split_path_reach` are measured by a path while
+ /// `DAT_1439e60e3` (1 at run time) holds.
+ const SPLIT_BY_PATH: bool = true;
+@@ -438,3 +543,10 @@ pub(super) fn splits_together(
      }
      Ok(at_most_or_unordered(d, f.influence.get()))
  }
