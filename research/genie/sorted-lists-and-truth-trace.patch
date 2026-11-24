@@ -8620,7 +8620,7 @@ index 51f6a791..97d7eb86 100644
 +        })
 +}
 diff --git a/crates/engine/genie-core/src/groups/stats.rs b/crates/engine/genie-core/src/groups/stats.rs
-index e101e2d0..f7de2eaa 100644
+index e101e2d0..8623b89c 100644
 --- a/crates/engine/genie-core/src/groups/stats.rs
 +++ b/crates/engine/genie-core/src/groups/stats.rs
 @@ -110,9 +110,19 @@ impl World {
@@ -8697,6 +8697,15 @@ index e101e2d0..f7de2eaa 100644
      /// [`World::statistics_only`]'s member loop: each member's view in the members' order with the
      /// index it has then, and the objects of their searches.
      fn member_views(
+@@ -412,7 +460,7 @@ impl World {
+     /// # Errors
+     ///
+     /// An object of a master the slice does not have.
+-    pub(super) fn range_against(
++    pub(crate) fn range_against(
+         &self,
+         object: WorldObject<'_>,
+         target: Option<WorldObject<'_>>,
 diff --git a/crates/engine/genie-core/src/groups/steer/detour.rs b/crates/engine/genie-core/src/groups/steer/detour.rs
 index 22a83675..f8600d96 100644
 --- a/crates/engine/genie-core/src/groups/steer/detour.rs
@@ -10114,7 +10123,7 @@ index 9f616e05..7f01861b 100644
      /// until the next call.
      pub const fn set_manager_buffer(&mut self, buffer: Option<Distance>) {
 diff --git a/crates/engine/genie-core/src/map/spatial/mod.rs b/crates/engine/genie-core/src/map/spatial/mod.rs
-index 4cc3b283..36f7407d 100644
+index 4cc3b283..5ced3def 100644
 --- a/crates/engine/genie-core/src/map/spatial/mod.rs
 +++ b/crates/engine/genie-core/src/map/spatial/mod.rs
 @@ -46,6 +46,7 @@ mod objects;
@@ -10125,8 +10134,77 @@ index 4cc3b283..36f7407d 100644
  mod sight;
  mod tile_sight;
  
+@@ -513,6 +514,14 @@ pub struct Spatial {
+     changed: Vec<PlanRect>,
+     /// The seconds since each frozen object froze.
+     frozen_for: IdTable<Seconds>,
++    /// The objects whose record holds `+3` bit 0x10 (it moves): their velocity was not 0 as their
++    /// last update ended (slot 0x5c8 then, [`Spatial::set_record_moving`]); a stop between
++    /// (a command's) leaves it set until the object's next update.
++    moving_records: IdTable<()>,
++    /// While set, the short pather's line query leaves out the objects whose record holds bit
++    /// 0x10 ([`Spatial::moving_records`]) instead of those whose velocity is not 0 now
++    /// ([`Spatial::with_record_movers`]).
++    record_movers: bool,
+     /// What a stopped player's units may have done since: the fastest any of the players' unit
+     /// masters (type 70) moves and the farthest any acts beyond its footprint (its weapon or work
+     /// range), for [`Spatial::check_known`]. 0 when not set.
+diff --git a/crates/engine/genie-core/src/map/spatial/objects.rs b/crates/engine/genie-core/src/map/spatial/objects.rs
+index 0134df68..d27ae9c9 100644
+--- a/crates/engine/genie-core/src/map/spatial/objects.rs
++++ b/crates/engine/genie-core/src/map/spatial/objects.rs
+@@ -61,6 +61,8 @@ impl Spatial {
+             tiles,
+             changed: Vec::new(),
+             frozen_for: IdTable::new(),
++            moving_records: IdTable::new(),
++            record_movers: false,
+             fastest: 0.0,
+             reach: Distance::ZERO,
+             scout_maps: BTreeMap::new(),
+@@ -256,6 +258,32 @@ impl Spatial {
+         }
+     }
+ 
++    /// Object `id`'s update ended: its record's `+3` bit 0x10 becomes whether it moves then
++    /// (slot 0x5c8, its velocity not 0), until its next update ends.
++    pub fn set_record_moving(&mut self, id: ObjectId, moving: bool) {
++        if moving {
++            let _ = self.moving_records.insert(id, ());
++        } else {
++            let _ = self.moving_records.remove(id);
++        }
++    }
++
++    /// Whether object `id`'s record holds `+3` bit 0x10 ([`Spatial::set_record_moving`]).
++    #[must_use]
++    pub fn record_moving(&self, id: ObjectId) -> bool {
++        self.moving_records.contains_key(id)
++    }
++
++    /// `f` with the short pather's line query leaving out the objects whose record holds bit
++    /// 0x10 ([`Spatial::record_moving`]), as the game's query does, instead of those whose
++    /// velocity is not 0 now.
++    pub fn with_record_movers<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
++        self.record_movers = true;
++        let r = f(self);
++        self.record_movers = false;
++        r
++    }
++
+     /// The object's place is the game's again (the oracle's forced replay): it is known.
+     pub fn unfreeze(&mut self, id: ObjectId) {
+         if let Some(p) = self.objects.get_mut(id) {
+@@ -466,6 +494,7 @@ impl Spatial {
+     /// The object `id` leaves the world.
+     pub fn remove(&mut self, id: ObjectId) {
+         let _ = self.inside.remove(id);
++        let _ = self.moving_records.remove(id);
+         if let Some(gone) = self.objects.remove(id) {
+             self.refile(id);
+             if let Some(i) = self.tiles.tile_of(gone.position) {
 diff --git a/crates/engine/genie-core/src/map/spatial/pather.rs b/crates/engine/genie-core/src/map/spatial/pather.rs
-index 4be84371..28a61938 100644
+index 4be84371..8f7a7ab8 100644
 --- a/crates/engine/genie-core/src/map/spatial/pather.rs
 +++ b/crates/engine/genie-core/src/map/spatial/pather.rs
 @@ -13,6 +13,8 @@ use crate::objects::masters::ObstructionKind;
@@ -10146,7 +10224,22 @@ index 4be84371..28a61938 100644
      ) -> Result<Vec<Hit>, GenieError> {
          const MOST_HITS: usize = 25;
          let roles = by_id.roles();
-@@ -124,11 +127,14 @@ impl Spatial {
+@@ -108,8 +111,13 @@ impl Spatial {
+                 continue;
+             };
+             let kind = o.kind.filed();
++            let moves = if self.record_movers {
++                self.moving_records.contains_key(id)
++            } else {
++                by_id.moving(id)
++            };
+             if !kind.tested()
+-                || by_id.moving(id)
++                || moves
+                 || ignore.contains(&RecordId::from(id))
+                 || !self.visits(p, kind, grown)
+             {
+@@ -124,11 +132,14 @@ impl Spatial {
                      "a pather query meeting a record of kind 11 (its own radii)",
                  ));
              }
@@ -10166,7 +10259,7 @@ index 4be84371..28a61938 100644
              }
              hits.push(Hit {
                  id: RecordId::from(id),
-@@ -151,9 +157,23 @@ impl Spatial {
+@@ -151,9 +162,23 @@ impl Spatial {
          mask: TerrainMask,
          ignore: &[RecordId],
          by_id: ObjectsRef<'_>,
@@ -10191,7 +10284,7 @@ index 4be84371..28a61938 100644
              .is_empty())
      }
  
-@@ -168,7 +188,20 @@ impl Spatial {
+@@ -168,7 +193,20 @@ impl Spatial {
          ignore: &[RecordId],
          by_id: ObjectsRef<'_>,
      ) -> Result<Vec<Hit>, GenieError> {
@@ -11029,7 +11122,7 @@ index 7a714172..474720e3 100644
      /// with the sprite `given` (else the constructor's default, [`SpriteReads::to_point`]), as
      /// the list adds it: far ([`NO_TARGET_GAP`]).
 diff --git a/crates/engine/genie-core/src/movement/move_to/mod.rs b/crates/engine/genie-core/src/movement/move_to/mod.rs
-index 8ae7fee5..35ac2065 100644
+index 8ae7fee5..88c84f97 100644
 --- a/crates/engine/genie-core/src/movement/move_to/mod.rs
 +++ b/crates/engine/genie-core/src/movement/move_to/mod.rs
 @@ -117,7 +117,12 @@ impl MoveWait {
@@ -11046,6 +11139,69 @@ index 8ae7fee5..35ac2065 100644
          if !matches!(self.state, MoveWaitState::Never) || matches!(patience, Patience::Fails) {
              return MoveTo::Failed;
          }
+@@ -517,6 +522,19 @@ impl Follow {
+ /// [`Spatial::manager_ignore`]), and walks on; else it tells the unit (notify 0x1fc), turns to
+ /// state 3 and the motion step runs on ([`Follow::Blocked`]).
+ ///
++/// 188329 (`GENIE_EXPERIMENT_MOVETO_188329`; 0xb9347f, the line test 0xb9374c..0xb93858): the
++/// line test is `0x111d0c0` with flags `0x40` and the walker's player (`+0x7c`), between the tile
++/// records `0x111d8e0` and their removal `0x1121280`: every tested kind counts (units' circles
++/// too), a moving object's record (`+3` bit 0x10) and the manager's ignore list are left out, a
++/// gate the player may pass is passed (slot 0x6d8) — the short pather's line query
++/// ([`Spatial::pather_blocked_for`]), with the buffer the manager was left with (findings 214:
++/// truth24 912.386 s, P2's militia 8612 on 8496 asks for a path again where three of its group
++/// stand on the line). A record moves (`+3` bit 0x10) when the object's velocity was not 0 as its
++/// last update ended ([`Spatial::with_record_movers`], [`Spatial::record_moving`]), the walker's
++/// own too (521420102 392.541 s: villager 4597, stopped by the player's new MOVE before its
++/// update, still moves for militia 4580's test, whose line to it stays clear; truth24
++/// 912.386 s: militia 8642, stopped by its Attack in range in its update, blocks).
++///
+ /// # Errors
+ ///
+ /// A target the world lacks, a walker without movement state.
+@@ -547,6 +565,42 @@ pub fn target_left(
+         return Ok(Follow::Again);
+     }
+     let mover = walk.mover().ok_or(WALKER_UNMOVING)?;
++    if mover.walks_to_path_end()? && std::env::var_os("GENIE_EXPERIMENT_MOVETO_188329").is_some()
++    {
++        let mask = mover.stats.restriction_mask;
++        let me = walk.position();
++        let (a, b) = (me.ground(), at.ground());
++        let buffer = walk.world.manager_buffer();
++        let ignore = walk.world.manager_ignore();
++        let player = walk.world.get(walk.me.id).map(|p| p.player);
++        let by_id = walk.by_id;
++        // the records that move are those whose `+3` bit 0x10 the end of their last update set
++        // (the walker's own too), not those whose velocity is not 0 now
++        let blocked = walk.world.with_record_movers(|w| {
++            let blocked = w.pather_blocked_for(a, b, buffer, mask, (&ignore, by_id), player);
++            w.clear_tile_records();
++            blocked
++        })?;
++        if std::env::var_os("GENIE_TRACE_TARGETLINE").is_some() {
++            let hits = walk.world.with_record_movers(|w| {
++                let hits = w.pather_hits_for(a, b, buffer, mask, (&ignore, by_id), player);
++                w.clear_tile_records();
++                hits
++            })?;
++            let grow = walk.world.manager_grow();
++            // 158041's test (flags 0x100), for comparison
++            let old = walk.world.segment_blocked(a, b, grow, mask, &ignore);
++            eprintln!(
++                "TARGETLINE unit={:?} target={target:?} a={a:?} b={b:?} buffer={buffer:?} ignore={ignore:?} old_blocked={old} hits={:?}",
++                walk.me.id,
++                hits.iter().map(|h| (h.id, h.bounds)).collect::<Vec<_>>()
++            );
++        }
++        if !blocked {
++            return Ok(Follow::PathEnd(at));
++        }
++        return Ok(Follow::Blocked);
++    }
+     if mover.walks_to_path_end()? {
+         let me = walk.position();
+         let (a, b) = (me.ground(), at.ground());
 diff --git a/crates/engine/genie-core/src/movement/new_path.rs b/crates/engine/genie-core/src/movement/new_path.rs
 index 1f873756..1a2d063d 100644
 --- a/crates/engine/genie-core/src/movement/new_path.rs
@@ -16032,7 +16188,7 @@ index 00000000..886df08f
 +    }
 +}
 diff --git a/crates/engine/genie-core/src/orders/split.rs b/crates/engine/genie-core/src/orders/split.rs
-index b8bda6ff..b2e4a3f8 100644
+index b8bda6ff..bd389d0e 100644
 --- a/crates/engine/genie-core/src/orders/split.rs
 +++ b/crates/engine/genie-core/src/orders/split.rs
 @@ -3,6 +3,8 @@
@@ -16087,7 +16243,7 @@ index b8bda6ff..b2e4a3f8 100644
              ..Split::default()
          };
          for run in sorted.chunks(60) {
-@@ -159,12 +180,54 @@ impl World {
+@@ -159,12 +180,58 @@ impl World {
          split: &mut Split,
      ) -> Result<(), GenieError> {
          let left = self.splittables(run)?;
@@ -16100,13 +16256,14 @@ index b8bda6ff..b2e4a3f8 100644
          }
 +        // 188329 0x10b4880-0x10b4aa0 (GENIE_EXPERIMENT_SPLITTARGET_188329, findings 79): with a
 +        // target, the centroid of the units left (x, y, z sums over their count) is taken; in
-+        // the run's order a unit is loose when it is above type 69 of formation category 0, or
-+        // when its squared distance to the centroid (y² + x² + z²) is more than its squared
-+        // footprint gap to the target (0x124daf0). The test "within its range (slot 0x250) of
-+        // the target" (not queued) is not modelled: slot 0x250 is 0 for a unit without a
-+        // weapon range, so it never holds for a melee unit.
++        // the run's order a unit is loose when it is above type 69 of formation category 0; when
++        // the order is not queued (`+0x828`) and its range against the target (slot 0x250 =
++        // 0x115ce70: [`World::range_against`]) squared is above its squared footprint gap to the
++        // target (0x124daf0; COMISS, JBE: a NaN is not); or when its squared distance to the
++        // centroid (y² + x² + z²) is more than that gap (findings 213: truth24 888.507 s, P2's
++        // three archers ordered on 8701 in their range go loose and attack at once)
 +        if splittarget_188329()
-+            && let Some((target, _queued)) = split.aim
++            && let Some((target, queued)) = split.aim
 +            && let Some(t) = self.spatial.get(target).copied()
 +            && !left.is_empty()
 +        {
@@ -16125,6 +16282,9 @@ index b8bda6ff..b2e4a3f8 100644
 +                if let Some(me) = self.spatial.get(u.id) {
 +                    let gap =
 +                        footprint_gap_squared(u.position, me.radius, t.position, t.radius).get();
++                    if self.in_range_of(u.id, Some((target, queued)))? {
++                        loose = true;
++                    }
 +                    let dx = cx - u.position.x();
 +                    let dy = cy - u.position.y();
 +                    let dz = cz - u.position.z();
@@ -16143,7 +16303,7 @@ index b8bda6ff..b2e4a3f8 100644
          // units above type 69 of formation category 0 stay loose (the dock test FUN_141158210 is
          // 1 only on an `E` tile in game type 12)
          let (loose, rest): (Vec<Splittable>, Vec<Splittable>) = left
-@@ -244,7 +307,13 @@ impl World {
+@@ -244,7 +311,13 @@ impl World {
                      }
                  }
                  if group.len() < 2 {
@@ -16158,8 +16318,31 @@ index b8bda6ff..b2e4a3f8 100644
                      continue;
                  }
              }
-@@ -293,11 +362,18 @@ impl World {
+@@ -291,13 +364,41 @@ impl World {
+         Ok(left)
+     }
  
++    /// 188329's run splitter's range test (0x10b45f1, 0x10b49f7): with an order's target `aim`
++    /// that is not queued, unit `id`'s range against the target (slot 0x250 = 0x115ce70,
++    /// [`World::range_against`]) squared is above its squared footprint gap to it (0x124daf0;
++    /// `COMISS`, `JA`: a NaN is not). False without a target, for a queued order, or for a unit
++    /// or target the world does not place.
++    fn in_range_of(&self, id: ObjectId, aim: Option<(ObjectId, bool)>) -> Result<bool, GenieError> {
++        let Some((target, false)) = aim else {
++            return Ok(false);
++        };
++        let (Some(me), Some(t), Some(unit)) = (
++            self.spatial.get(id).copied(),
++            self.spatial.get(target).copied(),
++            self.world_object(id),
++        ) else {
++            return Ok(false);
++        };
++        let gap = footprint_gap_squared(me.position, me.radius, t.position, t.radius).get();
++        let range = self.range_against(unit, self.world_object(target))?.get();
++        Ok(gap < range * range)
++    }
++
      /// The units of `left` in a group the world holds go into `split` with the run's other
      /// members of their group (`FUN_140fd76d0`: one alone is loose); the others are returned.
 +    ///
@@ -16177,7 +16360,21 @@ index b8bda6ff..b2e4a3f8 100644
          // the units in a group the world holds, with the order's other members of their group
          let mut taken = vec![false; left.len()];
          for (i, first) in left.iter().enumerate() {
-@@ -316,7 +392,7 @@ impl World {
+@@ -307,6 +408,13 @@ impl World {
+             let Some(group) = first.group.and_then(|id| self.groups.get(id)) else {
+                 continue;
+             };
++            // 188329 0x10b45f1..0x10b4623: an order with a target, not queued (`+0x828`), passes
++            // over a unit within its range of the target (slot 0x250 squared above the squared
++            // footprint gap 0x124daf0): it keeps no group from here (findings 213); one that
++            // keeps its group still takes the others in it, in range or not
++            if self.in_range_of(first.id, split.aim)? {
++                continue;
++            }
+             *taken.checked_mut(i)? = true;
+             let mut members = vec![first.id];
+             for (j, u) in left.iter().enumerate() {
+@@ -316,7 +424,7 @@ impl World {
                  }
              }
              match members[..] {
@@ -16186,7 +16383,7 @@ index b8bda6ff..b2e4a3f8 100644
                  _ => split.keep(members),
              }
          }
-@@ -375,6 +451,35 @@ impl World {
+@@ -375,6 +483,35 @@ impl World {
  
  /// The splitter groups units of a type above this (`0x45`).
  pub(super) const MAX_UNGROUPED: MasterKind = MasterKind::of_data(69);
@@ -16222,7 +16419,7 @@ index b8bda6ff..b2e4a3f8 100644
  /// Units nearer than `OrderTuning::split_path_reach` are measured by a path while
  /// `DAT_1439e60e3` (1 at run time) holds.
  const SPLIT_BY_PATH: bool = true;
-@@ -438,3 +543,10 @@ pub(super) fn splits_together(
+@@ -438,3 +575,10 @@ pub(super) fn splits_together(
      }
      Ok(at_most_or_unordered(d, f.influence.get()))
  }
@@ -22353,7 +22550,7 @@ index dede9f25..23028da4 100644
  }
  
 diff --git a/crates/engine/genie-core/src/world/world_update.rs b/crates/engine/genie-core/src/world/world_update.rs
-index f127e410..c81b0510 100644
+index f127e410..8b91576d 100644
 --- a/crates/engine/genie-core/src/world/world_update.rs
 +++ b/crates/engine/genie-core/src/world/world_update.rs
 @@ -49,6 +49,8 @@ impl World {
@@ -22365,6 +22562,16 @@ index f127e410..c81b0510 100644
              tracing::debug!(target: UPDATE, ?command, "command");
              let stopped: Vec<bool> = self
                  .players
+@@ -151,6 +153,9 @@ impl World {
+                 u.update(a, c, &roles, slots)
+             }) {
+                 Ok(s) => {
++                    // its record's `+3` bit 0x10 as its update ends (slot 0x5c8)
++                    let moving = self.objects().moving(id);
++                    self.spatial.set_record_moving(id, moving);
+                     if self.file_step(p, s.slot, s.outcome)? == ListCount::GoesOn {
+                         i = i.next();
+                     }
 diff --git a/crates/engine/genie-import/Cargo.toml b/crates/engine/genie-import/Cargo.toml
 index bab1493b..15f99b24 100644
 --- a/crates/engine/genie-import/Cargo.toml
