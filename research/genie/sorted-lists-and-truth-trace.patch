@@ -9076,7 +9076,7 @@ index d9156f6d..fd81e8ea 100644
          let near =
              !within && !below_or_unordered(radius * self.model.tuning.group.slot_reach, gap.get());
 diff --git a/crates/engine/genie-core/src/groups/steer/to_slots.rs b/crates/engine/genie-core/src/groups/steer/to_slots.rs
-index 999d44b5..1edf79c0 100644
+index 999d44b5..a9843131 100644
 --- a/crates/engine/genie-core/src/groups/steer/to_slots.rs
 +++ b/crates/engine/genie-core/src/groups/steer/to_slots.rs
 @@ -61,6 +61,9 @@ impl World {
@@ -9315,6 +9315,29 @@ index 999d44b5..1edf79c0 100644
          Ok(hits.is_empty())
      }
  
+@@ -363,7 +555,8 @@ impl World {
+     }
+ 
+     /// [`World::steer_to_slot`] of a member that is not idle: it stops unless its action keeps
+-    /// it moving, its failures reset and a slot in state 1 or 2 takes state 3.
++    /// it moving, its failures reset, 188329 forms the group (`0x10effe4`), and a slot in state 1
++    /// or 2 takes state 3.
+     fn steer_busy_member(
+         &mut self,
+         group: GroupId,
+@@ -380,6 +573,12 @@ impl World {
+             .checked_mut(index)?
+             .specific_move
+             .consecutive_move_failures = 0;
++        if crate::groups::forming_188329() {
++            // 188329 0x10effe4: a member that is not free forms the group (findings 215:
++            // truth24 918.659 s, group 36's spearman 8687 attacking; the next speed pass is
++            // the formed one, every member at S(gap, 1.2))
++            g.formed = true;
++        }
+         let state = &mut g
+             .current_formation
+             .as_mut()
 diff --git a/crates/engine/genie-core/src/groups/update/attack.rs b/crates/engine/genie-core/src/groups/update/attack.rs
 index 3130ba99..6d74151f 100644
 --- a/crates/engine/genie-core/src/groups/update/attack.rs
