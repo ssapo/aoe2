@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-23T22:57:21.484348+00:00",
-  "last_checked_at": "2026-11-23T22:53:33.523230+00:00",
+  "updated_at": "2026-11-24T06:42:06.222209+00:00",
+  "last_checked_at": "2026-11-24T06:39:41.189096+00:00",
   "sync_error": null,
   "profile": {
     "id": 8793414,
@@ -183,7 +183,11 @@
       "analysis_status": "pending",
       "analysis": null,
       "attempts": 0,
-      "source_url": "https://www.aoe2insights.com/match/523203661/"
+      "source_url": "https://www.aoe2insights.com/match/523203661/",
+      "civ_choice": {
+        "22210642": true,
+        "8793414": true
+      }
     },
     {
       "id": 523197237,
@@ -215,7 +219,11 @@
       "analysis_status": "pending",
       "analysis": null,
       "attempts": 0,
-      "source_url": "https://www.aoe2insights.com/match/523197237/"
+      "source_url": "https://www.aoe2insights.com/match/523197237/",
+      "civ_choice": {
+        "6097615": true,
+        "8793414": true
+      }
     },
     {
       "id": 523193115,
@@ -247,7 +255,11 @@
       "analysis_status": "pending",
       "analysis": null,
       "attempts": 0,
-      "source_url": "https://www.aoe2insights.com/match/523193115/"
+      "source_url": "https://www.aoe2insights.com/match/523193115/",
+      "civ_choice": {
+        "1224481": true,
+        "8793414": true
+      }
     },
     {
       "id": 523191304,
@@ -279,7 +291,11 @@
       "analysis_status": "pending",
       "analysis": null,
       "attempts": 0,
-      "source_url": "https://www.aoe2insights.com/match/523191304/"
+      "source_url": "https://www.aoe2insights.com/match/523191304/",
+      "civ_choice": {
+        "19867271": true,
+        "8793414": true
+      }
     },
     {
       "id": 523182402,
@@ -1498452,7 +1498468,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 43,
+        "analysis_revision": 45,
         "duration_game_seconds": 234.3,
         "civilization": "Georgians",
         "random_civ": true,
@@ -1516516,7 +1516532,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 43,
+        "analysis_revision": 45,
         "duration_game_seconds": 1799.98,
         "civilization": "Jurchens",
         "random_civ": true,
@@ -1562274,8 +1562290,8 @@
             ]
           },
           "engine_version": {
-            "research_commit": "aedccf4",
-            "patch_sha256": "ebd43919f115"
+            "research_commit": "9201f07",
+            "patch_sha256": "5f703426f8b4"
           }
         },
         "game_build": 188329,
@@ -1562699,7 +1562715,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 43,
+        "analysis_revision": 45,
         "duration_game_seconds": 1277.3,
         "civilization": "Vietnamese",
         "random_civ": true,
@@ -1596200,8 +1596216,8 @@
             ]
           },
           "engine_version": {
-            "research_commit": "aedccf4",
-            "patch_sha256": "ebd43919f115"
+            "research_commit": "9201f07",
+            "patch_sha256": "5f703426f8b4"
           }
         },
         "game_build": 188329,
