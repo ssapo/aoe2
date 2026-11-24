@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-24T06:42:06.222209+00:00",
-  "last_checked_at": "2026-11-24T06:39:41.189096+00:00",
+  "updated_at": "2026-11-24T18:49:32.697283+00:00",
+  "last_checked_at": "2026-11-24T18:47:32.815080+00:00",
   "sync_error": null,
   "profile": {
     "id": 8793414,
@@ -327,7 +327,11 @@
       "analysis_status": "pending",
       "analysis": null,
       "attempts": 0,
-      "source_url": "https://www.aoe2insights.com/match/523182402/"
+      "source_url": "https://www.aoe2insights.com/match/523182402/",
+      "civ_choice": {
+        "251265": true,
+        "8793414": true
+      }
     },
     {
       "id": 523175206,
@@ -359,7 +363,11 @@
       "analysis_status": "pending",
       "analysis": null,
       "attempts": 0,
-      "source_url": "https://www.aoe2insights.com/match/523175206/"
+      "source_url": "https://www.aoe2insights.com/match/523175206/",
+      "civ_choice": {
+        "251265": true,
+        "8793414": true
+      }
     },
     {
       "id": 523054649,
@@ -1596560,7 +1596568,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 43,
+        "analysis_revision": 45,
         "duration_game_seconds": 2727.05,
         "civilization": "Armenians",
         "random_civ": true,
@@ -1663848,8 +1663856,8 @@
             ]
           },
           "engine_version": {
-            "research_commit": "aedccf4",
-            "patch_sha256": "ebd43919f115"
+            "research_commit": "97e5ef3",
+            "patch_sha256": "0ab4614e1fba"
           }
         },
         "game_build": 188329,
@@ -1664240,7 +1664248,7 @@
       "analysis_status": "complete",
       "analysis": {
         "parser": "mgz",
-        "analysis_revision": 43,
+        "analysis_revision": 45,
         "duration_game_seconds": 1485.82,
         "civilization": "Danes",
         "random_civ": true,
@@ -1711759,8 +1711767,8 @@
             ]
           },
           "engine_version": {
-            "research_commit": "aedccf4",
-            "patch_sha256": "ebd43919f115"
+            "research_commit": "97e5ef3",
+            "patch_sha256": "0ab4614e1fba"
           }
         },
         "game_build": 188329,
