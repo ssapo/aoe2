@@ -19618,10 +19618,256 @@ index 00000000..03c10982
 +    }
 +}
 diff --git a/crates/engine/genie-core/src/unit_ai/best_target/choice.rs b/crates/engine/genie-core/src/unit_ai/best_target/choice.rs
-index 57aa6315..a7169db7 100644
+index 57aa6315..4082112f 100644
 --- a/crates/engine/genie-core/src/unit_ai/best_target/choice.rs
 +++ b/crates/engine/genie-core/src/unit_ai/best_target/choice.rs
-@@ -528,12 +528,13 @@ fn rank_entries(
+@@ -6,7 +6,9 @@ use crate::movement::Speed;
+ use crate::objects::ObjectId;
+ use crate::objects::ObjectState;
+ use crate::objects::masters::AttackPriority;
++use crate::objects::masters::ClassId;
+ use crate::objects::masters::MasterKind;
++use crate::ownership::CaptureKind;
+ use crate::players::Amount;
+ use crate::players::PlayerId;
+ use crate::players::{ByRelation, UnitRelation};
+@@ -63,7 +65,8 @@ pub(super) fn tested(
+         return Ok(None);
+     }
+     let gaia_taken = !me.scenario && t.owner == PlayerId::GAIA && MasterKind::COMBAT <= t.kind;
+-    if gaia_taken && t.capture.any() {
++    // 188329 0xd1fe6a: only capture kinds other than 0 and 3 (livestock) pass it over
++    if gaia_taken && captured_188329(t.capture) {
+         return Ok(None);
+     }
+     if !t.flags.contains(ThingFlags::TARGETABLE)
+@@ -109,7 +112,11 @@ pub(super) fn kept_by_owner_and_class(me: &Searcher, ask: &Ask, t: &Thing, roles
+     if !ask.any_class && roles.of_class(t.class).contains(ClassRoles::NOT_ANY) {
+         return false;
+     }
+-    let captured = MasterKind::COMBAT <= t.kind && t.capture.any();
++    // 188329: the class filter also passes over class 67
++    if super::best_188329() && !ask.any_class && t.class == ClassId::named(67) {
++        return false;
++    }
++    let captured = MasterKind::COMBAT <= t.kind && captured_188329(t.capture);
+     // nothing held (`+0x310` at most 0) and not taken by sight
+     let free = t.held <= Amount::ZERO && !captured;
+     if me.player_kind.is_computer() && t.owner == PlayerId::GAIA && !free {
+@@ -130,9 +137,26 @@ pub(super) fn kept_by_owner_and_class(me: &Searcher, ask: &Ask, t: &Thing, roles
+ /// within the weapon range unless the unit moves, within `near` (the main walk's sight, the
+ /// retry walk's range) unless it may move, within the reference distance when there is one, and
+ /// within the sight.
+-pub(super) fn within(me: &Searcher, ask: &Ask, gap: Distance, near: Distance) -> bool {
+-    me.min_range <= gap
+-        && (gap <= me.weapon_range || me.speed != Speed::ZERO)
++///
++/// In the main walk (`main`) or the retry walk: 188329 lets a NaN gap pass the least range
++/// (`COMISS min, gap`, `JA`), and in the main walk only a stationary unit of masters 2784..2787
++/// (`0x141252520`) counts objects beyond its weapon range.
++pub(super) fn within_walk(
++    me: &Searcher,
++    ask: &Ask,
++    gap: Distance,
++    near: Distance,
++    main: bool,
++) -> bool {
++    let b = super::best_188329();
++    let least = if b {
++        !(me.min_range > gap)
++    } else {
++        me.min_range <= gap
++    };
++    let beyond_weapon = b && main && (2784..=2787).contains(&me.master.get());
++    least
++        && (gap <= me.weapon_range || me.speed != Speed::ZERO || beyond_weapon)
+         && (me.can_move || gap <= near)
+         && (ask.distance <= Distance::ZERO || gap <= ask.distance)
+         && gap <= me.sight
+@@ -179,13 +203,33 @@ pub(crate) fn best_unit_to_attack(
+     world: &mut AttackField<'_, '_>,
+     roles: &Roles,
+     best_target_tuning: &BestTargetTuning,
++) -> Result<Choice, crate::GenieError> {
++    super::set_path_keep(false);
++    let out = best_unit_to_attack_inner(me, ask, lists, world, roles, best_target_tuning);
++    super::set_path_keep(false);
++    out
++}
++
++/// [`best_unit_to_attack`]'s body, between the resets of [`super::path_keep`].
++fn best_unit_to_attack_inner(
++    me: &Searcher,
++    ask: &Ask,
++    lists: &ByRelation<Vec<ObjectId>>,
++    world: &mut AttackField<'_, '_>,
++    roles: &Roles,
++    best_target_tuning: &BestTargetTuning,
+ ) -> Result<Choice, crate::GenieError> {
+     let current = current_target(me, world)?;
+     let walls = attacks_walls(me, roles);
+     let mut st = Statistics::default();
+     let narrowed = add_current(me, ask, current, &mut st, world, roles, best_target_tuning)?;
+     add_extra(me, ask, &mut st, world, roles, best_target_tuning)?;
+-    let mut walked = Walked::new(narrowed, walls);
++    let current_wall = current.is_some_and(|(_, t)| {
++        roles
++            .of_class(t.class)
++            .intersects(ClassRoles::WALL | ClassRoles::GATE)
++    });
++    let mut walked = Walked::new(narrowed, walls, current_wall);
+     let layer = WalkLayer {
+         roles,
+         best_target_tuning,
+@@ -222,6 +266,8 @@ fn current_target(
+     Ok(world
+         .thing(target)?
+         .filter(|t| t.state <= ObjectState::Alive && !t.flags.contains(ThingFlags::ALLIED))
++        // 188329 0xd1ef24..0xd1ef56: also not inside another object (0x1412461e0, obj+0x148)
++        .filter(|t| !(super::best_188329() && t.flags.contains(ThingFlags::INSIDE)))
+         .map(|t| (target, t)))
+ }
+ 
+@@ -256,7 +302,11 @@ fn add_current(
+         return Ok(None);
+     };
+     let k = category(t.master, t.class, roles);
+-    st.add(&world.candidate(target, t.distance, k)?, best_target_tuning);
++    // 188329: the statistics' add 0xd424c0 refuses an object without a unit AI (obj+0x1f0); the
++    // narrowing below follows either way
++    if !super::best_188329() || t.flags.contains(ThingFlags::HAS_AI) {
++        st.add(&world.candidate(target, t.distance, k)?, best_target_tuning);
++    }
+     let narrows = !ask.idle
+         && t.distance <= ask.distance
+         && !roles
+@@ -291,7 +341,16 @@ pub(super) fn add_extra(
+             if me.speed == Speed::ZERO {
+                 continue;
+             }
+-            gap = gap + me.weapon_range + Distance::new(ONE);
++            // 188329 0xd1f5a5..: the gap plus (the weapon range plus 1)
++            gap = if super::best_188329() {
++                gap + (me.weapon_range + Distance::new(ONE))
++            } else {
++                gap + me.weapon_range + Distance::new(ONE)
++            };
++        }
++        // 188329: 0xd424c0 refuses an object without a unit AI
++        if super::best_188329() && !t.flags.contains(ThingFlags::HAS_AI) {
++            continue;
+         }
+         st.add(
+             &world.candidate(id, gap, category(t.master, t.class, roles))?,
+@@ -330,11 +389,13 @@ struct Walked {
+     gate: (Option<ObjectId>, Distance),
+     wall: (Option<ObjectId>, Distance),
+     beyond_walls: bool,
++    /// 188329: the current target (as kept) is a wall or a gate (classes 27, 39).
++    current_wall: bool,
+ }
+ 
+ impl Walked {
+     /// Before the walks: no gate, no wall, nothing left for later.
+-    const fn new(narrowed: Option<AttackCategory>, walls: bool) -> Self {
++    const fn new(narrowed: Option<AttackCategory>, walls: bool, current_wall: bool) -> Self {
+         Self {
+             narrowed,
+             walls,
+@@ -342,6 +403,7 @@ impl Walked {
+             gate: (None, NO_GAP),
+             wall: (None, NO_GAP),
+             beyond_walls: false,
++            current_wall,
+         }
+     }
+ 
+@@ -362,7 +424,8 @@ impl Walked {
+             roles,
+             best_target_tuning,
+         } = layer;
+-        let lowest = if me.scenario && !me.player_kind.is_computer() {
++        let b = super::best_188329();
++        let lowest = if me.scenario && !me.player_kind.is_computer() && !b {
+             UnitRelation::Ally
+         } else {
+             UnitRelation::Gaia
+@@ -375,6 +438,28 @@ impl Walked {
+                 if STATISTICS <= st.entries.len() {
+                     return Ok(());
+                 }
++                // 188329 0xd1fab0: a human player's scenario walks relations 1 and 0 too, but
++                // only for livestock (capture kind 3, 0x141245ab0)
++                if b
++                    && me.scenario
++                    && !me.player_kind.is_computer()
++                    && relation < UnitRelation::Ally
++                {
++                    let livestock = world
++                        .thing(id)?
++                        .is_some_and(|t| t.capture == CaptureKind::Livestock);
++                    if !livestock {
++                        continue;
++                    }
++                }
++                // 188329 0xd1fb2d: the current target's own record sets beyond-walls unless the
++                // current target is a wall or a gate (classes 27, 39), even when it was dropped
++                if b && Some(id) == me.target {
++                    if !self.current_wall {
++                        self.beyond_walls = true;
++                    }
++                    continue;
++                }
+                 if Some(id) == me.target || ask.extra.contains(&id) {
+                     continue;
+                 }
+@@ -383,7 +468,8 @@ impl Walked {
+                     continue;
+                 }
+                 let listed = Listed { id, relation };
+-                let Some((t, gap, k)) = self.counted(me, ask, listed, me.sight, world, roles)?
++                let Some((t, gap, k)) =
++                    self.counted(me, ask, listed, (me.sight, true), world, roles)?
+                 else {
+                     continue;
+                 };
+@@ -428,7 +514,9 @@ impl Walked {
+         } = layer;
+         for (id, relation) in take(&mut self.later) {
+             let listed = Listed { id, relation };
+-            let Some((t, gap, k)) = self.counted(me, ask, listed, me.range, world, roles)? else {
++            let Some((t, gap, k)) =
++                self.counted(me, ask, listed, (me.range, false), world, roles)?
++            else {
+                 continue;
+             };
+             let counts = {
+@@ -450,13 +538,13 @@ impl Walked {
+     }
+ 
+     /// The object `id` of list `relation`, its gap and its category when it passes the shared tests
+-    /// ([`tested`]), the ranges ([`within`], `near` the walk's) and the narrowed category.
++    /// ([`tested`]), the ranges ([`within_walk`], `near` the walk's) and the narrowed category.
+     fn counted(
+         &self,
+         me: &Searcher,
+         ask: &Ask,
+         Listed { id, relation }: Listed,
+-        near: Distance,
++        (near, main): (Distance, bool),
+         world: &mut AttackField<'_, '_>,
+         roles: &Roles,
+     ) -> Result<Option<(Thing, Distance, Option<AttackCategory>)>, crate::GenieError> {
+@@ -464,7 +552,7 @@ impl Walked {
+             return Ok(None);
+         };
+         let gap = t.distance;
+-        if !within(me, ask, gap, near) {
++        if !within_walk(me, ask, gap, near, main) {
+             return Ok(None);
+         }
+         let k = category(t.master, t.class, roles);
+@@ -528,12 +616,13 @@ fn rank_entries(
      Ok(ranked)
  }
  
@@ -19641,7 +19887,7 @@ index 57aa6315..a7169db7 100644
  fn choose(
      me: &Searcher,
      ask: &Ask,
-@@ -543,23 +544,12 @@ fn choose(
+@@ -543,23 +632,12 @@ fn choose(
      world: &mut AttackField<'_, '_>,
      last_resort: Option<ObjectId>,
  ) -> Result<Choice, crate::GenieError> {
@@ -19667,7 +19913,12 @@ index 57aa6315..a7169db7 100644
          let top = st.entries.checked(*st.order.checked(0)?)?.id;
          // the game's two branches: the unit's own target when it is the top, else the top
          // without paths; either is the top
-@@ -594,25 +584,6 @@ fn current_holds(
+@@ -590,29 +668,10 @@ fn current_holds(
+             || Speed::ZERO < t.speed)
+         && !ask.idle
+         && (world.engages(target)? || st.armed < EntryCount::new(1))
+-        && (ask.paths == 0 || world.path(target, me.range)?);
++        && (ask.paths == 0 || path_tested(world, target, me.range)?);
      Ok(holds.then_some(target))
  }
  
@@ -19693,6 +19944,98 @@ index 57aa6315..a7169db7 100644
  /// The first of the first three entries but `tried` with a path; each one before it that
  /// fails is ignored for 1 s (moving) or 2 s from now (`retries`, in order).
  fn path_pick(
+@@ -624,7 +683,7 @@ fn path_pick(
+ ) -> Result<Option<ObjectId>, crate::GenieError> {
+     for &i in st.order.iter().take(3) {
+         let e = *st.entries.checked(i)?;
+-        if Some(e.id) != tried && world.path(e.id, me.range)? {
++        if Some(e.id) != tried && path_tested(world, e.id, me.range)? {
+             return Ok(Some(e.id));
+         }
+         let wait = if e.moving { RETRY_MOVING } else { RETRY_OTHER };
+@@ -633,6 +692,30 @@ fn path_pick(
+     Ok(None)
+ }
+ 
++/// The path test (slot 0x408) of object `id` within `range`; in 188329 a failed test turns the
++/// call's `keep` argument on for the tests after it ([`super::path_keep`]).
++fn path_tested(
++    world: &mut AttackField<'_, '_>,
++    id: ObjectId,
++    range: Distance,
++) -> Result<bool, crate::GenieError> {
++    let reached = world.path(id, range)?;
++    if !reached {
++        super::set_path_keep(true);
++    }
++    Ok(reached)
++}
++
++/// A capture kind that passes a Gaia object over in the walks: any but none, and in 188329
++/// (`0xd1fe6a`, `0xd2001f`) also not livestock (3).
++fn captured_188329(kind: CaptureKind) -> bool {
++    if super::best_188329() {
++        !matches!(kind, CaptureKind::None | CaptureKind::Livestock)
++    } else {
++        kind.any()
++    }
++}
++
+ /// 1 (`DAT_14330eb8c`): an extra object under the least range counts this much beyond the
+ /// weapon range.
+ pub(super) const ONE: f32 = BEST_TARGET_ONE;
+diff --git a/crates/engine/genie-core/src/unit_ai/best_target/mod.rs b/crates/engine/genie-core/src/unit_ai/best_target/mod.rs
+index a377ec10..896fdfb6 100644
+--- a/crates/engine/genie-core/src/unit_ai/best_target/mod.rs
++++ b/crates/engine/genie-core/src/unit_ai/best_target/mod.rs
+@@ -23,11 +23,46 @@ use crate::world::layer::ClassRoles;
+ use crate::world::layer::MasterRoles;
+ use crate::world::layer::Roles;
+ 
++/// 188329's `bestUnitToAttack` (`0xd1ec40`..`0xd2215b`, findings 220; the comparison in
++/// `runs/B61/best_d1ec40_vs_engine.md`) instead of 158041's where they part:
++/// `GENIE_EXPERIMENT_BEST_188329`.
++#[must_use]
++pub(crate) fn best_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_BEST_188329").is_some())
++}
++
++thread_local! {
++    /// 188329 `0xd1ec40`'s path test argument `keep` (slot 0x408's 7th, `0x120ff70` -> `0x107a5e0`'s
++    /// 11th): 0 at the call's start, 1 after its first failed path test (the current target's hold
++    /// test `0xd21a3c..` or a candidate of the first three `0xd21d23..`). The unit's reach test
++    /// ([`crate::map::spatial::Reach`]) reads it while a search runs.
++    static PATH_KEEP: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
++}
++
++/// [`PATH_KEEP`] as the running search left it (false outside one, or without
++/// `GENIE_EXPERIMENT_BESTKEEP_188329`: a test with `keep` 1 that reaches the short pather needs
++/// its kept area, which the pathing does not model yet, so the flag stays its own switch).
++#[must_use]
++pub(crate) fn path_keep() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_BESTKEEP_188329").is_some())
++        && PATH_KEEP.with(std::cell::Cell::get)
++}
++
++/// [`PATH_KEEP`] becomes `keep`.
++pub(super) fn set_path_keep(keep: bool) {
++    PATH_KEEP.with(|k| k.set(keep));
++}
++
+ /// `FUN_140c4c8e0`: the attack category of an object of master `master` and class `class`, by
+ /// which `bestUnitToAttack` weighs and narrows its choice; none (−1) for a class it does not
+-/// rank.
++/// rank. 188329's `0xd259b0` also gives class 67 category 0 ([`best_188329`]).
+ #[must_use]
+ pub fn category(master: MasterId, class: ClassId, roles: &Roles) -> Option<AttackCategory> {
++    if best_188329() && class == ClassId::named(67) {
++        return Some(AttackCategory::named(0));
++    }
+     {
+         let held = roles.of_class(class);
+         if held.intersects(
 diff --git a/crates/engine/genie-core/src/unit_ai/best_target/world_view.rs b/crates/engine/genie-core/src/unit_ai/best_target/world_view.rs
 index b6187bc3..cad3800e 100644
 --- a/crates/engine/genie-core/src/unit_ai/best_target/world_view.rs
@@ -20093,7 +20436,7 @@ index 21df231c..08d53ece 100644
              NotifyKind::SENT_OFF => self.sent_off(n, side, ai_rng, roles, unit_ai_tuning),
              // a unit of a group sent off a footprint: the action value 0x2c0
 diff --git a/crates/engine/genie-core/src/unit_ai/idle.rs b/crates/engine/genie-core/src/unit_ai/idle.rs
-index 28ca0268..0659899d 100644
+index 28ca0268..dbb31bbd 100644
 --- a/crates/engine/genie-core/src/unit_ai/idle.rs
 +++ b/crates/engine/genie-core/src/unit_ai/idle.rs
 @@ -63,13 +63,11 @@ impl UnitAi {
@@ -20113,7 +20456,67 @@ index 28ca0268..0659899d 100644
                  "processIdle (slot 0x240) of a unit-AI type not modelled",
              )),
          }
-@@ -571,7 +569,9 @@ impl UnitAi {
+@@ -405,7 +403,7 @@ impl UnitAi {
+         {
+             return Ok(IdleOutcome::Acted);
+         }
+-        self.soldier_idle_end(at, ai, side)
++        self.soldier_idle_end(at, player_kind, ai, side)
+     }
+ 
+     /// [`UnitAi::soldier_idle`]'s `bestUnitToAttack` without a target, from its place
+@@ -493,6 +491,7 @@ impl UnitAi {
+     fn soldier_idle_end(
+         &mut self,
+         at: &Surroundings,
++        player_kind: PlayerKind,
+         ai: &mut Well512,
+         side: &mut dyn UnitSide,
+     ) -> Result<IdleOutcome, GenieError> {
+@@ -502,6 +501,14 @@ impl UnitAi {
+         ) {
+             return Ok(IdleOutcome::Idle);
+         }
++        // 188329 0xcfeec8..0xcfeee4: a human player's unit in a group (its raw id `unit+0x210`
++        // not -1) ends here (5), before the walk back, the saved patrol and the healer's search
++        if soldier_idle_188329()
++            && !player_kind.is_computer()
++            && at.flags.contains(SurroundingFlags::GROUP_ID_188329)
++        {
++            return Ok(IdleOutcome::Idle);
++        }
+         if self.stance.leashed() {
+             let _ = self.walk_back(at, side, ai)?;
+         }
+@@ -549,13 +556,20 @@ impl UnitAi {
+             pick: Pick::Look,
+             memory: Memory::default(),
+         })?;
+-        if found.enemies {
+-            return Err(GenieError::unsupported(
+-                "a NoAttack soldier's search that finds enemies",
+-            ));
+-        }
+-        if found.fresh {
+-            self.alert_mode = AlertMode::Calm;
++        if soldier_idle_188329() {
++            // 188329 0xcfeadf..0xcfeb79: slot 0x50 (0xd3fdd0) with r9b 1 does the alert itself
++            // (the enemies-found byte, the 10 s sighting time, notify 0x210); the idle only
++            // writes the alert object `+0x1c4` (0xcfeb94, slot 0x1d8), which nothing reads
++            self.attack_search_alert(found, player_kind, &at.unit_ai_tuning)?;
++        } else {
++            if found.enemies {
++                return Err(GenieError::unsupported(
++                    "a NoAttack soldier's search that finds enemies",
++                ));
++            }
++            if found.fresh {
++                self.alert_mode = AlertMode::Calm;
++            }
+         }
+         if !matches!(
+             self.current_order,
+@@ -571,7 +585,9 @@ impl UnitAi {
          Ok(())
      }
  
@@ -20124,7 +20527,7 @@ index 28ca0268..0659899d 100644
      /// slot 0x250 first retries no order (the tower's slot 0x60 taking none as retryable), then
      /// the inlined cap of `FUN_140c41e50` ([`UnitAi::cap_human_order`]). In `NoAttack` (stance
      /// 3) it only searches (slot 0x50 with mode 1 from its place, [`Pick::Look`] over its cared
-@@ -585,6 +585,7 @@ impl UnitAi {
+@@ -585,6 +601,7 @@ impl UnitAi {
          player_kind: PlayerKind,
          side: &mut dyn UnitSide,
          rng: &mut Well512,
@@ -20132,7 +20535,7 @@ index 28ca0268..0659899d 100644
      ) -> Result<IdleOutcome, GenieError> {
          let unit_ai_tuning = &at.unit_ai_tuning;
          self.cap_human_order(side, rng)?;
-@@ -592,7 +593,7 @@ impl UnitAi {
+@@ -592,7 +609,7 @@ impl UnitAi {
              let found = side.closest(&Search {
                  at: at.position.ground(),
                  radius: attack_search_radius(at),
@@ -20141,7 +20544,7 @@ index 28ca0268..0659899d 100644
                  size: at.size,
                  pick: Pick::Look,
                  memory: Memory::default(),
-@@ -603,7 +604,7 @@ impl UnitAi {
+@@ -603,7 +620,7 @@ impl UnitAi {
          let found = side.closest(&Search {
              at: at.position.ground(),
              radius: attack_search_radius(at),
@@ -20150,7 +20553,7 @@ index 28ca0268..0659899d 100644
              size: at.size,
              pick: Pick::Attack {
                  lowest: if at.flags.contains(SurroundingFlags::SCENARIO)
-@@ -645,7 +646,7 @@ impl UnitAi {
+@@ -645,7 +662,7 @@ impl UnitAi {
      /// What the attack tests read of the unit AI ([`Seeker`]), its current target's master type
      /// `target_master_kind` as the world holds it.
      #[must_use]
@@ -20159,7 +20562,7 @@ index 28ca0268..0659899d 100644
          Seeker {
              stance: self.stance,
              state_position: self.state_position,
-@@ -655,6 +656,16 @@ impl UnitAi {
+@@ -655,6 +672,16 @@ impl UnitAi {
              target_class: self.target_class,
              last_target_class: self.last_target_class,
              patrol_path: self.patrol_path.is_some(),
@@ -20176,6 +20579,20 @@ index 28ca0268..0659899d 100644
              target_master_kind,
          }
      }
+@@ -687,3 +714,13 @@ impl UnitAi {
+         Ok(())
+     }
+ }
++
++/// 188329's soldier idle handling (`0xcfea00`, slot 0x240) instead of 158041's where they part
++/// (findings 221; the comparison in `runs/B61/soldier_idle_cfea00_vs_engine.md`):
++/// `GENIE_EXPERIMENT_SOLDIERIDLE_188329` (the idle end's group test, the NoAttack search's
++/// alert).
++#[must_use]
++pub(crate) fn soldier_idle_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_SOLDIERIDLE_188329").is_some())
++}
 diff --git a/crates/engine/genie-core/src/unit_ai/idle_animals.rs b/crates/engine/genie-core/src/unit_ai/idle_animals.rs
 index bf5761c6..83c758c1 100644
 --- a/crates/engine/genie-core/src/unit_ai/idle_animals.rs
@@ -21150,10 +21567,20 @@ index 7fd24514..84166f0c 100644
  
  /// A unit AI's call on its unit from a side that holds none (a search's closure).
 diff --git a/crates/engine/genie-core/src/unit_ai/surroundings.rs b/crates/engine/genie-core/src/unit_ai/surroundings.rs
-index 7cc2f5c9..fee4e1fc 100644
+index 7cc2f5c9..a4f4ba9f 100644
 --- a/crates/engine/genie-core/src/unit_ai/surroundings.rs
 +++ b/crates/engine/genie-core/src/unit_ai/surroundings.rs
-@@ -250,6 +250,10 @@ pub struct Surroundings {
+@@ -157,6 +157,9 @@ bitflags::bitflags! {
+         /// The game mode (the save's `mGameMode`, options `+0x34`) is one of `FUN_141302540`'s:
+         /// Scenario (3), Campaign (4), King of the Hill (5), Co-op Campaign (15).
+         const SCENARIO = 1 << 6;
++        /// 188329: the unit's group id (`unit+0x210`) is not -1, whether or not the world holds
++        /// the group (`0xcfeedd`).
++        const GROUP_ID_188329 = 1 << 7;
+         /// The master has a task of action type 0x69 (`FUN_1415c60b0`; the healers'), whose idle
+         /// soldier looks for an ally to heal (`FUN_140c16f00`).
+         const TASK_0X69 = 1 << 7;
+@@ -250,6 +253,10 @@ pub struct Surroundings {
      /// Slot 400 (`FUN_14106d090`): its top action's target (`FUN_140a78450`) as the world holds
      /// it; None without one.
      pub top_target: Option<TopTarget>,
@@ -21164,7 +21591,7 @@ index 7cc2f5c9..fee4e1fc 100644
      /// Slot 0x240 (`FUN_1410863c0`): its master's least range (`+0x850`).
      pub min_range: Distance,
      /// Where the unit last moved to (slot 0x520: `+0x824`), as the game's vector (x, height,
-@@ -299,6 +303,11 @@ pub(super) struct LiveTop {
+@@ -299,6 +306,11 @@ pub(super) struct LiveTop {
  /// The idle part's group test (`0x140c67e8f`): no group, or one that is idle (`FUN_141017ad0`) of
  /// a unit that does not move (slot 0x5c8).
  pub(super) fn group_lets_idle(group: Option<GroupState>) -> bool {
@@ -21176,7 +21603,7 @@ index 7cc2f5c9..fee4e1fc 100644
      group.is_none_or(|g| g.contains(GroupState::IDLE) && !g.contains(GroupState::MEMBER_MOVING))
  }
  
-@@ -317,6 +326,13 @@ bitflags::bitflags! {
+@@ -317,6 +329,13 @@ bitflags::bitflags! {
          const MOVING = 1 << 3;
          /// The unit itself moves (its slot 0x5c8), which the idle part reads with the group.
          const MEMBER_MOVING = 1 << 4;
@@ -21190,7 +21617,7 @@ index 7cc2f5c9..fee4e1fc 100644
      }
  }
  
-@@ -359,6 +375,9 @@ pub struct UnitSeen {
+@@ -359,6 +378,9 @@ pub struct UnitSeen {
      /// The unit's owner counts its owner as its own or an ally (`FUN_141663d90` with the ally
      /// flag, [`crate::unit_ai::task_finder::allied`]).
      pub allied: bool,
@@ -21416,7 +21843,7 @@ index 4cc9cc71..b603cd5e 100644
      let (r, w) = hear(PlayerKind::Human, Vec::new());
      assert_eq!(r, Ok(GO_ON));
 diff --git a/crates/engine/genie-core/src/unit_ai/unit.rs b/crates/engine/genie-core/src/unit_ai/unit.rs
-index dc286d39..179375d3 100644
+index dc286d39..9a93b8ae 100644
 --- a/crates/engine/genie-core/src/unit_ai/unit.rs
 +++ b/crates/engine/genie-core/src/unit_ai/unit.rs
 @@ -89,9 +89,13 @@ impl Unit {
@@ -21435,7 +21862,15 @@ index dc286d39..179375d3 100644
          }
          if let Some((new, main)) = c.taken_over.take() {
              captured = Some(Captured {
-@@ -257,10 +261,15 @@ impl Unit {
+@@ -158,6 +162,7 @@ impl Unit {
+                     SurroundingFlags::SCENARIO,
+                     c.w.settings.game_mode.scenario(),
+                 );
++                flags.set(SurroundingFlags::GROUP_ID_188329, self.group.id.is_some());
+                 flags.set(
+                     SurroundingFlags::TASK_0X69,
+                     master.is_some_and(|m| {
+@@ -257,10 +262,15 @@ impl Unit {
                      GroupState::MEMBER_MOVING,
                      c.w.parts.mover_of(self.id).is_some_and(Mover::is_moving),
                  );
@@ -21451,7 +21886,7 @@ index dc286d39..179375d3 100644
              min_range: master.map_or(Distance::ZERO, |m| m.combat_part().min_range),
              moved_at: c
                  .w
-@@ -471,6 +480,7 @@ impl Unit {
+@@ -471,6 +481,7 @@ impl Unit {
          c: &mut Step<'_>,
          captured: Option<&Captured>,
          after: Option<AfterOrder>,
@@ -21459,7 +21894,7 @@ index dc286d39..179375d3 100644
      ) -> Result<Option<AfterOrder>, GenieError> {
          let busy = actions.top_action_kind().is_some() || c.w.parts.unread.contains(self.id);
          // the unit's master: its own (a captured unit's copy), else its owner's
-@@ -483,7 +493,7 @@ impl Unit {
+@@ -483,7 +494,7 @@ impl Unit {
          let class = master.map(|ms| ms.class);
          // a captured unit's unit AI runs as its new owner's (RGE_Combat_Object::update reads the
          // owner then): on that player's turn, with its time as it stands
@@ -21468,7 +21903,7 @@ index dc286d39..179375d3 100644
              Some(k) if k.main => (
                  (k.new == c.w.player_turn)
                      .then(|| c.w.player_time.get(k.new.index()).copied())
-@@ -495,13 +505,31 @@ impl Unit {
+@@ -495,13 +506,31 @@ impl Unit {
              ),
              _ => (c.turn, c.player, c.w.players.player(c.player)?.kind),
          };
@@ -21501,7 +21936,7 @@ index dc286d39..179375d3 100644
          }
          if turn.is_some()
              && after.is_none()
-@@ -549,6 +577,7 @@ impl Unit {
+@@ -549,6 +578,7 @@ impl Unit {
                      .map_or(Speed::ZERO, |m| m.stats.speed),
              ),
          );
@@ -21509,7 +21944,7 @@ index dc286d39..179375d3 100644
          self.with_side(
              actions,
              c,
-@@ -562,6 +591,10 @@ impl Unit {
+@@ -562,6 +592,10 @@ impl Unit {
                          .after_order(after, world_time, player_kind, &at, ai_stream, side)
                          .map(|()| None),
                      (Some(dt), None) => {
@@ -21520,7 +21955,7 @@ index dc286d39..179375d3 100644
                          ai.update(dt, world_time, player_kind, &at, ai_stream, side)
                      }
                      (None, _) => ai
-@@ -656,6 +689,7 @@ impl Unit {
+@@ -656,6 +690,7 @@ impl Unit {
                      owner,
                      AllyTest::WithRelation4,
                  ),
@@ -21528,7 +21963,7 @@ index dc286d39..179375d3 100644
              });
          }
          Ok(seen)
-@@ -691,3 +725,47 @@ impl Unit {
+@@ -691,3 +726,47 @@ impl Unit {
          Ok(())
      }
  }
@@ -21863,7 +22298,7 @@ index ea0838e3..fa603b75 100644
          return Ok(Some(first));
      }
 diff --git a/crates/engine/genie-core/src/unit_ai/world_view/side.rs b/crates/engine/genie-core/src/unit_ai/world_view/side.rs
-index 77dc93ea..fc816c23 100644
+index 77dc93ea..aa7df159 100644
 --- a/crates/engine/genie-core/src/unit_ai/world_view/side.rs
 +++ b/crates/engine/genie-core/src/unit_ai/world_view/side.rs
 @@ -29,6 +29,7 @@ use crate::objects::ObjectState;
@@ -22348,7 +22783,24 @@ index 77dc93ea..fc816c23 100644
      fn closest(&mut self, search: &Search<'_>) -> Result<Found, GenieError> {
          let roles = &self.c.w.model.roles.clone();
          let seeker = match search.pick {
-@@ -505,6 +920,14 @@ impl UnitSide for UnitView<'_, '_> {
+@@ -404,13 +819,14 @@ impl UnitSide for UnitView<'_, '_> {
+             let m = mover.ok_or(GenieError::unsupported(
+                 "a reach test of a unit that does not move",
+             ))?;
+-            m.reaches_object(
++            // 188329 bestUnitToAttack: slot 0x408's `keep` (its 7th argument) after a failed test
++            m.reaches_object_keeping(
+                 (at, &walker),
+                 (spatial, by_id),
+                 &mut plan,
+                 id,
+                 range,
+-                master_id,
++                (master_id, crate::unit_ai::best_target::path_keep()),
+             )
+         };
+         let moving = |id: ObjectId| herded(by_id, id);
+@@ -505,6 +921,14 @@ impl UnitSide for UnitView<'_, '_> {
          done
      }
  
@@ -22363,7 +22815,7 @@ index 77dc93ea..fc816c23 100644
      fn busy_now(&mut self) -> Result<bool, GenieError> {
          Ok(
              self.actions.top_action_kind().is_some()
-@@ -522,6 +945,7 @@ impl UnitSide for UnitView<'_, '_> {
+@@ -522,6 +946,7 @@ impl UnitSide for UnitView<'_, '_> {
          ai: &UnitAi,
          rng: &mut Well512,
      ) -> Result<Option<Tile>, GenieError> {
@@ -22371,7 +22823,7 @@ index 77dc93ea..fc816c23 100644
          let tc = town_centre(
              owner_view(
                  &self.c.w.players,
-@@ -530,6 +954,7 @@ impl UnitSide for UnitView<'_, '_> {
+@@ -530,6 +955,7 @@ impl UnitSide for UnitView<'_, '_> {
                  self.new_owner,
              )?,
              self.c.w.model.slots.master,
