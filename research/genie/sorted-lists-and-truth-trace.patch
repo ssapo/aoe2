@@ -21049,7 +21049,7 @@ index 7fd24514..84166f0c 100644
  
  /// A unit AI's call on its unit from a side that holds none (a search's closure).
 diff --git a/crates/engine/genie-core/src/unit_ai/surroundings.rs b/crates/engine/genie-core/src/unit_ai/surroundings.rs
-index 7cc2f5c9..171f8944 100644
+index 7cc2f5c9..fee4e1fc 100644
 --- a/crates/engine/genie-core/src/unit_ai/surroundings.rs
 +++ b/crates/engine/genie-core/src/unit_ai/surroundings.rs
 @@ -250,6 +250,10 @@ pub struct Surroundings {
@@ -21083,8 +21083,8 @@ index 7cc2f5c9..171f8944 100644
 +        /// or a move (`+0x3b0` -1 or 1) and patrols (`0x110ffd0`, bit 11 of `+0x140`), or the
 +        /// unit holds a slot of its formation (`+0x128`, `0x10dd1e0`) and either the group has
 +        /// no wait delays and its walked level wants no path (`0x1110070`) and the member has
-+        /// at least 3 failures (`+0xf8[i].+0x1c`), or the slot is in place (state `+0x20` 3).
-+        /// The test of `+0x460` is not modelled (read as 0).
++        /// at least 3 failures (`+0xf8[i].+0x1c`), or the slot is in place (state `+0x20` 3);
++        /// a group with queued commands (`+0x460`) that does not patrol holds every member.
 +        const IDLE_FREE_188329 = 1 << 5;
      }
  }
@@ -21315,7 +21315,7 @@ index 4cc9cc71..b603cd5e 100644
      let (r, w) = hear(PlayerKind::Human, Vec::new());
      assert_eq!(r, Ok(GO_ON));
 diff --git a/crates/engine/genie-core/src/unit_ai/unit.rs b/crates/engine/genie-core/src/unit_ai/unit.rs
-index dc286d39..121b60c5 100644
+index dc286d39..179375d3 100644
 --- a/crates/engine/genie-core/src/unit_ai/unit.rs
 +++ b/crates/engine/genie-core/src/unit_ai/unit.rs
 @@ -89,9 +89,13 @@ impl Unit {
@@ -21427,13 +21427,25 @@ index dc286d39..121b60c5 100644
              });
          }
          Ok(seen)
-@@ -691,3 +725,32 @@ impl Unit {
+@@ -691,3 +725,47 @@ impl Unit {
          Ok(())
      }
  }
 +
 +/// 188329 `0x10dd760(group, id)` (0x10dd760..0x10dd865) is false: see
-+/// [`GroupState::IDLE_FREE_188329`].
++/// [`GroupState::IDLE_FREE_188329`]. Its branches in order:
++/// - `0x10dd774`: not idle (`0x10dd870`, [`crate::groups::UnitGroup::is_idle`]) -> true (busy);
++/// - `0x10dd781`: a current command (`+0x3b0`) other than none (-1) or a move (1) -> busy;
++/// - `0x10dd798`/`0x10dd7a5`: it patrols (`0x110ffd0`) or holds bit 11 of `+0x140`
++///   ([`crate::groups::UnitGroup::patrols`]) -> false (free);
++/// - `0x10dd7b5`: queued commands (`+0x460`, the queue at `+0x430`,
++///   [`crate::groups::UnitGroup::command_queue`]) -> busy (findings 218: truth24 1028.717 s, group
++///   49 with three queued moves; its spearman 8647 does not run its idle check);
++/// - `0x10dd7cb`: no slot of its formation (`+0x128`, `0x10dd1e0`) -> busy;
++/// - `0x10dd7d8`..`0x10dd818`: no wait delays (`+0xc0` 0), its walked level wants no path
++///   (`0x1110070` 0) and the member (`0x10dd280`, below `+0xe4`) has at least 3 failures
++///   (`+0xf8[i].+0x1c`) -> free;
++/// - `0x10dd81a`: the slot's state (`+0x20`) not 3 (in place) -> busy, else free.
 +fn idle_free_188329(g: &crate::groups::UnitGroup, id: ObjectId) -> bool {
 +    if !g.is_idle()
 +        || !(g.current_command == GroupCommandKind::NONE
@@ -21443,6 +21455,9 @@ index dc286d39..121b60c5 100644
 +    }
 +    if g.patrols() {
 +        return true;
++    }
++    if !g.command_queue.is_empty() {
++        return false;
 +    }
 +    let Some(slot) = g
 +        .current_formation
