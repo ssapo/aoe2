@@ -14527,7 +14527,7 @@ index 91ca8b12..16fcb5d8 100644
          let part = completion.first_part(construction, roles)?;
          // its tracker part (FUN_14104eac0): the foundation leaves the pending lists
 diff --git a/crates/engine/genie-core/src/objects/unit/mod.rs b/crates/engine/genie-core/src/objects/unit/mod.rs
-index e8e94a15..fbfa090c 100644
+index e8e94a15..a0b45d0e 100644
 --- a/crates/engine/genie-core/src/objects/unit/mod.rs
 +++ b/crates/engine/genie-core/src/objects/unit/mod.rs
 @@ -13,6 +13,8 @@ use crate::world::WorldTime;
@@ -14539,7 +14539,15 @@ index e8e94a15..fbfa090c 100644
  use crate::construction::FootprintWaits;
  use crate::gathering::{DropSiteId, PastureId};
  use crate::groups::GroupLink;
-@@ -117,6 +119,11 @@ pub struct Unit {
+@@ -34,6 +36,7 @@ mod death;
+ mod default_task;
+ mod life_step;
+ mod stop;
++pub(crate) use self::stop::capgroup_188329;
+ mod top;
+ mod update;
+ 
+@@ -117,6 +120,11 @@ pub struct Unit {
      /// `+0x650`, `mLastHumanOrderTime`: the world time of the last order a human gave it
      /// (`FUN_140e5e780`, for a unit with a unit AI); an animal's idle check lowers it to 5000.
      pub last_human_order: WorldTime,
@@ -14552,10 +14560,20 @@ index e8e94a15..fbfa090c 100644
      /// its speed since) while the rest of its player's objects go on.
      pub stopped: bool,
 diff --git a/crates/engine/genie-core/src/objects/unit/stop.rs b/crates/engine/genie-core/src/objects/unit/stop.rs
-index 7c1fba27..91e6c79b 100644
+index 7c1fba27..ba3e4145 100644
 --- a/crates/engine/genie-core/src/objects/unit/stop.rs
 +++ b/crates/engine/genie-core/src/objects/unit/stop.rs
-@@ -250,7 +250,7 @@ impl Unit {
+@@ -211,6 +211,9 @@ impl Unit {
+         match e {
+             Effect::Stop => self.stop_action(actions, c),
+             Effect::CapHumanOrder(cap) => {
++                if capgroup_188329() && !self.caps_human_order_188329(c) {
++                    return Ok(());
++                }
+                 self.last_human_order = self.last_human_order.min(cap);
+                 Ok(())
+             }
+@@ -250,7 +253,7 @@ impl Unit {
      /// # Errors
      ///
      /// The command's and the lend's.
@@ -14564,7 +14582,7 @@ index 7c1fba27..91e6c79b 100644
          &mut self,
          actions: &mut Action,
          command: AiCommand,
-@@ -267,12 +267,20 @@ impl Unit {
+@@ -267,12 +270,20 @@ impl Unit {
                  w.gather_command(p, i, target)
              }),
              AiCommand::WorkOn { target, point } => {
@@ -14587,6 +14605,55 @@ index 7c1fba27..91e6c79b 100644
                  };
                  c.lend_at((&mut *self, &mut *actions), |w, p, i| {
                      w.order_work(p, i, &work)
+@@ -288,3 +299,48 @@ impl Unit {
+         }
+     }
+ }
++
++impl Unit {
++    /// 188329 `0xd1c2e0` (the unit AI's cap of its unit's last human order time, `+0x198`;
++    /// 158041 `FUN_140c41e50`), its test: whether the cap runs. The unit's group (`+0x210`) in the
++    /// world's list (`0x16027d0`, 0xd1c2f4..0xd1c306) decides when there is one; else the AI's
++    /// order (`+0x3c`, 0xd1c30e..0xd1c330): none of orders `0x2c7` (patrol), `0x2bd` (defend),
++    /// `0x2c8` (follow) and `0x2dd` (attack-move; bits 0, 11 and 32 of `0x100000801` from
++    /// `0x2bd`). A group (0xd1c33e..0xd1c360) stops the cap whatever the order when its flags
++    /// (`+0x140`) have bit 12 ([`GroupFlags::FOLLOWED`], `0x10d28e0`) or bit 11
++    /// ([`GroupFlags::PATROL`], `0x10dd8e0`), or its top path loops (`0x110ffd0`: the group's
++    /// path data `+0xb0`, its top level, that level's path flags `+0xc` bit 0); with none of
++    /// those it caps, also on the four orders. The cap itself (0xd1c362..0xd1c37e: `+0x198`
++    /// above `0x10bde60`'s 5000 becomes 5000) is the caller's.
++    ///
++    /// [`GroupFlags::FOLLOWED`]: crate::groups::GroupFlags::FOLLOWED
++    /// [`GroupFlags::PATROL`]: crate::groups::GroupFlags::PATROL
++    fn caps_human_order_188329(&self, c: &Step<'_>) -> bool {
++        use crate::groups::GroupFlags;
++        use crate::unit_ai::OrderKind;
++        match self.group.id.and_then(|id| c.w.groups.get(id)) {
++            // 0xd1c339 / 0xd1c332 without a group
++            None => !matches!(
++                c.w.parts.unit_ai.get(self.id).and_then(|ai| ai.current_order),
++                Some(
++                    OrderKind::Patrol
++                        | OrderKind::Defend
++                        | OrderKind::Follow
++                        | OrderKind::AttackMove
++                )
++            ),
++            // UnitGroup::patrols: bit 11 or the top path's loop (0x110ffd0)
++            Some(g) => !(g.flags.contains(GroupFlags::FOLLOWED) || g.patrols()),
++        }
++    }
++}
++
++/// `GENIE_EXPERIMENT_CAPGROUP_188329` (on unless set to `0`): the unit AI's cap of its unit's
++/// last human order time tests the unit's group first, as 188329 `0xd1c2e0` does
++/// ([`Unit::caps_human_order_188329`]); off, the 158041 test of the order alone.
++pub(crate) fn capgroup_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| {
++        std::env::var_os("GENIE_EXPERIMENT_CAPGROUP_188329").is_none_or(|v| v != "0")
++    })
++}
 diff --git a/crates/engine/genie-core/src/objects/unit/top.rs b/crates/engine/genie-core/src/objects/unit/top.rs
 index cee0a80b..c1040a9b 100644
 --- a/crates/engine/genie-core/src/objects/unit/top.rs
@@ -20610,6 +20677,40 @@ index 48ac7e77..2d072b4d 100644
              NotifyKind::ACTION_EXECUTED | NotifyKind::MISSILE_WARNING
                  if player_kind.is_computer() =>
              {
+diff --git a/crates/engine/genie-core/src/unit_ai/life.rs b/crates/engine/genie-core/src/unit_ai/life.rs
+index 9feac939..afeb8c37 100644
+--- a/crates/engine/genie-core/src/unit_ai/life.rs
++++ b/crates/engine/genie-core/src/unit_ai/life.rs
+@@ -559,16 +559,24 @@ impl UnitAi {
+     }
+ 
+     /// `FUN_140c41e50`: the unit's last human order time drops to `FUN_140fe0d10`'s 5000, not on
+-    /// orders 701, 711, 712 and 733.
++    /// orders 701, 711, 712 and 733. 188329 `0xd1c2e0` asks the unit's group first
++    /// (`GENIE_EXPERIMENT_CAPGROUP_188329`, the unit's test of the effect).
+     pub(super) fn cap_human_order(
+         &mut self,
+         side: &mut dyn UnitSide,
+         rng: &mut Well512,
+     ) -> Result<(), GenieError> {
+-        if !matches!(
+-            self.current_order,
+-            Some(OrderKind::Defend | OrderKind::Patrol | OrderKind::Follow | OrderKind::AttackMove)
+-        ) {
++        // 188329 0xd1c2e0 (GENIE_EXPERIMENT_CAPGROUP_188329): the unit's group decides before
++        // the order, so the unit takes the effect on every order and tests both itself
++        // (`Unit::caps_human_order_188329`)
++        if crate::objects::unit::capgroup_188329()
++            || !matches!(
++                self.current_order,
++                Some(
++                    OrderKind::Defend | OrderKind::Patrol | OrderKind::Follow | OrderKind::AttackMove
++                )
++            )
++        {
+             side.effect_now(Effect::CapHumanOrder(HUMAN_ORDER_CAP), self, rng)?;
+         }
+         Ok(())
 diff --git a/crates/engine/genie-core/src/unit_ai/mod.rs b/crates/engine/genie-core/src/unit_ai/mod.rs
 index ea0ee786..cf7d97e2 100644
 --- a/crates/engine/genie-core/src/unit_ai/mod.rs
