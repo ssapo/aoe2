@@ -52,13 +52,23 @@ async function start(pieces, rec, name) {
 // the public demo (?demo=518363684): the engine's frames of one match, computed beforehand and
 // served as demo-<id>.bin (raw deflate of genie-web's stdout), played without the engine or any
 // game file
-const DEMOS = { 518363684: '프로 경기 · 10분 32초' };
+const DEMOS = {
+  521084500: { label: '프로 경기 · 13분 37초', check: '<strong>13:28까지 125개 중 124개 체크포인트가 완전히 일치</strong>하고, 마지막 13:34에는 양쪽 위치 합계가 조금 달라요' },
+  518363684: { label: '프로 경기 · 10분 32초', check: '<strong>10:19까지 96개 중 95개 체크포인트가 완전히 일치</strong>하고, 마지막 10:26에는 한쪽 위치 합계만 조금 달라요' },
+};
 async function startDemo(id) {
   $('setup').hidden = true; $('demoNote').hidden = false;
+  $('demoCheck').innerHTML = DEMOS[id].check;
+  $('demoPick').replaceChildren(...Object.keys(DEMOS).sort((a, b) => b - a).map(k => {
+    const a = document.createElement(k === id ? 'strong' : 'a');
+    if (k !== id) a.href = '?demo=' + k;
+    a.textContent = '#' + k + ' (' + DEMOS[k].label + ')';
+    return a;
+  }));
   document.querySelector('header h1 small').textContent = '(데모)';
   $('status').textContent = '엔진 출력 불러오는 중…';
   $('stage').hidden = false; $('side').hidden = false;
-  const packed = await fetch('demo-' + id + '.bin?v=20261123').then(r => { if (!r.ok) throw Error('HTTP ' + r.status); return r.arrayBuffer(); });
+  const packed = await fetch('demo-' + id + '.bin?v=20261125').then(r => { if (!r.ok) throw Error('HTTP ' + r.status); return r.arrayBuffer(); });
   const bytes = await new Response(new Blob([packed]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer();
   st = { name: '#' + id, demo: true, frames: [], stills: [], info: null, labels: null, words: 10, playMs: 0, playing: false, done: false, wall: 1, wasmBytes: 0 };
   cam.fitted = false; hover = selected = null;
@@ -69,7 +79,7 @@ async function startDemo(id) {
     o += 8 + len;
   }
   st.done = true;
-  $('status').textContent = '#' + id + ' (' + (DEMOS[id] || '') + '): 미리 계산한 엔진 출력이에요';
+  $('status').textContent = '#' + id + ' (' + DEMOS[id].label + '): 미리 계산한 엔진 출력이에요';
   $('bPlay').disabled = false; $('seek').disabled = false;
   if (!looping) { looping = true; loop(); }
 }
