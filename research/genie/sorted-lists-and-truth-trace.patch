@@ -6248,6 +6248,35 @@ index 617e311c..d012669e 100644
      /// Whether a task whose `attribute_type4` is 0x124 stops the target's decay
      /// (`FUN_140ac44b0`): the player's attribute 292 is 1.
      pub(crate) decay: DecayRule,
+diff --git a/crates/engine/genie-core/src/gathering/hunt/start.rs b/crates/engine/genie-core/src/gathering/hunt/start.rs
+index b6704bd4..6dbda690 100644
+--- a/crates/engine/genie-core/src/gathering/hunt/start.rs
++++ b/crates/engine/genie-core/src/gathering/hunt/start.rs
+@@ -349,6 +349,24 @@ impl HuntAction {
+         if self.target.map(HuntTargetId::id) == Some(target.id) {
+             return Ok(None);
+         }
++        // 188329 (GENIE_EXPERIMENT_HUNT_188329; slot 0x48 = 0xbb7f50 at 0xbb817a): slot 0x68's base
++        // change of target (0xb6ba50) refuses an object past state 6 (`+0x188` >= 7: the target
++        // stays none, id -1, nothing taken); `+0x68` takes its class, the second target goes and
++        // `set_state(4)` (0xbb4e11) without a target is `set_state(13)` (0xbb5084): the list's
++        // sub-actions go (0xb89e60) and the timer clears (findings 217: truth24 960.854 s,
++        // lumberjack 8519's next-tree search finds its own carcass, which the farm's footprint
++        // clearing killed; the hunt fails)
++        if std::env::var_os("GENIE_EXPERIMENT_HUNT_188329").is_some()
++            && ObjectState::Undead < target.state
++        {
++            self.set_target(None);
++            self.target_class = Some(target.class);
++            self.carry_to = None;
++            self.tear_down(Some(mover))?;
++            self.state = HuntState::Failed;
++            self.timer = Seconds::ZERO;
++            return Ok(None);
++        }
+         self.set_target(Some(HuntTargetId::new(target.id)));
+         self.target_class = Some(target.class);
+         self.carry_to = None;
 diff --git a/crates/engine/genie-core/src/gathering/hunt/tests.rs b/crates/engine/genie-core/src/gathering/hunt/tests.rs
 index 8ea13ae4..6db0127b 100644
 --- a/crates/engine/genie-core/src/gathering/hunt/tests.rs
