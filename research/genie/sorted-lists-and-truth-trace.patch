@@ -10146,7 +10146,7 @@ index 9f616e05..7f01861b 100644
      /// until the next call.
      pub const fn set_manager_buffer(&mut self, buffer: Option<Distance>) {
 diff --git a/crates/engine/genie-core/src/map/spatial/mod.rs b/crates/engine/genie-core/src/map/spatial/mod.rs
-index 4cc3b283..5ced3def 100644
+index 4cc3b283..b3715abf 100644
 --- a/crates/engine/genie-core/src/map/spatial/mod.rs
 +++ b/crates/engine/genie-core/src/map/spatial/mod.rs
 @@ -46,6 +46,7 @@ mod objects;
@@ -10157,13 +10157,14 @@ index 4cc3b283..5ced3def 100644
  mod sight;
  mod tile_sight;
  
-@@ -513,6 +514,14 @@ pub struct Spatial {
+@@ -513,6 +514,15 @@ pub struct Spatial {
      changed: Vec<PlanRect>,
      /// The seconds since each frozen object froze.
      frozen_for: IdTable<Seconds>,
-+    /// The objects whose record holds `+3` bit 0x10 (it moves): their velocity was not 0 as their
-+    /// last update ended (slot 0x5c8 then, [`Spatial::set_record_moving`]); a stop between
-+    /// (a command's) leaves it set until the object's next update.
++    /// The objects whose record holds `+3` bit 0x10 (it moves): their velocity was not 0 when
++    /// their last update set it, after its actions and before its unit AI (188329
++    /// `0x1226600` from `0x1139e49`, [`Spatial::set_record_moving`]); a stop after that (its own
++    /// action's, a command's) leaves it set until the object's next update.
 +    moving_records: IdTable<()>,
 +    /// While set, the short pather's line query leaves out the objects whose record holds bit
 +    /// 0x10 ([`Spatial::moving_records`]) instead of those whose velocity is not 0 now
@@ -10173,7 +10174,7 @@ index 4cc3b283..5ced3def 100644
      /// masters (type 70) moves and the farthest any acts beyond its footprint (its weapon or work
      /// range), for [`Spatial::check_known`]. 0 when not set.
 diff --git a/crates/engine/genie-core/src/map/spatial/objects.rs b/crates/engine/genie-core/src/map/spatial/objects.rs
-index 0134df68..d27ae9c9 100644
+index 0134df68..f3b472b4 100644
 --- a/crates/engine/genie-core/src/map/spatial/objects.rs
 +++ b/crates/engine/genie-core/src/map/spatial/objects.rs
 @@ -61,6 +61,8 @@ impl Spatial {
@@ -10185,12 +10186,13 @@ index 0134df68..d27ae9c9 100644
              fastest: 0.0,
              reach: Distance::ZERO,
              scout_maps: BTreeMap::new(),
-@@ -256,6 +258,32 @@ impl Spatial {
+@@ -256,6 +258,33 @@ impl Spatial {
          }
      }
  
-+    /// Object `id`'s update ended: its record's `+3` bit 0x10 becomes whether it moves then
-+    /// (slot 0x5c8, its velocity not 0), until its next update ends.
++    /// Object `id`'s update reached its record's refresh (188329 `0x1226600` -> `0x11203a0`,
++    /// after its actions, before its unit AI): its `+3` bit 0x10 becomes whether it
++    /// moves then (slot 0x610, its velocity not 0), until its next update.
 +    pub fn set_record_moving(&mut self, id: ObjectId, moving: bool) {
 +        if moving {
 +            let _ = self.moving_records.insert(id, ());
@@ -10218,7 +10220,7 @@ index 0134df68..d27ae9c9 100644
      /// The object's place is the game's again (the oracle's forced replay): it is known.
      pub fn unfreeze(&mut self, id: ObjectId) {
          if let Some(p) = self.objects.get_mut(id) {
-@@ -466,6 +494,7 @@ impl Spatial {
+@@ -466,6 +495,7 @@ impl Spatial {
      /// The object `id` leaves the world.
      pub fn remove(&mut self, id: ObjectId) {
          let _ = self.inside.remove(id);
@@ -11145,7 +11147,7 @@ index 7a714172..474720e3 100644
      /// with the sprite `given` (else the constructor's default, [`SpriteReads::to_point`]), as
      /// the list adds it: far ([`NO_TARGET_GAP`]).
 diff --git a/crates/engine/genie-core/src/movement/move_to/mod.rs b/crates/engine/genie-core/src/movement/move_to/mod.rs
-index 8ae7fee5..88c84f97 100644
+index 8ae7fee5..9754f792 100644
 --- a/crates/engine/genie-core/src/movement/move_to/mod.rs
 +++ b/crates/engine/genie-core/src/movement/move_to/mod.rs
 @@ -117,7 +117,12 @@ impl MoveWait {
@@ -11162,7 +11164,7 @@ index 8ae7fee5..88c84f97 100644
          if !matches!(self.state, MoveWaitState::Never) || matches!(patience, Patience::Fails) {
              return MoveTo::Failed;
          }
-@@ -517,6 +522,19 @@ impl Follow {
+@@ -517,6 +522,21 @@ impl Follow {
  /// [`Spatial::manager_ignore`]), and walks on; else it tells the unit (notify 0x1fc), turns to
  /// state 3 and the motion step runs on ([`Follow::Blocked`]).
  ///
@@ -11173,16 +11175,18 @@ index 8ae7fee5..88c84f97 100644
 +/// gate the player may pass is passed (slot 0x6d8) — the short pather's line query
 +/// ([`Spatial::pather_blocked_for`]), with the buffer the manager was left with (findings 214:
 +/// truth24 912.386 s, P2's militia 8612 on 8496 asks for a path again where three of its group
-+/// stand on the line). A record moves (`+3` bit 0x10) when the object's velocity was not 0 as its
-+/// last update ended ([`Spatial::with_record_movers`], [`Spatial::record_moving`]), the walker's
-+/// own too (521420102 392.541 s: villager 4597, stopped by the player's new MOVE before its
-+/// update, still moves for militia 4580's test, whose line to it stays clear; truth24
-+/// 912.386 s: militia 8642, stopped by its Attack in range in its update, blocks).
++/// stand on the line). A record moves (`+3` bit 0x10) when the object's velocity was not 0 at
++/// its last update's refresh, after its actions and before its unit AI
++/// ([`Spatial::with_record_movers`], [`Spatial::record_moving`]), the walker's own too
++/// (521420102 392.541 s: villager 4597, stopped by the player's new MOVE before its update,
++/// still moves; truth24 929.581 s: villager 8772 moved, then its build ended and stopped it in
++/// the same update (its unit AI), still moves; truth24 912.386 s: militia 8642, stopped by
++/// its Attack a second before, blocks).
 +///
  /// # Errors
  ///
  /// A target the world lacks, a walker without movement state.
-@@ -547,6 +565,42 @@ pub fn target_left(
+@@ -547,6 +567,42 @@ pub fn target_left(
          return Ok(Follow::Again);
      }
      let mover = walk.mover().ok_or(WALKER_UNMOVING)?;
@@ -11195,7 +11199,7 @@ index 8ae7fee5..88c84f97 100644
 +        let ignore = walk.world.manager_ignore();
 +        let player = walk.world.get(walk.me.id).map(|p| p.player);
 +        let by_id = walk.by_id;
-+        // the records that move are those whose `+3` bit 0x10 the end of their last update set
++        // the records that move are those whose `+3` bit 0x10 their last update's refresh set
 +        // (the walker's own too), not those whose velocity is not 0 now
 +        let blocked = walk.world.with_record_movers(|w| {
 +            let blocked = w.pather_blocked_for(a, b, buffer, mask, (&ignore, by_id), player);
@@ -14570,10 +14574,26 @@ index cee0a80b..c1040a9b 100644
              path_made: m
                  .paths
 diff --git a/crates/engine/genie-core/src/objects/unit/update.rs b/crates/engine/genie-core/src/objects/unit/update.rs
-index d7751598..d70b2aa2 100644
+index d7751598..a19df4b1 100644
 --- a/crates/engine/genie-core/src/objects/unit/update.rs
 +++ b/crates/engine/genie-core/src/objects/unit/update.rs
-@@ -72,7 +72,7 @@ impl Unit {
+@@ -48,6 +48,15 @@ impl Unit {
+             return Ok(Outcome::Sleep);
+         };
+         let captured = self.update_actions(actions, c, roles, slots)?;
++        // 188329 0x1139e49 -> 0x1226600 -> 0x11203a0: the record's `+3` bit 0x10 takes whether
++        // the unit moves now (slot 0x610, its velocity not 0), after its actions and before its
++        // unit AI; a stop after that keeps it until the next update (findings 214/216)
++        let moving = c
++            .w
++            .parts
++            .mover_of(self.id)
++            .is_some_and(crate::movement::Mover::is_moving);
++        c.w.spatial.set_record_moving(self.id, moving);
+         self.ai_part(actions, c, (captured, leaves), roles)
+     }
+ 
+@@ -72,7 +81,7 @@ impl Unit {
          self.let_removed_links_go(c, roles)?;
          self.gate_update(actions, c, roles)?;
          self.complete_on_update(actions, c, roles)?;
@@ -14582,7 +14602,7 @@ index d7751598..d70b2aa2 100644
          // a new object's combat layer (none in the table) has no timer to run down
          if let Some(combat) = c.w.parts.combat.get_mut(self.id) {
              run_down_attack_timers(combat, c.dt.seconds(), c.w.world_time);
-@@ -105,6 +105,7 @@ impl Unit {
+@@ -105,6 +114,7 @@ impl Unit {
          } else {
              self.update_head(actions, c, roles, slots)?
          };
@@ -14590,7 +14610,7 @@ index d7751598..d70b2aa2 100644
          self.after_actions(c)?;
          Ok(captured)
      }
-@@ -149,6 +150,10 @@ impl Unit {
+@@ -149,6 +159,10 @@ impl Unit {
              Some(Action::Build(_)) => self.build_part(actions, c, me),
              Some(Action::Repair(_)) => self.repair_part(actions, c, me, roles),
              Some(Action::Enter(_)) => self.enter_part(actions, c, me, roles),
@@ -14601,7 +14621,7 @@ index d7751598..d70b2aa2 100644
              Some(Action::Transport(_)) => self.transport_update(actions, c, me, roles),
              Some(Action::WaitSolidify(_)) => Ok(actions.wait_solidify_part(
                  OthersRef::of(&c.w.players, &c.w.index, c.player)?,
-@@ -299,6 +304,25 @@ impl Unit {
+@@ -299,6 +313,25 @@ impl Unit {
          Ok(())
      }
  
@@ -14627,7 +14647,7 @@ index d7751598..d70b2aa2 100644
      /// After the actions: the units its walk met take their pauses (slot 0x5f0: their walked
      /// level's pause; the walk read them from its own list till now, `Mover::pause_of`). A unit
      /// whose walk met others in its way is not modelled.
-@@ -310,10 +334,15 @@ impl Unit {
+@@ -310,10 +343,15 @@ impl Unit {
              if c.w.object(id).is_none() {
                  continue;
              }
@@ -22573,7 +22593,7 @@ index dede9f25..23028da4 100644
  }
  
 diff --git a/crates/engine/genie-core/src/world/world_update.rs b/crates/engine/genie-core/src/world/world_update.rs
-index f127e410..8b91576d 100644
+index f127e410..c81b0510 100644
 --- a/crates/engine/genie-core/src/world/world_update.rs
 +++ b/crates/engine/genie-core/src/world/world_update.rs
 @@ -49,6 +49,8 @@ impl World {
@@ -22585,16 +22605,6 @@ index f127e410..8b91576d 100644
              tracing::debug!(target: UPDATE, ?command, "command");
              let stopped: Vec<bool> = self
                  .players
-@@ -151,6 +153,9 @@ impl World {
-                 u.update(a, c, &roles, slots)
-             }) {
-                 Ok(s) => {
-+                    // its record's `+3` bit 0x10 as its update ends (slot 0x5c8)
-+                    let moving = self.objects().moving(id);
-+                    self.spatial.set_record_moving(id, moving);
-                     if self.file_step(p, s.slot, s.outcome)? == ListCount::GoesOn {
-                         i = i.next();
-                     }
 diff --git a/crates/engine/genie-import/Cargo.toml b/crates/engine/genie-import/Cargo.toml
 index bab1493b..15f99b24 100644
 --- a/crates/engine/genie-import/Cargo.toml
