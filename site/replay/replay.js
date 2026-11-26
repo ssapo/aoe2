@@ -8,7 +8,7 @@ const COLORS = ['#8b7d6b', '#3d7bff', '#ff4b3e', '#2fbf4f', '#f2c12e', '#2ec7c9'
 // the still objects (kind 0) by master class: 15 tree, 32 gold, 8 stone, 34 cliff, 5 bush;
 // 14 (grass and other decorations), 30 (map placeholders, removed in the first update) and the
 // rest are not drawn
-const STILL_COLORS = { 15: '#2f6b38', 32: '#d4b13a', 8: '#9a9a9a', 34: '#5a4a3a', 5: '#6aa84f' };
+const STILL_COLORS = { 15: '#24502b', 32: '#d4b13a', 8: '#9a9a9a', 34: '#5a4a3a', 5: '#6aa84f' };
 const UNIT_LABEL_ZOOM = 14;     // px per tile from which unit names show
 const $ = id => document.getElementById(id);
 const canvas = $('map'), ctx = canvas.getContext('2d');
@@ -37,7 +37,7 @@ async function start(pieces, rec, name) {
   if (st && st.worker) st.worker.terminate();
   $('status').textContent = name + ' 불러오는 중…';
   $('stage').hidden = false; $('side').hidden = false;
-  const [wasm, env] = await Promise.all([fetch('genie-web.wasm?v=20261126').then(r => r.arrayBuffer()), envVars()]);
+  const [wasm, env] = await Promise.all([fetch('genie-web.wasm?v=20261126b').then(r => r.arrayBuffer()), envVars()]);
   st = { name, frames: [], stills: [], info: null, labels: null, words: 10, playMs: 0, playing: false, done: false, wall: 0, wasmBytes: wasm.byteLength };
   cam.fitted = false; hover = selected = null;
   const worker = new Worker('worker.js?v=20261123');
@@ -68,7 +68,7 @@ async function startDemo(id) {
   document.querySelector('header h1 small').textContent = '(데모)';
   $('status').textContent = '엔진 출력 불러오는 중…';
   $('stage').hidden = false; $('side').hidden = false;
-  const packed = await fetch('demo-' + id + '.bin?v=20261126').then(r => { if (!r.ok) throw Error('HTTP ' + r.status); return r.arrayBuffer(); });
+  const packed = await fetch('demo-' + id + '.bin?v=20261126b').then(r => { if (!r.ok) throw Error('HTTP ' + r.status); return r.arrayBuffer(); });
   const bytes = await new Response(new Blob([packed]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer();
   st = { name: '#' + id, demo: true, frames: [], stills: [], info: null, labels: null, words: 10, playMs: 0, playing: false, done: false, wall: 1, wasmBytes: 0 };
   cam.fitted = false; hover = selected = null;
@@ -99,13 +99,15 @@ function onMessage(m) {
     st.info = JSON.parse(new TextDecoder().decode(m.bytes));
     if (st.info.error) $('status').textContent = '불러오지 못했어요: ' + st.info.error;
     if (st.info.view_words) st.words = st.info.view_words;
+    if (!st.seen && st.info.map && st.info.players) st.seen = st.info.players.map(() => new Float32Array(st.info.map[0] * st.info.map[1]).fill(Infinity));
     return;
   }
-  if (m.tag === 4) { st.labels = JSON.parse(new TextDecoder().decode(m.bytes)); legend(); return; }
+  if (m.tag === 4) { st.labels = JSON.parse(new TextDecoder().decode(m.bytes)); legend(); fogOptions(); return; }
   const words = new Uint32Array(m.bytes);
   const f = { u: words[0], ms: words[1], data: words.subarray(2), floats: new Float32Array(m.bytes, 8), ints: new Int32Array(m.bytes, 8) };
   if (m.tag === 2) {
     st.frames.push(f);
+    if (st.frames.length % 4 === 1) explore(f);
     if (!st.done && !st.demo) $('status').textContent = st.name + ': ' + fmt(f.ms) + '까지 계산 (실제 1초에 게임 ' + (f.ms / m.wall).toFixed(1) + '초)';
   } else if (m.tag === 3) st.stills.push(f);
 }
@@ -173,6 +175,7 @@ function objectAt(a, o, next, b, t) {
     id: d[o], player: d[o + 1], master: d[o + 2], kind: d[o + 3] & 0xff, cls: (d[o + 3] >> 8) & 0xffff,
     inside: (d[o + 3] & 0x80000000) !== 0, x, y, hp: f[o + 6], action: d[o + 7],
     target: W > 8 ? a.ints[o + 8] : -1, heldKind: W > 9 ? (d[o + 9] << 16 >> 16) : -1, heldAmount: W > 9 ? d[o + 9] >>> 16 : 0,
+    sight: W > 10 ? f[o + 10] : 0,
   };
 }
 
@@ -190,6 +193,66 @@ function zoomAt(sx, sy, factor) {
   cam.scale = Math.min(80, Math.max(1, cam.scale * factor));
   const [nx, ny] = toWorld(sx, sy);
   cam.x += wx - nx; cam.y += wy - ny;
+}
+
+// ---- sight (fog of war): each object's master line of sight (view word 10, tiles) ----
+// st.seen[p][tile]: the first game time (ms) player p's objects saw that tile (stamped every
+// 4th view as the frames come); visible now: the current view's circles
+function stampCircle(grid, mw, mh, x, y, r, value, keepMin) {
+  const x0 = Math.max(0, Math.floor(x - r)), x1 = Math.min(mw - 1, Math.floor(x + r));
+  const y0 = Math.max(0, Math.floor(y - r)), y1 = Math.min(mh - 1, Math.floor(y + r)), r2 = r * r;
+  for (let ty = y0; ty <= y1; ty++) {
+    const dy = ty + 0.5 - y, row = ty * mw;
+    for (let tx = x0; tx <= x1; tx++) {
+      const dx = tx + 0.5 - x;
+      if (dx * dx + dy * dy > r2) continue;
+      if (keepMin) { if (grid[row + tx] > value) grid[row + tx] = value; } else grid[row + tx] = value;
+    }
+  }
+}
+function explore(f) {
+  if (!st.seen || st.words < 11) return;
+  const [mw, mh] = st.info.map, W = st.words, d = f.data, fl = f.floats;
+  for (let o = 0; o + W <= d.length; o += W) {
+    const p = d[o + 1], r = fl[o + 10];
+    if (!p || !(r > 0) || (d[o + 3] & 0x80000000) || !st.seen[p]) continue;
+    stampCircle(st.seen[p], mw, mh, fl[o + 4], fl[o + 5], r, f.ms, true);
+  }
+}
+// the viewers: [] for off, else the players whose sight shows
+function viewers() {
+  const v = $('fog').value;
+  if (v === '0' || !st.seen || st.words < 11) return [];
+  return v === 'all' ? st.seen.map((_, i) => i).filter(i => i > 0) : [+v];
+}
+function fogOptions() {
+  const sel = $('fog'), keep = sel.value;
+  sel.replaceChildren(new Option('끔', '0'));
+  ((st.labels && st.labels.players) || []).forEach((p, i) => { if (i) sel.append(new Option('P' + i + ' ' + (p.name || ''), String(i))); });
+  sel.append(new Option('양쪽 다', 'all'));
+  sel.value = [...sel.options].some(o => o.value === keep) ? keep : '0';
+  sel.disabled = st.words < 11;
+  sel.title = st.words < 11 ? '이 엔진 출력에는 시야 값이 없어요' : '고른 선수가 보는 곳만 밝게, 본 적 있는 곳은 어둡게, 못 본 곳은 검게';
+}
+const fogCanvas = document.createElement('canvas');
+// the visible grid (1 visible) for the viewers from view a, and the fog drawn over the map
+function fog(a, vs, mw, mh) {
+  const W = st.words, d = a.data, fl = a.floats, vis = new Uint8Array(mw * mh);
+  for (let o = 0; o + W <= d.length; o += W) {
+    const r = fl[o + 10];
+    if (!vs.includes(d[o + 1]) || !(r > 0) || (d[o + 3] & 0x80000000)) continue;
+    stampCircle(vis, mw, mh, fl[o + 4], fl[o + 5], r, 1, false);
+  }
+  if (fogCanvas.width !== mw || fogCanvas.height !== mh) { fogCanvas.width = mw; fogCanvas.height = mh; }
+  const fctx = fogCanvas.getContext('2d'), img = fctx.createImageData(mw, mh), px = img.data;
+  for (let i = 0; i < mw * mh; i++) {
+    const explored = vs.some(p => st.seen[p][i] <= st.playMs);
+    px[i * 4 + 3] = vis[i] ? 0 : explored ? 120 : 225;
+  }
+  fctx.putImageData(img, 0, 0);
+  const [x0, y0] = toScreen(0, 0);
+  ctx.imageSmoothingEnabled = true; ctx.drawImage(fogCanvas, x0, y0, mw * cam.scale, mh * cam.scale);
+  return { vis, explored: i => vs.some(p => st.seen[p][i] <= st.playMs) };
 }
 
 // ---- drawing ----
@@ -219,6 +282,7 @@ function draw() {
   const i = at(st.frames, st.playMs);
   if (i < 0) return;
   const a = st.frames[i], b = st.frames[i + 1];
+  const vs = viewers(), seen = vs.length ? fog(a, vs, mw, mh) : null, size = +$('markScale').value;
   const t = b && b.ms > a.ms ? Math.min(1, (st.playMs - a.ms) / (b.ms - a.ms)) : 0;
   let next = null;
   if (b && t > 0) { next = new Map(); for (let o = 0; o + W <= b.data.length; o += W) next.set(b.data[o], o); }
@@ -229,13 +293,20 @@ function draw() {
     if (ob.inside) continue;
     const [cx, cy] = toScreen(ob.x, ob.y);
     if (cx < -3 * k || cy < -3 * k || cx > w + 3 * k || cy > h + 3 * k) continue;
+    // in sight mode: the others' units only where the viewers see, their buildings where explored
+    if (seen && !vs.includes(ob.player)) {
+      const tx = Math.floor(ob.x), ty = Math.floor(ob.y), ti = ty * mw + tx;
+      if (tx < 0 || ty < 0 || tx >= mw || ty >= mh) continue;
+      if (ob.kind === 1 ? !seen.explored(ti) : !seen.vis[ti]) continue;
+    }
     ctx.fillStyle = COLORS[ob.player] || '#fff';
     ctx.beginPath();
     let r;
-    if (ob.kind === 1) { r = Math.max(2, k * 1.1); ctx.rect(cx - r, cy - r, 2 * r, 2 * r); }
-    else if (ob.kind === 2) { r = Math.max(2.5, k * 0.45); ctx.arc(cx, cy, r, 0, Math.PI * 2); }
-    else { r = Math.max(3, k * (ob.player === 0 ? 0.5 : 0.7)); ctx.moveTo(cx, cy - r); ctx.lineTo(cx + r, cy + r * 0.8); ctx.lineTo(cx - r, cy + r * 0.8); ctx.closePath(); }
+    if (ob.kind === 1) { r = Math.max(2.5, k * 1.1); ctx.rect(cx - r, cy - r, 2 * r, 2 * r); }
+    else if (ob.kind === 2) { r = Math.max(2.5, k * 0.45) * size; ctx.arc(cx, cy, r, 0, Math.PI * 2); }
+    else { r = Math.max(3, k * (ob.player === 0 ? 0.5 : 0.7)) * size; ctx.moveTo(cx, cy - r); ctx.lineTo(cx + r, cy + r * 0.8); ctx.lineTo(cx - r, cy + r * 0.8); ctx.closePath(); }
     ctx.fill();
+    ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(0,0,0,.85)'; ctx.stroke();
     if (ob.id === selected || ob.id === hover) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(cx, cy, r + 4, 0, Math.PI * 2); ctx.stroke(); }
     if (ob.kind !== 0 && ob.player !== 0 && ob.hp < 0.999 && ob.hp >= 0 && k >= 4) {
       ctx.fillStyle = '#000'; ctx.fillRect(cx - r, cy - r - 5, 2 * r, 3);
