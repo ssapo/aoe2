@@ -8,7 +8,7 @@ const COLORS = ['#8b7d6b', '#3d7bff', '#ff4b3e', '#2fbf4f', '#f2c12e', '#2ec7c9'
 // the still objects (kind 0) by master class: 15 tree, 32 gold, 8 stone, 34 cliff, 5 bush;
 // 14 (grass and other decorations), 30 (map placeholders, removed in the first update) and the
 // rest are not drawn
-const STILL_COLORS = { 15: '#24502b', 32: '#d4b13a', 8: '#9a9a9a', 34: '#5a4a3a', 5: '#6aa84f' };
+const STILL_COLORS = { 15: '#24502b', 32: '#d4b13a', 8: '#9a9a9a', 34: '#8a6440', 5: '#6aa84f' };
 const UNIT_LABEL_ZOOM = 14;     // px per tile from which unit names show
 const $ = id => document.getElementById(id);
 const canvas = $('map'), ctx = canvas.getContext('2d');
@@ -276,7 +276,9 @@ function draw() {
       if (color === undefined) continue;
       const [sx, sy] = toScreen(s.floats[o + 4], s.floats[o + 5]);
       if (sx < -k || sy < -k || sx > w + k || sy > h + k) continue;
-      ctx.fillStyle = color; ctx.fillRect(sx - k * 0.45, sy - k * 0.45, k * 0.9, k * 0.9);
+      // a cliff piece covers about 3 x 3 tiles: drawn as one block, so a cliff reads as a wall
+      const half = ((s.data[o + 3] >> 8) & 0xffff) === 34 ? 1.5 : 0.45;
+      ctx.fillStyle = color; ctx.fillRect(sx - k * half, sy - k * half, k * 2 * half, k * 2 * half);
     }
   }
   const i = at(st.frames, st.playMs);
@@ -299,14 +301,16 @@ function draw() {
       if (tx < 0 || ty < 0 || tx >= mw || ty >= mh) continue;
       if (ob.kind === 1 ? !seen.explored(ti) : !seen.vis[ti]) continue;
     }
-    ctx.fillStyle = COLORS[ob.player] || '#fff';
+    const bird = ob.player === 0 && DECOR_BIRDS.has(ob.master);
+    ctx.fillStyle = bird ? 'rgba(170,170,170,.45)' : COLORS[ob.player] || '#fff';
     ctx.beginPath();
     let r;
     if (ob.kind === 1) { r = Math.max(2.5, k * 1.1); ctx.rect(cx - r, cy - r, 2 * r, 2 * r); }
     else if (ob.kind === 2) { r = Math.max(2.5, k * 0.45) * size; ctx.arc(cx, cy, r, 0, Math.PI * 2); }
+    else if (bird) { r = Math.max(2, k * 0.3); ctx.moveTo(cx - r, cy); ctx.lineTo(cx, cy - r * 0.6); ctx.lineTo(cx + r, cy); }
     else { r = Math.max(3, k * (ob.player === 0 ? 0.5 : 0.7)) * size; ctx.moveTo(cx, cy - r); ctx.lineTo(cx + r, cy + r * 0.8); ctx.lineTo(cx - r, cy + r * 0.8); ctx.closePath(); }
     ctx.fill();
-    ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(0,0,0,.85)'; ctx.stroke();
+    if (!bird) { ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(0,0,0,.85)'; ctx.stroke(); }
     if (ob.id === selected || ob.id === hover) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(cx, cy, r + 4, 0, Math.PI * 2); ctx.stroke(); }
     if (ob.kind !== 0 && ob.player !== 0 && ob.hp < 0.999 && ob.hp >= 0 && k >= 4) {
       ctx.fillStyle = '#000'; ctx.fillRect(cx - r, cy - r - 5, 2 * r, 3);
@@ -319,7 +323,7 @@ function draw() {
     const focus = ob.id === selected || ob.id === hover;
     const priority = focus ? 0
       : ob.kind === 1 ? (MASTER_NAMES[ob.master] && !UNLABELLED.has(ob.master) ? 1 : -1)
-      : unitLabels ? 2 : -1;
+      : unitLabels && !bird ? 2 : -1;
     if (priority >= 0) labels.push({ text: masterName(ob.master), x: cx, y: cy + r + 2, building: ob.kind === 1, priority });
   }
   // greedy placement: a label that would overlap one already placed is left out (but focus)

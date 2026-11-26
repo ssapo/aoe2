@@ -2,6 +2,8 @@
 // 파일은 싣지 않는다. 표에 없는 마스터는 리플 헤더의 내부 이름(예: "VMBAS"), 그것도 없으면 "#번호".
 'use strict';
 const MASTER_NAMES = {
+  // 장식 새: 하늘을 맴돌 뿐, 사냥·시야·경기 결과와 상관없음
+  96: 'Hawk (장식)', 917: 'Vulture (장식)', 1305: 'Vulture (장식)', 2578: 'Raven (장식)', 816: 'Macaw (장식)', 1028: 'Stork (장식)', 2742: 'Flamingo (장식)',
   // 일꾼 (작업별 남/여)
   83: 'Villager', 293: 'Villager', 118: 'Builder', 212: 'Builder', 120: 'Forager', 354: 'Forager',
   122: 'Hunter', 216: 'Hunter', 123: 'Lumberjack', 218: 'Lumberjack', 124: 'Stone Miner', 220: 'Stone Miner',
@@ -33,3 +35,5 @@ const ACTION_NAMES = {
 };
 // 들고 있는 자원: 0 식량, 1 나무, 2 돌, 3 금, 15-17 고기
 const HELD_NAMES = { 0: '식량', 1: '나무', 2: '돌', 3: '금', 15: '고기', 16: '고기', 17: '고기' };
+// 장식 새: 흐리고 작게, 이름은 고르거나 올렸을 때만
+const DECOR_BIRDS = new Set([96, 917, 1305, 2578, 816, 1028, 2742]);
