@@ -293,6 +293,7 @@ function draw() {
   for (let o = 0; o + W <= a.data.length; o += W) {
     const ob = objectAt(a, o, next, b, t);
     if (ob.inside) continue;
+    if (ob.player === 0 && DECOR_BIRDS.has(ob.master)) continue;   // decorative birds: no effect on the game, not drawn
     const [cx, cy] = toScreen(ob.x, ob.y);
     if (cx < -3 * k || cy < -3 * k || cx > w + 3 * k || cy > h + 3 * k) continue;
     // in sight mode: the others' units only where the viewers see, their buildings where explored
@@ -301,16 +302,14 @@ function draw() {
       if (tx < 0 || ty < 0 || tx >= mw || ty >= mh) continue;
       if (ob.kind === 1 ? !seen.explored(ti) : !seen.vis[ti]) continue;
     }
-    const bird = ob.player === 0 && DECOR_BIRDS.has(ob.master);
-    ctx.fillStyle = bird ? 'rgba(170,170,170,.45)' : COLORS[ob.player] || '#fff';
+    ctx.fillStyle = COLORS[ob.player] || '#fff';
     ctx.beginPath();
     let r;
     if (ob.kind === 1) { r = Math.max(2.5, k * 1.1); ctx.rect(cx - r, cy - r, 2 * r, 2 * r); }
     else if (ob.kind === 2) { r = Math.max(2.5, k * 0.45) * size; ctx.arc(cx, cy, r, 0, Math.PI * 2); }
-    else if (bird) { r = Math.max(2, k * 0.3); ctx.moveTo(cx - r, cy); ctx.lineTo(cx, cy - r * 0.6); ctx.lineTo(cx + r, cy); }
     else { r = Math.max(3, k * (ob.player === 0 ? 0.5 : 0.7)) * size; ctx.moveTo(cx, cy - r); ctx.lineTo(cx + r, cy + r * 0.8); ctx.lineTo(cx - r, cy + r * 0.8); ctx.closePath(); }
     ctx.fill();
-    if (!bird) { ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(0,0,0,.85)'; ctx.stroke(); }
+    ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(0,0,0,.85)'; ctx.stroke();
     if (ob.id === selected || ob.id === hover) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(cx, cy, r + 4, 0, Math.PI * 2); ctx.stroke(); }
     if (ob.kind !== 0 && ob.player !== 0 && ob.hp < 0.999 && ob.hp >= 0 && k >= 4) {
       ctx.fillStyle = '#000'; ctx.fillRect(cx - r, cy - r - 5, 2 * r, 3);
@@ -323,7 +322,7 @@ function draw() {
     const focus = ob.id === selected || ob.id === hover;
     const priority = focus ? 0
       : ob.kind === 1 ? (MASTER_NAMES[ob.master] && !UNLABELLED.has(ob.master) ? 1 : -1)
-      : unitLabels && !bird ? 2 : -1;
+      : unitLabels ? 2 : -1;
     if (priority >= 0) labels.push({ text: masterName(ob.master), x: cx, y: cy + r + 2, building: ob.kind === 1, priority });
   }
   // greedy placement: a label that would overlap one already placed is left out (but focus)
