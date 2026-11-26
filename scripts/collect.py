@@ -45,7 +45,12 @@ def read_json(path, default):
 def write_json(path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile('w', encoding='utf-8', dir=path.parent, delete=False) as h:
-        json.dump(data, h, ensure_ascii=False, indent=2, allow_nan=False)
+        # report.json files hold up to 200 analysed matches each; indented they passed GitHub's 100 MiB
+        # file limit (profile 251265, 2026-11-26), so they are written compact
+        if path.name == 'report.json':
+            json.dump(data, h, ensure_ascii=False, separators=(',', ':'), allow_nan=False)
+        else:
+            json.dump(data, h, ensure_ascii=False, indent=2, allow_nan=False)
         h.write('\n')
         temporary = h.name
     for attempt in range(10):
