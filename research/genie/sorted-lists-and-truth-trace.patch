@@ -6281,7 +6281,7 @@ index 2945a9b1..79aa24d9 100644
          [one] => Ok(Some(**one)),
          [] if on_tile.iter().all(open) => Ok(None),
 diff --git a/crates/engine/genie-core/src/gathering/hunt/drop_off.rs b/crates/engine/genie-core/src/gathering/hunt/drop_off.rs
-index c6c883ca..371bd1e3 100644
+index c6c883ca..d9eda175 100644
 --- a/crates/engine/genie-core/src/gathering/hunt/drop_off.rs
 +++ b/crates/engine/genie-core/src/gathering/hunt/drop_off.rs
 @@ -93,7 +93,7 @@ impl HuntAction {
@@ -6306,6 +6306,39 @@ index c6c883ca..371bd1e3 100644
          }
          if c.w.model.tuning.hunt.drop_reach < site.gap_squared.get() {
              self.timer = DROP_WAIT;
+@@ -217,7 +217,7 @@ impl HuntAction {
+ 
+ impl Unit {
+     /// The hunt's `set_state(8)` after its gathering (`0x140ac60e0` case 8): a unit that carries
+-    /// nothing goes back to state 3 (not modelled). Without a drop site, its master's drop sites
++    /// nothing lets an emptied target go and goes back to state 3. Without a drop site, its master's drop sites
+     /// (`+0x7a0`; none when the first is −1) are searched among its player's objects, from the
+     /// unit by path ([`drop_site_search`] with the unit), else by distance from its place (without
+     /// it); none found is not modelled (notify 0x203, `set_state` 2). The drop site found is the
+@@ -232,6 +232,23 @@ impl Unit {
+         c: &mut Step<'_>,
+         roles: &Roles,
+     ) -> Result<(), GenieError> {
++        if self.life.amount <= Amount::ZERO && super::update::hunt_at_once_188329() {
++            // 188329 FUN_140bb4a80 (set_state) case 8: a unit that carries nothing (`+0x168`;
++            // a load given at once) lets an emptied target go (slot 0x68 with none) and goes
++            // back to state 3 (slot 0x80 with 3), its target otherwise kept
++            let hunt = actions.list.hunt_mut().ok_or(super::NO_HUNT)?;
++            let emptied = hunt.target.is_some_and(|t| {
++                OthersRef::of(&c.w.players, &c.w.index, c.player)
++                    .ok()
++                    .and_then(|o| o.find(t))
++                    .is_some_and(|(_, u)| u.life.amount <= Amount::ZERO)
++            });
++            if emptied {
++                let target = hunt.let_go();
++                self.hunt_release(c, [target])?;
++            }
++            return self.hunt_search_state(actions, c, roles);
++        }
+         let (mover, by_id) =
+             c.w.parts
+                 .lend_mover(self.id, (&c.w.players, &c.w.index, &c.w.model));
 diff --git a/crates/engine/genie-core/src/gathering/hunt/gathering.rs b/crates/engine/genie-core/src/gathering/hunt/gathering.rs
 index 2df7dd4b..c431404d 100644
 --- a/crates/engine/genie-core/src/gathering/hunt/gathering.rs
@@ -6687,10 +6720,81 @@ index 0c37a95e..26ea365a 100644
  
      /// Nothing found after the drop (`LAB_140ac9509`): a computer player's hunt of a kind but
 diff --git a/crates/engine/genie-core/src/gathering/hunt/update.rs b/crates/engine/genie-core/src/gathering/hunt/update.rs
-index ce4ef0b7..bf7f12c4 100644
+index ce4ef0b7..3c2b31dd 100644
 --- a/crates/engine/genie-core/src/gathering/hunt/update.rs
 +++ b/crates/engine/genie-core/src/gathering/hunt/update.rs
-@@ -196,6 +196,24 @@ impl HuntAction {
+@@ -9,6 +9,10 @@ use crate::combat::victims::{file_kill, write_back};
+ use crate::gathering::hunt::HuntGather;
+ use crate::gathering::hunt::HuntState;
+ use crate::gathering::hunt::walks::QUIET_CODE;
++use crate::gathering::hunt::REMAINDER;
++use crate::players::attribute::AttributeId;
++use std::mem::take as mem_take;
++use std::sync::OnceLock;
+ use crate::gathering::hunt::{Herd, HuntAction, HuntNext, HuntReads};
+ use crate::math::rng::Stream;
+ use crate::movement::Me;
+@@ -77,7 +81,26 @@ impl HuntAction {
+                 })
+             }
+             HuntState::Gather => {
+-                let gathered = self.gather(c.dt.seconds(), unit, &mut f.victim, r, roles)?;
++                let mut gathered = self.gather(c.dt.seconds(), unit, &mut f.victim, r, roles)?;
++                if let Some(kind) = self.gives_at_once(c, unit)? {
++                    // 188329 FUN_140bb6230 case 6 (0xbb7655..0xbb7740): a task whose `+0x15` has
++                    // bit 0 (the villagers' red fox task, class 65: gold in, gold out) gives the
++                    // whole load at once, the task's `resource_out` (`+0x24`) or, below 0, the
++                    // unit's resource (`+0x160`): the player's slot 0xf8 and its statistics (slot
++                    // 0xb8), the unit holds none (slot 0x110 with -1); then the gathering goes on
++                    // while `|held - capacity|` is at least the remainder and the target holds
++                    // something, else set_state(8), as for the hunt's own load
++                    let given = mem_take(&mut unit.life.amount);
++                    c.give_load(kind, given)?;
++                    crate::gain_trace::dropped(c.player.index(), unit.id.get(), i16::from(kind), given.get(), false);
++                    gathered = if REMAINDER <= (unit.life.amount - r.capacity).abs()
++                        && Amount::ZERO < f.victim.amount
++                    {
++                        HuntGather::GoesOn
++                    } else {
++                        HuntGather::DropOff
++                    };
++                }
+                 write_target_back(c, unit, actions, f, roles)?;
+                 Ok(match gathered {
+                     HuntGather::DropOff => HuntNext::Drop,
+@@ -90,6 +113,31 @@ impl HuntAction {
+         }
+     }
+ 
++    /// The resource a hunt's task gives at once (188329 `0xbb7655`: the live task's `+0x15` bit 0),
++    /// the task's `resource_out` (`+0x24`) or, below 0, the unit's resource (`+0x160`); none for
++    /// a task without the bit (or with `GENIE_EXPERIMENT_HUNTATONCE_188329=0`).
++    ///
++    /// # Errors
++    ///
++    /// A hunter whose master the slice lacks, or a load given at once without a resource kind.
++    fn gives_at_once(&self, c: &Step<'_>, unit: &Unit) -> Result<Option<AttributeId>, GenieError> {
++        if !hunt_at_once_188329() {
++            return Ok(None);
++        }
++        let master = unit.master(MasterTables::new(&c.w.model.masters, &c.w.parts.own_master), c.player)?;
++        // the action's task pointer (`+0x48`) reads the master's task as it is now
++        let Some(live) = master.action_part().tasks.iter().find(|t| t.id == self.task.id) else {
++            return Ok(None);
++        };
++        if live.combat_level_flag.bits() & 1 == 0 {
++            return Ok(None);
++        }
++        live.attribute_kind3
++            .or(unit.life.attribute_kind)
++            .map(Some)
++            .ok_or(GenieError::unsupported("a hunt's load given at once without a resource kind"))
++    }
++
+     /// State 12, the Attack's update (`FUN_140a992b0`) and its end: ended (codes 1, 2 and 5)
+     /// with no target left the hunt searches (`set_state(3)`); a predator (class 10) of a unit AI
+     /// with orders queued (`FUN_140c564a0` above 0) would end the hunt (`set_state(1)`) under
+@@ -196,6 +244,24 @@ impl HuntAction {
              3 => self
                  .walk_failed(c.w.parts.motion_mut(unit.id), r, roles)
                  .map(|()| HuntNext::Stay),
@@ -6715,6 +6819,17 @@ index ce4ef0b7..bf7f12c4 100644
              4 | 5 => self
                  .lost_on_the_way(c, unit, r, roles)
                  .map(|()| HuntNext::Stay),
+@@ -380,3 +446,10 @@ pub(super) fn write_target_back(
+     }
+     Ok(())
+ }
++
++/// `GENIE_EXPERIMENT_HUNTATONCE_188329`: the hunt's load given at once (188329 `0xbb7655`), on
++/// unless "0".
++pub(super) fn hunt_at_once_188329() -> bool {
++    static FLAG: OnceLock<bool> = OnceLock::new();
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_HUNTATONCE_188329").is_none_or(|v| v != "0"))
++}
 diff --git a/crates/engine/genie-core/src/gathering/mod.rs b/crates/engine/genie-core/src/gathering/mod.rs
 index 005a4467..22cc562c 100644
 --- a/crates/engine/genie-core/src/gathering/mod.rs

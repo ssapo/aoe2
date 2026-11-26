@@ -2126,3 +2126,9 @@ genie-b is left as R59a + B52a (tree = R59a.patch + B52a.diff; no commit beyond 
 - C7(genie-c a265ac14): 하차 장소 찾기(0x133bf7f)에서 task+0x15 bit0 켜진 작업은 건너뜀(스위치 DROPFLAG_188329, unit_ai/task_finder/target_steps.rs).
 - R65o = R65n + C6 + C7. PC: `runs\census_R65o.exe`, `runs\R65o.patch`. 검사: 전체 세트 7708 -> 7748(q_921 +20, P_521113438 +16, V_520169985 +3, P_520821782 +1), 나빠진 판 없음; 321판(S33_R65o): 끝까지 9, 재현 비율 30.3%(분 3500 -> 3508), 평범한 180판 31.5% -> 31.6%, 길어진 판 5, 짧아진 판 0.
 - 226 정정: truth24 170->172, truth28 56/56은 C5 몫이 아니라 R65k 바탕(B65b 추정) 몫. C5 자체 몫은 truth22와 n_090 181->257.
+
+## 229. 표시된 사냥 작업은 짐을 한 번에 넘기고, 빈손 사냥꾼은 빈 목표를 놓아(D3, 스위치 GENIE_EXPERIMENT_HUNTATONCE_188329 기본 켬)
+- 188329 Hunt 경우 6(FUN_140bb6230, 0xbb7655): task+0x15 bit0 켜진 작업(마을 사람의 붉은여우 작업, 마스터 1955, 클래스 65)은 운반량 전체를 플레이어에게 한 번에 줌. 엔진은 Gather에만 있었음.
+- FUN_140bb4a80 경우 8: 아무것도 안 든 Hunt set_state 8은 빈 목표를 놓고 set_state 3으로 돌아감.
+- 고침: gathering/hunt/update.rs, drop_off.rs(엔진 D 갈래). 조사 신호 "자원 +n / 보유 -n, 위치 같음"(522082277, 520397411, 522032698, 518951840 등)을 고침.
+- R65p = R65o + D3. PC: `runs\census_R65p.exe`, `runs\R65p.patch`. 검사: 전체 세트 7748 -> 7844(q_411 160 -> 256), 나빠진 판 없음; 321판(S33_R65p): 끝까지 9, 재현 비율 30.3% -> 30.4%(분 3508 -> 3520), 평범한 180판 31.6% -> 31.7%, 길어진 판 5, 짧아진 판 0.
