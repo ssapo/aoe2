@@ -2275,7 +2275,7 @@ index 1c85e4af..e12c25c7 100644
  
      /// The queue path of a builder at `idx` of player `q` (slot 0x30 into slot 0x28): its
 diff --git a/crates/engine/genie-core/src/commands/mod.rs b/crates/engine/genie-core/src/commands/mod.rs
-index d2edcddb..227bdaf4 100644
+index d2edcddb..2629303c 100644
 --- a/crates/engine/genie-core/src/commands/mod.rs
 +++ b/crates/engine/genie-core/src/commands/mod.rs
 @@ -38,6 +38,7 @@ mod placement;
@@ -2331,7 +2331,7 @@ index d2edcddb..227bdaf4 100644
                  }
 -                _ => None,
 +                other => {
-+                    if std::env::var_os("GENIE_LOG_DROPPED").is_some() {
++                    if crate::env_os!("GENIE_LOG_DROPPED").is_some() {
 +                        eprintln!(
 +                            "DROPPED world_ms={} player={} id={:?} holder={:?}",
 +                            self.world_time.millis(),
@@ -2356,7 +2356,7 @@ index d2edcddb..227bdaf4 100644
 +fn experiment_remap(id: Option<ObjectId>) -> Option<ObjectId> {
 +    static MAP: std::sync::OnceLock<Vec<(i32, i32)>> = std::sync::OnceLock::new();
 +    let map = MAP.get_or_init(|| {
-+        std::env::var("GENIE_EXPERIMENT_REMAP_IDS")
++        crate::env_str!("GENIE_EXPERIMENT_REMAP_IDS")
 +            .unwrap_or_default()
 +            .split(',')
 +            .filter_map(|pair| {
@@ -2776,7 +2776,7 @@ index 89344b09..0cc0cd71 100644
          let move_reads = builder.move_to_reads(
              c.w.parts.motion.mover(builder.id),
 diff --git a/crates/engine/genie-core/src/construction/build/states.rs b/crates/engine/genie-core/src/construction/build/states.rs
-index 76304cf8..e8c11eda 100644
+index 76304cf8..cae77147 100644
 --- a/crates/engine/genie-core/src/construction/build/states.rs
 +++ b/crates/engine/genie-core/src/construction/build/states.rs
 @@ -125,8 +125,18 @@ impl BuildAction {
@@ -2789,7 +2789,7 @@ index 76304cf8..e8c11eda 100644
 +        // 188329: then each additional resource of the load (`0xb9f496` to `0xb9f4d7`,
 +        // [`crate::gathering::extra`])
 +        for (extra, more) in std::mem::take(&mut builder.extra) {
-+            if std::env::var_os("GENIE_TRACE_EXTRA").is_some() {
++            if crate::env_os!("GENIE_TRACE_EXTRA").is_some() {
 +                eprintln!("EXTRA build id={} resource={extra} amount={}", builder.id, more.get());
 +            }
 +            c.give_load(extra, more)?;
@@ -3045,7 +3045,7 @@ index e59bc443..9a584a97 100644
      }
  
 diff --git a/crates/engine/genie-core/src/construction/building_update.rs b/crates/engine/genie-core/src/construction/building_update.rs
-index d42efbec..419a8d18 100644
+index d42efbec..354aeed7 100644
 --- a/crates/engine/genie-core/src/construction/building_update.rs
 +++ b/crates/engine/genie-core/src/construction/building_update.rs
 @@ -2,6 +2,9 @@
@@ -3190,7 +3190,7 @@ index d42efbec..419a8d18 100644
 -            ));
 +            let relics = c.w.parts.building_of(self.id).relics;
 +            if relics != Relics::NONE
-+                || std::env::var_os("GENIE_EXPERIMENT_UPSTREAM_RELICS").is_some()
++                || crate::env_os!("GENIE_EXPERIMENT_UPSTREAM_RELICS").is_some()
 +            {
 +                c.w.relic_goods(c.player, relics, seconds)?;
 +            }
@@ -3235,7 +3235,7 @@ index 92c1f195..59410b34 100644
  /// (`FUN_1410562e0`), every record and the query grown by `TurnTuning::gate_grow` (`FUN_1410562d0`), any
 diff --git a/crates/engine/genie-core/src/correction.rs b/crates/engine/genie-core/src/correction.rs
 new file mode 100644
-index 00000000..235e801f
+index 00000000..56e1358d
 --- /dev/null
 +++ b/crates/engine/genie-core/src/correction.rs
 @@ -0,0 +1,296 @@
@@ -3290,13 +3290,13 @@ index 00000000..235e801f
 +#[must_use]
 +pub fn enabled() -> bool {
 +    static ON: OnceLock<bool> = OnceLock::new();
-+    *ON.get_or_init(|| std::env::var_os("GENIE_CORRECT").is_some())
++    *ON.get_or_init(|| crate::env_os!("GENIE_CORRECT").is_some())
 +}
 +
 +/// Whether the mode puts targets back (`GENIE_CORRECT` not `ids`).
 +fn snaps() -> bool {
 +    static ON: OnceLock<bool> = OnceLock::new();
-+    *ON.get_or_init(|| std::env::var("GENIE_CORRECT").as_deref() != Ok("ids"))
++    *ON.get_or_init(|| crate::env_str!("GENIE_CORRECT").as_deref() != Ok("ids"))
 +}
 +
 +/// A recorded id the commanding player holds stands for itself.
@@ -3535,9 +3535,105 @@ index 00000000..235e801f
 +        );
 +    }
 +}
+diff --git a/crates/engine/genie-core/src/env_cache.rs b/crates/engine/genie-core/src/env_cache.rs
+new file mode 100644
+index 00000000..95dcfc96
+--- /dev/null
++++ b/crates/engine/genie-core/src/env_cache.rs
+@@ -0,0 +1,90 @@
++//! The process environment, read once (SPD speed prototype).
++//!
++//! The engine's switches (`GENIE_EXPERIMENT_*`, `GENIE_TRACE_*`) are read in hot paths, many per unit and update; on
++//! Windows each `std::env::var_os` takes the environment lock, searches the environment block and allocates the value.
++//! Nothing in the workspace sets a variable while a run goes on (no `set_var`), so a copy taken at the first read
++//! answers every later read the same: [`var_os`] and [`var`] say what `std::env` would, borrowed from the copy.
++
++use std::collections::HashMap;
++use std::env::VarError;
++use std::ffi::{OsStr, OsString};
++use std::hash::{BuildHasherDefault, Hasher};
++use std::sync::OnceLock;
++
++/// FNV-1a: the names are short and few, a keyed hash buys nothing here.
++#[derive(Clone, Copy, Debug)]
++struct Fnv(u64);
++
++impl Default for Fnv {
++    fn default() -> Self { Self(0xcbf2_9ce4_8422_2325) }
++}
++
++impl Hasher for Fnv {
++    fn finish(&self) -> u64 { self.0 }
++    fn write(&mut self, bytes: &[u8]) {
++        for &b in bytes { self.0 = (self.0 ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3); }
++    }
++}
++
++/// A value as read: the raw value and, when it is Unicode, the same as a string.
++type Entry = (OsString, Option<String>);
++
++static ENV: OnceLock<HashMap<String, Entry, BuildHasherDefault<Fnv>>> = OnceLock::new();
++
++/// A name as the platform compares it (Windows: ASCII case-insensitive).
++fn key(name: &str) -> String {
++    if cfg!(windows) { name.to_ascii_uppercase() } else { name.to_owned() }
++}
++
++fn env() -> &'static HashMap<String, Entry, BuildHasherDefault<Fnv>> {
++    ENV.get_or_init(|| {
++        std::env::vars_os()
++            .filter_map(|(k, v)| {
++                let text = v.to_str().map(str::to_owned);
++                k.into_string().ok().map(|k| (key(&k), (v, text)))
++            })
++            .collect()
++    })
++}
++
++fn get(name: &str) -> Option<&'static Entry> {
++    if cfg!(windows) && name.bytes().any(|b| b.is_ascii_lowercase()) { env().get(&key(name)) } else { env().get(name) }
++}
++
++/// `std::env::var_os(name)`, borrowed from the copy.
++#[must_use]
++pub fn var_os(name: &str) -> Option<&'static OsStr> {
++    get(name).map(|(v, _)| v.as_os_str())
++}
++
++/// `std::env::var(name)`, borrowed from the copy.
++///
++/// # Errors
++///
++/// As `std::env::var`: not present, or not Unicode.
++pub fn var(name: &str) -> Result<&'static str, VarError> {
++    match get(name) {
++        Some((_, Some(text))) => Ok(text),
++        Some((raw, None)) => Err(VarError::NotUnicode(raw.clone())),
++        None => Err(VarError::NotPresent),
++    }
++}
++
++/// [`var_os`] of a literal name, looked up once per call site (a `static` there): a switch in a hot path then costs a
++/// load, not a lookup.
++#[macro_export]
++macro_rules! env_os {
++    ($name:literal) => {{
++        static VALUE: ::std::sync::OnceLock<::core::option::Option<&'static ::std::ffi::OsStr>> = ::std::sync::OnceLock::new();
++        *VALUE.get_or_init(|| $crate::env_cache::var_os($name))
++    }};
++}
++
++/// [`var`] of a literal name, looked up once per call site.
++#[macro_export]
++macro_rules! env_str {
++    ($name:literal) => {{
++        static VALUE: ::std::sync::OnceLock<::core::result::Result<&'static str, ::std::env::VarError>> = ::std::sync::OnceLock::new();
++        VALUE.get_or_init(|| $crate::env_cache::var($name)).clone()
++    }};
++}
 diff --git a/crates/engine/genie-core/src/gain_trace.rs b/crates/engine/genie-core/src/gain_trace.rs
 new file mode 100644
-index 00000000..307fdcd4
+index 00000000..8e1241dd
 --- /dev/null
 +++ b/crates/engine/genie-core/src/gain_trace.rs
 @@ -0,0 +1,193 @@
@@ -3594,7 +3690,7 @@ index 00000000..307fdcd4
 +
 +fn enabled() -> bool {
 +    static FLAG: OnceLock<bool> = OnceLock::new();
-+    *FLAG.get_or_init(|| std::env::var_os("GENIE_TRACE_GAIN").is_some())
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_TRACE_GAIN").is_some())
 +}
 +
 +fn state() -> &'static Mutex<State> {
@@ -3994,7 +4090,7 @@ index cdd56c6d..98b73d04 100644
      /// found (its `+0x48`): the top action's slot 0x48 ([`TransportAction::work`] at the work's
      /// point, from the unit itself when the target is the unit), then the unit AI's notify as
 diff --git a/crates/engine/genie-core/src/garrison/unit.rs b/crates/engine/genie-core/src/garrison/unit.rs
-index d8742d52..b08f125f 100644
+index d8742d52..2eed8d47 100644
 --- a/crates/engine/genie-core/src/garrison/unit.rs
 +++ b/crates/engine/genie-core/src/garrison/unit.rs
 @@ -351,8 +351,18 @@ impl Unit {
@@ -4007,7 +4103,7 @@ index d8742d52..b08f125f 100644
 +                // 188329: then each additional resource of the load (`0xb77b6c` to `0xb77bb7`,
 +                // [`crate::gathering::extra`])
 +                for (extra, more) in std::mem::take(&mut self.extra) {
-+                    if std::env::var_os("GENIE_TRACE_EXTRA").is_some() {
++                    if crate::env_os!("GENIE_TRACE_EXTRA").is_some() {
 +                        eprintln!("EXTRA enter id={} resource={extra} amount={}", self.id, more.get());
 +                    }
 +                    c.give_load(extra, more)?;
@@ -4025,7 +4121,7 @@ index d8742d52..b08f125f 100644
 +        // the AI's first own queued order, not modelled here); a unit that came in without an
 +        // action on the building (a new unit whose gather point is its own building) records no
 +        // target and the building's place as its point
-+        let recorded = if std::env::var_os("GENIE_EXPERIMENT_UNLOAD_188329").is_some()
++        let recorded = if crate::env_os!("GENIE_EXPERIMENT_UNLOAD_188329").is_some()
 +            && actions.top_target() != Some(target.id())
 +        {
 +            None
@@ -4053,7 +4149,7 @@ index d8742d52..b08f125f 100644
          Ok(())
      }
 diff --git a/crates/engine/genie-core/src/garrison/unload.rs b/crates/engine/genie-core/src/garrison/unload.rs
-index 0f3076d6..94eb7d5a 100644
+index 0f3076d6..ac245b99 100644
 --- a/crates/engine/genie-core/src/garrison/unload.rs
 +++ b/crates/engine/genie-core/src/garrison/unload.rs
 @@ -9,6 +9,7 @@ use crate::garrison::WorkReturn;
@@ -4114,7 +4210,7 @@ index 0f3076d6..94eb7d5a 100644
              if b.master(self.master_tables(), p)?.kind != MasterKind::BUILDING {
                  continue;
              }
-+            if std::env::var_os("GENIE_EXPERIMENT_BACKWORK_IGNORE_188329").is_some() {
++            if crate::env_os!("GENIE_EXPERIMENT_BACKWORK_IGNORE_188329").is_some() {
 +                self.back_to_work_inside_188329(p, idx)?;
 +                continue;
 +            }
@@ -4187,7 +4283,7 @@ index 0f3076d6..94eb7d5a 100644
 +        // the search is asked only after the unit went (0x12a16e0 / slot 0x370 first), with the
 +        // unit AI's target and last target forgotten (0xd27410) before the action is set
 +        // (0xd40980) and notify 0x202 posted; the let-out's move no longer replaces the action
-+        let order_188329 = std::env::var_os("GENIE_EXPERIMENT_BACKWORK_ORDER_188329").is_some();
++        let order_188329 = crate::env_os!("GENIE_EXPERIMENT_BACKWORK_ORDER_188329").is_some();
 +        let search = found.is_none() && record.target_class.is_some() && record.action.is_some();
 +        if order_188329 {
 +            let went = match from {
@@ -5225,7 +5321,7 @@ index 88cd0044..b248e3dd 100644
  
  /// What an update asks of the caller.
 diff --git a/crates/engine/genie-core/src/gathering/gather/start.rs b/crates/engine/genie-core/src/gathering/gather/start.rs
-index 01be8685..8dedc539 100644
+index 01be8685..e401e0ab 100644
 --- a/crates/engine/genie-core/src/gathering/gather/start.rs
 +++ b/crates/engine/genie-core/src/gathering/gather/start.rs
 @@ -57,6 +57,19 @@ pub struct GatherStart<'a> {
@@ -5256,7 +5352,7 @@ index 01be8685..8dedc539 100644
 +/// `GENIE_EXPERIMENT_FARMSPOT_188329`.
 +pub(crate) fn farmspot_188329() -> bool {
 +    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-+    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_FARMSPOT_188329").is_some())
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_FARMSPOT_188329").is_some())
 +}
 +
  /// `set_state(4)`'s point of a farm's next stop (`0x140a8cd40` case 4): a tile of the farm's
@@ -5270,7 +5366,7 @@ index 01be8685..8dedc539 100644
 +        // 188329 0xb7edb0..0xb7ee3b: the first candidate that passes ok() (0xb7aa90) is taken; no
 +        // test against the last stop. ok() is taken as true: farther than 16 passes, else the point
 +        // reach test (0x120fec0) within 16.0 of the point, which a unit within 16 of it passes.
-+        if std::env::var_os("GENIE_TRACE_FARMSPOT").is_some() {
++        if crate::env_os!("GENIE_TRACE_FARMSPOT").is_some() {
 +            let mut c = rng.clone();
 +            let d: Vec<(f32, f32)> = (0..5)
 +                .map(|_| {
@@ -5394,7 +5490,7 @@ index 5226b21a..dadc3952 100644
      };
      let gathered = rig.run(GatherState::Work, 500, |c, u, _, _| {
 diff --git a/crates/engine/genie-core/src/gathering/gather/unit.rs b/crates/engine/genie-core/src/gathering/gather/unit.rs
-index a7e36539..f722b6e5 100644
+index a7e36539..2aca2e68 100644
 --- a/crates/engine/genie-core/src/gathering/gather/unit.rs
 +++ b/crates/engine/genie-core/src/gathering/gather/unit.rs
 @@ -1,5 +1,6 @@
@@ -5438,7 +5534,7 @@ index a7e36539..f722b6e5 100644
 +        crate::gain_trace::dropped(c.player.index(), self.id.get(), i16::from(kind), amount.get(), false);
 +        // 188329: then each additional resource of the load (`0xb81e93` to `0xb81edc`)
 +        for (extra, more) in std::mem::take(&mut self.extra) {
-+            if std::env::var_os("GENIE_TRACE_EXTRA").is_some() {
++            if crate::env_os!("GENIE_TRACE_EXTRA").is_some() {
 +                eprintln!("EXTRA gather id={} resource={extra} amount={}", self.id, more.get());
 +            }
 +            c.give_load(extra, more)?;
@@ -5492,7 +5588,7 @@ index 3ab90215..e4a3fe71 100644
                  }
                  let walks = r.walks(&c.w.model.graphics, (unit, c.w.parts.mover_of(unit.id)));
 diff --git a/crates/engine/genie-core/src/gathering/gather/work.rs b/crates/engine/genie-core/src/gathering/gather/work.rs
-index b1ab9a1e..f91549ff 100644
+index b1ab9a1e..061d5530 100644
 --- a/crates/engine/genie-core/src/gathering/gather/work.rs
 +++ b/crates/engine/genie-core/src/gathering/gather/work.rs
 @@ -64,6 +64,26 @@ impl GatherAction {
@@ -5502,7 +5598,7 @@ index b1ab9a1e..f91549ff 100644
 +        // 188329 `set_state(6)` (0xb7f773..0xb7f78d): a target of class 8, 32 or 15 pulls the unit
 +        // against it (0x1116f60), as the Hunt's does (finding 49)
 +        // ENG-25 diagnostic (item 5, N4): a mine faced from a tile that differs on both axes
-+        if std::env::var_os("GENIE_TRACE_ITEM5").is_some() && matches!(target.class.get(), 8 | 32) {
++        if crate::env_os!("GENIE_TRACE_ITEM5").is_some() && matches!(target.class.get(), 8 | 32) {
 +            let (u, t) = (unit.position(), target.position);
 +            if u.x().floor() != t.x().floor() && u.y().floor() != t.y().floor() {
 +                // ENG-27: 188329 skips the re-target when the unit AI has an order (0xd28770,
@@ -5514,7 +5610,7 @@ index b1ab9a1e..f91549ff 100644
 +                );
 +            }
 +        }
-+        if std::env::var_os("GENIE_EXPERIMENT_GATHER_SNAP_188329").is_some()
++        if crate::env_os!("GENIE_EXPERIMENT_GATHER_SNAP_188329").is_some()
 +            && matches!(target.class.get(), 8 | 32 | 15)
 +        {
 +            crate::gathering::snap_to_resource(c, unit, target.id, roles)?;
@@ -5593,7 +5689,7 @@ index b1ab9a1e..f91549ff 100644
          }
          let empty = target.amount <= Amount::ZERO
 diff --git a/crates/engine/genie-core/src/gathering/gather_search.rs b/crates/engine/genie-core/src/gathering/gather_search.rs
-index b8879db5..09fc2d2a 100644
+index b8879db5..53f29d9a 100644
 --- a/crates/engine/genie-core/src/gathering/gather_search.rs
 +++ b/crates/engine/genie-core/src/gathering/gather_search.rs
 @@ -71,6 +71,9 @@ pub struct Candidate {
@@ -5662,7 +5758,7 @@ index b8879db5..09fc2d2a 100644
 +/// `ClosestResourceObject`, 0xd23bf0 over 0xd19f60).
 +#[must_use]
 +pub fn ressearch_188329() -> bool {
-+    std::env::var_os("GENIE_EXPERIMENT_RESSEARCH_188329").is_some()
++    crate::env_os!("GENIE_EXPERIMENT_RESSEARCH_188329").is_some()
 +}
 +
 +/// The range the search's reach test passes (slot 0x408): 0 as the old build's; with
@@ -5671,7 +5767,7 @@ index b8879db5..09fc2d2a 100644
 +/// diagnostic `GENIE_EXPERIMENT_RESSEARCH_RANGE0` is set.
 +#[must_use]
 +pub fn reach_range() -> Distance {
-+    if ressearch_188329() && std::env::var_os("GENIE_EXPERIMENT_RESSEARCH_RANGE0").is_none() {
++    if ressearch_188329() && crate::env_os!("GENIE_EXPERIMENT_RESSEARCH_RANGE0").is_none() {
 +        Distance::new(0.1)
 +    } else {
 +        Distance::ZERO
@@ -6064,7 +6160,7 @@ index c6c883ca..371bd1e3 100644
          if c.w.model.tuning.hunt.drop_reach < site.gap_squared.get() {
              self.timer = DROP_WAIT;
 diff --git a/crates/engine/genie-core/src/gathering/hunt/gathering.rs b/crates/engine/genie-core/src/gathering/hunt/gathering.rs
-index 2df7dd4b..b5cbd7cf 100644
+index 2df7dd4b..c431404d 100644
 --- a/crates/engine/genie-core/src/gathering/hunt/gathering.rs
 +++ b/crates/engine/genie-core/src/gathering/hunt/gathering.rs
 @@ -175,6 +175,14 @@ impl HuntAction {
@@ -6074,7 +6170,7 @@ index 2df7dd4b..b5cbd7cf 100644
 +        // 188329 `set_state(6)` (0xbb5b11..0xbb5b2f): a target of class 8, 32 or 15 pulls the unit
 +        // against it (0x1116f60) when their tiles are in line on one axis: that coordinate
 +        // becomes the target's minus both radii times the whole tile difference
-+        if std::env::var_os("GENIE_EXPERIMENT_HUNT_188329").is_some()
++        if crate::env_os!("GENIE_EXPERIMENT_HUNT_188329").is_some()
 +            && matches!(f.victim.class.get(), 8 | 32 | 15)
 +        {
 +            crate::gathering::snap_to_resource(c, unit, self.target, roles)?;
@@ -6108,7 +6204,7 @@ index 2df7dd4b..b5cbd7cf 100644
          if roles
              .of_class(victim.class)
 diff --git a/crates/engine/genie-core/src/gathering/hunt/hunter.rs b/crates/engine/genie-core/src/gathering/hunt/hunter.rs
-index 3e35c7a5..6963f159 100644
+index 3e35c7a5..59081a23 100644
 --- a/crates/engine/genie-core/src/gathering/hunt/hunter.rs
 +++ b/crates/engine/genie-core/src/gathering/hunt/hunter.rs
 @@ -98,15 +98,27 @@ impl Unit {
@@ -6122,7 +6218,7 @@ index 3e35c7a5..6963f159 100644
 +    /// `HuntAction::update_walk`) and the search (0xbb2c90) does not run; only code 3 (failed)
 +    /// searches whatever the queue holds. 158041's update searched first.
      pub(crate) fn tree_lost(&self, actions: &Action, c: &Step<'_>, roles: &Roles) -> bool {
-+        let queued = std::env::var_os("GENIE_EXPERIMENT_HUNT_188329").is_some()
++        let queued = crate::env_os!("GENIE_EXPERIMENT_HUNT_188329").is_some()
 +            && c.w.parts
 +                .unit_ai
 +                .get(self.id)
@@ -6181,7 +6277,7 @@ index 3e35c7a5..6963f159 100644
 +                crate::gain_trace::dropped(c.player.index(), self.id.get(), i16::from(kind), amount.get(), false);
 +                // 188329: then each additional resource of the load (`0xbb7905` to `0xbb7947`)
 +                for (extra, more) in std::mem::take(&mut self.extra) {
-+                    if std::env::var_os("GENIE_TRACE_EXTRA").is_some() {
++                    if crate::env_os!("GENIE_TRACE_EXTRA").is_some() {
 +                        eprintln!("EXTRA hunt id={} resource={extra} amount={}", self.id, more.get());
 +                    }
 +                    c.give_load(extra, more)?;
@@ -6249,7 +6345,7 @@ index 617e311c..d012669e 100644
      /// (`FUN_140ac44b0`): the player's attribute 292 is 1.
      pub(crate) decay: DecayRule,
 diff --git a/crates/engine/genie-core/src/gathering/hunt/start.rs b/crates/engine/genie-core/src/gathering/hunt/start.rs
-index b6704bd4..6dbda690 100644
+index b6704bd4..3afad509 100644
 --- a/crates/engine/genie-core/src/gathering/hunt/start.rs
 +++ b/crates/engine/genie-core/src/gathering/hunt/start.rs
 @@ -349,6 +349,24 @@ impl HuntAction {
@@ -6263,7 +6359,7 @@ index b6704bd4..6dbda690 100644
 +        // sub-actions go (0xb89e60) and the timer clears (findings 217: truth24 960.854 s,
 +        // lumberjack 8519's next-tree search finds its own carcass, which the farm's footprint
 +        // clearing killed; the hunt fails)
-+        if std::env::var_os("GENIE_EXPERIMENT_HUNT_188329").is_some()
++        if crate::env_os!("GENIE_EXPERIMENT_HUNT_188329").is_some()
 +            && ObjectState::Undead < target.state
 +        {
 +            self.set_target(None);
@@ -6303,7 +6399,7 @@ index 8ea13ae4..6db0127b 100644
  }
  
 diff --git a/crates/engine/genie-core/src/gathering/hunt/unit.rs b/crates/engine/genie-core/src/gathering/hunt/unit.rs
-index 0c37a95e..b88ea8f0 100644
+index 0c37a95e..26ea365a 100644
 --- a/crates/engine/genie-core/src/gathering/hunt/unit.rs
 +++ b/crates/engine/genie-core/src/gathering/hunt/unit.rs
 @@ -83,9 +83,12 @@ impl Unit {
@@ -6315,7 +6411,7 @@ index 0c37a95e..b88ea8f0 100644
 -            .contains(ClassRoles::PREDATOR)
 +        // 188329 (0xbb65b0 -> 0xbb7e86 set_state(3); case 3 at 0xbb4aec has no class test): a
 +        // hunt of class 10 searches like any other (notify 0x202, standing sprite, timer -10)
-+        if std::env::var_os("GENIE_EXPERIMENT_HUNT_188329").is_none()
++        if crate::env_os!("GENIE_EXPERIMENT_HUNT_188329").is_none()
 +            && roles
 +                .of_some_class(hunt.target_class)
 +                .contains(ClassRoles::PREDATOR)
@@ -6340,7 +6436,7 @@ index 0c37a95e..b88ea8f0 100644
 +        // 188329 (0xcf9c60): the villager AI's slot 0x1b0 gives kind 5 for class 10, so a boar
 +        // hunt searches by kind after its drop
 +        if kind.is_none()
-+            && std::env::var_os("GENIE_EXPERIMENT_HUNT_188329").is_some()
++            && crate::env_os!("GENIE_EXPERIMENT_HUNT_188329").is_some()
 +            && class.is_some_and(|k| k.get() == 10)
 +        {
 +            kind = Some(GatherGroup::from(5_u8));
@@ -6353,7 +6449,7 @@ index 0c37a95e..b88ea8f0 100644
                  None
              }
 +            // 188329 0xbb7aa8..0xbb7c39: livestock (class 58) is searched in three passes
-+            None if std::env::var_os("GENIE_EXPERIMENT_HUNT_188329").is_some()
++            None if crate::env_os!("GENIE_EXPERIMENT_HUNT_188329").is_some()
 +                && class.is_some_and(|k| k.get() == 58) =>
 +            {
 +                use crate::map::spatial::{CLOSEST_FROM, ClosestFrom};
@@ -6427,7 +6523,7 @@ index 0c37a95e..b88ea8f0 100644
                  ))?;
          ai.alert(result, c.dt.seconds());
 -        Ok(result.id)
-+        if std::env::var_os("GENIE_LOG_HUNT_SEARCH").is_some() {
++        if crate::env_os!("GENIE_LOG_HUNT_SEARCH").is_some() {
 +            eprintln!(
 +                "HUNT_AFTER_DROP world_ms={} turn={:?} fresh={} unit={} at={:?} class={:?} found={:?}",
 +                c.w.world_time.millis(),
@@ -6444,7 +6540,7 @@ index 0c37a95e..b88ea8f0 100644
  
      /// Nothing found after the drop (`LAB_140ac9509`): a computer player's hunt of a kind but
 diff --git a/crates/engine/genie-core/src/gathering/hunt/update.rs b/crates/engine/genie-core/src/gathering/hunt/update.rs
-index ce4ef0b7..5275d250 100644
+index ce4ef0b7..bf7f12c4 100644
 --- a/crates/engine/genie-core/src/gathering/hunt/update.rs
 +++ b/crates/engine/genie-core/src/gathering/hunt/update.rs
 @@ -196,6 +196,24 @@ impl HuntAction {
@@ -6457,7 +6553,7 @@ index ce4ef0b7..5275d250 100644
 +            // next update deletes it ([`HuntState::Done`] in `Unit::hunt_part`) and the queued
 +            // order runs
 +            4 | 5
-+                if std::env::var_os("GENIE_EXPERIMENT_HUNT_188329").is_some()
++                if crate::env_os!("GENIE_EXPERIMENT_HUNT_188329").is_some()
 +                    && r.has_ai
 +                    && !r.attack.flags.contains(AttackerFlags::QUEUE_EMPTY) =>
 +            {
@@ -6530,7 +6626,7 @@ index 005a4467..22cc562c 100644
 +    Ok(())
 +}
 diff --git a/crates/engine/genie-core/src/gathering/mule_cart.rs b/crates/engine/genie-core/src/gathering/mule_cart.rs
-index c9f58b16..c6df3d71 100644
+index c9f58b16..600b6068 100644
 --- a/crates/engine/genie-core/src/gathering/mule_cart.rs
 +++ b/crates/engine/genie-core/src/gathering/mule_cart.rs
 @@ -215,19 +215,25 @@ impl World {
@@ -6546,7 +6642,7 @@ index c9f58b16..c6df3d71 100644
          idx: ListIndex,
          (target, point): (Option<ObjectId>, Position),
      ) -> Result<(), GenieError> {
-+        let upstream = std::env::var_os("GENIE_EXPERIMENT_UPSTREAM_CART").is_some();
++        let upstream = crate::env_os!("GENIE_EXPERIMENT_UPSTREAM_CART").is_some();
          let work = Work {
              target,
              point,
@@ -7936,7 +8032,7 @@ index 00000000..e8b44cf1
 +            .all(|(x, y)| x.command == y.command && x.target_id == y.target_id)
 +}
 diff --git a/crates/engine/genie-core/src/groups/mod.rs b/crates/engine/genie-core/src/groups/mod.rs
-index 7787900f..046d228d 100644
+index 7787900f..9564ebf6 100644
 --- a/crates/engine/genie-core/src/groups/mod.rs
 +++ b/crates/engine/genie-core/src/groups/mod.rs
 @@ -50,7 +50,7 @@ pub use self::formation_category::FormationCategory;
@@ -8001,27 +8097,27 @@ index 7787900f..046d228d 100644
 +/// 228.5 s of replay 517426097): `GENIE_EXPERIMENT_FORMING_188329`.
 +pub(crate) fn forming_188329() -> bool {
 +    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-+    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_FORMING_188329").is_some())
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_FORMING_188329").is_some())
 +}
 +
 +/// 188329's `commandHorde` (`0x10d86e0`; finding 55): `GENIE_EXPERIMENT_HORDE_188329`.
 +pub(crate) fn horde_188329() -> bool {
 +    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-+    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_HORDE_188329").is_some())
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_HORDE_188329").is_some())
 +}
 +
 +/// 188329's end of a group move (`0x110d3a0`, case update 64,092 of replay 516956894):
 +/// `GENIE_EXPERIMENT_MOVEEND_188329`.
 +pub(crate) fn moveend_188329() -> bool {
 +    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-+    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_MOVEEND_188329").is_some())
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_MOVEEND_188329").is_some())
 +}
 +
 +/// On top of [`forming_188329`], SUSPECTED (not read): a group's first speed pass measures each
 +/// member's gap from its place one step back (`GENIE_EXPERIMENT_FORMING_FIRSTGAP_188329`).
 +pub(crate) fn forming_firstgap_188329() -> bool {
 +    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-+    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_FORMING_FIRSTGAP_188329").is_some())
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_FORMING_FIRSTGAP_188329").is_some())
 +}
 +
 +/// On top of [`forming_188329`], F10 of the P20 reading: both motion steps of a group's first
@@ -8031,13 +8127,13 @@ index 7787900f..046d228d 100644
 +/// lag from the stored positions' front) the four truth points match bit for bit (findings 39).
 +pub(crate) fn forming_firstplan_188329() -> bool {
 +    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-+    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_FORMING_FIRSTPLAN_188329").is_some())
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_FORMING_FIRSTPLAN_188329").is_some())
 +}
 +
 +/// `GENIE_TRACE_FORMING`: FORMING lines (group place, top speed, budget, members' speeds).
 +pub(crate) fn trace_forming() -> bool {
 +    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-+    *FLAG.get_or_init(|| std::env::var_os("GENIE_TRACE_FORMING").is_some())
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_TRACE_FORMING").is_some())
 +}
 +
 +/// 188329 `0x10d6960`: a member's speed for gap `g` and factor `k`, `v` its top speed (slot
@@ -8222,7 +8318,7 @@ index 398a973c..417fe101 100644
      /// task 1's move before it returned: a command not queued either joins the command queue
      /// (not direct, with commands queued: the queue is approved and run, begun) or runs
 diff --git a/crates/engine/genie-core/src/groups/place.rs b/crates/engine/genie-core/src/groups/place.rs
-index 51f6a791..97d7eb86 100644
+index 51f6a791..2b041fa7 100644
 --- a/crates/engine/genie-core/src/groups/place.rs
 +++ b/crates/engine/genie-core/src/groups/place.rs
 @@ -16,6 +16,8 @@ use crate::map::DistanceSquared;
@@ -8330,7 +8426,7 @@ index 51f6a791..97d7eb86 100644
 +        (at, centre): (BVector, BVector),
 +        held: &[(ObjectId, BVector)],
 +    ) -> Result<BVector, GenieError> {
-+        let searched = if std::env::var_os("GENIE_EXPERIMENT_FRONTPATH_188329").is_some() {
++        let searched = if crate::env_os!("GENIE_EXPERIMENT_FRONTPATH_188329").is_some() {
 +            self.front_path_188329(group, lead_id, centre)?
 +        } else {
 +            None
@@ -8736,7 +8832,7 @@ index e101e2d0..8623b89c 100644
          object: WorldObject<'_>,
          target: Option<WorldObject<'_>>,
 diff --git a/crates/engine/genie-core/src/groups/steer/detour.rs b/crates/engine/genie-core/src/groups/steer/detour.rs
-index 22a83675..f8600d96 100644
+index 22a83675..36490db5 100644
 --- a/crates/engine/genie-core/src/groups/steer/detour.rs
 +++ b/crates/engine/genie-core/src/groups/steer/detour.rs
 @@ -58,7 +58,7 @@ impl World {
@@ -8755,7 +8851,7 @@ index 22a83675..f8600d96 100644
 +        // EXPERIMENT (GENIE_EXPERIMENT_FRONTPATH_188329, findings 63; 188329 `0x10ef890`): the
 +        // first try (the short path to the slot) and the "ends farther than the gap" stop are
 +        // made only once the group is formed (`+0x5cc`).
-+        let unformed = !g.formed && std::env::var_os("GENIE_EXPERIMENT_FRONTPATH_188329").is_some();
++        let unformed = !g.formed && crate::env_os!("GENIE_EXPERIMENT_FRONTPATH_188329").is_some();
          let r = self.rounder(id, differentiators)?;
 -        let (way, serves) = self.find_way(&r, (to, forward, place))?;
 -        if serves && !moving && !waits && ends_farther(&way.record, to, gap) {
@@ -9053,14 +9149,14 @@ index 22a83675..f8600d96 100644
 +/// 1.5 (findings 81, 89).
 +fn notileplan_188329() -> bool {
 +    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-+    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_NOTILEPLAN_188329").is_some())
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_NOTILEPLAN_188329").is_some())
 +}
 +
 +/// `GENIE_EXPERIMENT_CROWDEND_188329`: the way round's crowded end and the own move's goal at
 +/// the path's last point, as 188329 0x10ef890 runs them (findings 92).
 +fn crowdend_188329() -> bool {
 +    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-+    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_CROWDEND_188329").is_some())
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_CROWDEND_188329").is_some())
 +}
 +
  struct Way {
@@ -9105,7 +9201,7 @@ index d9156f6d..fd81e8ea 100644
          let near =
              !within && !below_or_unordered(radius * self.model.tuning.group.slot_reach, gap.get());
 diff --git a/crates/engine/genie-core/src/groups/steer/to_slots.rs b/crates/engine/genie-core/src/groups/steer/to_slots.rs
-index 999d44b5..a9843131 100644
+index 999d44b5..d8b95175 100644
 --- a/crates/engine/genie-core/src/groups/steer/to_slots.rs
 +++ b/crates/engine/genie-core/src/groups/steer/to_slots.rs
 @@ -61,6 +61,9 @@ impl World {
@@ -9135,7 +9231,7 @@ index 999d44b5..a9843131 100644
 +                // (vtable slot 0x568 = `+0x3bc`, `0x113c480`), not where it last moved to, and a
 +                // slot within the master's radius + 0.01 (`[0x32063d4]`) of a map edge counts as
 +                // blocked (strict `<` on each side and axis).
-+                let frontpath = std::env::var_os("GENIE_EXPERIMENT_FRONTPATH_188329").is_some();
++                let frontpath = crate::env_os!("GENIE_EXPERIMENT_FRONTPATH_188329").is_some();
 +                let from = if frontpath {
 +                    u.position().vector()
 +                } else {
@@ -9688,7 +9784,7 @@ index d3230577..bf45bd8b 100644
      /// below its master's hit points (the short at `+0x530`, `CVTDQ2PS`), and its player and
      /// `owner` count each other as allies.
 diff --git a/crates/engine/genie-core/src/groups/update/mod.rs b/crates/engine/genie-core/src/groups/update/mod.rs
-index 0e406949..c361f426 100644
+index 0e406949..7fbd7594 100644
 --- a/crates/engine/genie-core/src/groups/update/mod.rs
 +++ b/crates/engine/genie-core/src/groups/update/mod.rs
 @@ -16,6 +16,7 @@ mod awake;
@@ -9721,7 +9817,7 @@ index 0e406949..c361f426 100644
 -        if self.flags.contains(GroupFlags::MEMBERS_SENT) {
 +        // 188329 0x10dd870 never reads bit 5 of `+0x140`: no "consider idle" shortcut
 +        if self.flags.contains(GroupFlags::MEMBERS_SENT)
-+            && std::env::var_os("GENIE_EXPERIMENT_AI_ORDER_188329").is_none()
++            && crate::env_os!("GENIE_EXPERIMENT_AI_ORDER_188329").is_none()
 +        {
              return true;
          }
@@ -10137,11 +10233,14 @@ index d2241f9d..2470dee0 100644
                  } else {
                      OrderSource::Queued
 diff --git a/crates/engine/genie-core/src/lib.rs b/crates/engine/genie-core/src/lib.rs
-index f639a3e9..7372ee74 100644
+index f639a3e9..6c6f2778 100644
 --- a/crates/engine/genie-core/src/lib.rs
 +++ b/crates/engine/genie-core/src/lib.rs
-@@ -34,7 +34,9 @@ pub use genie_error::{ErrorKind, GenieError, GenieResult};
+@@ -32,9 +32,12 @@
  
+ pub use genie_error::{ErrorKind, GenieError, GenieResult};
+ 
++pub mod env_cache;
  pub mod combat;
  pub mod commands;
 +pub mod correction;
@@ -10151,7 +10250,7 @@ index f639a3e9..7372ee74 100644
  pub mod gathering;
  pub mod groups;
 diff --git a/crates/engine/genie-core/src/map/spatial/grid.rs b/crates/engine/genie-core/src/map/spatial/grid.rs
-index 9f616e05..8821f054 100644
+index 9f616e05..f1ceb5cf 100644
 --- a/crates/engine/genie-core/src/map/spatial/grid.rs
 +++ b/crates/engine/genie-core/src/map/spatial/grid.rs
 @@ -251,12 +251,40 @@ impl Spatial {
@@ -10168,7 +10267,7 @@ index 9f616e05..8821f054 100644
 +    #[must_use]
 +    pub fn ignorelist_188329() -> bool {
 +        static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-+        *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_IGNORELIST_188329").is_some())
++        *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_IGNORELIST_188329").is_some())
 +    }
 +
      /// `FUN_1410562d0` on the obstruction manager: its buffer becomes `buffer` (None: not set),
@@ -10623,7 +10722,7 @@ index bf0aa945..ae8a0ca1 100644
              .or_else(|| object_sprite(own))
              .and_then(|id| c.w.model.graphics.get(id).copied());
 diff --git a/crates/engine/genie-core/src/movement/explore.rs b/crates/engine/genie-core/src/movement/explore.rs
-index bce6387c..613cb811 100644
+index bce6387c..85e493d8 100644
 --- a/crates/engine/genie-core/src/movement/explore.rs
 +++ b/crates/engine/genie-core/src/movement/explore.rs
 @@ -59,6 +59,15 @@ use crate::world::layer::generated::MoveToTuning;
@@ -10636,7 +10735,7 @@ index bce6387c..613cb811 100644
 +/// whose update counts `+0x44` down by 0.1 and goes back to state 3 once it is used up.
 +fn explore_wait_188329() -> bool {
 +    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-+    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_EXPLORE_WAIT_188329").is_some())
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_EXPLORE_WAIT_188329").is_some())
 +}
 +
  /// A point of −1 is no point (`DAT_14330ec20`).
@@ -10903,7 +11002,7 @@ index fbef4ed9..2335262d 100644
                  sprites: TaskSprites::of_data([-1, -1, -1, 5]),
                  ..unsprited
 diff --git a/crates/engine/genie-core/src/movement/long_walk.rs b/crates/engine/genie-core/src/movement/long_walk.rs
-index f6314358..25f64723 100644
+index f6314358..05b7164f 100644
 --- a/crates/engine/genie-core/src/movement/long_walk.rs
 +++ b/crates/engine/genie-core/src/movement/long_walk.rs
 @@ -204,6 +204,11 @@ pub struct ShortAsk<'a> {
@@ -10989,7 +11088,7 @@ index f6314358..25f64723 100644
          ))?;
      let found = pather.search(mesh, &words, &query, &shapes)?;
 +    // DIAGNOSTIC: the short pather's query and answer
-+    if crate::movement::trace_steer() || std::env::var_os("GENIE_TRACE_PATHS").is_some() {
++    if crate::movement::trace_steer() || crate::env_os!("GENIE_TRACE_PATHS").is_some() {
 +        eprintln!(
 +            "SHORTPATH walker={:?} target={} target_shape={:?} ignore_shapes={:?} query={:?} result={:?} points={:?}",
 +            walker.id,
@@ -11000,7 +11099,7 @@ index f6314358..25f64723 100644
 +            found.result,
 +            to_path(&found.points).points
 +        );
-+        if std::env::var_os("GENIE_TRACE_SHAPES").is_some() {
++        if crate::env_os!("GENIE_TRACE_SHAPES").is_some() {
 +            let b = [
 +                x.min(to.x()) - 2.0,
 +                y.min(to.y()) - 2.0,
@@ -11018,7 +11117,7 @@ index f6314358..25f64723 100644
          let _ = out.push(p);
      }
 diff --git a/crates/engine/genie-core/src/movement/mod.rs b/crates/engine/genie-core/src/movement/mod.rs
-index 21b160d4..8d6cab01 100644
+index 21b160d4..b44dd09d 100644
 --- a/crates/engine/genie-core/src/movement/mod.rs
 +++ b/crates/engine/genie-core/src/movement/mod.rs
 @@ -47,6 +47,7 @@ use genie_model::movement::move_algorithm;
@@ -11081,7 +11180,7 @@ index 21b160d4..8d6cab01 100644
 +/// DIAGNOSTIC: whether the steering traces print.
 +#[must_use]
 +pub fn trace_steer() -> bool {
-+    TRACE_STEER_WINDOW.load(std::sync::atomic::Ordering::Relaxed) || std::env::var_os("GENIE_TRACE_STEER").is_some()
++    TRACE_STEER_WINDOW.load(std::sync::atomic::Ordering::Relaxed) || crate::env_os!("GENIE_TRACE_STEER").is_some()
 +}
 diff --git a/crates/engine/genie-core/src/movement/move_to/action.rs b/crates/engine/genie-core/src/movement/move_to/action.rs
 index f4ca7417..d58ae6b9 100644
@@ -11259,7 +11358,7 @@ index 7a714172..474720e3 100644
      /// with the sprite `given` (else the constructor's default, [`SpriteReads::to_point`]), as
      /// the list adds it: far ([`NO_TARGET_GAP`]).
 diff --git a/crates/engine/genie-core/src/movement/move_to/mod.rs b/crates/engine/genie-core/src/movement/move_to/mod.rs
-index 8ae7fee5..9754f792 100644
+index 8ae7fee5..677ecd4b 100644
 --- a/crates/engine/genie-core/src/movement/move_to/mod.rs
 +++ b/crates/engine/genie-core/src/movement/move_to/mod.rs
 @@ -117,7 +117,12 @@ impl MoveWait {
@@ -11270,7 +11369,7 @@ index 8ae7fee5..9754f792 100644
 +    pub fn give_up(&mut self, patience: Patience, stance: UnitStance) -> MoveTo {
 +        // 188329 (0xb93260): the MoveTo has no wait timer (object 0x70 bytes, no set_state(2) in
 +        // its update); the walk giving up (0xb939cb) is set_state(13) at once for every owner
-+        if std::env::var_os("GENIE_EXPERIMENT_MOVETO_188329").is_some() {
++        if crate::env_os!("GENIE_EXPERIMENT_MOVETO_188329").is_some() {
 +            return MoveTo::Failed;
 +        }
          if !matches!(self.state, MoveWaitState::Never) || matches!(patience, Patience::Fails) {
@@ -11302,7 +11401,7 @@ index 8ae7fee5..9754f792 100644
          return Ok(Follow::Again);
      }
      let mover = walk.mover().ok_or(WALKER_UNMOVING)?;
-+    if mover.walks_to_path_end()? && std::env::var_os("GENIE_EXPERIMENT_MOVETO_188329").is_some()
++    if mover.walks_to_path_end()? && crate::env_os!("GENIE_EXPERIMENT_MOVETO_188329").is_some()
 +    {
 +        let mask = mover.stats.restriction_mask;
 +        let me = walk.position();
@@ -11318,7 +11417,7 @@ index 8ae7fee5..9754f792 100644
 +            w.clear_tile_records();
 +            blocked
 +        })?;
-+        if std::env::var_os("GENIE_TRACE_TARGETLINE").is_some() {
++        if crate::env_os!("GENIE_TRACE_TARGETLINE").is_some() {
 +            let hits = walk.world.with_record_movers(|w| {
 +                let hits = w.pather_hits_for(a, b, buffer, mask, (&ignore, by_id), player);
 +                w.clear_tile_records();
@@ -11342,7 +11441,7 @@ index 8ae7fee5..9754f792 100644
          let me = walk.position();
          let (a, b) = (me.ground(), at.ground());
 diff --git a/crates/engine/genie-core/src/movement/new_path.rs b/crates/engine/genie-core/src/movement/new_path.rs
-index 1f873756..312282ed 100644
+index 1f873756..0366aed2 100644
 --- a/crates/engine/genie-core/src/movement/new_path.rs
 +++ b/crates/engine/genie-core/src/movement/new_path.rs
 @@ -2,6 +2,7 @@
@@ -11370,7 +11469,7 @@ index 1f873756..312282ed 100644
          if !flags.contains(PlanFlags::FOUND) || level.range < to_end {
 +            // 188329 (0x121445d): tries left are tested before the last-waypoint test, so the
 +            // unit pauses 0.1 and stops at any waypoint
-+            if std::env::var_os("GENIE_EXPERIMENT_WALK_188329").is_some()
++            if crate::env_os!("GENIE_EXPERIMENT_WALK_188329").is_some()
 +                && level.continue_counter.left()
 +            {
 +                level.pause_time = Seconds::new(movement_tuning.stuck_pause);
@@ -11609,17 +11708,17 @@ index 1f873756..312282ed 100644
 +/// walked level (0x1214f05-0x1214f33, 0x1215229-0x1215250, slot 0x640 = 0x12191b0; findings 89).
 +pub(crate) fn pauseall_188329() -> bool {
 +    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-+    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_PAUSEALL_188329").is_some())
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_PAUSEALL_188329").is_some())
 +}
 +
 +/// `GENIE_EXPERIMENT_DROPIGNORE_188329`: the drop-off worker ignore query as 188329 runs it
 +/// (0x120ef00-0x120f344, findings 78).
 +pub(crate) fn dropignore_188329() -> bool {
 +    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-+    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_DROPIGNORE_188329").is_some())
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_DROPIGNORE_188329").is_some())
 +}
 diff --git a/crates/engine/genie-core/src/movement/path_end.rs b/crates/engine/genie-core/src/movement/path_end.rs
-index 8dd9623e..331023b1 100644
+index 8dd9623e..0b966dc8 100644
 --- a/crates/engine/genie-core/src/movement/path_end.rs
 +++ b/crates/engine/genie-core/src/movement/path_end.rs
 @@ -31,7 +31,7 @@ use crate::movement::{
@@ -11943,7 +12042,7 @@ index 8dd9623e..331023b1 100644
 +/// (findings 94).
 +fn memberhit_188329() -> bool {
 +    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-+    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_MEMBERHIT_188329").is_some())
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_MEMBERHIT_188329").is_some())
 +}
 diff --git a/crates/engine/genie-core/src/movement/request.rs b/crates/engine/genie-core/src/movement/request.rs
 index 57e0d943..484efafb 100644
@@ -11974,7 +12073,7 @@ index 57e0d943..484efafb 100644
              {
                  level.flags |= LevelFlags::REACHED;
 diff --git a/crates/engine/genie-core/src/movement/request_plans.rs b/crates/engine/genie-core/src/movement/request_plans.rs
-index 8c1a150a..0d42be22 100644
+index 8c1a150a..841c56ba 100644
 --- a/crates/engine/genie-core/src/movement/request_plans.rs
 +++ b/crates/engine/genie-core/src/movement/request_plans.rs
 @@ -176,7 +176,7 @@ impl Mover {
@@ -12025,7 +12124,7 @@ index 8c1a150a..0d42be22 100644
 -        let r = self.short_path_to(me, (world, by_id), plan, w, near, np)?;
 +        // 188329 (0x1212df3..0x1212efd): with every level that has a path on its last waypoint,
 +        // the tail short try asks for the target's own place, not the waypoint
-+        let goal = if std::env::var_os("GENIE_EXPERIMENT_WALK_188329").is_some()
++        let goal = if crate::env_os!("GENIE_EXPERIMENT_WALK_188329").is_some()
 +            && self
 +                .paths
 +                .iter()
@@ -12219,7 +12318,7 @@ index ff48ae22..d6dfeeae 100644
  
      /// The speed control toward the waypoint (slot 198, `0x141150a80`): a unit whose turn fell
 diff --git a/crates/engine/genie-core/src/movement/waypoint.rs b/crates/engine/genie-core/src/movement/waypoint.rs
-index 54c082c7..033be8d9 100644
+index 54c082c7..7967b17d 100644
 --- a/crates/engine/genie-core/src/movement/waypoint.rs
 +++ b/crates/engine/genie-core/src/movement/waypoint.rs
 @@ -13,7 +13,6 @@ use crate::math::fmath::sqrt;
@@ -12257,7 +12356,7 @@ index 54c082c7..033be8d9 100644
                  // a looping parent path moves on (FUN_140f98bc0 with 1)
                  if parent.has_path && parent.path_flags.contains(PathFlags::LOOPS) {
                      parent.waypoint = parent.looping_next(parent.waypoint);
-+                } else if std::env::var_os("GENIE_EXPERIMENT_WALK_188329").is_some() {
++                } else if crate::env_os!("GENIE_EXPERIMENT_WALK_188329").is_some() {
 +                    // 188329 (0x1211cb3..0x1211d35): the levels above are dropped too until the
 +                    // walked one is the top level, each left asking again. PARTIAL: the trade
 +                    // cart's exemption (class 19) is not tested here.
@@ -14670,7 +14769,7 @@ index e8e94a15..a0b45d0e 100644
      /// its speed since) while the rest of its player's objects go on.
      pub stopped: bool,
 diff --git a/crates/engine/genie-core/src/objects/unit/stop.rs b/crates/engine/genie-core/src/objects/unit/stop.rs
-index 7c1fba27..ba3e4145 100644
+index 7c1fba27..0876962d 100644
 --- a/crates/engine/genie-core/src/objects/unit/stop.rs
 +++ b/crates/engine/genie-core/src/objects/unit/stop.rs
 @@ -211,6 +211,9 @@ impl Unit {
@@ -14761,7 +14860,7 @@ index 7c1fba27..ba3e4145 100644
 +pub(crate) fn capgroup_188329() -> bool {
 +    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
 +    *FLAG.get_or_init(|| {
-+        std::env::var_os("GENIE_EXPERIMENT_CAPGROUP_188329").is_none_or(|v| v != "0")
++        crate::env_os!("GENIE_EXPERIMENT_CAPGROUP_188329").is_none_or(|v| v != "0")
 +    })
 +}
 diff --git a/crates/engine/genie-core/src/objects/unit/top.rs b/crates/engine/genie-core/src/objects/unit/top.rs
@@ -15299,7 +15398,7 @@ index 00000000..ba176db4
 +    }
 +}
 diff --git a/crates/engine/genie-core/src/orders/actions.rs b/crates/engine/genie-core/src/orders/actions.rs
-index 00aaf602..9d2e97f2 100644
+index 00aaf602..72de1244 100644
 --- a/crates/engine/genie-core/src/orders/actions.rs
 +++ b/crates/engine/genie-core/src/orders/actions.rs
 @@ -15,6 +15,7 @@ use crate::objects::ObjectId;
@@ -15340,7 +15439,7 @@ index 00aaf602..9d2e97f2 100644
 -        unit.life.hp = HitPoints::new(f32::from(hp as i32 as i16));
 +        // 188329 (0x1266b90: 0x1266ccc..0x1266d3d): the share goes to the hit points (`+0x130`) as
 +        // the float it is, within 1 and the new master's; nothing makes it whole
-+        let masterhp_188329 = std::env::var_os("GENIE_EXPERIMENT_MASTERHP_188329").is_some();
++        let masterhp_188329 = crate::env_os!("GENIE_EXPERIMENT_MASTERHP_188329").is_some();
 +        unit.life.hp = if masterhp_188329 {
 +            HitPoints::new(hp)
 +        } else {
@@ -15383,7 +15482,7 @@ index 00aaf602..9d2e97f2 100644
 +                && (damage_share(old_hp, old.hit_points, old.class, roles)?
 +                    != damage_share(unit.life.hp, next.hit_points, next.class, roles)?)
 +        };
-+        if std::env::var_os("GENIE_TRACE_MASTERHP").is_some() {
++        if crate::env_os!("GENIE_TRACE_MASTERHP").is_some() {
 +            eprintln!(
 +                "MASTERHP id={:?} master={:?}->{:?} hp={:?}->{:?} share={hp} whole={} change={sprites_change} entries={:?}",
 +                unit.id,
@@ -16071,7 +16170,7 @@ index 77933740..f1555814 100644
      /// `0x140e67b5d`..`0x140e67cb1`): the first of `units` the world holds, when it has a unit
      /// AI, names its target (`+0x48`, `FUN_140c4cc40`); the object the world holds for it
 diff --git a/crates/engine/genie-core/src/orders/mod.rs b/crates/engine/genie-core/src/orders/mod.rs
-index b97f7d35..50d4fa7f 100644
+index b97f7d35..122a8387 100644
 --- a/crates/engine/genie-core/src/orders/mod.rs
 +++ b/crates/engine/genie-core/src/orders/mod.rs
 @@ -61,9 +61,11 @@ pub use self::order_flags::OrderFlags;
@@ -16100,7 +16199,7 @@ index b97f7d35..50d4fa7f 100644
 +/// retargeting byte, the villager's drop elsewhere source 1 and the byte 0.
 +pub(crate) fn taskargs_188329() -> bool {
 +    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-+    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_TASKARGS_188329").is_some())
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_TASKARGS_188329").is_some())
 +}
 +
  /// What a unit's slot 0x7e8 (`FUN_141227190`) is given through slot 0x128: the target, the point
@@ -16143,7 +16242,7 @@ index b97f7d35..50d4fa7f 100644
  const TROPHIES: RangeInclusive<i16> = 1650..=1653;
  
 diff --git a/crates/engine/genie-core/src/orders/moves.rs b/crates/engine/genie-core/src/orders/moves.rs
-index 29f5d776..5e243a42 100644
+index 29f5d776..c3257cf5 100644
 --- a/crates/engine/genie-core/src/orders/moves.rs
 +++ b/crates/engine/genie-core/src/orders/moves.rs
 @@ -91,12 +91,18 @@ impl World {
@@ -16158,7 +16257,7 @@ index 29f5d776..5e243a42 100644
 -            }
 +        // 188329 0x12cbca0 (the villager's slot 0x148; 0x12cbd38: class 4): the move clears the
 +        // town-bell flag (`+0x664`), so a later garrison order records its work again
-+        let bell_free_188329 = std::env::var_os("GENIE_EXPERIMENT_GARRISON_RECORD_188329").is_some()
++        let bell_free_188329 = crate::env_os!("GENIE_EXPERIMENT_GARRISON_RECORD_188329").is_some()
 +            && self
 +                .model
 +                .roles
@@ -16437,7 +16536,7 @@ index 00000000..886df08f
 +    }
 +}
 diff --git a/crates/engine/genie-core/src/orders/split.rs b/crates/engine/genie-core/src/orders/split.rs
-index b8bda6ff..bd389d0e 100644
+index b8bda6ff..39005f03 100644
 --- a/crates/engine/genie-core/src/orders/split.rs
 +++ b/crates/engine/genie-core/src/orders/split.rs
 @@ -3,6 +3,8 @@
@@ -16677,7 +16776,7 @@ index b8bda6ff..bd389d0e 100644
 +/// units of a targeted order nearer the target than the units' centroid (findings 79).
 +pub(crate) fn splittarget_188329() -> bool {
 +    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-+    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_SPLITTARGET_188329").is_some())
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_SPLITTARGET_188329").is_some())
 +}
 diff --git a/crates/engine/genie-core/src/orders/start_work.rs b/crates/engine/genie-core/src/orders/start_work.rs
 index b0488a3d..3da9757b 100644
@@ -16815,14 +16914,14 @@ index 465e724e..0a3983fe 100644
          groups: vec![object_id_list([11, 12])],
          far: [object_id(15)].into(),
 diff --git a/crates/engine/genie-core/src/orders/town_bell.rs b/crates/engine/genie-core/src/orders/town_bell.rs
-index 72090fb3..3f1a775d 100644
+index 72090fb3..14c4f650 100644
 --- a/crates/engine/genie-core/src/orders/town_bell.rs
 +++ b/crates/engine/genie-core/src/orders/town_bell.rs
 @@ -135,6 +135,12 @@ impl TownBell {
      /// its point (−1, −1)). The new record ([`WorkReturn`]) is the caller's: its target, target
      /// class, the unit AI's action, the second target and the point.
      pub fn record(&mut self, now: BackToWork) {
-+        if std::env::var_os("GENIE_TRACE_BELL").is_some() {
++        if crate::env_os!("GENIE_TRACE_BELL").is_some() {
 +            eprintln!(
 +                "BELL_RECORD flag={:?} now={now:?} work={:?} before={:?}",
 +                self.flag, self.work, self.before_building
@@ -16835,7 +16934,7 @@ index 72090fb3..3f1a775d 100644
          lookup: &dyn Fn(ObjectId) -> Result<Option<RecordTarget>, GenieError>,
          roles: &Roles,
      ) -> Result<(Option<RecordTarget>, BackToWork), GenieError> {
-+        if std::env::var_os("GENIE_TRACE_BELL").is_some() {
++        if crate::env_os!("GENIE_TRACE_BELL").is_some() {
 +            eprintln!(
 +                "BELL_BACK flag={:?} work={:?} before={:?}",
 +                self.flag, self.work, self.before_building
@@ -16851,7 +16950,7 @@ index 72090fb3..3f1a775d 100644
 -        if self.work.point == none {
 +        // 188329 0x12b6a26..0x12b6a9e: the second record also when the first has neither an
 +        // action nor a target class and the second has both
-+        let second_188329 = std::env::var_os("GENIE_EXPERIMENT_GARRISON_RECORD_188329").is_some()
++        let second_188329 = crate::env_os!("GENIE_EXPERIMENT_GARRISON_RECORD_188329").is_some()
 +            && self.work.action.is_none()
 +            && self.work.target_class.is_none()
 +            && before.action.is_some()
@@ -16865,7 +16964,7 @@ index 72090fb3..3f1a775d 100644
      /// ([`crate::world::World::back_to_work`]; its sound, slot 0x4c0, is not simulation).
      fn workers_out(&mut self, owner: PlayerId, idx: ListIndex) -> Result<(), GenieError> {
 +        // 188329 0x16f4ba0's ignore lists (case P16)
-+        if std::env::var_os("GENIE_EXPERIMENT_BACKWORK_IGNORE_188329").is_some() {
++        if crate::env_os!("GENIE_EXPERIMENT_BACKWORK_IGNORE_188329").is_some() {
 +            return self.back_to_work_inside_188329(owner, idx);
 +        }
          let mut i = self.players.live(owner, idx)?.garrison.len();
@@ -17223,7 +17322,7 @@ index 9e2d36cf..65739101 100644
      }
  
 diff --git a/crates/engine/genie-core/src/pathing/hull_path/find.rs b/crates/engine/genie-core/src/pathing/hull_path/find.rs
-index 5f94be05..c61f5dcd 100644
+index 5f94be05..d6d077d2 100644
 --- a/crates/engine/genie-core/src/pathing/hull_path/find.rs
 +++ b/crates/engine/genie-core/src/pathing/hull_path/find.rs
 @@ -102,7 +102,22 @@ impl HullPather<'_> {
@@ -17263,7 +17362,7 @@ index 5f94be05..c61f5dcd 100644
 +pub(crate) fn keptarea_188329() -> bool {
 +    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
 +    *FLAG.get_or_init(|| {
-+        std::env::var_os("GENIE_EXPERIMENT_KEPTAREA_188329").is_none_or(|v| v != "0")
++        crate::env_os!("GENIE_EXPERIMENT_KEPTAREA_188329").is_none_or(|v| v != "0")
 +    })
 +}
 diff --git a/crates/engine/genie-core/src/pathing/hull_path/mod.rs b/crates/engine/genie-core/src/pathing/hull_path/mod.rs
@@ -17671,7 +17770,7 @@ index e9cbaaa4..6094bdfe 100644
          let dir_y = AxisDir::of_dy(delta.y());
          self.legs(base, c, dir_x, dir_y, delta)?;
 diff --git a/crates/engine/genie-core/src/pathing/short_path/mod.rs b/crates/engine/genie-core/src/pathing/short_path/mod.rs
-index 84934264..856597fe 100644
+index 84934264..881d3b07 100644
 --- a/crates/engine/genie-core/src/pathing/short_path/mod.rs
 +++ b/crates/engine/genie-core/src/pathing/short_path/mod.rs
 @@ -178,6 +178,36 @@ const NUDGES: [FixedPoint; 4] = [
@@ -17682,21 +17781,21 @@ index 84934264..856597fe 100644
 +/// (`0x107f7a0`), where it differs from 158041's.
 +pub(super) fn build_188329() -> bool {
 +    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-+    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_SHORT_188329").is_some())
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_SHORT_188329").is_some())
 +}
 +
 +/// The corner ray's callback of 188329 (`0x107c590`, case 4.9 s of replay 518470161), on top of
 +/// [`build_188329`]: `GENIE_EXPERIMENT_CORNER_188329`.
 +pub(super) fn corner_ray_188329() -> bool {
 +    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-+    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_CORNER_188329").is_some())
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_CORNER_188329").is_some())
 +}
 +
 +/// The re-walk's goal test of the vertices it passes over (188329 `0x1080670`, `0x108096f`,
 +/// case 90.9 s of replay 517426097), on top of [`build_188329`]: `GENIE_EXPERIMENT_REWALK_188329`.
 +pub(super) fn rewalk_goal_188329() -> bool {
 +    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-+    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_REWALK_188329").is_some())
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_REWALK_188329").is_some())
 +}
 +
 +/// The start's escape contacts (188329 `0x107f3bd..0x107f5d2`, case 215.4 s of replay 518470161),
@@ -17705,7 +17804,7 @@ index 84934264..856597fe 100644
 +/// `GENIE_EXPERIMENT_ESCAPE_188329`.
 +pub(super) fn escape_188329() -> bool {
 +    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-+    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_ESCAPE_188329").is_some())
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_ESCAPE_188329").is_some())
 +}
 +
  /// The goal of a search (`local_148`): its point, the unit's radius, the target's half sizes,
@@ -17890,7 +17989,7 @@ index 916707bf..e881fe5e 100644
              (
                  through_float(delta.x().wrapping_abs()).wrapping_add(b.g),
 diff --git a/crates/engine/genie-core/src/pathing/tile_path/planning.rs b/crates/engine/genie-core/src/pathing/tile_path/planning.rs
-index 7277973c..778db9c6 100644
+index 7277973c..cea0723b 100644
 --- a/crates/engine/genie-core/src/pathing/tile_path/planning.rs
 +++ b/crates/engine/genie-core/src/pathing/tile_path/planning.rs
 @@ -154,12 +154,39 @@ impl Planner {
@@ -17900,7 +17999,7 @@ index 7277973c..778db9c6 100644
 -        let (chosen, result) =
 -            if second.unwrap_or(Found::OffMap) != first || levels.length < tiles.length {
 -                (&levels, first)
-+        let (chosen, result) = if std::env::var_os("GENIE_EXPERIMENT_PLANCHOICE_188329").is_some() {
++        let (chosen, result) = if crate::env_os!("GENIE_EXPERIMENT_PLANCHOICE_188329").is_some() {
 +            // 188329 0x1057ea9..0x1057fa7: the tile path when its search reached the goal too
 +            // and, with the levels path ending within `max(range^2, 1) + radii` (squared) of the
 +            // goal, it is no longer than the levels path; with the levels path ending farther,
@@ -18267,7 +18366,7 @@ index 8f8edb17..4a98956f 100644
          // a unit without speed takes nothing; one not in state 2 would notify without moving
          if self
 diff --git a/crates/engine/genie-core/src/production/spawn/new_unit.rs b/crates/engine/genie-core/src/production/spawn/new_unit.rs
-index 21b51dda..7953e6ce 100644
+index 21b51dda..0cee3082 100644
 --- a/crates/engine/genie-core/src/production/spawn/new_unit.rs
 +++ b/crates/engine/genie-core/src/production/spawn/new_unit.rs
 @@ -37,6 +37,11 @@ use crate::vision::SightShape;
@@ -18391,7 +18490,7 @@ index 21b51dda..7953e6ce 100644
 +        toward: Option<crate::map::Point>,
 +    ) -> Result<(), GenieError> {
 +        // 188329 spawn search, step 7: the tile path from the gather point to the building
-+        if std::env::var_os("GENIE_EXPERIMENT_SPAWN_188329").is_some() {
++        if crate::env_os!("GENIE_EXPERIMENT_SPAWN_188329").is_some() {
 +            let mut points: Option<Vec<(f32, f32)>> = None;
 +            if let (Some(g), Some(moving)) = (toward, made.move_stats) {
 +                let hx = self.players.live(p, i)?.master(self.master_tables(), p)?.radius.x();
@@ -18410,7 +18509,7 @@ index 21b51dda..7953e6ce 100644
 +                    points = Some(path.points.iter().map(|q| (q.x(), q.y())).collect());
 +                }
 +            }
-+            if std::env::var_os("GENIE_TRACE_SPAWN").is_some() {
++            if crate::env_os!("GENIE_TRACE_SPAWN").is_some() {
 +                eprintln!("SPAWNPATH {:?}", points);
 +            }
 +            super::search::SPAWN_PATH.with(|s| *s.borrow_mut() = points);
@@ -18424,7 +18523,7 @@ index 21b51dda..7953e6ce 100644
 +    }
 +}
 diff --git a/crates/engine/genie-core/src/production/spawn/objects.rs b/crates/engine/genie-core/src/production/spawn/objects.rs
-index 9e0c8f61..17c5e310 100644
+index 9e0c8f61..89c269b2 100644
 --- a/crates/engine/genie-core/src/production/spawn/objects.rs
 +++ b/crates/engine/genie-core/src/production/spawn/objects.rs
 @@ -84,6 +84,10 @@ impl World {
@@ -18432,7 +18531,7 @@ index 9e0c8f61..17c5e310 100644
              walls,
          };
 +        // DIAGNOSTIC: the spawn search's site
-+        if std::env::var_os("GENIE_TRACE_SPAWN").is_some() {
++        if crate::env_os!("GENIE_TRACE_SPAWN").is_some() {
 +            eprintln!("SPAWNSITE player={:?} site={:?} unit_radius={:?}", p, site, made.radius);
 +        }
          let moving = made.move_stats.ok_or(NOT_MOVING)?;
@@ -18442,7 +18541,7 @@ index 9e0c8f61..17c5e310 100644
          };
          let map = WorldMap { turns: self };
          let spatial = &self.spatial;
-+        if std::env::var_os("GENIE_EXPERIMENT_SPAWN_188329").is_some() {
++        if crate::env_os!("GENIE_EXPERIMENT_SPAWN_188329").is_some() {
 +            let (cx, cy) = (position.x(), position.y());
 +            let (hx, hy) = (site_master.radius.x(), site_master.radius.y());
 +            spatial.check_known(Rect::new(cx - hx - 3.0, cy - hy - 3.0, cx + hx + 3.0, cy + hy + 3.0))?;
@@ -18471,7 +18570,7 @@ index 9e0c8f61..17c5e310 100644
 +                },
 +                &passable,
 +            );
-+            if std::env::var_os("GENIE_TRACE_SPAWN").is_some() {
++            if crate::env_os!("GENIE_TRACE_SPAWN").is_some() {
 +                eprintln!("SPAWN188329 player={:?} found={:?}", p, found);
 +            }
 +            return found;
@@ -18480,7 +18579,7 @@ index 9e0c8f61..17c5e310 100644
              &site,
              made.radius,
 diff --git a/crates/engine/genie-core/src/production/spawn/search.rs b/crates/engine/genie-core/src/production/spawn/search.rs
-index e5f89e13..04e9c49d 100644
+index e5f89e13..06642b55 100644
 --- a/crates/engine/genie-core/src/production/spawn/search.rs
 +++ b/crates/engine/genie-core/src/production/spawn/search.rs
 @@ -79,6 +79,261 @@ pub fn spawn_point(
@@ -18664,7 +18763,7 @@ index e5f89e13..04e9c49d 100644
 +            let i = ((y - oyf) as i64 as i32)
 +                .wrapping_mul(grid_w as i32)
 +                .wrapping_add((x - oxf) as i64 as i32) as u32 as usize;
-+            if std::env::var_os("GENIE_TRACE_SPAWN").is_some() {
++            if crate::env_os!("GENIE_TRACE_SPAWN").is_some() {
 +                let st = steps.get(i).copied();
 +                let free = test(Point::new(x, y))? == Tested::Free;
 +                eprintln!("SPAWNCAND ring={n} x={x} y={y} steps={st:?} free={free}");
@@ -18771,7 +18870,7 @@ index c1078321..55a778ba 100644
                  (MasterAttribute::STANDING_GRAPHIC, 0) => master.standing_sprite,
                  (MasterAttribute::STANDING_GRAPHIC_2, 1) => master.standing_sprite_2,
 diff --git a/crates/engine/genie-core/src/technology/effect/completion.rs b/crates/engine/genie-core/src/technology/effect/completion.rs
-index 00dffb2a..147bee40 100644
+index 00dffb2a..ee7e28c9 100644
 --- a/crates/engine/genie-core/src/technology/effect/completion.rs
 +++ b/crates/engine/genie-core/src/technology/effect/completion.rs
 @@ -25,7 +25,6 @@ use crate::technology::TechMode;
@@ -18786,7 +18885,7 @@ index 00dffb2a..147bee40 100644
          }
          self.research_effect_known(p, tech)?;
          self.players.player_mut(p)?.techs.checked_mut(t)?.state = ResearchState::Researched;
-+        if std::env::var_os("GENIE_TRACE_RESEARCH").is_some() {
++        if crate::env_os!("GENIE_TRACE_RESEARCH").is_some() {
 +            eprintln!("RESEARCH ms={} player={} tech={t} building={building:?}", self.world_time.millis(), p.get());
 +        }
          let effect = self.players.player(p)?.techs.checked(t)?.effect(&def);
@@ -18796,7 +18895,7 @@ index 00dffb2a..147bee40 100644
              self.players.player_mut(p)?.techs.checked_mut(d)?.state = ResearchState::Disabled;
              return Ok(counted);
          }
-+        if std::env::var_os("GENIE_TRACE_RESEARCH").is_some() {
++        if crate::env_os!("GENIE_TRACE_RESEARCH").is_some() {
 +            eprintln!("DEPENDENT ms={} player={} tech={d} of={} state={:?}", self.world_time.millis(), p.get(), t.index(), self.players.player(p)?.techs.checked(d)?);
 +        }
          counted += 1;
@@ -19074,7 +19173,7 @@ index 070778cd..62c4ade7 100644
          target: DRAWS,
          stream,
 diff --git a/crates/engine/genie-core/src/unit_ai/actions.rs b/crates/engine/genie-core/src/unit_ai/actions.rs
-index 7a8bacbb..f5493e8f 100644
+index 7a8bacbb..f46e7ddb 100644
 --- a/crates/engine/genie-core/src/unit_ai/actions.rs
 +++ b/crates/engine/genie-core/src/unit_ai/actions.rs
 @@ -136,10 +136,13 @@ impl UnitAi {
@@ -19119,7 +19218,7 @@ index 7a8bacbb..f5493e8f 100644
      ) -> Result<(), GenieError> {
 -        if !self.notifies.is_empty() || self.orders.is_empty() {
 +        // 188329 0xd443f0 has no pending-notify guard and requires an idle group.
-+        let order_188329 = std::env::var_os("GENIE_EXPERIMENT_AI_ORDER_188329").is_some();
++        let order_188329 = crate::env_os!("GENIE_EXPERIMENT_AI_ORDER_188329").is_some();
 +        if (!order_188329 && !self.notifies.is_empty()) || self.orders.is_empty() {
 +            return Ok(());
 +        }
@@ -19132,7 +19231,7 @@ index 7a8bacbb..f5493e8f 100644
              }
              if r == OrderOutcome::Taken {
 +                // 188329 0xd386d2 finishes pending notifies after taking an order.
-+                if std::env::var_os("GENIE_EXPERIMENT_AI_ORDER_188329").is_some() {
++                if crate::env_os!("GENIE_EXPERIMENT_AI_ORDER_188329").is_some() {
 +                    self.end_notifies(Millis::ZERO, at, side, ai)?;
 +                }
                  return Ok(());
@@ -19450,7 +19549,7 @@ index 4bca7b20..6a87074e 100644
      match s.stance {
          UnitStance::StandGround
 diff --git a/crates/engine/genie-core/src/unit_ai/attack_rules.rs b/crates/engine/genie-core/src/unit_ai/attack_rules.rs
-index 87f4b772..a360891f 100644
+index 87f4b772..15a985c3 100644
 --- a/crates/engine/genie-core/src/unit_ai/attack_rules.rs
 +++ b/crates/engine/genie-core/src/unit_ai/attack_rules.rs
 @@ -293,6 +293,15 @@ pub(super) const fn defend_patrol_range() -> Result<(), GenieError> {
@@ -19463,7 +19562,7 @@ index 87f4b772..a360891f 100644
 +/// `MINSS` (`0x106f05c`): `GENIE_EXPERIMENT_PATROLRANGE_188329`.
 +pub(crate) fn patrolrange_188329() -> bool {
 +    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-+    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_PATROLRANGE_188329").is_some())
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_PATROLRANGE_188329").is_some())
 +}
 +
  /// The classes the siege unit never attacks as neutral objects (`FUN_140c1ae10`'s mask
@@ -19486,7 +19585,7 @@ index 87f4b772..a360891f 100644
      Ok(Distance::new(least))
  }
 diff --git a/crates/engine/genie-core/src/unit_ai/attacked.rs b/crates/engine/genie-core/src/unit_ai/attacked.rs
-index 7e435e73..81690f9c 100644
+index 7e435e73..a8a28d5b 100644
 --- a/crates/engine/genie-core/src/unit_ai/attacked.rs
 +++ b/crates/engine/genie-core/src/unit_ai/attacked.rs
 @@ -361,7 +361,11 @@ impl UnitAi {
@@ -19512,7 +19611,7 @@ index 7e435e73..81690f9c 100644
 +/// it (findings 95).
 +fn waygroup_188329() -> bool {
 +    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-+    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_WAYGROUP_188329").is_some())
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_WAYGROUP_188329").is_some())
 +}
 diff --git a/crates/engine/genie-core/src/unit_ai/back_up.rs b/crates/engine/genie-core/src/unit_ai/back_up.rs
 new file mode 100644
@@ -20151,7 +20250,7 @@ index 57aa6315..4082112f 100644
  /// weapon range.
  pub(super) const ONE: f32 = BEST_TARGET_ONE;
 diff --git a/crates/engine/genie-core/src/unit_ai/best_target/mod.rs b/crates/engine/genie-core/src/unit_ai/best_target/mod.rs
-index a377ec10..896fdfb6 100644
+index a377ec10..94bbf3bb 100644
 --- a/crates/engine/genie-core/src/unit_ai/best_target/mod.rs
 +++ b/crates/engine/genie-core/src/unit_ai/best_target/mod.rs
 @@ -23,11 +23,46 @@ use crate::world::layer::ClassRoles;
@@ -20164,7 +20263,7 @@ index a377ec10..896fdfb6 100644
 +#[must_use]
 +pub(crate) fn best_188329() -> bool {
 +    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-+    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_BEST_188329").is_some())
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_BEST_188329").is_some())
 +}
 +
 +thread_local! {
@@ -20181,7 +20280,7 @@ index a377ec10..896fdfb6 100644
 +#[must_use]
 +pub(crate) fn path_keep() -> bool {
 +    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-+    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_BESTKEEP_188329").is_some())
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_BESTKEEP_188329").is_some())
 +        && PATH_KEEP.with(std::cell::Cell::get)
 +}
 +
@@ -20602,7 +20701,7 @@ index 21df231c..08d53ece 100644
              NotifyKind::SENT_OFF => self.sent_off(n, side, ai_rng, roles, unit_ai_tuning),
              // a unit of a group sent off a footprint: the action value 0x2c0
 diff --git a/crates/engine/genie-core/src/unit_ai/idle.rs b/crates/engine/genie-core/src/unit_ai/idle.rs
-index 28ca0268..dbb31bbd 100644
+index 28ca0268..ad2804f4 100644
 --- a/crates/engine/genie-core/src/unit_ai/idle.rs
 +++ b/crates/engine/genie-core/src/unit_ai/idle.rs
 @@ -63,13 +63,11 @@ impl UnitAi {
@@ -20757,10 +20856,10 @@ index 28ca0268..dbb31bbd 100644
 +#[must_use]
 +pub(crate) fn soldier_idle_188329() -> bool {
 +    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-+    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_SOLDIERIDLE_188329").is_some())
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_SOLDIERIDLE_188329").is_some())
 +}
 diff --git a/crates/engine/genie-core/src/unit_ai/idle_animals.rs b/crates/engine/genie-core/src/unit_ai/idle_animals.rs
-index bf5761c6..83c758c1 100644
+index bf5761c6..a703dd82 100644
 --- a/crates/engine/genie-core/src/unit_ai/idle_animals.rs
 +++ b/crates/engine/genie-core/src/unit_ai/idle_animals.rs
 @@ -29,6 +29,38 @@ use crate::world::layer::ClassRoles;
@@ -20771,7 +20870,7 @@ index bf5761c6..83c758c1 100644
 +/// 518470161): `GENIE_EXPERIMENT_GRAZE_188329`.
 +fn graze_188329() -> bool {
 +    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-+    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_GRAZE_188329").is_some())
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_GRAZE_188329").is_some())
 +}
 +
 +/// The range of 188329's graze reach test (`[0x3202890]`, 0.1).
@@ -20789,7 +20888,7 @@ index bf5761c6..83c758c1 100644
 +        return Ok(true);
 +    }
 +    let len = side.reach_length(to, Distance::new(GRAZE_REACH))?;
-+    if std::env::var_os("GENIE_TRACE_ANIMAL").is_some() {
++    if crate::env_os!("GENIE_TRACE_ANIMAL").is_some() {
 +        eprintln!("ANIMAL_GRAZE to={to:?} limit={v} leash={leash} len={len:?}");
 +    }
 +    Ok(match len {
@@ -20814,7 +20913,7 @@ index bf5761c6..83c758c1 100644
 +        // more than one point and is longer than 0.3. PARTIAL: the clamp to the map, the second
 +        // target and the four directions (steps 4, 7 and 8) are not modelled; without a planner
 +        // the straight path stands in.
-+        if std::env::var_os("GENIE_EXPERIMENT_EVADE_188329").is_some() && !animalreact_188329() {
++        if crate::env_os!("GENIE_EXPERIMENT_EVADE_188329").is_some() && !animalreact_188329() {
 +            let radii = Distance::new(at.size.x());
 +            let points: Vec<(f32, f32)> = match side.tile_path(Point::new(point.x(), point.y()), radii)? {
 +                Some(path) if 1 < path.points.len() && 0.3 < path.length.get() => {
@@ -20844,7 +20943,7 @@ index bf5761c6..83c758c1 100644
 +            point = self.evade_from_188329(at, other, ai, side)?;
 +        }
 +        let moved = self.evasive_move(point, (OrderForce::Forced, BadPoint::Kept), at, ai, side)?;
-+        if std::env::var_os("GENIE_TRACE_ANIMAL").is_some() {
++        if crate::env_os!("GENIE_TRACE_ANIMAL").is_some() {
 +            eprintln!("ANIMAL_EVADE from={:?} other={:?} point={:?} moved={:?}", at.position, other, point, moved);
 +        }
          Ok(())
@@ -20941,7 +21040,7 @@ index bf5761c6..83c758c1 100644
 +            }
 +        };
 +        let p = found.unwrap_or(last);
-+        if std::env::var_os("GENIE_TRACE_ANIMAL").is_some() {
++        if crate::env_os!("GENIE_TRACE_ANIMAL").is_some() {
 +            eprintln!("ANIMAL_EVADE188329 from={:?} other={:?} first={:?} point={:?}", at.position, other, first, p);
 +        }
 +        Ok(Position::new(p.0, p.1, z))
@@ -20995,7 +21094,7 @@ index bf5761c6..83c758c1 100644
              },
              memory: Memory::default(),
          })?;
-+        if std::env::var_os("GENIE_TRACE_ANIMAL").is_some() {
++        if crate::env_os!("GENIE_TRACE_ANIMAL").is_some() {
 +            eprintln!("ANIMAL_SEARCH pos={:?} radius={:?} found={:?} other={:?}", at.position, radius, found.id, found.position);
 +        }
          self.alert(found, at.dt_seconds);
@@ -21029,7 +21128,7 @@ index bf5761c6..83c758c1 100644
 +
 +/// `GENIE_EXPERIMENT_ANIMALREACT_188329`: the hunted animal's whole `evasiveMoveFrom` (0xd26200).
 +fn animalreact_188329() -> bool {
-+    std::env::var_os("GENIE_EXPERIMENT_ANIMALREACT_188329").is_some()
++    crate::env_os!("GENIE_EXPERIMENT_ANIMALREACT_188329").is_some()
 +}
 diff --git a/crates/engine/genie-core/src/unit_ai/idle_priest.rs b/crates/engine/genie-core/src/unit_ai/idle_priest.rs
 new file mode 100644
@@ -21169,7 +21268,7 @@ index 00000000..1db1ef0e
 +    }
 +}
 diff --git a/crates/engine/genie-core/src/unit_ai/ids.rs b/crates/engine/genie-core/src/unit_ai/ids.rs
-index d0cbfb72..5adf364c 100644
+index d0cbfb72..66238f9c 100644
 --- a/crates/engine/genie-core/src/unit_ai/ids.rs
 +++ b/crates/engine/genie-core/src/unit_ai/ids.rs
 @@ -218,6 +218,10 @@ pub fn factory_kind(
@@ -21177,7 +21276,7 @@ index d0cbfb72..5adf364c 100644
          }
      }
 +    // 188329 (0x12ca630): class 65 takes the hunted animal's AI, like 9 and 59
-+    if class.get() == 65 && std::env::var_os("GENIE_EXPERIMENT_EVADE_188329").is_some() {
++    if class.get() == 65 && crate::env_os!("GENIE_EXPERIMENT_EVADE_188329").is_some() {
 +        return Some(UnitAiKind::Hunted);
 +    }
      Some({
@@ -21354,7 +21453,7 @@ index bf299a83..5761f4ab 100644
              return Answer::NotTaken;
          }
 diff --git a/crates/engine/genie-core/src/unit_ai/order_kinds.rs b/crates/engine/genie-core/src/unit_ai/order_kinds.rs
-index 281192de..f5e52419 100644
+index 281192de..e2fd301c 100644
 --- a/crates/engine/genie-core/src/unit_ai/order_kinds.rs
 +++ b/crates/engine/genie-core/src/unit_ai/order_kinds.rs
 @@ -26,8 +26,9 @@ use crate::unit_ai::TakenAs;
@@ -21406,7 +21505,7 @@ index 281192de..f5e52419 100644
 +                // old result, not taken: there the original's choice is not pinned (521379784
 +                // update 26803: the original did not send the new villager to its own TC)
 +                if o.shown.x() == -1.0 && o.shown.y() == -1.0 {
-+                    if std::env::var_os("GENIE_TRACE_ITEM5").is_some() {
++                    if crate::env_os!("GENIE_TRACE_ITEM5").is_some() {
 +                        eprintln!("ITEM5 B_GONE class={class:?}");
 +                    }
 +                    return Ok(OrderOutcome::NotTaken);
@@ -21483,14 +21582,14 @@ index 6f60bbc2..9d9b867f 100644
          }
          at.unit(id)
 diff --git a/crates/engine/genie-core/src/unit_ai/retarget.rs b/crates/engine/genie-core/src/unit_ai/retarget.rs
-index 516e920b..93e14d2f 100644
+index 516e920b..ecc47be9 100644
 --- a/crates/engine/genie-core/src/unit_ai/retarget.rs
 +++ b/crates/engine/genie-core/src/unit_ai/retarget.rs
 @@ -521,6 +521,9 @@ impl UnitAi {
              || unit_ai_tuning.follow_slack_high < dx
              || dy < unit_ai_tuning.follow_slack_low
              || unit_ai_tuning.follow_slack_high < dy;
-+        if std::env::var_os("GENIE_TRACE_ANIMAL").is_some() {
++        if crate::env_os!("GENIE_TRACE_ANIMAL").is_some() {
 +            eprintln!("FOLLOW_CHECK at={:?} size={:?} target={:?} at={:?} radius={:?} point={:?} moved={} gap={:?} range={:?}", at.position, at.size, id, target.position, target.radius, self.target_point, moved, footprint_gap_squared(at.position, at.size, target.position, target.radius), self.desired_distance);
 +        }
          if !moved {
@@ -21733,7 +21832,7 @@ index 7fd24514..84166f0c 100644
  
  /// A unit AI's call on its unit from a side that holds none (a search's closure).
 diff --git a/crates/engine/genie-core/src/unit_ai/surroundings.rs b/crates/engine/genie-core/src/unit_ai/surroundings.rs
-index 7cc2f5c9..a4f4ba9f 100644
+index 7cc2f5c9..58ffa64d 100644
 --- a/crates/engine/genie-core/src/unit_ai/surroundings.rs
 +++ b/crates/engine/genie-core/src/unit_ai/surroundings.rs
 @@ -157,6 +157,9 @@ bitflags::bitflags! {
@@ -21763,7 +21862,7 @@ index 7cc2f5c9..a4f4ba9f 100644
  pub(super) fn group_lets_idle(group: Option<GroupState>) -> bool {
 +    // 188329 0xd42a00 (0xd42ed6..): a member runs slot 0x240 only when `0x10dd760(group, id)`
 +    // is false ([`GroupState::IDLE_FREE_188329`]); the member's own mover is not read
-+    if std::env::var_os("GENIE_EXPERIMENT_IDLEGROUP_188329").is_some() {
++    if crate::env_os!("GENIE_EXPERIMENT_IDLEGROUP_188329").is_some() {
 +        return group.is_none_or(|g| g.contains(GroupState::IDLE_FREE_188329));
 +    }
      group.is_none_or(|g| g.contains(GroupState::IDLE) && !g.contains(GroupState::MEMBER_MOVING))
@@ -22009,7 +22108,7 @@ index 4cc9cc71..b603cd5e 100644
      let (r, w) = hear(PlayerKind::Human, Vec::new());
      assert_eq!(r, Ok(GO_ON));
 diff --git a/crates/engine/genie-core/src/unit_ai/unit.rs b/crates/engine/genie-core/src/unit_ai/unit.rs
-index dc286d39..9a93b8ae 100644
+index dc286d39..7012b622 100644
 --- a/crates/engine/genie-core/src/unit_ai/unit.rs
 +++ b/crates/engine/genie-core/src/unit_ai/unit.rs
 @@ -89,9 +89,13 @@ impl Unit {
@@ -22018,7 +22117,7 @@ index dc286d39..9a93b8ae 100644
          }
 -        let mut after = self.ai_run(actions, c, captured.as_ref(), None)?;
 +        // 188329: 0x114cf1c checks queued orders before the owner's full update.
-+        if std::env::var_os("GENIE_EXPERIMENT_AI_ORDER_188329").is_some() {
++        if crate::env_os!("GENIE_EXPERIMENT_AI_ORDER_188329").is_some() {
 +            let _ = self.ai_run(actions, c, captured.as_ref(), None, true)?;
 +        }
 +        let mut after = self.ai_run(actions, c, captured.as_ref(), None, false)?;
@@ -22076,7 +22175,7 @@ index dc286d39..9a93b8ae 100644
 +        if precheck {
 +            turn = None;
 +        } else if turn.is_none()
-+            && std::env::var_os("GENIE_EXPERIMENT_AI_ORDER_188329").is_some()
++            && crate::env_os!("GENIE_EXPERIMENT_AI_ORDER_188329").is_some()
 +        {
 +            return Ok(None);
 +        }
@@ -22088,7 +22187,7 @@ index dc286d39..9a93b8ae 100644
              // the full update's start lets the unit AIs' search cache go
 -            c.w.spatial.forget_search();
 +            // diagnostic GENIE_EXPERIMENT_SEARCH_CLEAR: "never", or "tick" (once per update)
-+            match std::env::var("GENIE_EXPERIMENT_SEARCH_CLEAR").as_deref() {
++            match crate::env_str!("GENIE_EXPERIMENT_SEARCH_CLEAR").as_deref() {
 +                Ok("never") => {}
 +                Ok("tick") => {
 +                    static LAST: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(u64::MAX);
@@ -22115,7 +22214,7 @@ index dc286d39..9a93b8ae 100644
                          .map(|()| None),
                      (Some(dt), None) => {
 +                        // DIAGNOSTIC: which object's full AI update the next draws belong to
-+                        if std::env::var_os("GENIE_TRACE_AIUPD").is_some() {
++                        if crate::env_os!("GENIE_TRACE_AIUPD").is_some() {
 +                            eprintln!("AIUPD id={:?} player={:?} draws_before={}", self_id_for_trace, player, ai_stream.draws);
 +                        }
                          ai.update(dt, world_time, player_kind, &at, ai_stream, side)
@@ -22178,7 +22277,7 @@ index dc286d39..9a93b8ae 100644
 +    failed || slot.state == crate::groups::SlotState::InPlace
 +}
 diff --git a/crates/engine/genie-core/src/unit_ai/update.rs b/crates/engine/genie-core/src/unit_ai/update.rs
-index 1ecba910..fa5ad72e 100644
+index 1ecba910..2efac657 100644
 --- a/crates/engine/genie-core/src/unit_ai/update.rs
 +++ b/crates/engine/genie-core/src/unit_ai/update.rs
 @@ -4,6 +4,7 @@
@@ -22203,7 +22302,7 @@ index 1ecba910..fa5ad72e 100644
              && !at.flags.contains(SurroundingFlags::GARRISONED)
 +            // 188329: the full update (0xd42a00) never runs the order queue; 0xd384f0 has the
 +            // one caller 0xd4445a, the per-tick check
-+            && std::env::var_os("GENIE_EXPERIMENT_AI_ORDER_188329").is_none()
++            && crate::env_os!("GENIE_EXPERIMENT_AI_ORDER_188329").is_none()
          {
              self.run_orders(at, side, player_kind, ai)?;
          }
@@ -22228,7 +22327,7 @@ index 1ecba910..fa5ad72e 100644
 +        // 188329 (0xcf9c60 -> 0xcf9c95): slot 0x1b0 gives kind 5 for class 10, so the notify of a
 +        // boar hunt searches by kind (slot 0x80), not ClosestObject over live boars
 +        if kind.is_none()
-+            && std::env::var_os("GENIE_EXPERIMENT_HUNT_188329").is_some()
++            && crate::env_os!("GENIE_EXPERIMENT_HUNT_188329").is_some()
 +            && class.get() == 10
 +        {
 +            kind = Some(GatherGroup::from(5_u8));
@@ -22258,7 +22357,7 @@ index 1ecba910..fa5ad72e 100644
 -                })?;
 -                self.alert(found, at.dt_seconds);
 +                };
-+                let found = if std::env::var_os("GENIE_EXPERIMENT_HUNT_188329").is_some()
++                let found = if crate::env_os!("GENIE_EXPERIMENT_HUNT_188329").is_some()
 +                    && n.p[0] == AiAction::Hunt.value()
 +                    && n.p[1] == 58
 +                {
@@ -22295,7 +22394,7 @@ index 1ecba910..fa5ad72e 100644
 +                    f
 +                };
 +                let found = found;
-+                if std::env::var_os("GENIE_LOG_HUNT_SEARCH").is_some() {
++                if crate::env_os!("GENIE_LOG_HUNT_SEARCH").is_some() {
 +                    eprintln!("HUNTER_SEARCH origin={origin:?} class={class:?} found={:?}", found.id);
 +                }
                  match (found.id, found.position) {
@@ -22464,7 +22563,7 @@ index ea0838e3..fa603b75 100644
          return Ok(Some(first));
      }
 diff --git a/crates/engine/genie-core/src/unit_ai/world_view/side.rs b/crates/engine/genie-core/src/unit_ai/world_view/side.rs
-index 77dc93ea..aa7df159 100644
+index 77dc93ea..a20aceef 100644
 --- a/crates/engine/genie-core/src/unit_ai/world_view/side.rs
 +++ b/crates/engine/genie-core/src/unit_ai/world_view/side.rs
 @@ -29,6 +29,7 @@ use crate::objects::ObjectState;
@@ -22485,7 +22584,7 @@ index 77dc93ea..aa7df159 100644
 +/// `GENIE_EXPERIMENT_HELPCALL_188329`.
 +fn helpcall_188329() -> bool {
 +    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-+    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_HELPCALL_188329").is_some())
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_HELPCALL_188329").is_some())
 +}
 +
 +impl UnitView<'_, '_> {
@@ -23246,7 +23345,7 @@ index 9912d9e7..a645c607 100644
      }
  }
 diff --git a/crates/engine/genie-core/src/world/step.rs b/crates/engine/genie-core/src/world/step.rs
-index ba6fdc83..8e0bc965 100644
+index ba6fdc83..1eebbfd4 100644
 --- a/crates/engine/genie-core/src/world/step.rs
 +++ b/crates/engine/genie-core/src/world/step.rs
 @@ -170,7 +170,20 @@ impl Step<'_> {
@@ -23274,7 +23373,7 @@ index ba6fdc83..8e0bc965 100644
          kind: AttributeId,
          amount: Amount,
      ) -> Result<(), GenieError> {
-+        if std::env::var_os("GENIE_TRACE_DROP").is_some() {
++        if crate::env_os!("GENIE_TRACE_DROP").is_some() {
 +            // ENG-27: each load given to a player, its float's bits
 +            eprintln!(
 +                "DROP ms={} p={} kind={} amount={} bits={:08x}",
@@ -27941,7 +28040,7 @@ index 00000000..098b2829
 +    Ok(())
 +}
 diff --git a/crates/tools/genie-oracle/src/census.rs b/crates/tools/genie-oracle/src/census.rs
-index 99849470..5d5b9b7e 100644
+index 99849470..2f1308e6 100644
 --- a/crates/tools/genie-oracle/src/census.rs
 +++ b/crates/tools/genie-oracle/src/census.rs
 @@ -112,7 +112,20 @@ pub fn census_run(
@@ -27952,7 +28051,7 @@ index 99849470..5d5b9b7e 100644
 +    let mut header = chapter.header()?;
 +    // EXPERIMENT (save 68.9): civilization names to numbers from the file GENIE_CIVILIZATIONS
 +    // names (the install's resources/_common/dat/civilizations.json).
-+    if let Ok(path) = std::env::var("GENIE_CIVILIZATIONS") {
++    if let Ok(path) = genie_core::env_str!("GENIE_CIVILIZATIONS") {
 +        let text = std::fs::read_to_string(&path)
 +            .map_err(|e| genie_save::GenieError::io("civilizations.json").with("path", &path).with_source(e))?;
 +        let json: serde_json::Value = serde_json::from_str(&text)
@@ -27979,7 +28078,7 @@ index 99849470..5d5b9b7e 100644
 +            }
 +        }
 +    }
-+    let sort_lists = std::env::var_os("GENIE_EXPERIMENT_SORT_LISTS").is_some();
++    let sort_lists = genie_core::env_os!("GENIE_EXPERIMENT_SORT_LISTS").is_some();
 +    if sort_lists {
 +        genie_core::objects::object_list::ID_ORDERED.store(true, std::sync::atomic::Ordering::Relaxed);
 +        for player in &mut turns.players { player.objects.sort_by_id(); }
@@ -27992,7 +28091,7 @@ index 99849470..5d5b9b7e 100644
      for frame in frames(&chapter, total)? {
 -        run(&mut turns, &mut decoder, from_ref(&frame));
 +        elapsed_ms += u64::from(frame.dt.get());
-+        if std::env::var_os("GENIE_TRACE_PHASE").is_some() && frame.checkpoint.is_some() {
++        if genie_core::env_os!("GENIE_TRACE_PHASE").is_some() && frame.checkpoint.is_some() {
 +            let cp = frame.checkpoint.as_ref().unwrap();
 +            let commands: Vec<_> = frame.commands.iter().filter_map(|p| decoder.command(p)).collect();
 +            let before_tick = turns.ticks.get();
@@ -28013,7 +28112,7 @@ index 99849470..5d5b9b7e 100644
 +            run(&mut turns, &mut decoder, from_ref(&frame));
 +        }
 +        // (the lists keep their order by themselves once ID_ORDERED is set)
-+        if let Ok(raw) = std::env::var("GENIE_TRACE_MOTION") {
++        if let Ok(raw) = genie_core::env_str!("GENIE_TRACE_MOTION") {
 +            if let Ok(wanted) = raw.parse::<i32>() {
 +                for (p, player) in turns.players.iter().enumerate() {
 +                    if let Some(u) = player.objects.iter().find(|u| u.id.get() == wanted) {
@@ -28025,7 +28124,7 @@ index 99849470..5d5b9b7e 100644
          census.update(&turns, &sections);
 -        if census.players.iter().all(CensusPlayer::done) {
 +        // DIAGNOSTIC: GENIE_TRACE_RES=1 prints each human player's food, wood, stone and gold after every update.
-+        if std::env::var_os("GENIE_TRACE_RES").is_some() {
++        if genie_core::env_os!("GENIE_TRACE_RES").is_some() {
 +            for (p, state) in turns.players.iter().enumerate().skip(1) {
 +                let r: Vec<f32> = state.attributes.iter().take(4).map(|a| a.get()).collect();
 +                eprintln!("RES {}", serde_json::json!({"ms": turns.world_time.millis(), "player": p, "res": r}));
@@ -28033,7 +28132,7 @@ index 99849470..5d5b9b7e 100644
 +        }
 +        // DIAGNOSTIC: GENIE_TRACE_GAIN=1 prints, each time the world time passes a multiple of 10 s, each
 +        // human player's cumulative amounts given at drop-offs by source (genie_core::gain_trace).
-+        if std::env::var_os("GENIE_TRACE_GAIN").is_some() {
++        if genie_core::env_os!("GENIE_TRACE_GAIN").is_some() {
 +            let ms = u64::from(turns.world_time.millis());
 +            if ms / 10_000 != gain_prev / 10_000 {
 +                let totals = genie_core::gain_trace::totals();
@@ -28048,7 +28147,7 @@ index 99849470..5d5b9b7e 100644
 +                }
 +                // GENIE_TRACE_GAIN_ANIMALS=1: one more line with every animal food was taken from
 +                // (id, master, class, gathered, given per player); the GAIN lines stay as they are
-+                if std::env::var_os("GENIE_TRACE_GAIN_ANIMALS").is_some() {
++                if genie_core::env_os!("GENIE_TRACE_GAIN_ANIMALS").is_some() {
 +                    let rows: Vec<serde_json::Value> = genie_core::gain_trace::animals().iter().map(|(id, a)| serde_json::json!({"id": id, "master": a.master, "class": a.class, "gathered": (a.gathered * 100.0).round() / 100.0, "full": (a.full * 100.0).round() / 100.0, "given": a.given.iter().map(|g| (g * 100.0).round() / 100.0).collect::<Vec<f64>>()})).collect();
 +                    eprintln!("GAINA {}", serde_json::json!({"ms": ms, "animals": rows}));
 +                }
@@ -28057,7 +28156,7 @@ index 99849470..5d5b9b7e 100644
 +        }
 +        // DIAGNOSTIC: GENIE_DUMP_MS=15000,30000 prints each player's non-zero attributes and live
 +        // object counts by master at the first update whose world time reaches each mark.
-+        if let Ok(raw) = std::env::var("GENIE_DUMP_MS") {
++        if let Ok(raw) = genie_core::env_str!("GENIE_DUMP_MS") {
 +            let now = u64::from(turns.world_time.millis());
 +            for mark in raw.split(',').filter_map(|x| x.trim().parse::<u64>().ok()) {
 +                if now >= mark && dump_prev < mark {
@@ -28068,8 +28167,8 @@ index 99849470..5d5b9b7e 100644
 +                        let mut by_master = std::collections::BTreeMap::<i16, usize>::new();
 +                        for u in &state.objects { *by_master.entry(u.life.master_id.get()).or_default() += 1; }
 +                        eprintln!("DUMP mark_ms={mark} world_ms={now} update={} player={p} live={} by_master={by_master:?} attrs=[{}]", census.updates, state.objects.len(), attrs.join(" "));
-+                        if std::env::var_os("GENIE_DUMP_UNITS").is_some() {
-+                            for u in state.objects.iter().filter(|u| p > 0 || std::env::var_os("GENIE_DUMP_ALL").is_some() || [1245i16, 48, 412, 822, 1139, 1301, 89, 126].contains(&u.life.master_id.get())) {
++                        if genie_core::env_os!("GENIE_DUMP_UNITS").is_some() {
++                            for u in state.objects.iter().filter(|u| p > 0 || genie_core::env_os!("GENIE_DUMP_ALL").is_some() || [1245i16, 48, 412, 822, 1139, 1301, 89, 126].contains(&u.life.master_id.get())) {
 +                                let a = crate::header_runs::checkpoint_action(turns.parts.actions_of(u.id), turns.parts.production.get(u.id));
 +                                let kind = a.and_then(|a| a.kind).map(|k| k.get());
 +                                let st = a.map(|a| a.state.get()).unwrap_or(0);
@@ -28083,27 +28182,27 @@ index 99849470..5d5b9b7e 100644
 +            dump_prev = now;
 +        }
 +        // DIAGNOSTIC: GENIE_TRACE_STEER_RANGE=a-b turns GENIE_TRACE_STEER on for those updates only
-+        if let Some((a, b)) = std::env::var("GENIE_TRACE_STEER_RANGE").ok().and_then(|r| { let mut it = r.split('-'); Some((it.next()?.parse::<u64>().ok()?, it.next()?.parse::<u64>().ok()?)) }) {
++        if let Some((a, b)) = genie_core::env_str!("GENIE_TRACE_STEER_RANGE").ok().and_then(|r| { let mut it = r.split('-'); Some((it.next()?.parse::<u64>().ok()?, it.next()?.parse::<u64>().ok()?)) }) {
 +            if census.updates as u64 == a { genie_core::movement::TRACE_STEER_WINDOW.store(true, std::sync::atomic::Ordering::Relaxed); }
 +            if census.updates as u64 == b + 1 { genie_core::movement::TRACE_STEER_WINDOW.store(false, std::sync::atomic::Ordering::Relaxed); }
 +        }
-+        if let Some((a, b)) = std::env::var("GENIE_TRACE_DRAWS_RANGE").ok().and_then(|r| { let mut it = r.split('-'); Some((it.next()?.parse::<u64>().ok()?, it.next()?.parse::<u64>().ok()?)) }) {
++        if let Some((a, b)) = genie_core::env_str!("GENIE_TRACE_DRAWS_RANGE").ok().and_then(|r| { let mut it = r.split('-'); Some((it.next()?.parse::<u64>().ok()?, it.next()?.parse::<u64>().ok()?)) }) {
 +            if census.updates as u64 == a { eprintln!("DRAWS_ON after update {}", census.updates); genie_core::trace::DRAW_WINDOW.store(true, std::sync::atomic::Ordering::Relaxed); }
 +            if census.updates as u64 == b + 1 { genie_core::trace::DRAW_WINDOW.store(false, std::sync::atomic::Ordering::Relaxed); }
 +            if genie_core::trace::DRAW_WINDOW.load(std::sync::atomic::Ordering::Relaxed) { eprintln!("DRAWS_UPDATE_DONE {}", census.updates); }
 +        }
-+        let trace_range = std::env::var("GENIE_TRACE_OBJECTS_RANGE").ok().and_then(|r| { let mut it = r.split('-'); Some((it.next()?.parse::<u64>().ok()?, it.next()?.parse::<u64>().ok()?)) });
-+        if (std::env::var_os("GENIE_TRACE_OBJECTS").is_some() && [499, 999, 1499].contains(&census.updates)) || trace_range.is_some_and(|(a, b)| (a..=b).contains(&(census.updates as u64))) {
++        let trace_range = genie_core::env_str!("GENIE_TRACE_OBJECTS_RANGE").ok().and_then(|r| { let mut it = r.split('-'); Some((it.next()?.parse::<u64>().ok()?, it.next()?.parse::<u64>().ok()?)) });
++        if (genie_core::env_os!("GENIE_TRACE_OBJECTS").is_some() && [499, 999, 1499].contains(&census.updates)) || trace_range.is_some_and(|(a, b)| (a..=b).contains(&(census.updates as u64))) {
 +            for (p, state) in turns.players.iter().enumerate() {
 +                for u in &state.objects {
-+                    if let Ok(ids) = std::env::var("GENIE_TRACE_OBJECT_IDS") {
++                    if let Ok(ids) = genie_core::env_str!("GENIE_TRACE_OBJECT_IDS") {
 +                        if !ids.split(',').any(|id| id.parse::<i32>().ok() == Some(u.id.get())) { continue; }
 +                    }
-+                    if p == 0 && turns.parts.unit_ai.get(u.id).is_none() && std::env::var_os("GENIE_TRACE_OBJECT_IDS").is_none() { continue; }
++                    if p == 0 && turns.parts.unit_ai.get(u.id).is_none() && genie_core::env_os!("GENIE_TRACE_OBJECT_IDS").is_none() { continue; }
 +                    let (look, limit) = turns.parts.unit_ai.get(u.id).map(|ai| (ai.look_around_timer.get(), ai.look_around_timeout.get())).unwrap_or((0, 0));
 +                    let a = crate::header_runs::checkpoint_action(turns.parts.actions_of(u.id), turns.parts.production.get(u.id));
 +                    let timer = turns.parts.unit_ai.get(u.id).map(|ai| ai.retarget_timer.get()).unwrap_or(0);
-+                    let ai_trace = turns.parts.unit_ai.get(u.id).map(|ai| format!("{:?} idle={}/{} order={:?} action={:?} target={:?}", ai.ai_kind, ai.idle_timer.get(), ai.adjusted_idle_timeout.get(), ai.current_order, ai.current_action, ai.current_target) + &(if std::env::var_os("GENIE_TRACE_ORDERS").is_some() { format!(" orders={:?}", ai.orders) } else { String::new() }));
++                    let ai_trace = turns.parts.unit_ai.get(u.id).map(|ai| format!("{:?} idle={}/{} order={:?} action={:?} target={:?}", ai.ai_kind, ai.idle_timer.get(), ai.adjusted_idle_timeout.get(), ai.current_order, ai.current_action, ai.current_target) + &(if genie_core::env_os!("GENIE_TRACE_ORDERS").is_some() { format!(" orders={:?}", ai.orders) } else { String::new() }));
 +                    let kind = a.and_then(|a| a.kind).map(|k| k.get());
 +                    let action_state = a.map(|a| a.state.get()).unwrap_or(0);
 +                    eprintln!("OBJECT {}", serde_json::json!({"ms":turns.world_time.millis(),"tick":census.updates,"player":p,"id":u.id.get(),"held":u.life.amount.get(),"state":u.life.state as u8,"master":u.life.master_id.get(),"position":u.position().get(),"action_kind":kind,"action_state":action_state,"retarget_ms":timer,"look":look,"limit":limit,"ai":ai_trace}));
@@ -28117,13 +28216,13 @@ index 99849470..5d5b9b7e 100644
 +            }
 +            eprintln!("TIMING update={} initial_ms={} elapsed_ms={} actual_ms={}", census.updates, initial_time, elapsed_ms, turns.world_time.millis());
 +        }
-+        if std::env::var_os("GENIE_NO_STOP").is_none() && census.players.iter().all(CensusPlayer::done) {
++        if genie_core::env_os!("GENIE_NO_STOP").is_none() && census.players.iter().all(CensusPlayer::done) {
 +            end = CensusEnd::AllDone;
 +            break;
 +        }
 +        // the survey's early stop: once both players' site words (1, 6, 10) have differed at a
 +        // checkpoint, its numbers (first mismatch, site span) cannot change any more
-+        if std::env::var_os("GENIE_STOP_AFTER_SITE_BREAK").is_some()
++        if genie_core::env_os!("GENIE_STOP_AFTER_SITE_BREAK").is_some()
 +            && census.site_bad.get(1).copied().unwrap_or(false)
 +            && census.site_bad.get(2).copied().unwrap_or(false)
 +        {
@@ -28162,7 +28261,7 @@ index 99849470..5d5b9b7e 100644
              ) else {
                  continue;
              };
-+            if std::env::var_os("GENIE_STOP_AFTER_SITE_BREAK").is_some() {
++            if genie_core::env_os!("GENIE_STOP_AFTER_SITE_BREAK").is_some() {
 +                let block = lane_block(section, lane[8], state, &turns.parts);
 +                if [1, 6, 10].iter().any(|&w| block[w] != lane[w])
 +                    && let Some(bad) = self.site_bad.get_mut(p)
@@ -28170,7 +28269,7 @@ index 99849470..5d5b9b7e 100644
 +                    *bad = true;
 +                }
 +            }
-+            if std::env::var_os("GENIE_PRINT_CHECKPOINTS").is_some() {
++            if genie_core::env_os!("GENIE_PRINT_CHECKPOINTS").is_some() {
 +                let block = lane_block(section, lane[8], state, &turns.parts);
 +                eprintln!(
 +                    "CPWORDS syncs={at} world_ms={} player={p} rec={:?} eng={:?}",
