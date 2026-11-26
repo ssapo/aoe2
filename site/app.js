@@ -413,10 +413,10 @@
     const icon=Object.hasOwn(civNames,civ)?`<img src="assets/civs/${civIconFiles[civ]||civ.toLowerCase()}.png" alt="" width="28" height="28" loading="lazy"${window.SSAPOCivInfo?.lines(civ)?` data-civ="${esc(civ)}" data-civ-name="${esc(name)}" aria-label="${esc(name)} 문명 특성"`:''}>`:'';
     return `<span class="civ-badge ${side==='나'?'own-civ':'opponent-civ'}"${window.SSAPOCivInfo?.lines(civ)?'':` title="${esc(civ||name)}"`}><small>${esc(side)}</small>${icon}<span>${esc(name)}</span>${random===true?randomMark:''}</span>`;
   }
-  // 경기 종류: 게임 서버 match type 번호(GetAvailableLeaderboards의 leaderboardmap으로 확인, 2026-11-26).
-  // 랭크 = 순위표가 있는 매칭, 이벤트 = Red Bull Wololo 이벤트 매칭, 일반 = 사용자 지정 방. 빠른 대전 번호는 아직 데이터에 없음.
-  const MATCH_KINDS={6:['rank','랭크 1대1 랜덤맵'],26:['rank','랭크 1대1 제국 전쟁'],2:['rank','랭크 1대1 데스매치'],122:['event','Red Bull Wololo 이벤트 매칭'],124:['event','Red Bull Wololo 이벤트 매칭'],0:['custom','사용자 지정 방'],60:['custom','사용자 지정 방 (데스매치)'],120:['custom','사용자 지정 방']};
-  const KIND_LABELS={rank:'랭크',event:'이벤트',custom:'일반',other:'기타'};
+  // 경기 종류: 게임 서버 match type 번호. GetAvailableLeaderboards의 leaderboardmap과 aoe2companion의 경기별 순위표 이름으로 확인(2026-11-26).
+  // 랭크 = 순위표가 걸린 경기, 빠대 = 빠른 대전(Quick Play 자동 매칭), 이벤트 = Red Bull Wololo 이벤트 매칭, 일반 = 순위 없는 방.
+  const MATCH_KINDS={6:['rank','랭크 1대1 랜덤맵'],26:['rank','랭크 1대1 제국 전쟁'],2:['rank','랭크 1대1 데스매치'],60:['rank','랭크 1대1 데스매치 (방)'],120:['rank','랭크 1대1 로마의 귀환'],18:['quick','빠른 대전 1대1 랜덤맵'],11:['quick','빠른 대전 1대1 데스매치'],122:['event','Red Bull Wololo 이벤트 매칭'],124:['event','Red Bull Wololo 이벤트 매칭'],0:['custom','순위 없는 방']};
+  const KIND_LABELS={rank:'랭크',quick:'빠대',event:'이벤트',custom:'일반',other:'기타'};
   function matchKind(m){const k=MATCH_KINDS[m.match_type_id];return k?{key:k[0],title:k[1]}:{key:'other',title:Number.isFinite(m.match_type_id)?`경기 종류 번호 ${m.match_type_id}`:'경기 종류 정보 없음'};}
   function kindBadge(m){const k=matchKind(m);return `<span class="kind-tag kind-${k.key}" title="${esc(k.title)}">${KIND_LABELS[k.key]}</span>`;}
   function matchCivs(m){

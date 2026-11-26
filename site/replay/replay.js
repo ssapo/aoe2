@@ -8,7 +8,8 @@ const COLORS = ['#8b7d6b', '#3d7bff', '#ff4b3e', '#2fbf4f', '#f2c12e', '#2ec7c9'
 // the still objects (kind 0) by master class: 15 tree, 32 gold, 8 stone, 34 cliff, 5 bush;
 // 14 (grass and other decorations), 30 (map placeholders, removed in the first update) and the
 // rest are not drawn
-const STILL_COLORS = { 15: '#24502b', 32: '#d4b13a', 8: '#9a9a9a', 34: '#8a6440', 5: '#6aa84f', 7: '#c0508a' };
+const GROUND = '#5d6644';     // land under everything
+const STILL_COLORS = { 15: '#1f3f24', 32: '#d4b13a', 8: '#9a9a9a', 34: '#8a6440', 5: '#6aa84f', 7: '#c0508a' };
 const UNIT_LABEL_ZOOM = 14;     // px per tile from which unit names show
 const $ = id => document.getElementById(id);
 const canvas = $('map'), ctx = canvas.getContext('2d');
@@ -248,7 +249,7 @@ function fog(a, vs, mw, mh) {
   for (let i = 0; i < mw * mh; i++) {
     const explored = vs.some(p => st.seen[p][i] <= st.playMs);
     // 'game': unseen black, explored dim; 'fog': the whole map shown, only what is out of sight dimmed
-    px[i * 4 + 3] = vis[i] ? 0 : fogAll ? 110 : explored ? 120 : 225;
+    px[i * 4 + 3] = vis[i] ? 0 : fogAll ? 165 : explored ? 175 : 240;
   }
   fctx.putImageData(img, 0, 0);
   const [x0, y0] = toScreen(0, 0);
@@ -267,6 +268,8 @@ function draw() {
   if (!cam.fitted) fit();
   const k = cam.scale, W = st.words, [mw, mh] = st.info.map;
   const [mx0, my0] = toScreen(0, 0);
+  // the ground: a land colour, so that what is out of sight (darkened below) reads at a glance
+  ctx.fillStyle = GROUND; ctx.fillRect(mx0, my0, mw * k, mh * k);
   ctx.strokeStyle = '#2a2f36'; ctx.lineWidth = 1; ctx.strokeRect(mx0, my0, mw * k, mh * k);
   const si = at(st.stills, st.playMs);
   if (si >= 0) {
