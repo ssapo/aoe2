@@ -8,7 +8,7 @@ const COLORS = ['#8b7d6b', '#3d7bff', '#ff4b3e', '#2fbf4f', '#f2c12e', '#2ec7c9'
 // the still objects (kind 0) by master class: 15 tree, 32 gold, 8 stone, 34 cliff, 5 bush;
 // 14 (grass and other decorations), 30 (map placeholders, removed in the first update) and the
 // rest are not drawn
-const STILL_COLORS = { 15: '#24502b', 32: '#d4b13a', 8: '#9a9a9a', 34: '#8a6440', 5: '#6aa84f' };
+const STILL_COLORS = { 15: '#24502b', 32: '#d4b13a', 8: '#9a9a9a', 34: '#8a6440', 5: '#6aa84f', 7: '#c0508a' };
 const UNIT_LABEL_ZOOM = 14;     // px per tile from which unit names show
 const $ = id => document.getElementById(id);
 const canvas = $('map'), ctx = canvas.getContext('2d');
@@ -37,7 +37,7 @@ async function start(pieces, rec, name) {
   if (st && st.worker) st.worker.terminate();
   $('status').textContent = name + ' 불러오는 중…';
   $('stage').hidden = false; $('side').hidden = false;
-  const [wasm, env] = await Promise.all([fetch('genie-web.wasm?v=20261126b').then(r => r.arrayBuffer()), envVars()]);
+  const [wasm, env] = await Promise.all([fetch('genie-web.wasm?v=20261126f').then(r => r.arrayBuffer()), envVars()]);
   st = { name, frames: [], stills: [], info: null, labels: null, words: 10, playMs: 0, playing: false, done: false, wall: 0, wasmBytes: wasm.byteLength };
   cam.fitted = false; hover = selected = null;
   const worker = new Worker('worker.js?v=20261123');
@@ -68,7 +68,7 @@ async function startDemo(id) {
   document.querySelector('header h1 small').textContent = '(데모)';
   $('status').textContent = '엔진 출력 불러오는 중…';
   $('stage').hidden = false; $('side').hidden = false;
-  const packed = await fetch('demo-' + id + '.bin?v=20261126b').then(r => { if (!r.ok) throw Error('HTTP ' + r.status); return r.arrayBuffer(); });
+  const packed = await fetch('demo-' + id + '.bin?v=20261126f').then(r => { if (!r.ok) throw Error('HTTP ' + r.status); return r.arrayBuffer(); });
   const bytes = await new Response(new Blob([packed]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer();
   st = { name: '#' + id, demo: true, frames: [], stills: [], info: null, labels: null, words: 10, playMs: 0, playing: false, done: false, wall: 1, wasmBytes: 0 };
   cam.fitted = false; hover = selected = null;
@@ -175,7 +175,7 @@ function objectAt(a, o, next, b, t) {
     id: d[o], player: d[o + 1], master: d[o + 2], kind: d[o + 3] & 0xff, cls: (d[o + 3] >> 8) & 0xffff,
     inside: (d[o + 3] & 0x80000000) !== 0, x, y, hp: f[o + 6], action: d[o + 7],
     target: W > 8 ? a.ints[o + 8] : -1, heldKind: W > 9 ? (d[o + 9] << 16 >> 16) : -1, heldAmount: W > 9 ? d[o + 9] >>> 16 : 0,
-    sight: W > 10 ? f[o + 10] : 0,
+    sight: W > 10 ? f[o + 10] : 0, rx: W > 12 ? f[o + 11] : 0, ry: W > 12 ? f[o + 12] : 0,
   };
 }
 
@@ -306,10 +306,16 @@ function draw() {
     ctx.fillStyle = COLORS[ob.player] || '#fff';
     ctx.beginPath();
     let r;
-    if (ob.kind === 1) { r = Math.max(2.5, k * 1.1); ctx.rect(cx - r, cy - r, 2 * r, 2 * r); }
+    if (ob.kind === 1 && ob.rx > 0) {
+      // the building's own footprint (master radius x, y): a wall is one tile, a town centre four
+      const hx = Math.max(1.5, ob.rx * k), hy = Math.max(1.5, ob.ry * k); r = Math.max(hx, hy);
+      ctx.rect(cx - hx, cy - hy, 2 * hx, 2 * hy);
+      if (ob.cls === 49) ctx.globalAlpha = 0.45;   // a farm: its field, faint
+    }
+    else if (ob.kind === 1) { r = Math.max(2.5, k * 1.1); ctx.rect(cx - r, cy - r, 2 * r, 2 * r); }
     else if (ob.kind === 2) { r = Math.max(2.5, k * 0.45) * size; ctx.arc(cx, cy, r, 0, Math.PI * 2); }
     else { r = Math.max(3, k * (ob.player === 0 ? 0.5 : 0.7)) * size; ctx.moveTo(cx, cy - r); ctx.lineTo(cx + r, cy + r * 0.8); ctx.lineTo(cx - r, cy + r * 0.8); ctx.closePath(); }
-    ctx.fill();
+    ctx.fill(); ctx.globalAlpha = 1;
     ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(0,0,0,.85)'; ctx.stroke();
     if (ob.id === selected || ob.id === hover) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(cx, cy, r + 4, 0, Math.PI * 2); ctx.stroke(); }
     if (ob.kind !== 0 && ob.player !== 0 && ob.hp < 0.999 && ob.hp >= 0 && k >= 4) {
@@ -322,7 +328,7 @@ function draw() {
     // in the table (an internal name) only when selected or hovered
     const focus = ob.id === selected || ob.id === hover;
     const priority = focus ? 0
-      : ob.kind === 1 ? (MASTER_NAMES[ob.master] && !UNLABELLED.has(ob.master) ? 1 : -1)
+      : ob.kind === 1 ? (MASTER_NAMES[ob.master] && !UNLABELLED.has(ob.master) && ob.cls !== 27 ? 1 : -1)   // walls: no name each
       : unitLabels ? 2 : -1;
     if (priority >= 0) labels.push({ text: masterName(ob.master), x: cx, y: cy + r + 2, building: ob.kind === 1, priority });
   }
@@ -468,6 +474,10 @@ canvas.addEventListener('pointerup', release);
 canvas.addEventListener('pointercancel', release);
 canvas.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') hover = null; });
 $('reset').onclick = () => { fit(); if (st) frameOnce(); };
+$('full').onclick = () => {
+  if (document.fullscreenElement) document.exitFullscreen(); else $('stage').requestFullscreen?.();
+};
+document.addEventListener('fullscreenchange', () => { $('full').textContent = document.fullscreenElement ? '작게' : '크게'; setTimeout(() => { fit(); if (st) frameOnce(); }, 50); });
 window.addEventListener('resize', () => { if (st) frameOnce(); });
 
 $('bPlay').onclick = () => { st.playing = !st.playing; $('bPlay').textContent = st.playing ? '멈춤' : '재생'; };

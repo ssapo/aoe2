@@ -19,7 +19,9 @@
   #setup .step { margin: 8px 0 12px; }
   #setup code { background: #2d333b; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
   .ok { color: var(--ok); } .bad { color: var(--bad); } .warn { color: var(--warn); }
-  #stage { position: relative; width: min(100%, 820px); aspect-ratio: 1 / 1; max-height: 82vh; }
+  #stage { position: relative; width: min(100%, max(820px, calc(100vw - 520px)), 88vh); aspect-ratio: 1 / 1; }
+  #stage:fullscreen { width: 100vw; height: 100vh; aspect-ratio: auto; background: #0d0f12; }
+  #full { position: absolute; right: 96px; top: 8px; }
   #map { position: absolute; inset: 0; width: 100%; height: 100%; background: #0d0f12; border: 1px solid #333; touch-action: none; cursor: grab; }
   #map.dragging { cursor: grabbing; }
   #tip { position: absolute; left: 8px; top: 8px; max-width: 260px; background: rgba(20,22,26,.92); border: 1px solid #444c56; border-radius: 6px; padding: 6px 8px; font-size: 12px; pointer-events: none; display: none; white-space: pre-line; }
@@ -80,6 +82,7 @@
     <div id="tip"></div>
     <div id="unverified">확인 안 됨</div>
     <button id="reset" title="지도 전체 보기">전체 보기</button>
+    <button id="full" title="지도를 화면 가득 (Esc로 돌아오기)">크게</button>
     <div id="zoomInfo"></div>
   </div>
   <div id="side" hidden>
@@ -97,12 +100,12 @@
     <input type="range" id="seek" min="0" max="1000" value="0" disabled aria-label="시간">
     <div id="span" title="초록: 기록과 맞는지 확인된 구간 · 빨강: 계산했지만 확인 안 됨"><i id="spanDone"></i><i id="spanOk"></i></div>
     <div id="players"></div>
-    <div class="row legend"><span>■ 건물</span><span>▲ 유닛</span><span>● 일꾼</span><span style="color:#8b7d6b">▲ 가이아 동물</span><span style="color:#3f8a4b">■ 나무</span><span style="color:#d4b13a">■ 금</span><span style="color:#9a9a9a">■ 돌</span><span style="color:#8a6440">■ 절벽</span></div>
+    <div class="row legend"><span>■ 건물</span><span>▲ 유닛</span><span>● 일꾼</span><span style="color:#8b7d6b">▲ 가이아 동물</span><span style="color:#3f8a4b">■ 나무</span><span style="color:#d4b13a">■ 금</span><span style="color:#9a9a9a">■ 돌</span><span style="color:#8a6440">■ 절벽</span><span style="color:#c0508a">■ 열매</span><span>▭ 성벽·농장은 실제 크기</span></div>
     <small>휠·두 손가락으로 확대, 끌어서 이동, 유닛에 마우스를 올리거나 누르면 정보가 나와요. 건물 이름은 항상, 유닛 이름은 가까이 확대하면 보여요. 시야를 고르면 그 선수가 지금 보는 곳이 밝게 나와요. 가림 "안개만"은 지도와 유닛을 전부 보여 주고 시야 밖만 어둡게, "게임처럼"은 본 적 없는 곳은 검게, 본 적 있는 곳은 어둡게, 상대 유닛은 보이는 곳에서만 보여 줘요. 시야 "끔"이면 가림 없이 전부 보여요.</small>
     <pre id="info">-</pre>
   </div>
 </main>
-<script src="names.js?v=20261126e"></script>
-<script src="replay.js?v=20261126e"></script>
+<script src="names.js?v=20261126f"></script>
+<script src="replay.js?v=20261126f"></script>
 </body>
 </html>
