@@ -280,9 +280,12 @@ function draw() {
       if (color === undefined) continue;
       const [sx, sy] = toScreen(s.floats[o + 4], s.floats[o + 5]);
       if (sx < -k || sy < -k || sx > w + k || sy > h + k) continue;
-      // a cliff piece covers about 3 x 3 tiles: drawn as one block, so a cliff reads as a wall
-      const half = ((s.data[o + 3] >> 8) & 0xffff) === 34 ? 1.5 : 0.45;
-      ctx.fillStyle = color; ctx.fillRect(sx - k * half, sy - k * half, k * 2 * half, k * 2 * half);
+      // the object's own footprint (master radius x, y; a cliff piece is 1 to 3 tiles each way), a
+      // little inset so neighbouring trees stay apart; without the radius words, a tile (a cliff 3 x 3)
+      const cliff = ((s.data[o + 3] >> 8) & 0xffff) === 34;
+      const hx = W > 12 && s.floats[o + 11] > 0 ? s.floats[o + 11] - (cliff ? 0 : 0.05) : cliff ? 1.5 : 0.45;
+      const hy = W > 12 && s.floats[o + 12] > 0 ? s.floats[o + 12] - (cliff ? 0 : 0.05) : cliff ? 1.5 : 0.45;
+      ctx.fillStyle = color; ctx.fillRect(sx - k * hx, sy - k * hy, k * 2 * hx, k * 2 * hy);
     }
   }
   const i = at(st.frames, st.playMs);
