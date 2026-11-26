@@ -231,7 +231,7 @@ function fogOptions() {
   ((st.labels && st.labels.players) || []).forEach((p, i) => { if (i) sel.append(new Option('P' + i + ' ' + (p.name || ''), String(i))); });
   sel.append(new Option('양쪽 다', 'all'));
   sel.value = [...sel.options].some(o => o.value === keep) ? keep : '0';
-  sel.disabled = st.words < 11;
+  sel.disabled = $('fogMode').disabled = st.words < 11;
   sel.title = st.words < 11 ? '이 엔진 출력에는 시야 값이 없어요' : '고른 선수가 보는 곳만 밝게, 본 적 있는 곳은 어둡게, 못 본 곳은 검게';
 }
 const fogCanvas = document.createElement('canvas');
@@ -244,10 +244,11 @@ function fog(a, vs, mw, mh) {
     stampCircle(vis, mw, mh, fl[o + 4], fl[o + 5], r, 1, false);
   }
   if (fogCanvas.width !== mw || fogCanvas.height !== mh) { fogCanvas.width = mw; fogCanvas.height = mh; }
-  const fctx = fogCanvas.getContext('2d'), img = fctx.createImageData(mw, mh), px = img.data;
+  const fctx = fogCanvas.getContext('2d'), img = fctx.createImageData(mw, mh), px = img.data, fogAll = $('fogMode').value === 'fog';
   for (let i = 0; i < mw * mh; i++) {
     const explored = vs.some(p => st.seen[p][i] <= st.playMs);
-    px[i * 4 + 3] = vis[i] ? 0 : explored ? 120 : 225;
+    // 'game': unseen black, explored dim; 'fog': the whole map shown, only what is out of sight dimmed
+    px[i * 4 + 3] = vis[i] ? 0 : fogAll ? 110 : explored ? 120 : 225;
   }
   fctx.putImageData(img, 0, 0);
   const [x0, y0] = toScreen(0, 0);
@@ -297,7 +298,7 @@ function draw() {
     const [cx, cy] = toScreen(ob.x, ob.y);
     if (cx < -3 * k || cy < -3 * k || cx > w + 3 * k || cy > h + 3 * k) continue;
     // in sight mode: the others' units only where the viewers see, their buildings where explored
-    if (seen && !vs.includes(ob.player)) {
+    if (seen && $('fogMode').value === 'game' && !vs.includes(ob.player)) {
       const tx = Math.floor(ob.x), ty = Math.floor(ob.y), ti = ty * mw + tx;
       if (tx < 0 || ty < 0 || tx >= mw || ty >= mh) continue;
       if (ob.kind === 1 ? !seen.explored(ti) : !seen.vis[ti]) continue;
