@@ -2116,3 +2116,13 @@ genie-b is left as R59a + B52a (tree = R59a.patch + B52a.diff; no commit beyond 
 - 원인: 이 경기는 유목 휴전(gb_force_nomad_treaty=1, treaty_length 0). 엔진은 저장본의 관계 4(P1<->P2 휴전)를 끝까지 둬서 4942가 동맹으로 보였음. 188329는 휴전 감시기(world+0x828, 갱신 0x1543330)가 모든 플레이어가 마을회관을 가지면(또는 시간이 끝나면) 관계 4를 3(적)으로 바꿈 — 통째로 옮김.
 - 고침: players/diplomacy.rs, world/schedule.rs(WorldStep::Treaty), genie-model world/settings.rs(nomad_treaty), genie-oracle setup.rs(엔진 C 갈래).
 - R65m = R65l + C5(genie-c cd45196b). PC: `runs\census_R65m.exe`, `runs\R65m.patch`. 검사: truth22 P2 36999 맞음, truth28 전부 맞음; 전체 세트 7632 -> 7708(n_090 181 -> 257), 나빠진 판 없음; 321판(S33_R65m): 끝까지 9, 재현 비율 30.1% -> 30.3%(평범한 180판 31.4% -> 31.5%), 길어진 판 2(유목 경기), 짧아진 판 0.
+
+## 227. 채집·건설 원본 대조 정리(D2, 스위치 FARMFORGET·TRAPWAIT·BUILDRATE·HUSSITESTOP 기본 켬)
+- 원본 대조 목록(PC `runs\AUD\sim_diffs.md`) 1·2·3·5번: 농장 잊기, 덫 대기, 건설 속도 계산, 후스파 멈춤을 원본 함수대로 옮김(엔진 D 갈래).
+- R65n = R65m + D2. 검사: 전체 세트 7708 = 7708, 321판(S33_R65n) R65m과 똑같음(끝까지 9, 재현 비율 30.3%). 결과는 안 바뀌고 원본과 같은 모양이 됨.
+
+## 228. 사거리 목표점·교역 수레·하차 작업 필터(C6·C7)
+- C6(genie-c b93bf239): 사거리 있는 quick_goal = 출발점 + 단위벡터·min(길이, 사거리)(188329 0x10613eb, 스위치 RANGEGOAL_188329); 교역 수레(클래스 0x13)는 link-2 레벨 낮춤 건너뜀(0x1211cb3, 스위치 TRADECART_188329). 결과 변화 없음. 0x1211eb9의 두 번째 교역 수레 분기는 아직.
+- C7(genie-c a265ac14): 하차 장소 찾기(0x133bf7f)에서 task+0x15 bit0 켜진 작업은 건너뜀(스위치 DROPFLAG_188329, unit_ai/task_finder/target_steps.rs).
+- R65o = R65n + C6 + C7. PC: `runs\census_R65o.exe`, `runs\R65o.patch`. 검사: 전체 세트 7708 -> 7748(q_921 +20, P_521113438 +16, V_520169985 +3, P_520821782 +1), 나빠진 판 없음; 321판(S33_R65o): 끝까지 9, 재현 비율 30.3%(분 3500 -> 3508), 평범한 180판 31.5% -> 31.6%, 길어진 판 5, 짧아진 판 0.
+- 226 정정: truth24 170->172, truth28 56/56은 C5 몫이 아니라 R65k 바탕(B65b 추정) 몫. C5 자체 몫은 truth22와 n_090 181->257.

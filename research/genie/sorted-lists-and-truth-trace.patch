@@ -142,9 +142,18 @@ index e1267700..dffb7d64 100644
 +opt-level = 0
 +codegen-units = 16
 diff --git a/builds/158041.ncl b/builds/158041.ncl
-index 5bba0718..a49e6ab1 100644
+index 5bba0718..6140228f 100644
 --- a/builds/158041.ncl
 +++ b/builds/158041.ncl
+@@ -3,7 +3,7 @@
+   build = 158041,
+   roles = {
+     classes = { "0" = ['ARCHERY, 'LEAST_HIT, 'LION_TARGET, 'MILITARY_COUNT, 'MILITARY_KEY, 'PREDATOR_TARGET], "1" = ['ARTIFACT, 'CAPTURE_IGNORED, 'GAIA_KEPT, 'PEACEFUL, 'UNDELETABLE], "2" = ['BOAT, 'CATEGORY_LIST_TARGET, 'CIVILIAN_COUNT, 'REPAIRED_AT_SHORE, 'REPAIR_COSTED, 'TRADER, 'TRADE_BOAT], "3" = ['BUILDING, 'CAPTURE_IGNORED, 'KEPT_BY_MEMBERS, 'NOT_ANY, 'PEACEFUL, 'PRIORITY_3_TARGET, 'RAM_TARGET, 'TREBUCHET_TARGET], "4" = ['CATEGORY_LIST_TARGET, 'LION_TARGET, 'PREDATOR_TARGET, 'VILLAGER, 'WALL_BUILDER], "5" = ['DAMAGE_BY_STORAGE, 'OCEAN_FISH, 'PEACEFUL], "6" = ['INFANTRY, 'LION_TARGET, 'MILITARY_COUNT, 'MILITARY_KEY, 'PREDATOR_TARGET], "7" = ['DAMAGE_BY_STORAGE_DEAD, 'FORAGE_BUSH, 'PEACEFUL], "8" = ['DAMAGE_BY_STORAGE_DEAD, 'PEACEFUL, 'STONE_MINE], "9" = ['CAPTURE_IGNORED, 'DAMAGE_BY_STORAGE, 'GAIA_KEPT, 'LION_TARGET, 'PEACEFUL, 'PREY], "10" = ['CAPTURE_IGNORED, 'DAMAGE_BY_STORAGE, 'GAIA_KEPT, 'PEACEFUL, 'PREDATOR], "11" = ['CAPTURE_IGNORED, 'GAIA_KEPT, 'MISCELLANEOUS, 'PEACEFUL], "12" = ['BOTH_LISTS_TARGET, 'CAVALRY, 'KEEPS_UNIT_AI_TO, 'LION_TARGET, 'MILITARY_COUNT, 'MILITARY_KEY, 'PREDATOR_TARGET], "13" = ['CATEGORY_LIST_TARGET, 'MILITARY_COUNT, 'RAM_TARGET, 'REPAIR_COSTED, 'SIEGE], "14" = ['CAPTURE_IGNORED, 'FOUNDATION_TERRAIN, 'GAIA_KEPT, 'PEACEFUL, 'TERRAIN], "15" = ['DAMAGE_BY_STORAGE_DEAD, 'PEACEFUL, 'TREE], "16" = ['PEACEFUL, 'TREE_STUMP], "17" = ['HEALER, 'MILITARY_KEY], "18" = ['CATEGORY_LIST_TARGET, 'MILITARY_COUNT, 'MILITARY_KEY, 'MONK, 'SHARES_UNIT_AI], "19" = ['CIVILIAN_COUNT, 'TRADER, 'TRADE_CART], "20" = ['BOAT, 'CATEGORY_LIST_TARGET, 'CIVILIAN_COUNT, 'MILITARY_KEY, 'REPAIRED_AT_SHORE, 'REPAIR_COSTED, 'TRANSPORT], "21" = ['BOAT, 'CATEGORY_LIST_TARGET, 'CIVILIAN_COUNT, 'FISHING_SHIP, 'REPAIRED_AT_SHORE, 'REPAIR_COSTED], "22" = ['BOAT, 'LEAST_HIT, 'MILITARY_COUNT, 'MILITARY_KEY, 'REPAIRED_AT_SHORE, 'REPAIR_COSTED, 'WARSHIP], "23" = ['CAVALRY_CANNON, 'LION_TARGET, 'MILITARY_COUNT, 'MILITARY_KEY, 'PREDATOR_TARGET], "24" = ['BOTH_LISTS_TARGET, 'LION_TARGET, 'MILITARY_COUNT, 'MILITARY_KEY, 'PREDATOR_TARGET, 'WAR_ELEPHANT], "25" = ['LION_TARGET, 'MILITARY_KEY, 'PREDATOR_TARGET], "26" = ['ELEPHANT_ARCHER, 'LION_TARGET, 'MILITARY_COUNT, 'MILITARY_KEY, 'PREDATOR_TARGET], "27" = ['CAPTURE_IGNORED, 'KEPT_BY_MEMBERS, 'NOT_ANY, 'PEACEFUL, 'PRIORITY_3_TARGET, 'RAM_TARGET, 'TREBUCHET_TARGET, 'WALL], "28" = ['LION_TARGET, 'MILITARY_COUNT, 'MILITARY_KEY, 'PHALANX, 'PREDATOR_TARGET], "29" = ['DAMAGE_BY_STORAGE, 'DOMESTIC_ANIMAL, 'PEACEFUL], "30" = ['CAPTURE_IGNORED, 'FLAG, 'PEACEFUL], "31" = ['DAMAGE_BY_STORAGE, 'DEEP_SEA_FISH, 'PEACEFUL], "32" = ['DAMAGE_BY_STORAGE_DEAD, 'GOLD_MINE, 'PEACEFUL], "33" = ['DAMAGE_BY_STORAGE, 'PEACEFUL, 'SHORE_FISH, 'WIDE_REACH], "34" = ['CLIFF, 'PEACEFUL], "35" = ['CATEGORY_LIST_TARGET, 'DEATH_BLAST, 'LION_TARGET, 'MILITARY_COUNT, 'MILITARY_KEY, 'NO_ATTACK, 'PETARD, 'PREDATOR_TARGET], "36" = ['CAVALRY_ARCHER, 'LEAST_HIT, 'LION_TARGET, 'MILITARY_COUNT, 'MILITARY_KEY, 'PREDATOR_TARGET], "37" = ['CAPTURE_IGNORED], "38" = ['BIRD, 'CAPTURE_IGNORED, 'DAMAGE_BY_STORAGE, 'GAIA_KEPT, 'PEACEFUL], "39" = ['CAPTURE_IGNORED, 'GATE, 'KEPT_BY_MEMBERS, 'NOT_ANY, 'PEACEFUL, 'PRIORITY_3_TARGET, 'RAM_TARGET, 'TREBUCHET_TARGET], "40" = ['DAMAGE_BY_STORAGE, 'GAIA_KEPT, 'PEACEFUL, 'SALVAGE_PILE], "41" = ['DAMAGE_BY_STORAGE, 'GAIA_KEPT, 'RESOURCE_PILE], "42" = ['ALWAYS_SPARED, 'CAPTURE_IGNORED, 'GAIA_KEPT, 'NEVER_EXHAUSTED, 'RELIC, 'UNDELETABLE, 'WHOLE_GARRISON_SHARE], "43" = ['CATEGORY_LIST_TARGET, 'MILITARY_COUNT, 'MILITARY_KEY, 'MONK_WITH_RELIC, 'SHARES_UNIT_AI], "44" = ['ARCHERY_CANNON, 'LEAST_HIT, 'LION_TARGET, 'MILITARY_COUNT, 'MILITARY_KEY, 'PREDATOR_TARGET], "45" = ['LION_TARGET, 'MILITARY_COUNT, 'MILITARY_KEY, 'PREDATOR_TARGET, 'TWO_HANDED_SWORDSMAN], "46" = ['LION_TARGET, 'MILITARY_COUNT, 'MILITARY_KEY, 'PIKEMAN, 'PREDATOR_TARGET], "47" = ['BOTH_LISTS_TARGET, 'KEEPS_UNIT_AI_FROM, 'LION_TARGET, 'MILITARY_COUNT, 'MILITARY_KEY, 'PREDATOR_TARGET, 'SCOUT_CAVALRY], "48" = ['DAMAGE_BY_STORAGE_DEAD, 'ORE_MINE, 'PEACEFUL], "49" = ['CAPTURE_IGNORED, 'CLOSEST_PASTURE, 'FARM, 'PRIORITY_3_TARGET, 'RAM_TARGET, 'TREBUCHET_TARGET], "50" = ['LION_TARGET, 'MILITARY_COUNT, 'MILITARY_KEY, 'PREDATOR_TARGET, 'SPEARMAN], "51" = ['ATTACK_MOVE_ATTACKS, 'CATEGORY_LIST_TARGET, 'MILITARY_COUNT, 'NEVER_PENDING, 'NOT_ANY, 'PACKED_TREBUCHET, 'RAM_TARGET, 'REPAIRED_AS_UNIT, 'REPAIR_COSTED, 'SKIPS_SIEGE_CHECK, 'STRUCK_BUILDING, 'TREBUCHET_TARGET, 'UNWATCHED], "52" = ['CAPTURE_IGNORED, 'KEPT_BY_MEMBERS, 'LEAST_HIT, 'MILITARY_KEY, 'NOT_ANY, 'PEACEFUL, 'PRIORITY_3_TARGET, 'RAM_TARGET, 'TOWER, 'TREBUCHET_TARGET], "53" = ['BOARDING_SHIP, 'BOAT, 'MILITARY_COUNT, 'MILITARY_KEY, 'REPAIRED_AT_SHORE, 'REPAIR_COSTED], "54" = ['ATTACK_MOVE_ATTACKS, 'CATEGORY_LIST_TARGET, 'MILITARY_COUNT, 'NEVER_PENDING, 'PACKED_ATTACKS_NOTHING, 'PACKS_TO_MOVE, 'RAM_TARGET, 'REPAIRED_AS_UNIT, 'REPAIR_COSTED, 'STRUCK_BUILDING, 'TREBUCHET_TARGET, 'UNPACKED_TREBUCHET, 'UNWATCHED], "55" = ['MILITARY_COUNT, 'RAM_TARGET, 'REPAIR_COSTED, 'SCORPION], "56" = ['LION_TARGET, 'MILITARY_COUNT, 'MILITARY_KEY, 'PREDATOR_TARGET, 'RAIDER], "57" = ['BOTH_LISTS_TARGET, 'CAVALRY_RAIDER, 'LION_TARGET, 'MILITARY_COUNT, 'MILITARY_KEY, 'PREDATOR_TARGET], "58" = ['CAPTURE_IGNORED, 'CLOSEST_LIVESTOCK, 'DAMAGE_BY_STORAGE, 'GAIA_KEPT, 'LIVESTOCK, 'PEACEFUL, 'UNDELETABLE], "59" = ['CATEGORY_LIST_TARGET, 'KING, 'MILITARY_KEY], "60" = ['CAPTURE_IGNORED, 'GAIA_KEPT, 'MISC_BUILDING, 'NOT_ATTACK_TARGET, 'PEACEFUL, 'PRIORITY_3_TARGET, 'UNDELETABLE], "61" = ['CATEGORY_LIST_TARGET, 'CONTROLLED_ANIMAL, 'DAMAGE_BY_STORAGE, 'NO_ATTACK_UNLESS_HERO], "62" = ['TRANSPORT_CATEGORY], "63" = ['DAMAGE_BY_STORAGE_DEAD, 'GOLD_FISH, 'PEACEFUL], "64" = ['DEATH_BLAST, 'LAND_MINE, 'NO_ATTACK, 'SELF_ALERTING] },
+-    masters = { "6" = ['CLASS_LIST_ONLY, 'ELITE_SKIRMISHER], "7" = ['CLASS_LIST_ONLY, 'SKIRMISHER], "13" = ['TRAPPER, 'TRAP_WAITER], "35" = ['BATTERING_RAM, 'BUILDINGS_ONLY_BLAST, 'MOVING_RULE_EXEMPT, 'RAM_TARGETS_ONLY], "42" = ['LONG_PATH_MOVER, 'TREBUCHET], "45" = ['BOAT_HUNTER, 'DOCK, 'REGATHERED, 'SEARCH_FROM_FOOTPRINT], "50" = ['DROP_SITE, 'FARM, 'NEVER_CONVERTED, 'REGATHERED, 'STOP_FARM, 'TOWER_SPARED, 'UNSTOPPED], "53" = ['BOAT_CONVERTER], "68" = ['DROP_SITE], "70" = ['HOUSE], "73" = ['CHU_KO_NU, 'QUIET_SWING], "82" = ['BOAT_HUNTER, 'CASTLE], "83" = ['VILLAGER_MALE], "84" = ['MARKET, 'TRADE_TARGET], "104" = ['MONASTERY], "109" = ['BOAT_HUNTER, 'NEVER_CONVERTED, 'PACKED_PEACEFUL, 'TOWN_CENTRE], "112" = ['CIRCLE_SIGHT], "118" = ['BUILDER], "128" = ['DEFENDLESS], "159" = ['NEVER_CONVERTED], "199" = ['DROP_SITE, 'FISH_TRAP, 'NEVER_CONVERTED, 'UNSTOPPED], "214" = ['FARM_WAITER], "259" = ['FARM_WAITER], "274" = ['CLEARING_FLAG], "276" = ['UNSTOPPED, 'WONDER], "282" = ['REFILL_LISTED], "285" = ['RELIC], "293" = ['VILLAGER_FEMALE], "329" = ['REFILL_LISTED], "330" = ['REFILL_LISTED], "331" = ['TREBUCHET_PACKED], "357" = ['DEAD_FARM, 'DEAD_FARM_SITE, 'TERRAIN_ORIGINAL], "420" = ['MOVING_RULE_EXEMPT], "422" = ['BUILDINGS_ONLY_BLAST, 'CAPPED_RAM, 'MOVING_RULE_EXEMPT, 'RAM_TARGETS_ONLY], "434" = ['KING], "440" = ['PETARD], "444" = ['PEACEFUL_SOLDIER], "448" = ['SCOUT_CAVALRY], "527" = ['DEATH_BLAST, 'DEFENSIVE_SOLDIER, 'DEMOLITION_SHIP], "528" = ['DEATH_BLAST, 'DEFENSIVE_SOLDIER, 'HEAVY_DEMOLITION_SHIP, 'STRAYING_MISS], "546" = ['LIGHT_CAVALRY], "548" = ['BUILDINGS_ONLY_BLAST, 'MOVING_RULE_EXEMPT, 'RAM_TARGETS_ONLY, 'SIEGE_RAM], "556" = ['REFILL_LISTED], "559" = ['ELITE_CHU_KO_NU, 'QUIET_SWING], "562" = ['DROP_SITE], "584" = ['DROP_SITE], "618" = ['NEVER_CONVERTED], "619" = ['NEVER_CONVERTED], "620" = ['NEVER_CONVERTED], "621" = ['DROP_SITE, 'MODE_TESTED, 'NEVER_CONVERTED, 'TOWN_CENTRE_621], "691" = ['MOVING_RULE_EXEMPT], "704" = ['KING_UNLED], "706" = ['IDLES_STILL], "775" = ['MISSIONARY], "814" = ['HORSE], "826" = ['MONUMENT], "854" = ['TORCH_CONVERTING], "1104" = ['DEATH_BLAST, 'DEFENSIVE_SOLDIER, 'DEMOLITION_RAFT], "1105" = ['SIEGE_TOWER], "1187" = ['DROP_SITE, 'NEVER_CONVERTED, 'REGATHERED, 'RICE_FARM, 'STOP_FARM, 'TOWER_SPARED, 'UNSTOPPED], "1188" = ['DEAD_FARM_SITE, 'DEAD_RICE_FARM, 'TERRAIN_ORIGINAL], "1258" = ['BATTERING_RAM_1258, 'BUILDINGS_ONLY_BLAST, 'MOVING_RULE_EXEMPT, 'RAM_TARGETS_ONLY], "1263" = ['FLAMING_CAMEL], "1649" = ['TRANSFORMED_TROPHY], "1663" = ['FLEMISH_MILITIA, 'MILITARY_235], "1689" = ['CLEARING_FLAG], "1697" = ['FLEMISH_MILITIA_FEMALE, 'MILITARY_235], "1704" = ['UNTURNED_ATTACKER], "1706" = ['UNTURNED_ATTACKER], "1715" = ['JADWIGA], "1744" = ['ARMORED_ELEPHANT, 'BUILDING_BY_PRIORITY, 'MOVING_RULE_EXEMPT], "1746" = ['BUILDING_BY_PRIORITY, 'MOVING_RULE_EXEMPT, 'SIEGE_ELEPHANT], "1785" = ['CLEARING_FLAG], "1808" = ['DROP_SITE, 'MULE_CART], "1810" = ['VILLAGER_ANY], "1811" = ['WARRIOR_PRIEST], "1822" = ['TAMAR], "1889" = ['PASTURE_1889], "1891" = ['FARM_WAITER], "1892" = ['FARM_WAITER], "1893" = ['COUNTED_PASTURE, 'PASTURE_MANGROVE, 'UNEXHAUSTED], "1894" = ['DEAD_PASTURE_MANGROVE], "1897" = ['COUNTED_PASTURE, 'PASTURE, 'UNEXHAUSTED], "1898" = ['DEAD_PASTURE], "2133" = ['DEATH_BLAST, 'INCENDIARY_RAFT], "2134" = ['DEATH_BLAST, 'INCENDIARY_SHIP], "2135" = ['DEATH_BLAST, 'HEAVY_INCENDIARY_SHIP], "2171" = ['TRAPPER, 'TRAP_WAITER], "2172" = ['PORT, 'SEARCH_FROM_FOOTPRINT], "2356" = ['TRAPPER, 'TRAP_WAITER] },
++    masters = { "6" = ['CLASS_LIST_ONLY, 'ELITE_SKIRMISHER], "7" = ['CLASS_LIST_ONLY, 'SKIRMISHER], "13" = ['TRAPPER, 'TRAP_WAITER], "35" = ['BATTERING_RAM, 'BUILDINGS_ONLY_BLAST, 'MOVING_RULE_EXEMPT, 'RAM_TARGETS_ONLY], "42" = ['LONG_PATH_MOVER, 'TREBUCHET], "45" = ['BOAT_HUNTER, 'DOCK, 'REGATHERED, 'SEARCH_FROM_FOOTPRINT], "50" = ['DROP_SITE, 'FARM, 'NEVER_CONVERTED, 'REGATHERED, 'STOP_FARM, 'TOWER_SPARED, 'UNSTOPPED], "53" = ['BOAT_CONVERTER], "68" = ['DROP_SITE], "70" = ['HOUSE], "73" = ['CHU_KO_NU, 'QUIET_SWING], "82" = ['BOAT_HUNTER, 'CASTLE], "83" = ['VILLAGER_MALE], "84" = ['MARKET, 'TRADE_TARGET], "104" = ['MONASTERY], "109" = ['BOAT_HUNTER, 'NEVER_CONVERTED, 'PACKED_PEACEFUL, 'TOWN_CENTRE], "112" = ['CIRCLE_SIGHT], "118" = ['BUILDER], "128" = ['DEFENDLESS], "159" = ['NEVER_CONVERTED], "199" = ['DROP_SITE, 'FISH_TRAP, 'NEVER_CONVERTED, 'UNSTOPPED], "214" = ['FARM_WAITER], "259" = ['FARM_WAITER], "274" = ['CLEARING_FLAG], "276" = ['UNSTOPPED, 'WONDER], "282" = ['REFILL_LISTED], "285" = ['RELIC], "293" = ['VILLAGER_FEMALE], "329" = ['REFILL_LISTED], "330" = ['REFILL_LISTED], "331" = ['TREBUCHET_PACKED], "357" = ['DEAD_FARM, 'DEAD_FARM_SITE, 'TERRAIN_ORIGINAL], "420" = ['MOVING_RULE_EXEMPT], "422" = ['BUILDINGS_ONLY_BLAST, 'CAPPED_RAM, 'MOVING_RULE_EXEMPT, 'RAM_TARGETS_ONLY], "434" = ['KING], "440" = ['PETARD], "444" = ['PEACEFUL_SOLDIER], "448" = ['SCOUT_CAVALRY], "527" = ['DEATH_BLAST, 'DEFENSIVE_SOLDIER, 'DEMOLITION_SHIP], "528" = ['DEATH_BLAST, 'DEFENSIVE_SOLDIER, 'HEAVY_DEMOLITION_SHIP, 'STRAYING_MISS], "546" = ['LIGHT_CAVALRY], "548" = ['BUILDINGS_ONLY_BLAST, 'MOVING_RULE_EXEMPT, 'RAM_TARGETS_ONLY, 'SIEGE_RAM], "556" = ['REFILL_LISTED], "559" = ['ELITE_CHU_KO_NU, 'QUIET_SWING], "562" = ['DROP_SITE], "584" = ['DROP_SITE], "618" = ['NEVER_CONVERTED], "619" = ['NEVER_CONVERTED], "620" = ['NEVER_CONVERTED], "621" = ['DROP_SITE, 'MODE_TESTED, 'NEVER_CONVERTED, 'TOWN_CENTRE_621], "691" = ['MOVING_RULE_EXEMPT], "704" = ['KING_UNLED], "706" = ['IDLES_STILL], "775" = ['MISSIONARY], "814" = ['HORSE], "826" = ['MONUMENT], "854" = ['TORCH_CONVERTING], "1104" = ['DEATH_BLAST, 'DEFENSIVE_SOLDIER, 'DEMOLITION_RAFT], "1105" = ['SIEGE_TOWER], "1187" = ['DROP_SITE, 'NEVER_CONVERTED, 'REGATHERED, 'RICE_FARM, 'STOP_FARM, 'TOWER_SPARED, 'UNSTOPPED], "1188" = ['DEAD_FARM_SITE, 'DEAD_RICE_FARM, 'TERRAIN_ORIGINAL], "1258" = ['BATTERING_RAM_1258, 'BUILDINGS_ONLY_BLAST, 'MOVING_RULE_EXEMPT, 'RAM_TARGETS_ONLY], "1263" = ['FLAMING_CAMEL], "1649" = ['TRANSFORMED_TROPHY], "1663" = ['FLEMISH_MILITIA, 'MILITARY_235], "1689" = ['CLEARING_FLAG], "1697" = ['FLEMISH_MILITIA_FEMALE, 'MILITARY_235], "1704" = ['UNTURNED_ATTACKER], "1706" = ['UNTURNED_ATTACKER], "1715" = ['JADWIGA], "1744" = ['ARMORED_ELEPHANT, 'BUILDING_BY_PRIORITY, 'MOVING_RULE_EXEMPT], "1746" = ['BUILDING_BY_PRIORITY, 'MOVING_RULE_EXEMPT, 'SIEGE_ELEPHANT], "1785" = ['CLEARING_FLAG], "1808" = ['DROP_SITE, 'MULE_CART], "1810" = ['VILLAGER_ANY], "1811" = ['WARRIOR_PRIEST], "1822" = ['TAMAR], "1889" = ['PASTURE_1889], "1891" = ['FARM_WAITER], "1892" = ['FARM_WAITER], "1893" = ['COUNTED_PASTURE, 'PASTURE_MANGROVE, 'UNEXHAUSTED], "1894" = ['DEAD_PASTURE_MANGROVE], "1897" = ['COUNTED_PASTURE, 'PASTURE, 'UNEXHAUSTED], "1898" = ['DEAD_PASTURE], "2133" = ['DEATH_BLAST, 'INCENDIARY_RAFT], "2134" = ['DEATH_BLAST, 'INCENDIARY_SHIP], "2135" = ['DEATH_BLAST, 'HEAVY_INCENDIARY_SHIP], "2171" = ['TRAPPER, 'TRAP_WAITER], "2172" = ['PORT, 'SEARCH_FROM_FOOTPRINT], "2356" = ['TRAPPER, 'TRAP_WAITER], "2630" = ['TRAP_WAITER] },
+     techs = {  },
+     attributes = { "0" = ['FOOD, 'HUNTED_LOAD], "1" = ['HUNTED_LOAD, 'WOOD], "2" = ['STONE], "3" = ['GOLD], "4" = ['HEADROOM], "7" = ['RELICS_HELD], "11" = ['ALIVE_STORAGE, 'MAGNITUDE_STORAGE], "15" = ['HUNTED_LOAD], "16" = ['FARM_FOOD], "19" = ['MAGNITUDE_STORAGE], "33" = ['EFFECT_FUNCTION], "36" = ['FARM_FOOD_AMOUNT], "50" = ['ALLIED_VISION], "56" = ['ORE], "57" = ['RELIC], "183" = ['SHARED_VISION], "196" = ['SPREAD_ATTRIBUTE], "292" = ['DECAY_TASK] },
+   },
 @@ -11,7 +11,7 @@
      class = { building = 3, villager = 4, farm = 49, livestock = 58, },
      master = { farm = 50, mill = 68, castle = 82, villager_male = 83, market = 84, town_centre = 109, flare = 112, builder = 118, villager_repairer_male = 156, fish_trap = 199, castle_mode_1 = 209, villager_repairer_female = 222, doppelganger = 243, flare_2 = 274, villager_female = 293, king = 434, town_centre_444 = 444, boarding_galley = 535, town_centre_621 = 621, flare_4 = 697, rice_farm = 1187, market_1647 = 1647, mule_cart = 1808, pasture_1889 = 1889, pasture_mangrove = 1893, pasture = 1897, pasture_argali = 1899, pasture_ibex = 1900, },
@@ -1249,7 +1258,7 @@ index c4299951..d7131358 100644
              .unwrap();
          assert_eq!(angle, Some(Angle::ZERO));
 diff --git a/crates/engine/genie-core/src/combat/missile/unit.rs b/crates/engine/genie-core/src/combat/missile/unit.rs
-index 9edd4dcf..0c58d35e 100644
+index 9edd4dcf..ffcb31eb 100644
 --- a/crates/engine/genie-core/src/combat/missile/unit.rs
 +++ b/crates/engine/genie-core/src/combat/missile/unit.rs
 @@ -1,6 +1,7 @@
@@ -1270,7 +1279,15 @@ index 9edd4dcf..0c58d35e 100644
  use crate::math::rng::Stream;
  use crate::objects::HitPoints;
  use crate::objects::ObjectId;
-@@ -31,8 +33,8 @@ use genie_model::model::Model;
+@@ -22,6 +24,7 @@ use crate::objects::ObjectKey;
+ use crate::objects::ObjectState;
+ use crate::objects::lifecycle::death_parts::forget_resource;
+ use crate::objects::masters::BlastDefense;
++use crate::objects::masters::MasterId;
+ use crate::objects::masters::MasterKind;
+ use crate::objects::masters::player_master;
+ use crate::objects::unit::{Unit, missed_passes};
+@@ -31,8 +34,8 @@ use genie_model::model::Model;
  
  use crate::combat::attack::{Hit, strike};
  use crate::combat::missile::{
@@ -1281,7 +1298,7 @@ index 9edd4dcf..0c58d35e 100644
  };
  use crate::objects::layers::Action;
  use crate::objects::masters::MasterTables;
-@@ -41,6 +43,7 @@ use crate::world::index::ObjectsRef;
+@@ -41,6 +44,7 @@ use crate::world::index::ObjectsRef;
  use crate::world::layer::Roles;
  use crate::world::lets::release;
  use crate::world::others::OthersRef;
@@ -1289,7 +1306,7 @@ index 9edd4dcf..0c58d35e 100644
  use crate::world::player::Player;
  use crate::world::slots::PlayerSlots;
  use crate::world::step::Step;
-@@ -54,8 +57,8 @@ impl Unit {
+@@ -54,8 +58,8 @@ impl Unit {
      /// slot 0x58, holds it on the map and puts it on the ground by its fly mode once it is no
      /// farther than 0.1 from its point, [`crate::combat::missile::grounded`]); the objects its step
      /// crossed meet it ([`Unit::missile_hits`]); a missile whose height is the ground's lands
@@ -1300,7 +1317,7 @@ index 9edd4dcf..0c58d35e 100644
      /// modelled.
      pub(crate) fn fly(
          &mut self,
-@@ -80,8 +83,7 @@ impl Unit {
+@@ -80,8 +84,7 @@ impl Unit {
      ///
      /// # Errors
      ///
@@ -1310,7 +1327,7 @@ index 9edd4dcf..0c58d35e 100644
      pub(crate) fn missile_ends(
          &mut self,
          action: &mut MissileAction,
-@@ -116,10 +118,46 @@ impl Unit {
+@@ -116,10 +119,46 @@ impl Unit {
              action.target = None;
          }
          if action.fired_from.is_some() && shooter_state.is_some_and(dead) {
@@ -1358,20 +1375,46 @@ index 9edd4dcf..0c58d35e 100644
          Ok(())
      }
  
-@@ -216,8 +254,10 @@ impl Unit {
+@@ -216,8 +255,10 @@ impl Unit {
      /// ([`Unit::missile_strike`]); unless the master's vanish mode has
      /// [`crate::combat::missile::VanishMode::PASSES_THROUGH`] or a shield blocked it, the missile
      /// ends (`set_state` 1: slot 0xd8, its hit points 0). The step's objects become the met ones
 -    /// (`+0x88`) when there are any. A missed missile's hit on another object than its target, hit
 -    /// mode 2 and the Hussite wagon's case (`+0x90`) are not modelled.
 +    /// (`+0x88`) when there are any. Hit
-+    /// mode 2 and the Hussite wagon's case (`+0x90`) are not modelled. A missed missile's hit on another
++    /// mode 2 is not modelled; the Hussite wagon's case (`+0x90`) is an error. A missed missile's hit on another
 +    /// object than its target strikes that object at the factor 0.5 (188329 `0xb8fd60`; the master's
 +    /// own factor for smart mode bit 1 is not modelled).
      pub(crate) fn missile_hits(
          &mut self,
          actions: &mut Action,
-@@ -248,7 +288,8 @@ impl Unit {
+@@ -236,6 +277,25 @@ impl Unit {
+             .combat_part()
+             .blast_level;
+         let met = self.missile_meets(stats, old, c)?;
++        // 188329 0xb8fd60 at 0xb904c4..0xb90600: while its +0x90 is clear, the first met object of
++        // another player (allies too) that is not its target and is a Hussite wagon (masters
++        // 0x6a8, 0x6aa) sets +0x90 and +0x94 (the wagon's id): the missile's factor is then 0.5 for
++        // the rest of its flight and the wagon is struck too. Not modelled: a clear stop.
++        if hussite_stop_188329() {
++            let target = action.target.map(MissileTargetId::id);
++            let wagon = met.iter().any(|&(id, player, _, _)| {
++                player != c.player
++                    && Some(id) != target
++                    && c.w
++                        .live_object(player, id)
++                        .is_some_and(|u| HUSSITE_WAGONS.contains(&u.life.master_id))
++            });
++            if wagon {
++                return Err(GenieError::unsupported(
++                    "a missile meeting a Hussite wagon (188329 0xb8fd60 +0x90, factor 0.5)",
++                ));
++            }
++        }
+         for &(id, player, kind, level) in &met {
+             if action.state == MissileState::Done {
+                 break;
+@@ -248,7 +308,8 @@ impl Unit {
                      if Some(id) != action.target.map(MissileTargetId::id) {
                          continue;
                      }
@@ -1381,7 +1424,7 @@ index 9edd4dcf..0c58d35e 100644
                      action.result = result;
                      if !stats.vanish_mode.contains(VanishMode::PASSES_THROUGH)
                          && result != StrikeResult::Shielded
-@@ -262,11 +303,27 @@ impl Unit {
+@@ -262,11 +323,27 @@ impl Unit {
                          continue;
                      }
                      if Some(id) != action.target.map(MissileTargetId::id) {
@@ -1413,7 +1456,7 @@ index 9edd4dcf..0c58d35e 100644
                      action.result = result;
                      // the master's dying sprite plays there (a sprite of its own, not held)
                      if (stats.vanish_mode.contains(VanishMode::PASSES_THROUGH)
-@@ -378,6 +435,7 @@ impl Unit {
+@@ -378,6 +455,7 @@ impl Unit {
          actions: &mut Action,
          action: &MissileAction,
          fired: Fired,
@@ -1421,7 +1464,7 @@ index 9edd4dcf..0c58d35e 100644
          c: &mut Step<'_>,
          roles: &Roles,
      ) -> Result<StrikeResult, GenieError> {
-@@ -386,9 +444,9 @@ impl Unit {
+@@ -386,9 +464,9 @@ impl Unit {
              return Err(GenieError::unsupported("a charge projectile's own hit"));
          }
          if action.fired_from.is_none() {
@@ -1433,7 +1476,7 @@ index 9edd4dcf..0c58d35e 100644
          let (p, mode_680) = (c.player, c.w.mode_680);
          let shooter_slot = c.w.live_index(p, action.fired_from);
          let World {
-@@ -441,6 +499,7 @@ impl Unit {
+@@ -441,6 +519,7 @@ impl Unit {
              from_z: Some(action.origin.position.z()),
              kind: HitKind::Missile,
              chance: master.combat_part().hit_chance,
@@ -1441,7 +1484,7 @@ index 9edd4dcf..0c58d35e 100644
          };
          let object = streams.get(Stream::Object);
          let struck = strike(
-@@ -480,21 +539,18 @@ impl Unit {
+@@ -480,21 +559,18 @@ impl Unit {
      /// factor (the missile's slot 0x1f0, `FUN_14113e550`: 1 for an origin without an owner); the
      /// damage's notify comes from what it was fired from (`+0x998`, [`crate::combat::damage`]). The
      /// executed action goes to the missile's unit AI, which it has none of; what a retaliation
@@ -1467,7 +1510,7 @@ index 9edd4dcf..0c58d35e 100644
          let master = self.master(c.w.master_tables(), c.player)?;
          if Distance::ZERO < master.combat_part().area_effect {
              return Err(GenieError::unsupported(
-@@ -520,15 +576,17 @@ impl Unit {
+@@ -520,15 +596,17 @@ impl Unit {
          );
          // the missile's own part is out of the unit while it flies
          own.source.fired_from = fired_from;
@@ -1486,7 +1529,7 @@ index 9edd4dcf..0c58d35e 100644
          };
          let object = c.w.streams.get(Stream::Object);
          let struck = strike(
-@@ -553,6 +611,49 @@ impl Unit {
+@@ -553,6 +631,49 @@ impl Unit {
          Ok(struck.result)
      }
  
@@ -1536,7 +1579,7 @@ index 9edd4dcf..0c58d35e 100644
      /// `FUN_140a9e6e0`'s landing: a missile still flying toward a target it did not meet lands on
      /// it when it lies on the target's box ([`crate::combat::missile::on_target`]) and its master's hit
      /// mode is 0 or 2, or 1 against another player's target: the shooter's hit
-@@ -638,7 +739,8 @@ impl Unit {
+@@ -638,7 +759,8 @@ impl Unit {
          if stats.hit_mode.strikes_on_landing(owner)
              && on_target(self.position(), stats.radius, v.position, v.radius)
          {
@@ -1546,7 +1589,7 @@ index 9edd4dcf..0c58d35e 100644
              action.result = result;
              if result != StrikeResult::Shielded {
                  self.end_missile(action);
-@@ -695,3 +797,43 @@ impl Unit {
+@@ -695,3 +817,57 @@ impl Unit {
          Ok(())
      }
  }
@@ -1589,6 +1632,20 @@ index 9edd4dcf..0c58d35e 100644
 +        }
 +    }
 +    false
++}
++
++/// The Hussite wagons' masters (188329 0xb904ed, 0xb90506: 0x6aa, 0x6a8) that a missile meets on
++/// its way ([`Unit::missile_hits`]).
++const HUSSITE_WAGONS: [MasterId; 2] = [MasterId::named(1704), MasterId::named(1706)];
++
++/// `GENIE_EXPERIMENT_HUSSITESTOP_188329` (on by default, "0" turns it off): a missile meeting a
++/// Hussite wagon stops the run as unsupported instead of flying on at full damage.
++#[must_use]
++fn hussite_stop_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| {
++        crate::env_os!("GENIE_EXPERIMENT_HUSSITESTOP_188329").is_none_or(|v| v != "0")
++    })
 +}
 diff --git a/crates/engine/genie-core/src/combat/mod.rs b/crates/engine/genie-core/src/combat/mod.rs
 index 0fb891c7..83511618 100644
@@ -2638,7 +2695,7 @@ index c7a0cf8b..e36379ba 100644
              .get(target)
              .ok_or(GenieError::unsupported(
 diff --git a/crates/engine/genie-core/src/construction/build/placing.rs b/crates/engine/genie-core/src/construction/build/placing.rs
-index 89344b09..0cc0cd71 100644
+index 89344b09..7dd93824 100644
 --- a/crates/engine/genie-core/src/construction/build/placing.rs
 +++ b/crates/engine/genie-core/src/construction/build/placing.rs
 @@ -73,7 +73,7 @@ impl BuildAction {
@@ -2719,7 +2776,31 @@ index 89344b09..0cc0cd71 100644
              }
          }
          if !self.added {
-@@ -393,18 +396,23 @@ impl BuildAction {
+@@ -353,7 +356,22 @@ impl BuildAction {
+         reads: &BuildReads,
+     ) -> Result<(), GenieError> {
+         let site = Self::site_unit(c, reads)?.ok_or(FOREIGN_SITE)?;
+-        let mut rate = self.task.work_rate * self.task.work_value * c.dt.seconds();
++        // 188329 0xba1b10 @0xba2b7a: the builder's slot 0x270 (0x11393d0) every work tick, its
++        // powerup (slot 0x748) plus its master's work rate (+0x238); the per-object modifier map
++        // (0x1241910 key 13) is not modelled, as for the repair
++        let work_rate = if build_rate_188329() {
++            c.w.parts.combat_of(builder.id).work_rate_powerup
++                + builder
++                    .master(
++                        MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
++                        c.player,
++                    )?
++                    .action_part()
++                    .work_rate
++        } else {
++            self.task.work_rate
++        };
++        let mut rate = work_rate * self.task.work_value * c.dt.seconds();
+         let mut factor =
+             c.w.players
+                 .player(c.player)?
+@@ -393,18 +411,23 @@ impl BuildAction {
      /// state 3, as a `MoveTo` to a point is far from it (`FUN_140aa2100`), in 13 for a unit
      /// without speed.
      ///
@@ -2746,7 +2827,7 @@ index 89344b09..0cc0cd71 100644
      ) -> Result<(), GenieError> {
          let by_id = ObjectsRef::new(
              &c.w.players,
-@@ -418,18 +426,16 @@ impl BuildAction {
+@@ -418,18 +441,16 @@ impl BuildAction {
          let site = c.w.spatial.get(footprint).ok_or(SITE_GONE)?;
          let site = (site.position, site.radius);
          let at = builder.position();
@@ -2775,6 +2856,21 @@ index 89344b09..0cc0cd71 100644
          self.state = BuildState::Clear { move_to: None };
          let move_reads = builder.move_to_reads(
              c.w.parts.motion.mover(builder.id),
+@@ -512,3 +533,14 @@ pub(super) const fn beside_diagonal(bx: i32, by: i32, dx: i32, dy: i32) -> (Tile
+         (Tile::new(bx, by - 1), Tile::new(bx - 1, by))
+     }
+ }
++
++/// `GENIE_EXPERIMENT_BUILDRATE_188329` (on by default, "0" turns it off): a builder's work rate is
++/// read every work tick (188329 0xba1b10 @0xba2b7a, slot 0x270) instead of the one its Build task
++/// took when it started.
++#[must_use]
++fn build_rate_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| {
++        crate::env_os!("GENIE_EXPERIMENT_BUILDRATE_188329").is_none_or(|v| v != "0")
++    })
++}
 diff --git a/crates/engine/genie-core/src/construction/build/states.rs b/crates/engine/genie-core/src/construction/build/states.rs
 index 76304cf8..cae77147 100644
 --- a/crates/engine/genie-core/src/construction/build/states.rs
@@ -4728,22 +4824,20 @@ index 9510abdd..12426307 100644
 +    Ok(zones.zone(Tile::new(at.x() as i32, at.y() as i32)))
 +}
 diff --git a/crates/engine/genie-core/src/gathering/drop_off.rs b/crates/engine/genie-core/src/gathering/drop_off.rs
-index 1e001e13..e4f7a99c 100644
+index 1e001e13..cf1bde44 100644
 --- a/crates/engine/genie-core/src/gathering/drop_off.rs
 +++ b/crates/engine/genie-core/src/gathering/drop_off.rs
-@@ -8,9 +8,10 @@ use crate::gathering::drop_sites::SitePlace;
+@@ -8,8 +8,9 @@ use crate::gathering::drop_sites::SitePlace;
  use crate::gathering::drop_sites::SiteSearch;
  use crate::gathering::drop_sites::{Seeker, drop_site_search};
  use crate::gathering::gather::GatherState;
 +use crate::gathering::gather::FARM_WAIT_TIME;
  use crate::gathering::gather::unit::NO_GATHER;
 -use crate::gathering::gather::{GatherRetarget, Walks};
--use crate::gathering::gather::{Resource, StopRate, productivity_of, waits_for_farm};
 +use crate::gathering::gather::{GatherRetarget, RetargetAi, Walks};
-+use crate::gathering::gather::{Resource, StopRate, productivity_of};
+ use crate::gathering::gather::{Resource, StopRate, productivity_of, waits_for_farm};
  use crate::gathering::hunt::NO_HUNT;
  use crate::map::Distance;
- use crate::map::Position;
 @@ -23,6 +24,7 @@ use crate::objects::ObjectId;
  use crate::objects::ObjectState;
  use crate::objects::layers::Action;
@@ -4830,7 +4924,7 @@ index 1e001e13..e4f7a99c 100644
          self.after_drop_retarget(actions, c, found, by, roles)
              .map(|()| HeadCode::Keeps)
      }
-@@ -116,19 +170,35 @@ impl Unit {
+@@ -116,19 +170,37 @@ impl Unit {
              return Ok(None);
          };
          let class = ai.target_class.or(gather.target_class);
@@ -4870,12 +4964,14 @@ index 1e001e13..e4f7a99c 100644
      /// Nothing found after the drop: a Gather with its point walks there to search again
 -    /// (`set_state(11)` within the task's range; a farmer's 0xf3 is not modelled); without one
 +    /// (`set_state(11)` within the task's range), a farmer's (masters 259, 214, 1891, 1892; 188329
-+    /// `0xb800b0` after the deposit, `0xb7e500` case 0xf3) waits a second for another farm
++    /// `0xb800b0` after the deposit, `0xb7e500` case 0xf3), and a fishing ship's on a fish trap
++    /// (masters 13, 2356, 2171, 2630 with the Gather's target class 0x31; 188329 0xb823af..0xb823e1,
++    /// [`waits_for_farm`]) waits a second for another farm
 +    /// (`set_state(0xf3)`: as the search's, the unit AI's notify 0x202, the unit stands); without one
      /// (`LAB_140a8ed55`) a computer player's Gather is done (its code; its deletion lets the drop
      /// site go), a human's idles (`set_state(2)`: its targets and point cleared, its sprite
      /// [`Unit::idle_sprite`]'s) and lets its drop site go.
-@@ -139,11 +209,9 @@ impl Unit {
+@@ -139,11 +211,9 @@ impl Unit {
          by: Releaser,
          roles: &Roles,
      ) -> Result<HeadCode, GenieError> {
@@ -4884,14 +4980,22 @@ index 1e001e13..e4f7a99c 100644
 -            actions.list.gather().and_then(|g| g.target_class),
 -            roles,
 -        );
-+        let farm_waits = roles
++        let farm_waiter = roles
 +            .of_master(self.life.master_id)
 +            .contains(MasterRoles::FARM_WAITER);
          let walks = self.move_walks(
              c.w.parts.mover_of(self.id),
              MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
-@@ -157,9 +225,22 @@ impl Unit {
+@@ -155,11 +225,30 @@ impl Unit {
+             roles,
+         )?;
          let gather = actions.list.gather_mut().ok_or(NO_GATHER)?;
++        // 188329 0xb8232d..0xb823e1: the farmers' masters, then the fishing ships' on a fish trap
++        let farm_waits = if trap_wait_188329() {
++            waits_for_farm(self.life.master_id, gather.target_class, roles)
++        } else {
++            farm_waiter
++        };
          if gather.point.x() != -1.0 && gather.point.y() != -1.0 {
              if farm_waits {
 -                return Err(GenieError::unsupported(
@@ -4916,7 +5020,7 @@ index 1e001e13..e4f7a99c 100644
              }
              // set_state(11) without a target: to the point within the task's range
              let mover =
-@@ -265,7 +346,7 @@ impl Unit {
+@@ -265,7 +354,7 @@ impl Unit {
          };
          let old = gather.targets();
          let rng = c.w.streams.get(Stream::Action);
@@ -4925,7 +5029,7 @@ index 1e001e13..e4f7a99c 100644
              GatherRetarget {
                  target: &resource,
                  player: c.player,
-@@ -280,6 +361,15 @@ impl Unit {
+@@ -280,6 +369,19 @@ impl Unit {
              &c.w.model.tuning,
          )?;
          let new = gather.targets();
@@ -4936,12 +5040,16 @@ index 1e001e13..e4f7a99c 100644
 +                RetargetAi::Aims => {
 +                    unit_ai.target_at(Some(found), Some(resource.class), resource.position);
 +                }
++                RetargetAi::AimsThenForgets => {
++                    unit_ai.target_at(Some(found), Some(resource.class), resource.position);
++                    unit_ai.remove_target();
++                }
 +            }
 +        }
          for (old, new) in old.into_iter().zip(new) {
              if old == new {
                  continue;
-@@ -398,11 +488,14 @@ impl Unit {
+@@ -398,11 +500,14 @@ impl Unit {
          }
          let gather = actions.list.gather().ok_or(NO_GATHER)?;
          let (carry_to, state) = (gather.carry_to, gather.state);
@@ -4957,7 +5065,7 @@ index 1e001e13..e4f7a99c 100644
              ActionState::new(state.get()),
              by_id,
          )?;
-@@ -448,11 +541,12 @@ impl Unit {
+@@ -448,11 +553,12 @@ impl Unit {
          }
          let hunt = actions.list.hunt().ok_or(NO_HUNT)?;
          let (carry_to, state) = (hunt.carry_to, hunt.state);
@@ -4971,7 +5079,7 @@ index 1e001e13..e4f7a99c 100644
              ActionState::new(state.get()),
              by_id,
          )?;
-@@ -485,14 +579,14 @@ impl Unit {
+@@ -485,14 +591,14 @@ impl Unit {
      /// The drop site a gatherer's (with its mover `mover`) `set_state(8)` walks to, its second
      /// target `carry_to` or, with
      /// none and a master with drop sites (`+0x7a0`), the closest of them (`FUN_1411671e0`: first
@@ -4989,7 +5097,7 @@ index 1e001e13..e4f7a99c 100644
          state: ActionState,
          by_id: ObjectsRef<'_>,
      ) -> Result<(Option<DropSiteId>, Distance), GenieError> {
-@@ -504,14 +598,25 @@ impl Unit {
+@@ -504,14 +610,25 @@ impl Unit {
                  "a drop-off of a player without masters",
              ))?;
              let sites = &master.action_part().drop_sites;
@@ -5023,6 +5131,21 @@ index 1e001e13..e4f7a99c 100644
                  Some(s) => Some(s),
                  None => drop_site_search(
                      others.own_iter(),
+@@ -627,3 +744,14 @@ impl Unit {
+         )
+     }
+ }
++
++/// `GENIE_EXPERIMENT_TRAPWAIT_188329` (on by default, "0" turns it off): after a drop with nothing
++/// found, a fishing ship on a fish trap waits for another farm as a farmer does (188329 0xb800b0 at
++/// 0xb823af..0xb823e1) instead of walking back to its point.
++#[must_use]
++fn trap_wait_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| {
++        crate::env_os!("GENIE_EXPERIMENT_TRAPWAIT_188329").is_none_or(|v| v != "0")
++    })
++}
 diff --git a/crates/engine/genie-core/src/gathering/drop_sites.rs b/crates/engine/genie-core/src/gathering/drop_sites.rs
 index acdc7c73..b3bbb64f 100644
 --- a/crates/engine/genie-core/src/gathering/drop_sites.rs
@@ -5321,10 +5444,10 @@ index 88cd0044..b248e3dd 100644
  
  /// What an update asks of the caller.
 diff --git a/crates/engine/genie-core/src/gathering/gather/start.rs b/crates/engine/genie-core/src/gathering/gather/start.rs
-index 01be8685..e401e0ab 100644
+index 01be8685..50e12ef0 100644
 --- a/crates/engine/genie-core/src/gathering/gather/start.rs
 +++ b/crates/engine/genie-core/src/gathering/gather/start.rs
-@@ -57,6 +57,19 @@ pub struct GatherStart<'a> {
+@@ -57,6 +57,34 @@ pub struct GatherStart<'a> {
      pub walks: Walks<'a>,
  }
  
@@ -5339,12 +5462,27 @@ index 01be8685..e401e0ab 100644
 +    /// The unit AI takes the target at its place (0xb82b0b, 0xd40b90 =
 +    /// [`crate::unit_ai::UnitAi::target_at`]): any other target.
 +    Aims,
++    /// The unit AI takes the target at its place (0xb82b0b, 0xd40b90), then forgets it again
++    /// (0xb82d62, 0xd38f90): a farm another farmer works, walked to as a point. The farm becomes
++    /// the unit AI's last target, its current target none, its point (−1, −1, −1).
++    AimsThenForgets,
++}
++
++/// `GENIE_EXPERIMENT_FARMFORGET_188329` (on by default, "0" turns it off): a farm another farmer
++/// works makes the unit AI take it and forget it again ([`RetargetAi::AimsThenForgets`], 188329
++/// 0xb82580 at 0xb82d46..0xb82d6c) instead of keeping it as its target.
++#[must_use]
++pub(crate) fn farm_forget_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| {
++        crate::env_os!("GENIE_EXPERIMENT_FARMFORGET_188329").is_none_or(|v| v != "0")
++    })
 +}
 +
  /// What a gather's retarget takes besides its mover and stream ([`GatherAction::retarget`]'s
  /// arguments).
  #[derive(Clone, Copy, Debug)]
-@@ -134,6 +147,13 @@ pub fn productivity_of(
+@@ -134,6 +162,13 @@ pub fn productivity_of(
          .unwrap_or(Amount::ZERO)
  }
  
@@ -5358,7 +5496,7 @@ index 01be8685..e401e0ab 100644
  /// `set_state(4)`'s point of a farm's next stop (`0x140a8cd40` case 4): a tile of the farm's
  /// footprint (its place `position` less its radii `radius`, plus a draw of the Action stream
  /// modulo twice each radius, its centre 0.5 in), drawn again while it is the last stop's, at
-@@ -157,6 +177,32 @@ pub fn stop_point(
+@@ -157,6 +192,32 @@ pub fn stop_point(
          (position.x() - radius.x()) as i32,
          (position.y() - radius.y()) as i32,
      );
@@ -5391,7 +5529,7 @@ index 01be8685..e401e0ab 100644
      let (mut x, mut y) = (last.x(), last.y());
      let mut draws = 0;
      while x == last.x() && y == last.y() && draws < STOP_DRAWS {
-@@ -316,6 +362,10 @@ impl GatherAction {
+@@ -316,6 +377,10 @@ impl GatherAction {
      /// # Errors
      ///
      /// What it does not model; a unit that cannot move.
@@ -5402,7 +5540,7 @@ index 01be8685..e401e0ab 100644
      pub fn retarget(
          &mut self,
          retarget: GatherRetarget<'_>,
-@@ -323,7 +373,7 @@ impl GatherAction {
+@@ -323,7 +388,7 @@ impl GatherAction {
          rng: &mut Well512,
          roles: &Roles,
          tuning: &Tuning,
@@ -5411,7 +5549,7 @@ index 01be8685..e401e0ab 100644
          let move_to_tuning = &tuning.move_to;
          let GatherRetarget {
              target,
-@@ -338,12 +388,12 @@ impl GatherAction {
+@@ -338,12 +403,12 @@ impl GatherAction {
          if self.target.map(GatherTargetId::id) == Some(target.id) {
              match self.state {
                  GatherState::Face | GatherState::Work | GatherState::Moved { .. } => {
@@ -5426,7 +5564,7 @@ index 01be8685..e401e0ab 100644
                  }
                  _ => {}
              }
-@@ -354,7 +404,7 @@ impl GatherAction {
+@@ -354,7 +419,7 @@ impl GatherAction {
              self.point = Position::from([-1.0; 3]);
              self.carry_to = Some(DropSiteId::new(target.id));
              self.set_drop(target.position, target.gap, mover, &walks, move_to_tuning)?;
@@ -5435,12 +5573,21 @@ index 01be8685..e401e0ab 100644
          }
          // slot 0x68 takes the target: its workers count it once it is new
          let taken = GatherTargetId::new(target.id);
-@@ -391,11 +441,11 @@ impl GatherAction {
+@@ -388,14 +453,20 @@ impl GatherAction {
+             } else {
+                 target.radius.x()
+             };
++            // 188329 0xb82d46..0xb82d6c: set_state(11), slot 0x68 with none, then the unit AI's
++            // remove_target (0xd38f90) after its target_at above (0xb82b0b)
              self.set_walk_back(Distance::new(radius), mover, &walks, move_to_tuning)?;
              self.target = None;
              self.carry_to = None;
 -            return Ok(());
-+            return Ok(RetargetAi::Aims);
++            return Ok(if farm_forget_188329() {
++                RetargetAi::AimsThenForgets
++            } else {
++                RetargetAi::Aims
++            });
          }
          self.carry_to = None;
          self.set_walk(target.walk_to(), target.radius, mover, rng, &walks, tuning)?;
@@ -12141,7 +12288,7 @@ index 8c1a150a..841c56ba 100644
          let blocked = r.fails()
              || length <= EPSILON
 diff --git a/crates/engine/genie-core/src/movement/step.rs b/crates/engine/genie-core/src/movement/step.rs
-index 75476db0..558be022 100644
+index 75476db0..daf29bbe 100644
 --- a/crates/engine/genie-core/src/movement/step.rs
 +++ b/crates/engine/genie-core/src/movement/step.rs
 @@ -107,6 +107,12 @@ impl Mover {
@@ -12175,7 +12322,20 @@ index 75476db0..558be022 100644
              in_the_way: Vec::new(),
              sprite_facets,
          }
-@@ -566,6 +576,15 @@ impl Mover {
+@@ -413,7 +423,11 @@ impl Mover {
+         include: &[ObjectId],
+     ) -> Result<Next, GenieError> {
+         match self.paths.walked()?.state {
+-            PathState::Arrived | PathState::Unplanned => self.arrived(goal),
++            PathState::Arrived | PathState::Unplanned => {
++                // the walker's master's class (r15w, decoded at 0x12110d1): a trade cart's (0x13)
++                let trade_cart = world.get(me.id).is_some_and(|p| p.class.get() == 0x13);
++                self.arrived(goal, trade_cart)
++            }
+             PathState::WantsPath => {
+                 let plan = plan.ok_or(GenieError::unsupported(
+                     "a path request without the world's planners",
+@@ -566,6 +580,15 @@ impl Mover {
          let position = self.moved_at.vector();
          let level = self.paths.walked()?;
          let waypoint = point_or_zero_of(level, level.waypoint);
@@ -12191,7 +12351,7 @@ index 75476db0..558be022 100644
          if ground(position, waypoint).get() < EPSILON {
              self.paths.walked_mut()?.flags |= LevelFlags::REACHED | LevelFlags::AT_WAYPOINT;
              return Ok(Next::Again);
-@@ -615,7 +634,7 @@ impl Mover {
+@@ -615,7 +638,7 @@ impl Mover {
                      (now, player_kind),
                  )?;
                  if !avoided.kept.is_empty() {
@@ -12201,7 +12361,7 @@ index 75476db0..558be022 100644
                  if avoided.at_target {
                      // FUN_140f9b4d0 three times: bit 0 on and bit 1 off on the walked level, bit 2
 diff --git a/crates/engine/genie-core/src/movement/tests.rs b/crates/engine/genie-core/src/movement/tests.rs
-index eb4f2f5f..ea4542ae 100644
+index eb4f2f5f..aa45496c 100644
 --- a/crates/engine/genie-core/src/movement/tests.rs
 +++ b/crates/engine/genie-core/src/movement/tests.rs
 @@ -221,8 +221,12 @@ pub(crate) fn builder_9177() -> Mover {
@@ -12234,6 +12394,23 @@ index eb4f2f5f..ea4542ae 100644
          Ok(())
      );
      assert_eq!((include, shapes(&pathing)), (vec![object_id(9177)], before));
+@@ -1352,14 +1357,14 @@ fn an_arrived_level_hands_looping_parent_its_next_waypoint() {
+     m.paths[0].linked_kind = LinkedPathKind::of_data(2);
+     m.paths[1].path_flags = PathFlags::LOOPS;
+     m.paths[1].waypoint = WaypointIndex::of_data(1);
+-    assert!(matches!(m.arrived(goal), Ok(Next::Again)));
++    assert!(matches!(m.arrived(goal, false), Ok(Next::Again)));
+     assert_eq!(
+         (m.paths.len(), m.paths[0].state, m.paths[0].waypoint.get()),
+         (1, PathState::WantsPath, 0)
+     );
+     let mut m = builder_9177();
+     m.paths[0].linked_kind = LinkedPathKind::of_data(0);
+-    assert!(matches!(m.arrived(goal), Ok(Next::Dispatch)));
++    assert!(matches!(m.arrived(goal, false), Ok(Next::Dispatch)));
+     assert_eq!(m.paths.len(), 2);
+ }
+ 
 @@ -3574,6 +3579,15 @@ fn request_spends_try_and_gives_up_or_goes_on_without_more() {
          (m.paths[0].flags, m.paths[0].continue_counter),
          (LevelFlags::REACHED, PlanTries::FULL)
@@ -12318,7 +12495,7 @@ index ff48ae22..d6dfeeae 100644
  
      /// The speed control toward the waypoint (slot 198, `0x141150a80`): a unit whose turn fell
 diff --git a/crates/engine/genie-core/src/movement/waypoint.rs b/crates/engine/genie-core/src/movement/waypoint.rs
-index 54c082c7..7967b17d 100644
+index 54c082c7..68c633ce 100644
 --- a/crates/engine/genie-core/src/movement/waypoint.rs
 +++ b/crates/engine/genie-core/src/movement/waypoint.rs
 @@ -13,7 +13,6 @@ use crate::math::fmath::sqrt;
@@ -12352,14 +12529,28 @@ index 54c082c7..7967b17d 100644
          // the query starts at +0x824, where the unit last moved to
          let (from, to) = self.query_ends(self.moved_at.vector(), p, world.map);
          let rect = Rect::spanning(from, to);
-@@ -434,6 +442,16 @@ impl Mover {
+@@ -414,8 +422,8 @@ impl Mover {
+     /// target, is reset (`FUN_140f98e80`) and the unit stops (slot 0x5d0): the step returns 2. Any
+     /// other hands over to its parent by its link (`mLinkedPathType`): 1 marks the parent's
+     /// waypoint reached, 2 has the parent ask again (a looping parent moves on first), 3 has it
+-    /// ask again; the step starts again with the parent.
+-    pub(super) fn arrived(&mut self, goal: Goal<'_>) -> Result<Next, GenieError> {
++    /// ask again; the step starts again with the parent. `trade_cart`: the walker's class is 0x13.
++    pub(super) fn arrived(&mut self, goal: Goal<'_>, trade_cart: bool) -> Result<Next, GenieError> {
+         let level = self.paths.walked()?;
+         if self.paths.len() == 1 || goal.gap <= level.range {
+             self.reset_level()?;
+@@ -434,6 +442,19 @@ impl Mover {
                  // a looping parent path moves on (FUN_140f98bc0 with 1)
                  if parent.has_path && parent.path_flags.contains(PathFlags::LOOPS) {
                      parent.waypoint = parent.looping_next(parent.waypoint);
-+                } else if crate::env_os!("GENIE_EXPERIMENT_WALK_188329").is_some() {
++                } else if crate::env_os!("GENIE_EXPERIMENT_WALK_188329").is_some()
++                    && !(trade_cart && tradecart_188329())
++                {
 +                    // 188329 (0x1211cb3..0x1211d35): the levels above are dropped too until the
-+                    // walked one is the top level, each left asking again. PARTIAL: the trade
-+                    // cart's exemption (class 19) is not tested here.
++                    // walked one is the top level, each left asking again; a walker of class 0x13
++                    // (the trade cart: `cmp r15w, 0x13; je` at 0x1211cb3, switch
++                    // `GENIE_EXPERIMENT_TRADECART_188329`, on unless "0") keeps them
 +                    while self.paths.len() > 1
 +                        && self.paths.walked()?.level != WaypointLevel::Top
 +                    {
@@ -12369,7 +12560,7 @@ index 54c082c7..7967b17d 100644
                  }
              }
              LinkedPathKind::AsksAgain => {
-@@ -496,19 +514,17 @@ impl Mover {
+@@ -496,19 +517,17 @@ impl Mover {
      /// Slot 0x5d0 (`FUN_14108c2f0` -> `FUN_141161730`): the unit stops: its speed and its
      /// acceleration along its forward vector go to 0 (slots 0x598 and 0x5a8, on velocity data it
      /// has), it stops waiting to move (`+0x7f9`, slot 0x2a0), its own ignore list (`+0x678`)
@@ -12399,7 +12590,7 @@ index 54c082c7..7967b17d 100644
          if let Some(v) = self.velocity.as_mut() {
              v.velocity = v.velocity.with_y(0.0);
              v.acceleration = v.acceleration.with_y(0.0);
-@@ -516,6 +532,16 @@ impl Mover {
+@@ -516,6 +535,16 @@ impl Mover {
          self.waiting = 0;
          self.ignore_units.clear();
          self.animated.speed = Speed::ZERO;
@@ -12416,6 +12607,19 @@ index 54c082c7..7967b17d 100644
          Ok(())
      }
  
+@@ -556,3 +585,12 @@ impl Mover {
+         })
+     }
+ }
++
++/// `GENIE_EXPERIMENT_TRADECART_188329` (on unless "0"): a trade cart's ended link-2 level leaves
++/// the levels above it (188329 `0x1211cb3`).
++fn tradecart_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| {
++        crate::env_os!("GENIE_EXPERIMENT_TRADECART_188329").is_none_or(|v| std::ffi::OsStr::new(&v) != "0")
++    })
++}
 diff --git a/crates/engine/genie-core/src/objects/actions.rs b/crates/engine/genie-core/src/objects/actions.rs
 index 118ae20f..f8ead826 100644
 --- a/crates/engine/genie-core/src/objects/actions.rs
@@ -16003,7 +16207,7 @@ index 01ff8670..102d95db 100644
          for (number, group_units) in split.groups.clone().iter().enumerate() {
              if group_units.is_empty() {
 diff --git a/crates/engine/genie-core/src/orders/gather.rs b/crates/engine/genie-core/src/orders/gather.rs
-index acb205d8..056541f9 100644
+index acb205d8..12728033 100644
 --- a/crates/engine/genie-core/src/orders/gather.rs
 +++ b/crates/engine/genie-core/src/orders/gather.rs
 @@ -7,7 +7,7 @@ use crate::construction::MainBuildingId;
@@ -16024,7 +16228,7 @@ index acb205d8..056541f9 100644
              GatherRetarget {
                  target: &resource,
                  player,
-@@ -153,6 +153,16 @@ impl World {
+@@ -153,6 +153,20 @@ impl World {
          let new = gather.targets();
          // a farm another farmer works: taken (slot 0x68) and let go again (set_state 11)
          let waits = matches!(gather.state, GatherState::WalkBack { .. }) && new[0].is_none();
@@ -16035,6 +16239,10 @@ index acb205d8..056541f9 100644
 +                RetargetAi::Forgets => unit_ai.remove_target(),
 +                RetargetAi::Aims => {
 +                    unit_ai.target_at(Some(target), Some(resource.class), resource.position);
++                }
++                RetargetAi::AimsThenForgets => {
++                    unit_ai.target_at(Some(target), Some(resource.class), resource.position);
++                    unit_ai.remove_target();
 +                }
 +            }
 +        }
@@ -17322,7 +17530,7 @@ index 9e2d36cf..65739101 100644
      }
  
 diff --git a/crates/engine/genie-core/src/pathing/hull_path/find.rs b/crates/engine/genie-core/src/pathing/hull_path/find.rs
-index 5f94be05..d6d077d2 100644
+index 5f94be05..aa9c8c8e 100644
 --- a/crates/engine/genie-core/src/pathing/hull_path/find.rs
 +++ b/crates/engine/genie-core/src/pathing/hull_path/find.rs
 @@ -102,7 +102,22 @@ impl HullPather<'_> {
@@ -17349,7 +17557,40 @@ index 5f94be05..d6d077d2 100644
          if clears {
              self.world.clear_tile_records();
              self.world.set_manager_buffer(None);
-@@ -374,3 +389,15 @@ impl HullPather<'_> {
+@@ -241,8 +256,13 @@ impl HullPather<'_> {
+     }
+ 
+     /// The quick path's goal: without a range (or with a target off the goal) the goal, short of
+-    /// a target on it by both radii when the target moves or stands near; with a range the goal
+-    /// moved on by the range along the walk.
++    /// a target on it by both radii when the target moves or stands near; with a range, 188329
++    /// (`0x1060d90` at `0x10613eb..0x10614e9`, switch `GENIE_EXPERIMENT_RANGEGOAL_188329`, on
++    /// unless "0") the start moved toward the goal by the range or the whole way, whichever is
++    /// shorter (`0x96e820` goal − start, its length `y² + x² + z²` by `0x140a841c0`, `MINSS`
++    /// with the range, `0x96e7f0` scales the unit vector, `0x96e8a0` adds the start); a walk of
++    /// no length (`COMISS` with 0, `JBE`) keeps the start. Off: the goal moved on by the range
++    /// along the walk (158041 `FUN_140f85580` as read before).
+     fn quick_goal(&self, q: &HullQuery) -> Point {
+         let hull_path_tuning = &self.by_id.tuning().hull_path;
+         let (from, to, r) = (q.from, q.to, self.radius);
+@@ -253,6 +273,16 @@ impl HullPather<'_> {
+                 .is_some_and(|t| t.at.x() != to.x() && t.at.y() != to.y())
+         {
+             let v = [to.x() - from.x(), to.y() - from.y(), 0.0];
++            if rangegoal_188329() {
++                let len = sqrt(v[1] * v[1] + v[0] * v[0] + v[2] * v[2]);
++                if len <= 0.0 || len.is_nan() {
++                    return from;
++                }
++                // MINSS len, range: the range where either is NaN or the range is smaller
++                let s = if len < q.range.get() { len } else { q.range.get() };
++                let (ux, uy) = (v[0] / len, v[1] / len);
++                return Point::new(ux * s + from.x(), uy * s + from.y());
++            }
+             let len = sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+             let (ux, uy) = (v[0] / len, v[1] / len);
+             return Point::new(ux * q.range.get() + to.x(), uy * q.range.get() + to.y());
+@@ -374,3 +404,24 @@ impl HullPather<'_> {
          Ok(false)
      }
  }
@@ -17363,6 +17604,15 @@ index 5f94be05..d6d077d2 100644
 +    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
 +    *FLAG.get_or_init(|| {
 +        crate::env_os!("GENIE_EXPERIMENT_KEPTAREA_188329").is_none_or(|v| v != "0")
++    })
++}
++
++/// `GENIE_EXPERIMENT_RANGEGOAL_188329` (on unless "0"): the quick path's goal with a range is the
++/// start moved toward the goal by at most the range (188329 `0x10613eb..0x10614e9`).
++fn rangegoal_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| {
++        crate::env_os!("GENIE_EXPERIMENT_RANGEGOAL_188329").is_none_or(|v| std::ffi::OsStr::new(&v) != "0")
 +    })
 +}
 diff --git a/crates/engine/genie-core/src/pathing/hull_path/mod.rs b/crates/engine/genie-core/src/pathing/hull_path/mod.rs
@@ -19206,10 +19456,28 @@ index e535cdbb..f2c11db0 100644
      ///
      /// # Errors
 diff --git a/crates/engine/genie-core/src/testing/build_158041.rs b/crates/engine/genie-core/src/testing/build_158041.rs
-index 1a1bfc98..bdca75be 100644
+index 1a1bfc98..8d6d1625 100644
 --- a/crates/engine/genie-core/src/testing/build_158041.rs
 +++ b/crates/engine/genie-core/src/testing/build_158041.rs
-@@ -974,6 +974,7 @@ const fn attribute_slots() -> AttributeSlots {
+@@ -623,7 +623,7 @@ const CLASS_ROLES: [(usize, ClassRoles); 65] = [
+ ];
+ 
+ /// The master roles by id.
+-const MASTER_ROLES: [(usize, MasterRoles); 90] = [
++const MASTER_ROLES: [(usize, MasterRoles); 91] = [
+     (
+         6,
+         MasterRoles::CLASS_LIST_ONLY.union(MasterRoles::ELITE_SKIRMISHER),
+@@ -856,6 +856,8 @@ const MASTER_ROLES: [(usize, MasterRoles); 90] = [
+         MasterRoles::PORT.union(MasterRoles::SEARCH_FROM_FOOTPRINT),
+     ),
+     (2356, MasterRoles::TRAPPER.union(MasterRoles::TRAP_WAITER)),
++    // 188329 0xb800b0 (0xb81200..0xb8122c, 0xb823c9): 0xa46 waits on a fish trap as 13, 2171, 2356
++    (2630, MasterRoles::TRAP_WAITER),
+ ];
+ 
+ /// The tech roles by id.
+@@ -974,6 +976,7 @@ const fn attribute_slots() -> AttributeSlots {
          fish_trap_food: AttributeId::named(88),
          total_value: AttributeId::named(98),
          research_spent: AttributeId::named(99),
@@ -19217,7 +19485,7 @@ index 1a1bfc98..bdca75be 100644
          castles: AttributeId::named(134),
          kills_value_other: AttributeId::named(152),
          razings_value_other: AttributeId::named(153),
-@@ -990,10 +991,12 @@ const fn attribute_slots() -> AttributeSlots {
+@@ -990,10 +993,12 @@ const fn attribute_slots() -> AttributeSlots {
          wonders_built: AttributeId::named(174),
          tribute_paid: AttributeId::named(175),
          castle_wonder_cost: AttributeId::named(184),
@@ -19230,7 +19498,7 @@ index 1a1bfc98..bdca75be 100644
          villager_killed_by_kind_2: AttributeId::named(226),
          villager_killed_by_animal: AttributeId::named(227),
          villager_killed_by_kind_3: AttributeId::named(228),
-@@ -1003,6 +1006,8 @@ const fn attribute_slots() -> AttributeSlots {
+@@ -1003,6 +1008,8 @@ const fn attribute_slots() -> AttributeSlots {
          building_cost: AttributeId::named(247),
          made_villagers: AttributeId::named(248),
          mill_food: AttributeId::named(254),
@@ -22249,6 +22517,34 @@ index d11a4839..e9f15119 100644
                  attribute,
              }],
              ..DropSite::default()
+diff --git a/crates/engine/genie-core/src/unit_ai/task_finder/target_steps.rs b/crates/engine/genie-core/src/unit_ai/task_finder/target_steps.rs
+index 8b85e109..aaab743d 100644
+--- a/crates/engine/genie-core/src/unit_ai/task_finder/target_steps.rs
++++ b/crates/engine/genie-core/src/unit_ai/task_finder/target_steps.rs
+@@ -129,6 +129,10 @@ pub(super) fn drop_off_finding<'m>(
+                 && task.attribute_kind == held_kind
+                 && matches!(task.action_kind, GATHER | HUNT | ActionKind::TRADE)
+                 && wanted(filter, task)
++                // 188329 0x133bf7f (`test byte [task+0x15], 1; je`): a task whose `+0x15` bit 0
++                // is set is passed over (the villagers' meat tasks carry it), switch
++                // GENIE_EXPERIMENT_DROPFLAG_188329 (on unless "0")
++                && !(dropflag_188329() && task.combat_level_flag.bits() & 1 != 0)
+         }) {
+             return Finding::Answer(Some(task));
+         }
+@@ -272,3 +276,12 @@ fn build_task<'m>(
+     }
+     by_class.map_or(generic, |task| (task.work_val1.positive()).then_some(task))
+ }
++
++/// `GENIE_EXPERIMENT_DROPFLAG_188329` (on unless "0"): a drop-off's task passes over one with
++/// `+0x15` bit 0 set (188329 `0x133bf7f`).
++fn dropflag_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| {
++        crate::env_os!("GENIE_EXPERIMENT_DROPFLAG_188329").is_none_or(|v| std::ffi::OsStr::new(&v) != "0")
++    })
++}
 diff --git a/crates/engine/genie-core/src/unit_ai/tests.rs b/crates/engine/genie-core/src/unit_ai/tests.rs
 index 4cc9cc71..b603cd5e 100644
 --- a/crates/engine/genie-core/src/unit_ai/tests.rs
