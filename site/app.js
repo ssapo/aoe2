@@ -3,7 +3,7 @@
   const $ = (selector) => document.querySelector(selector);
   const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const repo = 'ssapo/aoe2';
-  let report = {profile:null, matches:[]}, filter = 'all', visible = 12;
+  let report = {profile:null, matches:[]}, filter = 'all', kindFilter = 'all', visible = 12;
   let rankedData=null,rankedLoad=null,rankedLoadedAt=0;
   // Which site code, analysis revision and engine made the published data (scripts/site_version.py).
   const versionText=v=>!v||v.schema_version!==1?'':[` · 분석 개정 ${Number(v.analysis_revision)||'?'}`,
@@ -413,6 +413,12 @@
     const icon=Object.hasOwn(civNames,civ)?`<img src="assets/civs/${civIconFiles[civ]||civ.toLowerCase()}.png" alt="" width="28" height="28" loading="lazy"${window.SSAPOCivInfo?.lines(civ)?` data-civ="${esc(civ)}" data-civ-name="${esc(name)}" aria-label="${esc(name)} 문명 특성"`:''}>`:'';
     return `<span class="civ-badge ${side==='나'?'own-civ':'opponent-civ'}"${window.SSAPOCivInfo?.lines(civ)?'':` title="${esc(civ||name)}"`}><small>${esc(side)}</small>${icon}<span>${esc(name)}</span>${random===true?randomMark:''}</span>`;
   }
+  // 경기 종류: 게임 서버 match type 번호(GetAvailableLeaderboards의 leaderboardmap으로 확인, 2026-11-26).
+  // 랭크 = 순위표가 있는 매칭, 이벤트 = Red Bull Wololo 이벤트 매칭, 일반 = 사용자 지정 방. 빠른 대전 번호는 아직 데이터에 없음.
+  const MATCH_KINDS={6:['rank','랭크 1대1 랜덤맵'],26:['rank','랭크 1대1 제국 전쟁'],2:['rank','랭크 1대1 데스매치'],122:['event','Red Bull Wololo 이벤트 매칭'],124:['event','Red Bull Wololo 이벤트 매칭'],0:['custom','사용자 지정 방'],60:['custom','사용자 지정 방 (데스매치)'],120:['custom','사용자 지정 방']};
+  const KIND_LABELS={rank:'랭크',event:'이벤트',custom:'일반',other:'기타'};
+  function matchKind(m){const k=MATCH_KINDS[m.match_type_id];return k?{key:k[0],title:k[1]}:{key:'other',title:Number.isFinite(m.match_type_id)?`경기 종류 번호 ${m.match_type_id}`:'경기 종류 정보 없음'};}
+  function kindBadge(m){const k=matchKind(m);return `<span class="kind-tag kind-${k.key}" title="${esc(k.title)}">${KIND_LABELS[k.key]}</span>`;}
   function matchCivs(m){
     const own=m.analysis?.civilization||m.civilization;
     const opponents=m.analysis?.opponents||[];
@@ -421,7 +427,7 @@
     return `<span class="match-civs">${civBadge(own,'나',drawnAtRandom(m,self,m.analysis?.random_civ))}${opponents.length?opponents.map((p,i)=>civBadge(p.civilization,'상대',drawnAtRandom(m,fallback[i]?.profile_id,p.random_civ))).join(''):fallback.map(p=>civBadge(p.civilization,'상대',drawnAtRandom(m,p.profile_id))).join('')}</span>`;
   }
   function renderMatches() {
-    const matches=(report.matches||[]).filter(m=>filter==='all'||m.result===filter);
+    const matches=(report.matches||[]).filter(m=>(filter==='all'||m.result===filter)&&(kindFilter==='all'||matchKind(m).key===kindFilter));
     const list=$('#matches');
     if(!matches.length) {
       list.innerHTML = `<div class="empty"><h3>${filter==='all'?'경기 기록 없음':'해당 경기 없음'}</h3></div>`;
@@ -430,7 +436,7 @@
       list.innerHTML=matches.slice(0,visible).map(m=>{
         const opponent=(m.players||[]).filter(p=>!p.is_self).map(p=>p.name).join(', ');
         const status=Object.hasOwn(labels,m.analysis_status)?m.analysis_status:'pending';
-        return `<button class="match" data-match="${Number(m.id)}" aria-label="${esc(m.map)} ${m.result==='win'?'승리':m.result==='loss'?'패배':'결과 미확인'} 경기 복기"><span class="result ${m.result==='loss'?'loss':m.result==='win'?'':'unknown'}">${m.result==='win'?'W':m.result==='loss'?'L':'?'}</span><span class="match-info"><h3>${esc(m.map)}${window.SSAPOHousing?.badge(m.analysis?.housing)||''}</h3>${matchCivs(m)}<span class="match-opponent">vs ${esc(opponent||'상대 정보 없음')} · ${esc(date(m.started_at))} <small class="match-id">#${Number(m.id)}</small></span></span><span class="match-right"><span class="rating" title="경기 전 → 경기 후">${number(m.rating_before)} → ${number(m.rating_after)}</span><span class="tag ${status}">${labels[status]}</span></span></button>`;
+        return `<button class="match" data-match="${Number(m.id)}" aria-label="${esc(m.map)} ${m.result==='win'?'승리':m.result==='loss'?'패배':'결과 미확인'} 경기 복기"><span class="result ${m.result==='loss'?'loss':m.result==='win'?'':'unknown'}">${m.result==='win'?'W':m.result==='loss'?'L':'?'}</span><span class="match-info"><h3>${kindBadge(m)}${esc(m.map)}${window.SSAPOHousing?.badge(m.analysis?.housing)||''}</h3>${matchCivs(m)}<span class="match-opponent">vs ${esc(opponent||'상대 정보 없음')} · ${esc(date(m.started_at))} <small class="match-id">#${Number(m.id)}</small></span></span><span class="match-right"><span class="rating" title="경기 전 → 경기 후">${number(m.rating_before)} → ${number(m.rating_after)}</span><span class="tag ${status}">${labels[status]}</span></span></button>`;
       }).join('');
       list.querySelectorAll('[data-match]').forEach(b=>b.addEventListener('click',()=>openMatch(Number(b.dataset.match))));
     }
@@ -766,6 +772,8 @@
   document.querySelectorAll('dialog').forEach(d=>d.addEventListener('click',e=>{if(e.target===d){const r=d.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)d.close();}}));
   function syncFilter(){document.querySelectorAll('[data-filter]').forEach(b=>{b.classList.toggle('selected',b.dataset.filter===filter);b.setAttribute('aria-pressed',String(b.dataset.filter===filter));});}
   document.querySelectorAll('[data-filter]').forEach(b=>b.addEventListener('click',()=>{filter=b.dataset.filter;visible=12;syncFilter();renderMatches();}));
+  function syncKind(){document.querySelectorAll('[data-kind]').forEach(b=>{b.classList.toggle('selected',b.dataset.kind===kindFilter);b.setAttribute('aria-pressed',String(b.dataset.kind===kindFilter));});}
+  document.querySelectorAll('[data-kind]').forEach(b=>b.addEventListener('click',()=>{kindFilter=b.dataset.kind;visible=12;syncKind();renderMatches();}));
   $('#load-more').addEventListener('click',()=>{visible+=12;renderMatches();});
   document.addEventListener('visibilitychange',()=>{if(!document.hidden){load();collectionWatch.check();}});
   setInterval(()=>{if(!document.hidden)load();},120000);
