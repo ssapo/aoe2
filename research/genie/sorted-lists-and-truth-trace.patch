@@ -22352,7 +22352,7 @@ index dc286d39..7012b622 100644
 +    failed || slot.state == crate::groups::SlotState::InPlace
 +}
 diff --git a/crates/engine/genie-core/src/unit_ai/update.rs b/crates/engine/genie-core/src/unit_ai/update.rs
-index 1ecba910..2efac657 100644
+index 1ecba910..cb3bd423 100644
 --- a/crates/engine/genie-core/src/unit_ai/update.rs
 +++ b/crates/engine/genie-core/src/unit_ai/update.rs
 @@ -4,6 +4,7 @@
@@ -22381,7 +22381,30 @@ index 1ecba910..2efac657 100644
          {
              self.run_orders(at, side, player_kind, ai)?;
          }
-@@ -387,8 +392,9 @@ impl UnitAi {
+@@ -304,7 +309,9 @@ impl UnitAi {
+     /// ([`LIVE_TARGET_ACTIONS`]), an attack whose top action is no longer in its state 2 (slot
+     /// 0x2b0: the swing on the kill) or any action with `+0x1a8` set: `+0x1a8` clears; an attack
+     /// looks for its next target ([`UnitAi::next_after_kill`]); but for a hunt or `0x2be`, any
+-    /// other action loses its target and stops (slot 0xb0 with 1). The range test of a target on
++    /// other action loses its target and stops (slot 0xb0 with 1). In 188329 (`0xd42dc4`..
++    /// `0xd42edb`, [`kill_stop_188329`]) an attack loses its target and stops as the others do:
++    /// the full update calls no processIdle there. The range test of a target on
+     /// a patrol order or in a patrolling group (`FUN_140c41690`) answers 0 for a player that is
+     /// not a computer; a computer's (the ship and priority rules), a computer's priority by the
+     /// target's distance and action `0x2be`'s check (`FUN_140c40f10`) are not modelled.
+@@ -347,7 +354,10 @@ impl UnitAi {
+                         || attack_over
+                     {
+                         self.stop_after_kill = false;
+-                        if action == Some(AiAction::Attack) {
++                        // 188329 0xd42dc4..0xd42edb: an attack too only loses its target
++                        // (0xd38f90) and stops (slot 0xb0 with 1); processIdle waits for the idle
++                        // timer
++                        if action == Some(AiAction::Attack) && !kill_stop_188329() {
+                             self.next_after_kill(at, player_kind, ai, side)?;
+                         } else if !matches!(action, Some(AiAction::Hunt | AiAction::BoarLuring)) {
+                             self.remove_target();
+@@ -387,8 +397,9 @@ impl UnitAi {
      /// with 1, [`UnitAi::hunt_object`]) and the processing breaks; finding none, a human player's
      /// villager does nothing more. A class the slot names a kind of searches by it (slot 0x80,
      /// `ClosestResourceObject` from the notify's drop site, its third parameter: kind 0 below 2
@@ -22393,7 +22416,7 @@ index 1ecba910..2efac657 100644
      pub(super) fn hunter_search(
          &mut self,
          n: Notify,
-@@ -406,18 +412,27 @@ impl UnitAi {
+@@ -406,18 +417,27 @@ impl UnitAi {
              self.stop_current(StopOrder::Keep, at, side, rng)?;
              return Ok(GO_ON);
          };
@@ -22425,7 +22448,7 @@ index 1ecba910..2efac657 100644
                          master: None,
                          workers: if roles.of_class(class).contains(ClassRoles::FARM) {
                              WorkerCount::ONE
-@@ -428,8 +443,47 @@ impl UnitAi {
+@@ -428,8 +448,47 @@ impl UnitAi {
                          reach: true,
                      },
                      memory: Memory::default(),
@@ -22475,7 +22498,7 @@ index 1ecba910..2efac657 100644
                  match (found.id, found.position) {
                      (Some(id), Some(position)) => Some(Gatherable {
                          id,
-@@ -467,9 +521,50 @@ impl UnitAi {
+@@ -467,9 +526,50 @@ impl UnitAi {
              return Ok(GO_ON);
          };
          if roles.of_class(class).contains(ClassRoles::FARM) {
@@ -22528,7 +22551,7 @@ index 1ecba910..2efac657 100644
          Ok(BREAK)
      }
  
-@@ -558,28 +653,37 @@ impl UnitAi {
+@@ -558,28 +658,37 @@ impl UnitAi {
              }
              return Ok(GO_ON);
          };
@@ -22572,6 +22595,21 @@ index 1ecba910..2efac657 100644
      }
  
      /// The target block's attack whose target died (`0x140c66b10`): processIdle (slot 0x240 with
+@@ -614,3 +723,14 @@ impl UnitAi {
+         Ok(())
+     }
+ }
++
++/// `GENIE_EXPERIMENT_KILLSTOP_188329` (on by default, "0" turns it off): an attack whose target
++/// died loses its target and stops (188329 `0xd42dc4`..`0xd42edb`: `0xd38f90`, slot 0xb0 with 1)
++/// instead of looking for its next target at once ([`UnitAi::next_after_kill`]).
++#[must_use]
++pub(crate) fn kill_stop_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| {
++        crate::env_os!("GENIE_EXPERIMENT_KILLSTOP_188329").is_none_or(|v| v != "0")
++    })
++}
 diff --git a/crates/engine/genie-core/src/unit_ai/world_view/commands.rs b/crates/engine/genie-core/src/unit_ai/world_view/commands.rs
 index ea0838e3..fa603b75 100644
 --- a/crates/engine/genie-core/src/unit_ai/world_view/commands.rs
