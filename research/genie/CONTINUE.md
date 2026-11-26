@@ -530,7 +530,9 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 13.4 지금 하던 일 (멈출 때마다 이 절을 덮어쓴다)
 
-**2026-11-25 — R65g(가장 최신).** 엔진 = `runs\R65g.patch` = R65f + B64e(findings 220 적 찾기 0xd1ec40, 221 병사 대기 끝·NoAttack 경보). 새 스위치 GENIE_EXPERIMENT_BEST_188329=1·GENIE_EXPERIMENT_SOLDIERIDLE_188329=1(`runs\M6_envs.txt`, main `engine/switches.env`). truth24 154 -> 170(멈춤 없음). 전체 세트 7342 -> 7371. 321판: 끝까지 9, 재현 비율 29.0%(평범한 180판 30.2%). 다음: C2(짧은 길찾기 남겨 둔 구역, KEPTAREA) -> R65h, 그 뒤 BESTKEEP 켜기 시험.
+**2026-11-26 — R65h(가장 최신).** 엔진 = `runs\R65h.patch` = R65g + C2(findings 222 짧은 길찾기 남겨 둔 구역, KEPTAREA 기본 켬). 전체 세트 R65g와 같음. 다음: BESTKEEP 켜기 확인(B), C 갈래 다음 이동·길찾기 어긋남.
+
+**2026-11-25 — R65g(R65h 이전).** 엔진 = `runs\R65g.patch` = R65f + B64e(findings 220 적 찾기 0xd1ec40, 221 병사 대기 끝·NoAttack 경보). 새 스위치 GENIE_EXPERIMENT_BEST_188329=1·GENIE_EXPERIMENT_SOLDIERIDLE_188329=1(`runs\M6_envs.txt`, main `engine/switches.env`). truth24 154 -> 170(멈춤 없음). 전체 세트 7342 -> 7371. 321판: 끝까지 9, 재현 비율 29.0%(평범한 180판 30.2%). 다음: C2(짧은 길찾기 남겨 둔 구역, KEPTAREA) -> R65h, 그 뒤 BESTKEEP 켜기 시험.
 
 **2026-11-25 — R65f(R65g 이전).** 엔진 = `runs\R65f.patch` = R65e + C1(findings 219 사람 명령 시각 상한 0xd1c2e0은 무리를 먼저 봄). 전체 세트 7274 -> 7342, 나빠진 판 없음. 321판(R65d + C1 기준): 끝까지 9, 재현 비율 28.9%(평범한 180판 30.1%). 다음: B64d(0xd1ec40·0xcfea00, B 갈래 B64e로 확인 중).
 

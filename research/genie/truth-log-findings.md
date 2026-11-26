@@ -2088,3 +2088,8 @@ genie-b is left as R59a + B52a (tree = R59a.patch + B52a.diff; no commit beyond 
 - 대기 끝 0xcfeec8~0xcfeee4: 사람 선수의 유닛이 무리 번호가 있으면(unit+0x210 != -1) 되돌아가기·저장한 순찰·치료사 찾기 전에 5로 끝남.
 - NoAttack 병사가 적을 보면 엔진은 오류로 멈췄는데, 188329는 +0x1c4를 쓰고 슬롯 0x50이 경보를 냄 — 그대로 옮김(attack_search_alert).
 - R65g = R65f + B64e(= B64d를 R65f 위에, unit_ai 6파일). 두 스위치를 `runs\M6_envs.txt`와 main `engine/switches.env`에 추가(옛 목록 `runs\M6_envs_R65f.txt`). PC: `runs\census_R65g.exe`, `runs\R65g.patch`. 검사: truth24 154 -> 170(멈춤 없음, R65f는 NoAttack 오류로 멈춤), truth25~35 같음; 전체 세트 39판 B64e와 같음, R65f 대비 나빠진 판 없음, 버틴 지점 합 7342 -> 7371(P_517429796 204 -> 233); 321판(S33_B64e): C1a 대비 6판 길어짐(truth24 경기 1030 -> 1181초, 517429796 665 -> 782초), 짧아진 판 없음. 끝까지 9, 재현 비율 29.0%(평범한 180판 30.2%).
+
+## 222. 짧은 길찾기의 남겨 둔 구역(C2, 스위치 GENIE_EXPERIMENT_KEPTAREA_188329 기본 켬)
+- 188329: 도달 시험 0x107a5e0의 11번째 인자가 0x107ab45에서 짧은 길찾기 분배기 0x1078690의 12번째 인자로 가고, 0x1078690은 그것을 0x1078caf에서만 읽어 관리자의 옛 길찾기 하나 0x1060d90(= 158041 FindShortPath)의 11번째 인자로 넘김(새 길찾기 쪽은 안 읽음). 0x1060d90은 이 값이 0이면 처음에 구역 +0xe8..+0xf4를 -1로 되돌리고(0x1060dc7~), 1이면 남겨 둠; 구역을 정할 때(0x1061763~) 남은 구역이 -1이 아니면 그 구역과 껍질(hull)을 다시 씀. 옛 길찾기는 관리자마다 하나라서, 남는 것은 마지막 옛 길찾기 검색(어느 유닛이든)이 남긴 구역이야.
+- 고침: map/spatial이 옛 길찾기의 KeptHulls(구역 + 껍질)를 들고, pathing/hull_path/find.rs가 검색마다 저장하고 Kept 검색은 그것을 불러옴; movement/long_walk.rs ShortAsk.keep, path_end.rs 도달 시험이 멈추지 않고 keep을 넘김(다른 곳은 게임처럼 0).
+- R65h = R65g + C2(genie-c bc5c4015). PC: `runs\census_R65h.exe`, `runs\R65h.patch`. 검사: 전체 세트 39판 R65g와 바이트까지 같음(지금은 낚싯배 검색만 keep 1을 넘김). 경로 유지 플래그를 켜면(GENIE_EXPERIMENT_BESTKEEP_188329=1, 아직 끔) truth24가 66095에서 멈추지 않고 끝까지(첫 어긋남 85499), truth25~35 같음 — 켤지는 B 갈래가 전체 세트·321판으로 확인. 321판 숫자는 R65g와 같음(끝까지 9, 29.0%).

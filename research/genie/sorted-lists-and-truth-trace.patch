@@ -10151,10 +10151,10 @@ index f639a3e9..7372ee74 100644
  pub mod gathering;
  pub mod groups;
 diff --git a/crates/engine/genie-core/src/map/spatial/grid.rs b/crates/engine/genie-core/src/map/spatial/grid.rs
-index 9f616e05..7f01861b 100644
+index 9f616e05..8821f054 100644
 --- a/crates/engine/genie-core/src/map/spatial/grid.rs
 +++ b/crates/engine/genie-core/src/map/spatial/grid.rs
-@@ -251,6 +251,19 @@ impl Spatial {
+@@ -251,12 +251,40 @@ impl Spatial {
          self.manager_ignore.clone()
      }
  
@@ -10174,8 +10174,29 @@ index 9f616e05..7f01861b 100644
      /// `FUN_1410562d0` on the obstruction manager: its buffer becomes `buffer` (None: not set),
      /// until the next call.
      pub const fn set_manager_buffer(&mut self, buffer: Option<Distance>) {
+         self.manager_buffer = buffer;
+     }
+ 
++    /// What the manager's old pather (`+0x380`) kept from its last search: its area and hulls
++    /// ([`Spatial::set_kept_hulls`]).
++    #[must_use]
++    pub const fn kept_hulls(&self) -> &crate::pathing::hull_path::KeptHulls {
++        &self.kept_hulls
++    }
++
++    /// The manager's old pather's area and hulls after a search (188329 `0x1060d90` writes
++    /// `+0xe8`..`+0xf4` at its start, -1 for a search with its 11th argument 0 (0x1060dc7..
++    /// 0x1060e11), and at its area's setting (0x1061763..0x1061846, 0x1062b03); the hulls
++    /// stay in the pather until the next search builds new ones).
++    pub fn set_kept_hulls(&mut self, kept: crate::pathing::hull_path::KeptHulls) {
++        self.kept_hulls = kept;
++    }
++
+     /// The obstruction manager's buffer as the last `FUN_1410562d0` left it
+     /// ([`Spatial::set_manager_buffer`]).
+     #[must_use]
 diff --git a/crates/engine/genie-core/src/map/spatial/mod.rs b/crates/engine/genie-core/src/map/spatial/mod.rs
-index 4cc3b283..b3715abf 100644
+index 4cc3b283..68b817d4 100644
 --- a/crates/engine/genie-core/src/map/spatial/mod.rs
 +++ b/crates/engine/genie-core/src/map/spatial/mod.rs
 @@ -46,6 +46,7 @@ mod objects;
@@ -10186,7 +10207,20 @@ index 4cc3b283..b3715abf 100644
  mod sight;
  mod tile_sight;
  
-@@ -513,6 +514,15 @@ pub struct Spatial {
+@@ -499,6 +500,12 @@ pub struct Spatial {
+     /// set it reset it at their end but `FindShortPath`'s quick-only exit, and the queries that
+     /// set none read what is left ([`Spatial::manager_grow`]).
+     manager_buffer: Option<Distance>,
++    /// What the obstruction manager's one old pather (`+0x380`, 188329 `0x1060d90`) keeps from
++    /// its last search: the area (`+0xe8`..`+0xf4`) and the hulls, which a search with its 11th
++    /// argument 1 reuses ([`crate::pathing::hull_path::HullPather::find_keeping`]). Written by every
++    /// old-pather search while `GENIE_EXPERIMENT_KEPTAREA_188329` is on
++    /// ([`Spatial::set_kept_hulls`]).
++    kept_hulls: crate::pathing::hull_path::KeptHulls,
+     /// The placed objects by id (T7: a dense column, walked in the ids' order).
+     objects: IdTable<Placed>,
+     /// The cell of each object's record ([`RecordCells`]), kept with `objects`
+@@ -513,6 +520,15 @@ pub struct Spatial {
      changed: Vec<PlanRect>,
      /// The seconds since each frozen object froze.
      frozen_for: IdTable<Seconds>,
@@ -10203,10 +10237,17 @@ index 4cc3b283..b3715abf 100644
      /// masters (type 70) moves and the farthest any acts beyond its footprint (its weapon or work
      /// range), for [`Spatial::check_known`]. 0 when not set.
 diff --git a/crates/engine/genie-core/src/map/spatial/objects.rs b/crates/engine/genie-core/src/map/spatial/objects.rs
-index 0134df68..f3b472b4 100644
+index 0134df68..f966714d 100644
 --- a/crates/engine/genie-core/src/map/spatial/objects.rs
 +++ b/crates/engine/genie-core/src/map/spatial/objects.rs
-@@ -61,6 +61,8 @@ impl Spatial {
+@@ -55,12 +55,15 @@ impl Spatial {
+             manager_ignore: Vec::new(),
+             tile_records: BTreeSet::new(),
+             manager_buffer: None,
++            kept_hulls: crate::pathing::hull_path::KeptHulls::default(),
+             objects: IdTable::new(),
+             records: RecordCells::default(),
+             inside: IdTable::new(),
              tiles,
              changed: Vec::new(),
              frozen_for: IdTable::new(),
@@ -10215,7 +10256,7 @@ index 0134df68..f3b472b4 100644
              fastest: 0.0,
              reach: Distance::ZERO,
              scout_maps: BTreeMap::new(),
-@@ -256,6 +258,33 @@ impl Spatial {
+@@ -256,6 +259,33 @@ impl Spatial {
          }
      }
  
@@ -10249,7 +10290,7 @@ index 0134df68..f3b472b4 100644
      /// The object's place is the game's again (the oracle's forced replay): it is known.
      pub fn unfreeze(&mut self, id: ObjectId) {
          if let Some(p) = self.objects.get_mut(id) {
-@@ -466,6 +495,7 @@ impl Spatial {
+@@ -466,6 +496,7 @@ impl Spatial {
      /// The object `id` leaves the world.
      pub fn remove(&mut self, id: ObjectId) {
          let _ = self.inside.remove(id);
@@ -10862,10 +10903,22 @@ index fbef4ed9..2335262d 100644
                  sprites: TaskSprites::of_data([-1, -1, -1, 5]),
                  ..unsprited
 diff --git a/crates/engine/genie-core/src/movement/long_walk.rs b/crates/engine/genie-core/src/movement/long_walk.rs
-index f6314358..a82d0a1f 100644
+index f6314358..25f64723 100644
 --- a/crates/engine/genie-core/src/movement/long_walk.rs
 +++ b/crates/engine/genie-core/src/movement/long_walk.rs
-@@ -303,10 +303,14 @@ pub(crate) struct Walker {
+@@ -204,6 +204,11 @@ pub struct ShortAsk<'a> {
+     pub ignore: &'a [ObjectId],
+     /// The objects the old pather tests even moving.
+     pub include: &'a [ObjectId],
++    /// The dispatcher's 12th argument (188329 `0x1078690`, handed on as the old pather
++    /// `0x1060d90`'s 11th at 0x1078caf): 1 keeps the old pather's last area and hulls
++    /// ([`HullPather::find_keeping`]); the new pather does not read it. Only the reach test
++    /// `0x107a5e0` passes its own 11th argument there (0x107ab45); the others pass 0.
++    pub keep: bool,
+ }
+ 
+ /// The tile pathfinder (`FUN_140f7c530`) for `walker` from `from` (x, y on the map) to `to`,
+@@ -303,10 +308,14 @@ pub(crate) struct Walker {
  /// shape of its own, gets a temporary one there (`FUN_141054fe0` with 1, not the object's: its
  /// `+0x64c` stays -1), which the step's every exit removes; one past the list's end gets
  /// neither. The new pather's test before the shape (`FUN_14152b6e0`) always holds
@@ -10881,7 +10934,7 @@ index f6314358..a82d0a1f 100644
      kept: &[ObjectId],
      include: &mut Vec<ObjectId>,
  ) -> Result<(), GenieError> {
-@@ -322,6 +326,11 @@ pub(super) fn include_kept(
+@@ -322,6 +331,11 @@ pub(super) fn include_kept(
              let p = world
                  .get_known(id)?
                  .ok_or(GenieError::unsupported("a kept hit without a place"))?;
@@ -10893,7 +10946,23 @@ index f6314358..a82d0a1f 100644
              if p.obstruction_kind == ObstructionKind::KIND_11 {
                  return Err(GenieError::unsupported(
                      "a kept hit of obstruction type 11 (its outline)",
-@@ -425,6 +434,7 @@ pub(crate) fn short_path_including(
+@@ -367,6 +381,7 @@ pub(crate) fn short_path_for(
+         target,
+         ignore,
+         include: &[],
++        keep: false,
+     };
+     short_path_including(walker, from, (world, by_id), plan, ask, player, out)
+ }
+@@ -408,6 +423,7 @@ pub(crate) fn short_path_including(
+         target,
+         ignore,
+         include,
++        keep,
+     } = ask;
+     let (x, y) = (from.x(), from.y());
+     let target_object = match target {
+@@ -425,6 +441,7 @@ pub(crate) fn short_path_including(
              shape: plan.pathing.shape(id),
          })
          .collect();
@@ -10901,7 +10970,21 @@ index f6314358..a82d0a1f 100644
      let call = Call {
          from: Point::new(x, y),
          to: to.ground(),
-@@ -474,6 +484,32 @@ pub(crate) fn short_path_including(
+@@ -459,7 +476,12 @@ pub(crate) fn short_path_including(
+         let mut pather =
+             HullPather::for_list((world, by_id), ignore, walker.mask, walker.radius, player)
+                 .including(include);
+-        let (result, path) = pather.find(from, to.ground(), target, range)?;
++        // 0x1078caf: the dispatcher's 12th argument is the old pather's 11th
++        let (result, path) = if keep {
++            pather.find_keeping(from, to.ground(), target, range)?
++        } else {
++            pather.find(from, to.ground(), target, range)?
++        };
+         for p in &path.points {
+             let _ = out.push(BVector::new(p.x(), 0.0, p.y()));
+         }
+@@ -474,6 +496,32 @@ pub(crate) fn short_path_including(
              "a short path without the game's mesh",
          ))?;
      let found = pather.search(mesh, &words, &query, &shapes)?;
@@ -11259,7 +11342,7 @@ index 8ae7fee5..9754f792 100644
          let me = walk.position();
          let (a, b) = (me.ground(), at.ground());
 diff --git a/crates/engine/genie-core/src/movement/new_path.rs b/crates/engine/genie-core/src/movement/new_path.rs
-index 1f873756..1a2d063d 100644
+index 1f873756..312282ed 100644
 --- a/crates/engine/genie-core/src/movement/new_path.rs
 +++ b/crates/engine/genie-core/src/movement/new_path.rs
 @@ -2,6 +2,7 @@
@@ -11387,7 +11470,7 @@ index 1f873756..1a2d063d 100644
 +
 +    /// [`Mover::reaches_object`] with the test's last argument `keep` (188329 slot 0x408 =
 +    /// `0x120ff70` hands its 7th argument to `0x107a5e0`'s 11th): set, a test that reaches the
-+    /// short pather stops (its kept area is not modelled).
++    /// old pather reuses its last area and hulls ([`crate::movement::ShortAsk::keep`]).
 +    pub fn reaches_object_keeping(
 +        &self,
 +        (at, me): (Position, &Me),
@@ -11536,7 +11619,7 @@ index 1f873756..1a2d063d 100644
 +    *FLAG.get_or_init(|| std::env::var_os("GENIE_EXPERIMENT_DROPIGNORE_188329").is_some())
 +}
 diff --git a/crates/engine/genie-core/src/movement/path_end.rs b/crates/engine/genie-core/src/movement/path_end.rs
-index 8dd9623e..3af45b9f 100644
+index 8dd9623e..331023b1 100644
 --- a/crates/engine/genie-core/src/movement/path_end.rs
 +++ b/crates/engine/genie-core/src/movement/path_end.rs
 @@ -31,7 +31,7 @@ use crate::movement::{
@@ -11548,18 +11631,30 @@ index 8dd9623e..3af45b9f 100644
  use crate::pathing::tile_path::{Path, Request};
  use crate::players::PlayerId;
  use crate::players::PlayerSet;
-@@ -51,6 +51,10 @@ pub(super) struct ReachAsk {
+@@ -51,6 +51,11 @@ pub(super) struct ReachAsk {
      pub(super) range: Distance,
      /// The unit's master's id.
      pub(super) master: MasterId,
-+    /// The test's last argument (`0x107a5e0`'s 11th, the short pather's 12th): 1 keeps the short
-+    /// pather's last area and hulls. Not modelled for the short pather: a test with it set that
-+    /// reaches the short pather stops.
++    /// The test's last argument (`0x107a5e0`'s 11th, the short pather's 12th): 1 keeps the old
++    /// pather's last area and hulls ([`ShortAsk::keep`]; with
++    /// `GENIE_EXPERIMENT_KEPTAREA_188329` off, a test with it set that reaches the short pather
++    /// stops).
 +    pub(super) keep: bool,
  }
  
  impl Mover {
-@@ -86,6 +90,7 @@ impl Mover {
+@@ -60,8 +65,8 @@ impl Mover {
+     /// reach the goal or its range (result 0 or 1). Then a unit with a footprint and a height
+     /// (`FUN_141194060` with 1) no more than 10 tiles from the goal asks the short pather
+     /// (`FUN_140f9e540` with its ignore list, `FUN_14114ece0`, no include list, and its argument
+-    /// 12 the test's 11th: 0 from slot 0x3d8, the caller's from slot 0x3d0, which genie's callers
+-    /// give as 0; the old pather would keep its last area and hulls for 1), whose path to the
++    /// 12 the test's 11th: 0 from slot 0x3d8, the caller's from slot 0x3d0 or 0x408; the old
++    /// pather keeps its last area and hulls for 1, [`ShortAsk::keep`]), whose path to the
+     /// goal or into the range (a result below 2) answers yes. Otherwise a goal at least a tile from the unit's
+     /// footprint (the squared gap, to the target's footprint for a target, at least 1) is the long
+     /// pather's to answer ([`crate::pathing::long_path::reaches`], from the unit's tile to the goal's, the
+@@ -86,6 +91,7 @@ impl Mover {
              target,
              range,
              master,
@@ -11567,11 +11662,11 @@ index 8dd9623e..3af45b9f 100644
          } = ask;
          // FUN_14114fea0 and FUN_14114ffc0 hand the unit's +0x824 (x, height, y) as the start
          let (x, y, height_at) = (self.moved_at.x(), self.moved_at.y(), self.moved_at.z());
-@@ -133,6 +138,11 @@ impl Mover {
+@@ -133,6 +139,11 @@ impl Mover {
          let solid = 0.0 < radius.z() && 0.0 < radius.x() && 0.0 < radius.y();
          let (dx, dy) = (to.x() - x, to.y() - y);
          if solid && sqrt(dx * dx + 0.0 + dy * dy) <= movement_tuning.reach_short {
-+            if keep {
++            if keep && !crate::pathing::hull_path::keptarea_188329() {
 +                return Err(GenieError::unsupported(
 +                    "a reach test keeping the short pather's last area (0x107a5e0's last argument 1)",
 +                ));
@@ -11579,7 +11674,16 @@ index 8dd9623e..3af45b9f 100644
              let goal = BVector::new(to.x(), 0.0, to.y());
              // FUN_140fa0370 hands the start test both vectors' first two floats: x and the
              // height, the unit's (`+0x824`) and the target's (slot 0x520), not x and y
-@@ -222,6 +232,140 @@ impl Mover {
+@@ -145,6 +156,8 @@ impl Mover {
+                 target,
+                 ignore: &ignore,
+                 include: &[],
++                // 0x107ab45: the test's 11th argument is the dispatcher's 12th
++                keep,
+             };
+             if self
+                 .short_path(me, world, plan, ask, &mut path, by_id)?
+@@ -222,6 +235,141 @@ impl Mover {
          reaches(world.tiles(), world.map, &req, &gates, *long_path_tuning)
      }
  
@@ -11649,6 +11753,7 @@ index 8dd9623e..3af45b9f 100644
 +                target: None,
 +                ignore: &ignore,
 +                include: &[],
++                keep: false,
 +            };
 +            let owner = super::long_walk::owner_number(world, me.id);
 +            let found = super::long_walk::short_path_including(
@@ -11720,7 +11825,7 @@ index 8dd9623e..3af45b9f 100644
      /// The test before a non-quiet `MoveTo`'s path end follows its moved target (`0x140aa2a70` in
      /// state 4): the top path (`FUN_140f960f0`) and the walked level's own path, that level being
      /// level 0, are both held, and the level's current waypoint (`FUN_140f9bcd0`) is the top
-@@ -298,7 +442,9 @@ impl Mover {
+@@ -298,7 +446,9 @@ impl Mover {
          now: WorldTime,
          planned: bool,
      ) {
@@ -11730,7 +11835,7 @@ index 8dd9623e..3af45b9f 100644
          self.paths = vec![PathData {
              level: if planned {
                  WaypointLevel::Top
-@@ -344,14 +490,37 @@ impl Mover {
+@@ -344,14 +494,37 @@ impl Mover {
      ) {
          let start = from.vector();
          let mut path = Path::default();
@@ -11770,7 +11875,7 @@ index 8dd9623e..3af45b9f 100644
              let end = goal.vector();
              let last = point_or_zero(&path, WaypointIndex::last_of(path.points.len()));
              let mut d = end - last;
-@@ -386,6 +555,7 @@ impl Mover {
+@@ -386,6 +559,7 @@ impl Mover {
              path_flags & !PathFlags::BACK_AND_FORTH
          };
          let repath_time = self.paths.first().map_or(Seconds::ZERO, |l| l.repath_time);
@@ -11778,7 +11883,7 @@ index 8dd9623e..3af45b9f 100644
          self.paths = vec![PathData {
              level: WaypointLevel::Top,
              points: path.points,
-@@ -545,24 +715,37 @@ impl Mover {
+@@ -545,24 +719,37 @@ impl Mover {
          };
          // the walker's group (FUN_14152ff40 on +0x6d0) and its own move's reason there
          // (FUN_141017590): a member on one of reason 0 keeps buildings, walls and gates alone
@@ -11828,7 +11933,7 @@ index 8dd9623e..3af45b9f 100644
              }
              if self.keeps_hit((at, me), player, (id, other), projected, now, by_id)? {
                  kept.push(id);
-@@ -641,3 +824,11 @@ fn target_placed(world: &Spatial, target: Option<ObjectId>) -> Result<Option<&Pl
+@@ -641,3 +828,11 @@ fn target_placed(world: &Spatial, target: Option<ObjectId>) -> Result<Option<&Pl
          })
          .transpose()
  }
@@ -11869,7 +11974,7 @@ index 57e0d943..484efafb 100644
              {
                  level.flags |= LevelFlags::REACHED;
 diff --git a/crates/engine/genie-core/src/movement/request_plans.rs b/crates/engine/genie-core/src/movement/request_plans.rs
-index 8c1a150a..77fd054c 100644
+index 8c1a150a..0d42be22 100644
 --- a/crates/engine/genie-core/src/movement/request_plans.rs
 +++ b/crates/engine/genie-core/src/movement/request_plans.rs
 @@ -176,7 +176,7 @@ impl Mover {
@@ -11881,7 +11986,7 @@ index 8c1a150a..77fd054c 100644
          if r != ShortFound::Reached || np.path.length.get() <= EPSILON {
              np.flags |= PlanFlags::SHORT_FAILED;
              np.path.points.clear();
-@@ -251,12 +251,25 @@ impl Mover {
+@@ -251,16 +251,30 @@ impl Mover {
          w: &Way<'_>,
          near: GoalReach,
          np: &mut NewPath,
@@ -11908,7 +12013,12 @@ index 8c1a150a..77fd054c 100644
              range: short_range(near, w.range, movement_tuning),
              target: w.target_id,
              ignore: &ignore,
-@@ -333,7 +346,21 @@ impl Mover {
+             include: w.include,
++            keep: false,
+         };
+         let r = self.short_path(me, world, plan, ask, &mut np.path, by_id)?;
+         np.path.measure();
+@@ -333,7 +347,21 @@ impl Mover {
          let movement_tuning = &by_id.tuning().movement;
          np.flags &= !PlanFlags::PLANNED;
          np.path.points.clear();
@@ -17112,6 +17222,62 @@ index 9e2d36cf..65739101 100644
          }
      }
  
+diff --git a/crates/engine/genie-core/src/pathing/hull_path/find.rs b/crates/engine/genie-core/src/pathing/hull_path/find.rs
+index 5f94be05..c61f5dcd 100644
+--- a/crates/engine/genie-core/src/pathing/hull_path/find.rs
++++ b/crates/engine/genie-core/src/pathing/hull_path/find.rs
+@@ -102,7 +102,22 @@ impl HullPather<'_> {
+         hulls: Hulls,
+         quick: QuickPath,
+     ) -> Result<(ShortFound, Waypoints), GenieError> {
+-        let (result, path, clears) = self.find_unclear(from, to, target_id, range, hulls, quick)?;
++        let shared = keptarea_188329();
++        // 188329: the game has one old pather (the manager's `+0x380`); a kept search reads the
++        // area and hulls the last search of any unit left there (0x1060dc7: argument 11 1 skips
++        // the reset of `+0xe8`..`+0xf4`). A pather made with [`HullPather::with_kept`] keeps its own.
++        if shared && hulls == Hulls::Kept && self.area.x0() == NO_AREA.x0() {
++            let kept = self.world.kept_hulls().clone();
++            self.area = kept.area;
++            self.hulls = kept.hulls;
++        }
++        let found = self.find_unclear(from, to, target_id, range, hulls, quick);
++        if shared {
++            // every exit leaves the pather's area and hulls for the next search
++            let kept = self.kept();
++            self.world.set_kept_hulls(kept);
++        }
++        let (result, path, clears) = found?;
+         if clears {
+             self.world.clear_tile_records();
+             self.world.set_manager_buffer(None);
+@@ -374,3 +389,15 @@ impl HullPather<'_> {
+         Ok(false)
+     }
+ }
++
++/// `GENIE_EXPERIMENT_KEPTAREA_188329` (on by default, "0" turns it off): the manager's one old
++/// pather (188329 `0x1060d90`, the manager's `+0x380`) keeps its area and hulls from search to
++/// search in the world ([`crate::map::spatial::Spatial::kept_hulls`]), so a search with its 11th
++/// argument 1 (the reach test `0x107a5e0`'s 11th, through `0x1078690`'s 12th) reuses them. Off,
++/// such a reach test stops as unsupported (R65f).
++pub(crate) fn keptarea_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| {
++        std::env::var_os("GENIE_EXPERIMENT_KEPTAREA_188329").is_none_or(|v| v != "0")
++    })
++}
+diff --git a/crates/engine/genie-core/src/pathing/hull_path/mod.rs b/crates/engine/genie-core/src/pathing/hull_path/mod.rs
+index a13c5723..352cd285 100644
+--- a/crates/engine/genie-core/src/pathing/hull_path/mod.rs
++++ b/crates/engine/genie-core/src/pathing/hull_path/mod.rs
+@@ -50,6 +50,7 @@ mod walks;
+ use self::node_lists::{NewNode, UnrefusedNode};
+ pub(crate) use self::setup::{NO_RESTRICTION, NO_TERRAIN};
+ pub use self::setup::{quick_reach, quick_reach_from};
++pub(crate) use self::find::keptarea_188329;
+ #[cfg(test)]
+ use self::walk_in::WalkIn;
+ #[cfg(test)]
 diff --git a/crates/engine/genie-core/src/pathing/hull_path/node_lists.rs b/crates/engine/genie-core/src/pathing/hull_path/node_lists.rs
 index c9cd54a1..21f5e897 100644
 --- a/crates/engine/genie-core/src/pathing/hull_path/node_lists.rs
