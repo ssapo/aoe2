@@ -2110,3 +2110,9 @@ genie-b is left as R59a + B52a (tree = R59a.patch + B52a.diff; no commit beyond 
 - 고침: unit_ai/update.rs(엔진 B 갈래). 원본 대조 세션(PC `runs\AUD\ai_diffs.md`, `sim_diffs.md`)이 처음으로 찾은 차이를 옮긴 것.
 - R65l = R65k + B65c(genie-b 80499d35). PC: `runs\census_R65l.exe`, `runs\R65l.patch`. 검사: truth24~35 같음; 전체 세트 7632 = 7632, B 갈래 결과와 바이트까지 같음; 321판(S33_65c): 끝까지 9, 재현 비율 30.0% -> 30.1%(평범한 180판 31.3% -> 31.4%), 길어진 판 7, 짧아진 판 0.
 - truth23 1983.6초 기사 10658: 기록에는 죽인 뒤 약 234ms 동안 행동 목록이 비어 있고 유닛 AI도 대기 상태(엔진 D 갈래 확인). 엔진은 1983652에 바로 다음 목표, 게임은 1983808 — 대기 유닛 AI의 재조준 시점 문제로 B 갈래가 추적 중.
+
+## 226. 유목 휴전은 모두 마을회관을 가지면 끝나(C5, truth22 477.9초, 스위치 GENIE_EXPERIMENT_TREATY_188329 기본 켬)
+- 경우: truth22 P2 사냥꾼 5977·5979에게 적 병사 4942를 찍는 명령. 게임은 곧바로 마스터 293/83으로 바꾸고 공격(작업 9), 엔진은 이동만 하고 마스터 유지.
+- 원인: 이 경기는 유목 휴전(gb_force_nomad_treaty=1, treaty_length 0). 엔진은 저장본의 관계 4(P1<->P2 휴전)를 끝까지 둬서 4942가 동맹으로 보였음. 188329는 휴전 감시기(world+0x828, 갱신 0x1543330)가 모든 플레이어가 마을회관을 가지면(또는 시간이 끝나면) 관계 4를 3(적)으로 바꿈 — 통째로 옮김.
+- 고침: players/diplomacy.rs, world/schedule.rs(WorldStep::Treaty), genie-model world/settings.rs(nomad_treaty), genie-oracle setup.rs(엔진 C 갈래).
+- R65m = R65l + C5(genie-c cd45196b). PC: `runs\census_R65m.exe`, `runs\R65m.patch`. 검사: truth22 P2 36999 맞음, truth28 전부 맞음; 전체 세트 7632 -> 7708(n_090 181 -> 257), 나빠진 판 없음; 321판(S33_R65m): 끝까지 9, 재현 비율 30.1% -> 30.3%(평범한 180판 31.4% -> 31.5%), 길어진 판 2(유목 경기), 짧아진 판 0.

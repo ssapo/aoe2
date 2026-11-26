@@ -530,7 +530,9 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 13.4 지금 하던 일 (멈출 때마다 이 절을 덮어쓴다)
 
-**2026-11-26 — R65l(가장 최신).** 엔진 = `runs\R65l.patch` = R65k + B65c(findings 225 목표가 죽으면 잊고 멈추기만 함). 321판: 끝까지 9, 재현 비율 30.1%(평범한 180판 31.4%). 갈래: B(unit_ai·groups, 원본 대조 A 항목 B66a~j 확인 중), C(이동·길찾기·명령, C5~C7), D(전투·채집·건설, D1~). 원본 대조 목록 PC `runs\AUD\ai_diffs.md`·`sim_diffs.md`, 첫 어긋남 자동 찾기 PC `runs\DT\first_diff.py`. 동시 실행 한도 PC `runs\RUN_LIMIT.txt`.
+**2026-11-26 — R65m(가장 최신).** 엔진 = `runs\R65m.patch` = R65l + C5(findings 226 유목 휴전 끝내기). 전체 세트 7708. 321판: 끝까지 9, 재현 비율 30.3%(평범한 180판 31.5%). 다음: D2(채집·건설 원본 대조 1·2·3·5번, 결과 변화 없음) -> R65n, C6·C7, B66a~j.
+
+**2026-11-26 — R65l(R65m 이전).** 엔진 = `runs\R65l.patch` = R65k + B65c(findings 225 목표가 죽으면 잊고 멈추기만 함). 321판: 끝까지 9, 재현 비율 30.1%(평범한 180판 31.4%). 갈래: B(unit_ai·groups, 원본 대조 A 항목 B66a~j 확인 중), C(이동·길찾기·명령, C5~C7), D(전투·채집·건설, D1~). 원본 대조 목록 PC `runs\AUD\ai_diffs.md`·`sim_diffs.md`, 첫 어긋남 자동 찾기 PC `runs\DT\first_diff.py`. 동시 실행 한도 PC `runs\RUN_LIMIT.txt`.
 
 **2026-11-26 — R65k(R65l 이전).** 엔진 = `runs\R65k.patch` = R65j + B65a(BESTKEEP 기본 켬) + B65b(findings 223 공격받은 병사의 무시는 무리가 정함). 전체 세트 7632. 321판: 끝까지 9, 재현 비율 30.0%(평범한 180판 31.3%). 다음(C4 조사, PC `runs\C4_notes.txt`): truth20 696.77초·truth21 683.2초·truth23 1983.6초·truth24 86499는 B(unit_ai), truth22 477.9초 사냥꾼의 공격 명령 전환은 C(orders·task_finder).
 
