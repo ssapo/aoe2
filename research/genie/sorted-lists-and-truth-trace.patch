@@ -2215,7 +2215,7 @@ index 9a856bbb..ef88ada7 100644
          }
          let missile = Self {
 diff --git a/crates/engine/genie-core/src/commands/builders.rs b/crates/engine/genie-core/src/commands/builders.rs
-index 1c85e4af..e12c25c7 100644
+index 1c85e4af..bf5d37f9 100644
 --- a/crates/engine/genie-core/src/commands/builders.rs
 +++ b/crates/engine/genie-core/src/commands/builders.rs
 @@ -116,9 +116,13 @@ impl World {
@@ -2257,7 +2257,15 @@ index 1c85e4af..e12c25c7 100644
          let masters = self.model.masters.of(q).ok_or(GenieError::unsupported(
              "BUILD tasks the builders: no master table",
          ))?;
-@@ -231,7 +236,7 @@ impl World {
+@@ -200,6 +205,7 @@ impl World {
+             attackable: true,
+             pasture: None,
+             top_action: None,
++            workers: crate::objects::WorkerCount::ZERO,
+         };
+         let world = TaskWorld {
+             players: &self.players,
+@@ -231,7 +237,7 @@ impl World {
              general: Some(&target),
              terrain: self.task_terrain(Position::new(position.x(), position.y(), 0.0)),
          };
@@ -2266,7 +2274,7 @@ index 1c85e4af..e12c25c7 100644
              masters,
              &actor,
              &on,
-@@ -240,18 +245,11 @@ impl World {
+@@ -240,18 +246,11 @@ impl World {
              self.model.slots,
              &self.model.roles,
          )?
@@ -2290,7 +2298,7 @@ index 1c85e4af..e12c25c7 100644
          }
          let builder = masters.get(with).ok_or(NO_WORK_MASTER)?;
          let to = WalkTo {
-@@ -274,10 +272,38 @@ impl World {
+@@ -274,10 +273,38 @@ impl World {
              ),
              &self.model.roles,
          );
@@ -13966,6 +13974,26 @@ index 6f8b2b4c..79e38400 100644
      /// `mReloadStinger` (`+0xb40`), added to its master's reload time.
      pub reload_stinger: Seconds,
      /// `mHitpointsPowerup` and `mHitpointsMaxPowerup` (`+0xa38`, `+0xa3c`), which the task finder
+diff --git a/crates/engine/genie-core/src/objects/masters/tests.rs b/crates/engine/genie-core/src/objects/masters/tests.rs
+index b6929809..3ca1c5cd 100644
+--- a/crates/engine/genie-core/src/objects/masters/tests.rs
++++ b/crates/engine/genie-core/src/objects/masters/tests.rs
+@@ -1701,6 +1701,7 @@ fn villager_on_farm_takes_its_group_farmer_for_the_farm_class() {
+             attackable: true,
+             pasture: None,
+             top_action: None,
++            workers: crate::objects::WorkerCount::ZERO,
+         };
+         let actor = Actor {
+             id: object_id(9181),
+@@ -1766,6 +1767,7 @@ fn villager_takes_the_first_master_of_its_swap_group_with_task_for_its_foundatio
+         attackable: true,
+         pasture: None,
+         top_action: None,
++        workers: crate::objects::WorkerCount::ZERO,
+     };
+     let pick = |own| {
+         let actor = Actor {
 diff --git a/crates/engine/genie-core/src/objects/mod.rs b/crates/engine/genie-core/src/objects/mod.rs
 index 8e11f247..6e4dee2f 100644
 --- a/crates/engine/genie-core/src/objects/mod.rs
@@ -16493,7 +16521,7 @@ index 77933740..f1555814 100644
      /// `0x140e67b5d`..`0x140e67cb1`): the first of `units` the world holds, when it has a unit
      /// AI, names its target (`+0x48`, `FUN_140c4cc40`); the object the world holds for it
 diff --git a/crates/engine/genie-core/src/orders/mod.rs b/crates/engine/genie-core/src/orders/mod.rs
-index b97f7d35..122a8387 100644
+index b97f7d35..2b4df320 100644
 --- a/crates/engine/genie-core/src/orders/mod.rs
 +++ b/crates/engine/genie-core/src/orders/mod.rs
 @@ -61,9 +61,11 @@ pub use self::order_flags::OrderFlags;
@@ -16564,6 +16592,14 @@ index b97f7d35..122a8387 100644
  
  const TROPHIES: RangeInclusive<i16> = 1650..=1653;
  
+@@ -444,6 +462,7 @@ impl World {
+             attackable: u.flags.contains(UnitFlags::ATTACKABLE),
+             pasture: u.pasture,
+             top_action: self.parts.actions_of(u.id).top_action_kind(),
++            workers: u.workers,
+         })
+     }
+ }
 diff --git a/crates/engine/genie-core/src/orders/moves.rs b/crates/engine/genie-core/src/orders/moves.rs
 index 29f5d776..c3257cf5 100644
 --- a/crates/engine/genie-core/src/orders/moves.rs
@@ -22455,10 +22491,28 @@ index 7cc2f5c9..58ffa64d 100644
  
  /// What a computer player's unit weighs of an object on a damage notify ([`UnitAi::damaged`]):
 diff --git a/crates/engine/genie-core/src/unit_ai/task_finder/mod.rs b/crates/engine/genie-core/src/unit_ai/task_finder/mod.rs
-index d11a4839..e9f15119 100644
+index d11a4839..71d4df47 100644
 --- a/crates/engine/genie-core/src/unit_ai/task_finder/mod.rs
 +++ b/crates/engine/genie-core/src/unit_ai/task_finder/mod.rs
-@@ -476,6 +476,81 @@ fn finder_head<'m>(
+@@ -23,6 +23,7 @@ use crate::map::TerrainId;
+ use crate::objects::HitPoints;
+ use crate::objects::ObjectId;
+ use crate::objects::ObjectState;
++use crate::objects::WorkerCount;
+ use crate::objects::lifecycle::Held;
+ use crate::objects::masters::ActionKind;
+ use crate::objects::masters::ClassId;
+@@ -97,6 +98,9 @@ pub struct TaskTarget<'a> {
+     pub pasture: Option<PastureId>,
+     /// The type of the first action in its action list (`+0x880`), if any.
+     pub top_action: Option<ActionKind>,
++    /// `+0x644` (188329 `+0x18c`), `worker_num`: the actions that work on it, which the fish
++    /// trap's step reads.
++    pub workers: WorkerCount,
+ }
+ 
+ /// What the work command's finder searches on: its target (none for a point), the target its
+@@ -476,6 +480,81 @@ fn finder_head<'m>(
      Ok(Finding::Next)
  }
  
@@ -22540,7 +22594,7 @@ index d11a4839..e9f15119 100644
  /// The task finder's tail (`LAB_14127ba9e`, `LAB_14127bb9f`): task 13 for an own, allied or
  /// artifact target below state 3 (under that filter alone); a villager on livestock, or on
  /// what is inside something, takes task 110; anything else the general search
-@@ -493,41 +568,60 @@ fn finder_tail<'m>(
+@@ -493,41 +572,60 @@ fn finder_tail<'m>(
      let target = on.target;
      let own = actor.master;
      // the tail: conversions, task 0x84, healing, task 0x88, the siege and class-53 tasks
@@ -22624,7 +22678,15 @@ index d11a4839..e9f15119 100644
      }
      if roles
          .of_class(own.class)
-@@ -825,6 +919,7 @@ mod tests {
+@@ -669,6 +767,7 @@ mod tests {
+             attackable: true,
+             pasture: None,
+             top_action: None,
++            workers: WorkerCount::ZERO,
+         }
+     }
+ 
+@@ -825,6 +924,7 @@ mod tests {
                  class: class::TREE,
                  workers: WorkerCount::NO_CAP,
                  state: None,
@@ -22632,11 +22694,103 @@ index d11a4839..e9f15119 100644
                  attribute,
              }],
              ..DropSite::default()
+@@ -1374,8 +1474,8 @@ mod tests {
+         );
+     }
+ 
+-    /// The finder's steps on a target: its player's foundation takes the build task; master 199
+-    /// is not modelled; a dock or market below state 3 takes the first trade task (0x6f) for its
++    /// The finder's steps on a target: its player's foundation takes the build task; on master
++    /// 199 a unit without a gather task for it that is not a fishing ship goes on; a dock or market below state 3 takes the first trade task (0x6f) for its
+     /// master or class the filter takes, and without one goes on; a transport's garrison without
+     /// a task ends the finder (none); anything else goes on.
+     #[test]
+@@ -1416,7 +1516,7 @@ mod tests {
+             class::BUILDING,
+             vec![],
+         );
+-        assert!(
++        assert_eq!(
+             on_target(
+                 &builder,
+                 &a,
+@@ -1424,8 +1524,8 @@ mod tests {
+                 None,
+                 &Alone,
+                 &roles()
+-            )
+-            .is_err()
++            ),
++            Ok(Finding::Next)
+         );
+         let m45 = master(ids::ID_45, MasterKind::COMBAT, class::CLASS_6, vec![]);
+         assert_eq!(
 diff --git a/crates/engine/genie-core/src/unit_ai/task_finder/target_steps.rs b/crates/engine/genie-core/src/unit_ai/task_finder/target_steps.rs
-index 8b85e109..aaab743d 100644
+index 8b85e109..3c5f31f5 100644
 --- a/crates/engine/genie-core/src/unit_ai/task_finder/target_steps.rs
 +++ b/crates/engine/genie-core/src/unit_ai/task_finder/target_steps.rs
-@@ -129,6 +129,10 @@ pub(super) fn drop_off_finding<'m>(
+@@ -29,7 +29,8 @@ use crate::world::layer::Roles;
+ /// The task finder's steps on a `target` (`LAB_1412795f5` to `LAB_1412796b4`): the drop-off
+ /// ([`drop_off_finding`]), its player's foundation ([`build_task`]), the garrison into it
+ /// ([`garrison_into`]), the repair ([`repair_finding`]), the trade ([`trade_task`]); a garrison
+-/// into it without a task ends the finder there. Master 199 is not modelled.
++/// into it without a task ends the finder there. On a fish trap (master 199) the trap's step
++/// ([`fish_trap_finding`]) comes first.
+ pub(super) fn on_target<'m>(
+     list: &'m Master,
+     actor: &Actor<'_>,
+@@ -52,7 +53,12 @@ pub(super) fn on_target<'m>(
+         .of_master(t.master.id)
+         .contains(MasterRoles::FISH_TRAP)
+     {
+-        return Err(GenieError::unsupported("the task finder on master 199"));
++        if !fishtrap_188329() {
++            return Err(GenieError::unsupported("the task finder on master 199"));
++        }
++        if let Finding::Answer(task) = fish_trap_finding(list, actor, t, filter, roles) {
++            return Ok(Finding::Answer(task));
++        }
+     }
+     // LAB_141279cfa -> LAB_1412796b4: garrisoning, repairing, task 0x6f
+     let (garrison, no_task) = garrison_into(list, actor, t, filter, dip, roles);
+@@ -74,6 +80,36 @@ pub(super) fn on_target<'m>(
+     })
+ }
+ 
++/// The fish trap's step (188329 0x133c696..0x133c79f, the target's master 199): the first gather
++/// task (5) for master 199 the filter takes, when the trap is the unit's player's or no one works
++/// it (`[trap+0x18c]` = 0, `worker_num`); none: a fishing ship (class 0x15) with no filter gets no
++/// task (0x133c77b, `cmp ax, 0x15` -> 0x133b74e), any other goes on to the garrison.
++fn fish_trap_finding<'m>(
++    list: &'m Master,
++    actor: &Actor<'_>,
++    t: &TaskTarget<'_>,
++    filter: Option<ActionKind>,
++    roles: &Roles,
++) -> Finding<'m> {
++    let takes = t.player == actor.player || t.workers.get() == 0;
++    if let Some(task) = first(list, |task| {
++        task.action_kind == GATHER
++            && task.object_id == Some(t.master.id)
++            && filter.is_none_or(|f| f == GATHER)
++            && takes
++    }) {
++        return Finding::Answer(Some(task));
++    }
++    if filter.is_none()
++        && roles
++            .of_class(actor.master.class)
++            .contains(ClassRoles::FISHING_SHIP)
++    {
++        return Finding::Answer(None);
++    }
++    Finding::Next
++}
++
+ /// The trade task (0x6f) on a dock (45) or market (84) in a state below 3 (`LAB_1412796b4`'s
+ /// last loop): the first task of type 0x6f for the target's master or its class that the
+ /// filter takes; none goes on to the finder's tail.
+@@ -129,6 +165,10 @@ pub(super) fn drop_off_finding<'m>(
                  && task.attribute_kind == held_kind
                  && matches!(task.action_kind, GATHER | HUNT | ActionKind::TRADE)
                  && wanted(filter, task)
@@ -22647,7 +22801,7 @@ index 8b85e109..aaab743d 100644
          }) {
              return Finding::Answer(Some(task));
          }
-@@ -272,3 +276,12 @@ fn build_task<'m>(
+@@ -272,3 +312,22 @@ fn build_task<'m>(
      }
      by_class.map_or(generic, |task| (task.work_val1.positive()).then_some(task))
  }
@@ -22660,6 +22814,28 @@ index 8b85e109..aaab743d 100644
 +        crate::env_os!("GENIE_EXPERIMENT_DROPFLAG_188329").is_none_or(|v| std::ffi::OsStr::new(&v) != "0")
 +    })
 +}
++
++/// 188329's fish trap step in the task finder (0x133c583..0x133c79f): switch
++/// GENIE_EXPERIMENT_FISHTRAP_188329, on unless "0"; off keeps the old unsupported error.
++fn fishtrap_188329() -> bool {
++    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *ON.get_or_init(|| {
++        crate::env_os!("GENIE_EXPERIMENT_FISHTRAP_188329")
++            .is_none_or(|v| std::ffi::OsStr::new(&v) != "0")
++    })
++}
+diff --git a/crates/engine/genie-core/src/unit_ai/task_finder/world.rs b/crates/engine/genie-core/src/unit_ai/task_finder/world.rs
+index d36d231a..fb2a0488 100644
+--- a/crates/engine/genie-core/src/unit_ai/task_finder/world.rs
++++ b/crates/engine/genie-core/src/unit_ai/task_finder/world.rs
+@@ -145,6 +145,7 @@ pub(crate) fn task_target_with<'a>(
+         attackable: u.flags.contains(UnitFlags::ATTACKABLE),
+         pasture: u.pasture,
+         top_action: parts.actions_of(u.id).top_action_kind(),
++        workers: u.workers,
+     }))
+ }
+ 
 diff --git a/crates/engine/genie-core/src/unit_ai/tests.rs b/crates/engine/genie-core/src/unit_ai/tests.rs
 index 4cc9cc71..b603cd5e 100644
 --- a/crates/engine/genie-core/src/unit_ai/tests.rs
@@ -23889,7 +24065,7 @@ index be560628..1917696a 100644
  
  /// The objects of recyclable masters (`+0x680`, the `.dat`'s `recyclable`): a new one takes the
 diff --git a/crates/engine/genie-core/src/world/schedule.rs b/crates/engine/genie-core/src/world/schedule.rs
-index 187c02c8..b90d27a9 100644
+index 187c02c8..7613bc0a 100644
 --- a/crates/engine/genie-core/src/world/schedule.rs
 +++ b/crates/engine/genie-core/src/world/schedule.rs
 @@ -20,6 +20,9 @@ pub enum WorldStep {
@@ -23971,12 +24147,12 @@ index 187c02c8..b90d27a9 100644
              // setLastRandoms (0x140d3ce20): the multiplayer sync's draws
              WorldStep::LastRandoms => {
                  let _ = self.streams.set_last_randoms();
-@@ -409,21 +421,22 @@ mod tests {
+@@ -409,21 +421,23 @@ mod tests {
      }
  
      /// The number of world steps: [`world_place`]'s arms.
 -    const WORLD_STEPS: usize = 10;
-+    const WORLD_STEPS: usize = 11;
++    const WORLD_STEPS: usize = 12;
  
      /// Each world step's place in the update; the match fails to compile for a new step.
      const fn world_place(step: WorldStep) -> usize {
@@ -23999,8 +24175,9 @@ index 187c02c8..b90d27a9 100644
 +            WorldStep::Turn => 6,
 +            WorldStep::Victory => 7,
 +            WorldStep::FrameSeed => 8,
-+            WorldStep::LastRandoms => 9,
-+            WorldStep::Vision => 10,
++            WorldStep::Treaty => 9,
++            WorldStep::LastRandoms => 10,
++            WorldStep::Vision => 11,
          }
      }
  
@@ -29100,6 +29277,47 @@ index 0c6a6c44..4bbe2308 100644
          flags: option(OptionFlags::FULL_TECH_TREE, o.full_tech_tree_enabled)
              .union(option(
                  OptionFlags::VILLAGER_FORCE_DROP,
+diff --git a/crates/tools/genie-oracle/src/task_finder.rs b/crates/tools/genie-oracle/src/task_finder.rs
+index ccdfb8c2..75f605bf 100644
+--- a/crates/tools/genie-oracle/src/task_finder.rs
++++ b/crates/tools/genie-oracle/src/task_finder.rs
+@@ -75,6 +75,8 @@ pub struct FinderObject {
+     pub annex_of: Option<ObjectId>,
+     /// Its top action's type, if it has one.
+     pub top_action: Option<ActionKind>,
++    /// `worker_num`: the actions that work on it.
++    pub workers: genie_core::objects::WorkerCount,
+     /// Its place.
+     pub position: Position,
+ }
+@@ -117,6 +119,7 @@ impl FinderWorld {
+             attackable: o.attackable,
+             pasture: o.pasture,
+             top_action: o.top_action,
++            workers: o.workers,
+         })
+     }
+ 
+@@ -245,6 +248,7 @@ fn finder_object(
+             .and_then(|a| a.entries().next())
+             .map(|(kind, _)| ActionKind::try_from(kind))
+             .transpose()?,
++        workers: genie_core::objects::WorkerCount::of_data(s.worker_num),
+         position: Position::new(s.tx, s.ty, s.tz),
+     })
+ }
+diff --git a/crates/tools/genie-oracle/src/task_finder/tests.rs b/crates/tools/genie-oracle/src/task_finder/tests.rs
+index 90e6f22f..4815417a 100644
+--- a/crates/tools/genie-oracle/src/task_finder/tests.rs
++++ b/crates/tools/genie-oracle/src/task_finder/tests.rs
+@@ -38,6 +38,7 @@ fn object(annex_of: Option<ObjectId>) -> FinderObject {
+         pasture: None,
+         annex_of,
+         top_action: Some(GATHER),
++        workers: genie_core::objects::WorkerCount::ZERO,
+         position: Position::new(1.0, 2.0, 0.0),
+     }
+ }
 diff --git a/crates/tools/genie-oracle/src/top_actions.rs b/crates/tools/genie-oracle/src/top_actions.rs
 index b2774f57..522ab704 100644
 --- a/crates/tools/genie-oracle/src/top_actions.rs
