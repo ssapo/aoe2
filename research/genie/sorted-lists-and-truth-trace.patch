@@ -20859,10 +20859,10 @@ index 28ca0268..ad2804f4 100644
 +    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_SOLDIERIDLE_188329").is_some())
 +}
 diff --git a/crates/engine/genie-core/src/unit_ai/idle_animals.rs b/crates/engine/genie-core/src/unit_ai/idle_animals.rs
-index bf5761c6..a703dd82 100644
+index bf5761c6..886ccbbe 100644
 --- a/crates/engine/genie-core/src/unit_ai/idle_animals.rs
 +++ b/crates/engine/genie-core/src/unit_ai/idle_animals.rs
-@@ -29,6 +29,38 @@ use crate::world::layer::ClassRoles;
+@@ -29,6 +29,47 @@ use crate::world::layer::ClassRoles;
  use crate::world::layer::MasterRoles;
  use std::cmp::Ordering;
  
@@ -20875,6 +20875,15 @@ index bf5761c6..a703dd82 100644
 +
 +/// The range of 188329's graze reach test (`[0x3202890]`, 0.1).
 +const GRAZE_REACH: f32 = 0.1;
++
++/// `GENIE_EXPERIMENT_EVADEPATH_188329` (on unless "0"): `evasiveMoveFrom` (0xd26200) keeps one
++/// path over its tile-planner calls (0xd26527..0xd26843), each appending to it.
++fn evadepath_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| {
++        crate::env_os!("GENIE_EXPERIMENT_EVADEPATH_188329").is_none_or(|v| std::ffi::OsStr::new(&v) != "0")
++    })
++}
 +
 +/// 188329's test before a hunted animal's own move to `to` (`0xcfcbd0`): the graze limit `v`
 +/// (slot 0x870, [`UnitSide::graze_limit`]); at most 0 (`COMISS v, 0; JBE`) lets the move go.
@@ -20901,7 +20910,7 @@ index bf5761c6..a703dd82 100644
  impl UnitAi {
      /// The boar's idle check (slot 72, `FUN_140c1e630`): `FUN_140c41e50` first
      /// ([`UnitAi::cap_human_order`]). A furious boar, or any in mode 1, stays. Then one draw of
-@@ -153,11 +185,145 @@ impl UnitAi {
+@@ -153,11 +194,158 @@ impl UnitAi {
          let reach = (at.speed * unit_ai_tuning.evade_reach).get();
          let (dx, dy) = (other.x() - x, other.y() - y);
          let d = sqrt(dy * dy + dx * dx);
@@ -20961,7 +20970,8 @@ index bf5761c6..a703dd82 100644
 +    /// 0x1889) and the four table directions from it, each divided by the distance to the other
 +    /// object and times `2 * reach`; the first usable path. All failing: the last held target.
 +    /// Without a planner (no movement state) the first held target. The move (slot 0x370) is the
-+    /// caller's.
++    /// caller's. The calls share one path, each appending to it (`evadepath_188329`): B's walk
++    /// runs over A's points first.
 +    fn evade_from_188329(
 +        &self,
 +        at: &Surroundings,
@@ -20983,10 +20993,22 @@ index bf5761c6..a703dd82 100644
 +        let (maxx, maxy) = (at.map.width() as f32 - rad, at.map.height() as f32 - rad);
 +        let hold = |t: f32, max: f32| if t < rad { rad } else { max.min(t) };
 +        let held = |tx: f32, ty: f32| (hold(tx, maxx), hold(ty, maxy));
++        // 0xd26527..0xd26541: one path (`rbp - 0x60`, 0x14106ae10) for all the calls below, freed
++        // at 0xd26843 only; the planner (0x1057a40) appends its path to it (0x140f95c00: the
++        // points after the ones before, the length the new path's), so a later call's count and
++        // walk (0x141072970, 0x106e0b0) run over the earlier calls' points too
++        let kept_path = evadepath_188329();
++        let mut held_path = crate::pathing::tile_path::Path::default();
 +        // the point at the walked distance `along` on the path to `goal`, when the path is usable
 +        let mut walk = |goal: (f32, f32), along: f32| -> Result<Option<Option<(f32, f32)>>, GenieError> {
-+            let Some(path) = side.tile_path(Point::new(goal.0, goal.1), Distance::new(rad))? else {
++            let Some(new) = side.tile_path(Point::new(goal.0, goal.1), Distance::new(rad))? else {
 +                return Ok(None);
++            };
++            let path = if kept_path {
++                held_path.append(&new);
++                &held_path
++            } else {
++                &new
 +            };
 +            if !(1 < path.points.len() && 0.3 < path.length.get()) {
 +                return Ok(Some(None));
@@ -21049,7 +21071,7 @@ index bf5761c6..a703dd82 100644
      pub(super) fn hunted_idle(
          &mut self,
          at: &Surroundings,
-@@ -189,24 +355,35 @@ impl UnitAi {
+@@ -189,24 +377,35 @@ impl UnitAi {
          ai: &mut Well512,
          side: &mut dyn UnitSide,
      ) -> Result<IdleOutcome, GenieError> {
@@ -21090,7 +21112,7 @@ index bf5761c6..a703dd82 100644
              }
          }
          if at.flags.contains(SurroundingFlags::MODE_1) {
-@@ -236,6 +413,9 @@ impl UnitAi {
+@@ -236,6 +435,9 @@ impl UnitAi {
              },
              memory: Memory::default(),
          })?;
@@ -21100,7 +21122,7 @@ index bf5761c6..a703dd82 100644
          self.alert(found, at.dt_seconds);
          if found.id.is_some() {
              let other = found
-@@ -249,6 +429,10 @@ impl UnitAi {
+@@ -249,6 +451,10 @@ impl UnitAi {
              let dx = x - h.origin.x();
              let dy = y - h.origin.y();
              if HUNTED_HOME < dy * dy + dx * dx {
@@ -21111,7 +21133,7 @@ index bf5761c6..a703dd82 100644
                  if let Some(m) = self.move_to(go_home) {
                      side.effect_now(Effect::Move(m), self, ai)?;
                  }
-@@ -264,6 +448,9 @@ impl UnitAi {
+@@ -264,6 +470,9 @@ impl UnitAi {
              };
              let sx = step(ai) as f32;
              let sy = step(ai) as f32;
@@ -21121,7 +21143,7 @@ index bf5761c6..a703dd82 100644
              let wander = self.move_to(AiMove {
                  point: Position::new(x + sx, sy + y, z),
                  ..go_home
-@@ -353,3 +540,8 @@ impl UnitAi {
+@@ -353,3 +562,8 @@ impl UnitAi {
          Ok(IdleOutcome::Acted)
      }
  }
