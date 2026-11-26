@@ -9,7 +9,7 @@ const COLORS = ['#8b7d6b', '#3d7bff', '#ff4b3e', '#2fbf4f', '#f2c12e', '#2ec7c9'
 // 14 (grass and other decorations), 30 (map placeholders, removed in the first update) and the
 // rest are not drawn
 const GROUND = '#5d6644';     // land under everything
-const STILL_COLORS = { 15: '#1f3f24', 32: '#d4b13a', 8: '#9a9a9a', 34: '#8a6440', 5: '#6aa84f', 7: '#c0508a' };
+const STILL_COLORS = { 15: '#1f3f24', 32: '#d4b13a', 8: '#9a9a9a', 34: '#a17a4f', 5: '#6aa84f', 7: '#c0508a' };
 const UNIT_LABEL_ZOOM = 14;     // px per tile from which unit names show
 const $ = id => document.getElementById(id);
 const canvas = $('map'), ctx = canvas.getContext('2d');
@@ -274,7 +274,16 @@ function draw() {
   const si = at(st.stills, st.playMs);
   if (si >= 0) {
     const s = st.stills[si];
+    // cliffs first, in two passes: a dark rim under every piece, then the fills, so the pieces of one
+    // cliff read as one rock with a single outline
+    for (const pass of [0, 1]) for (let o = 0; o + W <= s.data.length; o += W) {
+      if (((s.data[o + 3] >> 8) & 0xffff) !== 34 || (s.data[o + 3] & 0x80000000)) continue;
+      const [sx, sy] = toScreen(s.floats[o + 4], s.floats[o + 5]);
+      const e = pass ? 0 : 0.22, hx = (W > 12 && s.floats[o + 11] > 0 ? s.floats[o + 11] : 1.5) + e, hy = (W > 12 && s.floats[o + 12] > 0 ? s.floats[o + 12] : 1.5) + e;
+      ctx.fillStyle = pass ? STILL_COLORS[34] : '#3a2817'; ctx.fillRect(sx - k * hx, sy - k * hy, k * 2 * hx, k * 2 * hy);
+    }
     for (let o = 0; o + W <= s.data.length; o += W) {
+      if (((s.data[o + 3] >> 8) & 0xffff) === 34) continue;
       if (s.data[o + 3] & 0x80000000) continue;
       const color = STILL_COLORS[(s.data[o + 3] >> 8) & 0xffff];
       if (color === undefined) continue;
