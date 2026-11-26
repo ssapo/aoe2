@@ -430,7 +430,7 @@
     const matches=(report.matches||[]).filter(m=>(filter==='all'||m.result===filter)&&(kindFilter==='all'||matchKind(m).key===kindFilter));
     const list=$('#matches');
     if(!matches.length) {
-      list.innerHTML = `<div class="empty"><h3>${filter==='all'?'경기 기록 없음':'해당 경기 없음'}</h3></div>`;
+      list.innerHTML = `<div class="empty"><h3>${filter==='all'&&kindFilter==='all'?'경기 기록 없음':'해당 경기 없음'}</h3>${kindFilter!=='all'?`<p class="compact-note">저장된 경기 중 '${KIND_LABELS[kindFilter]}' 경기가 없어요.</p>`:''}</div>`;
     } else {
       const labels={complete:'분석 완료',unavailable:'리플을 받지 못했어요',parser_error:'분석하지 못했어요',pending:'분석 대기'};
       list.innerHTML=matches.slice(0,visible).map(m=>{
