@@ -530,7 +530,9 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 13.4 지금 하던 일 (멈출 때마다 이 절을 덮어쓴다)
 
-**2026-11-26 — R65j(가장 최신).** 엔진 = `runs\R65j.patch` = R65i + C3(findings 224 동물 피하기 경로는 하나를 이어 붙임, 0xd26200). 전체 세트 7371 -> 7625. 321판: 끝까지 9, 재현 비율 29.9%(평범한 180판 31.1%). 다음: B65a(BESTKEEP 기본 켬)·B65b(findings 223 공격받을 때 무리 상태) -> R65k.
+**2026-11-26 — R65k(가장 최신).** 엔진 = `runs\R65k.patch` = R65j + B65a(BESTKEEP 기본 켬) + B65b(findings 223 공격받은 병사의 무시는 무리가 정함). 전체 세트 7632. 321판: 끝까지 9, 재현 비율 30.0%(평범한 180판 31.3%). 다음(C4 조사, PC `runs\C4_notes.txt`): truth20 696.77초·truth21 683.2초·truth23 1983.6초·truth24 86499는 B(unit_ai), truth22 477.9초 사냥꾼의 공격 명령 전환은 C(orders·task_finder).
+
+**2026-11-26 — R65j(R65k 이전).** 엔진 = `runs\R65j.patch` = R65i + C3(findings 224 동물 피하기 경로는 하나를 이어 붙임, 0xd26200). 전체 세트 7371 -> 7625. 321판: 끝까지 9, 재현 비율 29.9%(평범한 180판 31.1%). 다음: B65a(BESTKEEP 기본 켬)·B65b(findings 223 공격받을 때 무리 상태) -> R65k.
 
 **2026-11-26 — R65i(R65j 이전).** 엔진 = `runs\R65i.patch` = R65h + 설정값 캐시(PC `runs\SPD\apply_env_cache.sh`: genie-core `env_cache.rs`, `std::env::var(_os)("이름")`을 한 번만 읽는 `env_os!`/`env_str!`로; 계산은 그대로). 검사: 전체 세트 39판 R65h와 바이트까지 같음; 검사 담당 세션 증명(SPDe) 51판 + 321판 같음. 한 판 1.6배 빠름. 갈래는 자기 사본에 R65h를 맞춘 뒤 `apply_env_cache.sh <사본>`을 돌리면 R65i와 같아지고, 새 스위치를 넣은 뒤에도 다시 돌리면 됨(같은 결과, 여러 번 돌려도 됨).
 

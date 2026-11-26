@@ -19585,10 +19585,51 @@ index 87f4b772..15a985c3 100644
      Ok(Distance::new(least))
  }
 diff --git a/crates/engine/genie-core/src/unit_ai/attacked.rs b/crates/engine/genie-core/src/unit_ai/attacked.rs
-index 7e435e73..a8a28d5b 100644
+index 7e435e73..554e4d39 100644
 --- a/crates/engine/genie-core/src/unit_ai/attacked.rs
 +++ b/crates/engine/genie-core/src/unit_ai/attacked.rs
-@@ -361,7 +361,11 @@ impl UnitAi {
+@@ -108,6 +108,16 @@ impl UnitAi {
+         }
+         // `IsIdle` (FUN_141017ad0) of the unit's group, read at the handler's start
+         let held_by_group = at.group.is_some_and(|g| !g.contains(GroupState::IDLE));
++        // 188329 0xd33c40: the call for help reads `IsIdle` (0x10dd870, 0xd33cba) as above, but
++        // the ignore test reads 0x10dd760 (0xd341f8..0xd3421f): a human player's unit whose
++        // group the world holds ignores the attacker while the group holds the member busy
++        // ([`GroupState::IDLE_FREE_188329`] false), idle or not
++        let ignored_by_group = if attacked_group_188329() {
++            at.group
++                .is_some_and(|g| !g.contains(GroupState::IDLE_FREE_188329))
++        } else {
++            held_by_group
++        };
+         if !known
+             && !player_kind.is_computer()
+             && self.current_target != Some(attacker_id)
+@@ -115,7 +125,7 @@ impl UnitAi {
+         {
+             self.ask_for_help(attacker_id, at, player_kind, side)?;
+         }
+-        if self.ignores_attacker(&attacker, attacker_id, player_kind, held_by_group) {
++        if self.ignores_attacker(&attacker, attacker_id, player_kind, ignored_by_group) {
+             return Ok(GO_ON);
+         }
+         let current = Self::world_object(self.current_target, at, side)?;
+@@ -141,9 +151,11 @@ impl UnitAi {
+     }
+ 
+     /// [`UnitAi::damaged`]'s step 3 after the call for help: true when the unit ignores
+-    /// `attacker` (`attacker_id`): its attack on it already; a human player's unit's order other
+-    /// than the patrols (711, 733), or its group that is not idle (`held_by_group`); a computer
+-    /// player's unit on the explore order (0x2c1) attacked by another player than Gaia.
++    /// `attacker` (`attacker_id`): its attack on it already (`0xd34142`); a human player's
++    /// unit's order other than the patrols (711, 733, `0xd34186`), or its group that holds it
++    /// (`held_by_group`: 158041 its group not idle; 188329 `0x10dd760`, `0xd341f8`); a computer
++    /// player's unit on the explore order (0x2c1) attacked by another player than Gaia
++    /// (`0xd3426c`).
+     pub(super) fn ignores_attacker(
+         &self,
+         attacker: &UnitSeen,
+@@ -361,7 +373,11 @@ impl UnitAi {
              && let Some(met) = ObjectId::of_field(n.p[0])
              && at.unit(met).is_some()
              && self.retarget_disabled == 0
@@ -19601,7 +19642,7 @@ index 7e435e73..a8a28d5b 100644
              && self.stance == UnitStance::Aggressive
          {
              // slot 0xb8 forced, by the type
-@@ -548,3 +552,11 @@ impl UnitAi {
+@@ -548,3 +564,22 @@ impl UnitAi {
          }
      }
  }
@@ -19612,6 +19653,17 @@ index 7e435e73..a8a28d5b 100644
 +fn waygroup_188329() -> bool {
 +    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
 +    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_WAYGROUP_188329").is_some())
++}
++
++/// `GENIE_EXPERIMENT_ATTACKEDGROUP_188329` (on by default, "0" turns it off): the damage case's
++/// ignore test reads the group's `0x10dd760` (188329 `0xd33c40`, `0xd34218`) instead of
++/// `IsIdle` ([`UnitAi::damaged`]).
++#[must_use]
++pub(crate) fn attacked_group_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| {
++        crate::env_os!("GENIE_EXPERIMENT_ATTACKEDGROUP_188329").is_none_or(|v| v != "0")
++    })
 +}
 diff --git a/crates/engine/genie-core/src/unit_ai/back_up.rs b/crates/engine/genie-core/src/unit_ai/back_up.rs
 new file mode 100644
@@ -20250,10 +20302,10 @@ index 57aa6315..4082112f 100644
  /// weapon range.
  pub(super) const ONE: f32 = BEST_TARGET_ONE;
 diff --git a/crates/engine/genie-core/src/unit_ai/best_target/mod.rs b/crates/engine/genie-core/src/unit_ai/best_target/mod.rs
-index a377ec10..94bbf3bb 100644
+index a377ec10..44ae71bf 100644
 --- a/crates/engine/genie-core/src/unit_ai/best_target/mod.rs
 +++ b/crates/engine/genie-core/src/unit_ai/best_target/mod.rs
-@@ -23,11 +23,46 @@ use crate::world::layer::ClassRoles;
+@@ -23,11 +23,47 @@ use crate::world::layer::ClassRoles;
  use crate::world::layer::MasterRoles;
  use crate::world::layer::Roles;
  
@@ -20274,14 +20326,15 @@ index a377ec10..94bbf3bb 100644
 +    static PATH_KEEP: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 +}
 +
-+/// [`PATH_KEEP`] as the running search left it (false outside one, or without
-+/// `GENIE_EXPERIMENT_BESTKEEP_188329`: a test with `keep` 1 that reaches the short pather needs
-+/// its kept area, which the pathing does not model yet, so the flag stays its own switch).
++/// [`PATH_KEEP`] as the running search left it (false outside one).
++/// `GENIE_EXPERIMENT_BESTKEEP_188329` (on by default, "0" turns it off): a test with `keep` 1
++/// that reaches the short pather reads its kept area (`GENIE_EXPERIMENT_KEPTAREA_188329`).
 +#[must_use]
 +pub(crate) fn path_keep() -> bool {
 +    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-+    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_BESTKEEP_188329").is_some())
-+        && PATH_KEEP.with(std::cell::Cell::get)
++    *FLAG.get_or_init(|| {
++        crate::env_os!("GENIE_EXPERIMENT_BESTKEEP_188329").is_none_or(|v| v != "0")
++    }) && PATH_KEEP.with(std::cell::Cell::get)
 +}
 +
 +/// [`PATH_KEEP`] becomes `keep`.
