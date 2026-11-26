@@ -25,7 +25,7 @@ let drawn = [];                                            // this frame's objec
 function fmt(ms) { const s = Math.floor(ms / 1000); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); }
 
 async function envVars() {
-  const text = await (await fetch('engine-switches.txt')).text();
+  const text = await (await fetch('engine-switches.txt?v=20261126')).text();
   const env = {};
   for (const kv of text.split(/[;\r\n]+/)) { const i = kv.indexOf('='); if (i > 0) env[kv.slice(0, i)] = kv.slice(i + 1); }
   return env;
@@ -37,7 +37,7 @@ async function start(pieces, rec, name) {
   if (st && st.worker) st.worker.terminate();
   $('status').textContent = name + ' 불러오는 중…';
   $('stage').hidden = false; $('side').hidden = false;
-  const [wasm, env] = await Promise.all([fetch('genie-web.wasm?v=20261123').then(r => r.arrayBuffer()), envVars()]);
+  const [wasm, env] = await Promise.all([fetch('genie-web.wasm?v=20261126').then(r => r.arrayBuffer()), envVars()]);
   st = { name, frames: [], stills: [], info: null, labels: null, words: 10, playMs: 0, playing: false, done: false, wall: 0, wasmBytes: wasm.byteLength };
   cam.fitted = false; hover = selected = null;
   const worker = new Worker('worker.js?v=20261123');
@@ -68,7 +68,7 @@ async function startDemo(id) {
   document.querySelector('header h1 small').textContent = '(데모)';
   $('status').textContent = '엔진 출력 불러오는 중…';
   $('stage').hidden = false; $('side').hidden = false;
-  const packed = await fetch('demo-' + id + '.bin?v=20261125').then(r => { if (!r.ok) throw Error('HTTP ' + r.status); return r.arrayBuffer(); });
+  const packed = await fetch('demo-' + id + '.bin?v=20261126').then(r => { if (!r.ok) throw Error('HTTP ' + r.status); return r.arrayBuffer(); });
   const bytes = await new Response(new Blob([packed]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer();
   st = { name: '#' + id, demo: true, frames: [], stills: [], info: null, labels: null, words: 10, playMs: 0, playing: false, done: false, wall: 1, wasmBytes: 0 };
   cam.fitted = false; hover = selected = null;
