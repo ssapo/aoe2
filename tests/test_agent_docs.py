@@ -7,7 +7,7 @@ from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
 POINTERS=['CLAUDE.md','GEMINI.md','.github/copilot-instructions.md','.cursorrules']
-REQUIRED=['ONBOARDING.md','회사 메일','noreply@anthropic.com','noreply@openai.com','모든 경기에서 같은 칸']
+REQUIRED=['ONBOARDING.md','회사 메일','noreply@anthropic.com','noreply@openai.com','모든 경기에서 같은 칸','멈출 때 인계']
 
 
 class AgentDocsTests(unittest.TestCase):
