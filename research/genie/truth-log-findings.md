@@ -2151,3 +2151,7 @@ genie-b is left as R59a + B52a (tree = R59a.patch + B52a.diff; no commit beyond 
 - R65t = R65s + B66a~j(PC `runs\B66r.diff`, genie-b c4fc925c; 스위치 BACKUPRETURN, FOLLOW, FORMING, GAIAGATE, INPLACE, LEASHGROUP, OVERLAP, RELEASEARRIVED, RESPOINT, RESSEARCH, TOWERPATHS, TURNRELAYOUT 기본 켬).
 - 검사: 전체 세트 8012 -> 8504, 나빠진 판 없음; 321판(S33_R65t): 끝까지 10 -> 11, 재현 비율 30.9% -> 32.4%(분 3577 -> 3722), 평범한 180판 32.5% -> 34.2%(끝까지 5 -> 6), 길어진 판 29, 짧아진 판 2.
 - 짧아진 판(스위치를 하나씩 끈 확인, PC `runs\BIS65t\`): 520592057 769 -> 723초는 OVERLAP(B66a) 때문(끄면 769), 521849352 541 -> 535초는 RELEASEARRIVED 때문(끄면 541). 둘 다 원본에서 옮긴 고침이라 그대로 두고, 그 뒤에 드러난 다른 차이를 찾을 단서로 남김.
+
+## 233. R65u 확인 끝(C10 움직이는 기록 거르기 + D6 플레이어 난수 한 번)
+- R65u = R65t + C10(RECORDMOVERS_188329) + D6(PLAYERDRAW_188329, 188329 WorldPlayer::update 0x14170e990가 매 갱신 Player 난수를 한 번 뽑고 버림).
+- 검사: 전체 세트 8504 = 8504; 321판(S33_R65u): 끝까지 11, 재현 비율 32.4% -> 32.6%(분 3722 -> 3732), 평범한 180판 34.2% -> 34.3%, 길어진 판 2, 짧아진 판 0.

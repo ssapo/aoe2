@@ -10921,18 +10921,21 @@ index 9f616e05..4cfb5cae 100644
 +    })
 +}
 diff --git a/crates/engine/genie-core/src/map/spatial/mod.rs b/crates/engine/genie-core/src/map/spatial/mod.rs
-index 4cc3b283..37a11c50 100644
+index 4cc3b283..49088e69 100644
 --- a/crates/engine/genie-core/src/map/spatial/mod.rs
 +++ b/crates/engine/genie-core/src/map/spatial/mod.rs
-@@ -46,6 +46,7 @@ mod objects;
+@@ -44,8 +44,10 @@ pub use self::footprint::{Movers, SpotPick};
+ mod grid;
+ mod objects;
  mod pather;
++pub(crate) use pather::recordmovers_188329;
  mod record_id;
  mod search;
 +pub use self::search::{CLOSEST_FROM, ClosestFrom};
  mod sight;
  mod tile_sight;
  
-@@ -473,8 +474,10 @@ impl Tiles {
+@@ -473,8 +475,10 @@ impl Tiles {
  #[derive(Clone, Debug, Default, PartialEq, Eq)]
  struct RecordCells {
      /// The ids by cell, in (level, x, y) order: a query that visits more cells than are held
@@ -10945,7 +10948,7 @@ index 4cc3b283..37a11c50 100644
      filed: IdTable<(i32, i32, i32)>,
  }
  
-@@ -499,6 +502,12 @@ pub struct Spatial {
+@@ -499,6 +503,12 @@ pub struct Spatial {
      /// set it reset it at their end but `FindShortPath`'s quick-only exit, and the queries that
      /// set none read what is left ([`Spatial::manager_grow`]).
      manager_buffer: Option<Distance>,
@@ -10958,7 +10961,7 @@ index 4cc3b283..37a11c50 100644
      /// The placed objects by id (T7: a dense column, walked in the ids' order).
      objects: IdTable<Placed>,
      /// The cell of each object's record ([`RecordCells`]), kept with `objects`
-@@ -513,6 +522,15 @@ pub struct Spatial {
+@@ -513,6 +523,15 @@ pub struct Spatial {
      changed: Vec<PlanRect>,
      /// The seconds since each frozen object froze.
      frozen_for: IdTable<Seconds>,
@@ -11037,7 +11040,7 @@ index 0134df68..f966714d 100644
              self.refile(id);
              if let Some(i) = self.tiles.tile_of(gone.position) {
 diff --git a/crates/engine/genie-core/src/map/spatial/pather.rs b/crates/engine/genie-core/src/map/spatial/pather.rs
-index 4be84371..8f7a7ab8 100644
+index 4be84371..2477e25c 100644
 --- a/crates/engine/genie-core/src/map/spatial/pather.rs
 +++ b/crates/engine/genie-core/src/map/spatial/pather.rs
 @@ -13,6 +13,8 @@ use crate::objects::masters::ObstructionKind;
@@ -11057,11 +11060,15 @@ index 4be84371..8f7a7ab8 100644
      ) -> Result<Vec<Hit>, GenieError> {
          const MOST_HITS: usize = 25;
          let roles = by_id.roles();
-@@ -108,8 +111,13 @@ impl Spatial {
+@@ -108,8 +111,17 @@ impl Spatial {
                  continue;
              };
              let kind = o.kind.filed();
-+            let moves = if self.record_movers {
++            // 188329 0x111cb80 with flags 0x40: a record's `+3` bit 0x10 as its object's last
++            // update left it (0x1226600 -> 0x11203a0), for every pather query
++            // (GENIE_EXPERIMENT_RECORDMOVERS_188329, on unless "0"); off, only the short
++            // pather's (`with_record_movers`) reads it and the hull pather the live velocity
++            let moves = if self.record_movers || recordmovers_188329() {
 +                self.moving_records.contains_key(id)
 +            } else {
 +                by_id.moving(id)
@@ -11072,7 +11079,7 @@ index 4be84371..8f7a7ab8 100644
                  || ignore.contains(&RecordId::from(id))
                  || !self.visits(p, kind, grown)
              {
-@@ -124,11 +132,14 @@ impl Spatial {
+@@ -124,11 +136,14 @@ impl Spatial {
                      "a pather query meeting a record of kind 11 (its own radii)",
                  ));
              }
@@ -11092,7 +11099,7 @@ index 4be84371..8f7a7ab8 100644
              }
              hits.push(Hit {
                  id: RecordId::from(id),
-@@ -151,9 +162,23 @@ impl Spatial {
+@@ -151,9 +166,23 @@ impl Spatial {
          mask: TerrainMask,
          ignore: &[RecordId],
          by_id: ObjectsRef<'_>,
@@ -11117,7 +11124,7 @@ index 4be84371..8f7a7ab8 100644
              .is_empty())
      }
  
-@@ -168,7 +193,20 @@ impl Spatial {
+@@ -168,7 +197,20 @@ impl Spatial {
          ignore: &[RecordId],
          by_id: ObjectsRef<'_>,
      ) -> Result<Vec<Hit>, GenieError> {
@@ -11139,6 +11146,20 @@ index 4be84371..8f7a7ab8 100644
      }
  }
  
+@@ -404,3 +446,13 @@ pub(super) fn segment_meets_box(b: Rect, r: f32, walk: Segment, inside: Rect) ->
+     };
+     !(outside(start) && outside(end))
+ }
++
++/// `GENIE_EXPERIMENT_RECORDMOVERS_188329` (on unless "0"): every pather query leaves a moving
++/// record out by its `+3` bit 0x10 ([`Spatial::record_moving`]), the hull pather's too, as 188329
++/// `0x111cb80` tests it, instead of by its object's velocity now (sim_diffs #8).
++pub(crate) fn recordmovers_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| {
++        crate::env_os!("GENIE_EXPERIMENT_RECORDMOVERS_188329").is_none_or(|v| v != "0")
++    })
++}
 diff --git a/crates/engine/genie-core/src/map/spatial/search.rs b/crates/engine/genie-core/src/map/spatial/search.rs
 index 877228f6..2b5b448e 100644
 --- a/crates/engine/genie-core/src/map/spatial/search.rs
@@ -18148,7 +18169,7 @@ index a13c5723..352cd285 100644
  use self::walk_in::WalkIn;
  #[cfg(test)]
 diff --git a/crates/engine/genie-core/src/pathing/hull_path/node_lists.rs b/crates/engine/genie-core/src/pathing/hull_path/node_lists.rs
-index c9cd54a1..21f5e897 100644
+index c9cd54a1..2bb15a9f 100644
 --- a/crates/engine/genie-core/src/pathing/hull_path/node_lists.rs
 +++ b/crates/engine/genie-core/src/pathing/hull_path/node_lists.rs
 @@ -269,7 +269,14 @@ impl HullPather<'_> {
@@ -18183,6 +18204,22 @@ index c9cd54a1..21f5e897 100644
          for id in self.included_movers(a, b)? {
              if let Some(p) = self.world.get(id) {
                  hits.push(Hit {
+@@ -308,7 +322,14 @@ impl HullPather<'_> {
+             .include
+             .iter()
+             .copied()
+-            .filter(|id| !self.ignore.contains(&RecordId::from(*id)) && self.by_id.moving(*id))
++            .filter(|id| {
++                !self.ignore.contains(&RecordId::from(*id))
++                    && if crate::map::spatial::recordmovers_188329() {
++                        self.world.record_moving(*id)
++                    } else {
++                        self.by_id.moving(*id)
++                    }
++            })
+             .collect();
+         let mut met = Vec::new();
+         if movers.is_empty() {
 diff --git a/crates/engine/genie-core/src/pathing/hull_path/obstacles.rs b/crates/engine/genie-core/src/pathing/hull_path/obstacles.rs
 index 2c6cc59d..846944ae 100644
 --- a/crates/engine/genie-core/src/pathing/hull_path/obstacles.rs
@@ -19106,7 +19143,7 @@ index 2294f68c..8843f690 100644
      #[must_use]
      pub const fn pending(self) -> Self {
 diff --git a/crates/engine/genie-core/src/players/world_player/income.rs b/crates/engine/genie-core/src/players/world_player/income.rs
-index e920970d..c1d20089 100644
+index e920970d..5bacae81 100644
 --- a/crates/engine/genie-core/src/players/world_player/income.rs
 +++ b/crates/engine/genie-core/src/players/world_player/income.rs
 @@ -6,6 +6,7 @@ use crate::map::Tile;
@@ -19209,6 +19246,39 @@ index e920970d..c1d20089 100644
      /// The world player's attribute add (slot 0xf8, `FUN_141616820`) of `amount` to resource `kind`
      /// (food, wood, stone, gold: 0 to 3) of player `p`, with `stat` (its fourth argument) and
      /// `share` (its fifth, [`ResourceShare`]): with `stat` 1 the gathered total grows first (166 to
+@@ -232,8 +287,19 @@ impl World {
+     /// clears, is the list's length: only the AI's `FUN_140b90b90`, which a playback does not
+     /// run, reads it too, and the player's update ends with the list emptied (`FUN_141661030`).
+     /// Gaia's update has no tail.
++    ///
++    /// 188329: before the scout map, `WorldPlayer::update` (`0x14170e990`, line 0x639) draws
++    /// once from the Player stream for its log, whatever the player (its answer only goes to the
++    /// log, `FUN_140905250`); a spawn later in the update (effect 0x1a8's villager sex) takes the
++    /// draws after it.
+     pub fn world_player_tail(&mut self, p: PlayerId) -> Result<(), GenieError> {
+-        if self.players.player(p)?.kind == PlayerKind::Gaia || self.spatial.scout_map(p).is_none() {
++        if self.players.player(p)?.kind == PlayerKind::Gaia {
++            return Ok(());
++        }
++        if world_player_draws_188329() {
++            let _ = self.streams.get(crate::math::rng::Stream::Player).rand15();
++        }
++        if self.spatial.scout_map(p).is_none() {
+             return Ok(());
+         }
+         let Some(tiles) = self
+@@ -259,3 +325,11 @@ impl World {
+         Ok(())
+     }
+ }
++
++/// `GENIE_EXPERIMENT_PLAYERDRAW_188329`: each world player's update draws once from the Player
++/// stream before its scout map, as 188329's `WorldPlayer::update`, on unless "0".
++fn world_player_draws_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_PLAYERDRAW_188329").is_none_or(|v| v != "0"))
++}
++
 diff --git a/crates/engine/genie-core/src/production/spawn/gather_walk.rs b/crates/engine/genie-core/src/production/spawn/gather_walk.rs
 index 8f8edb17..4a98956f 100644
 --- a/crates/engine/genie-core/src/production/spawn/gather_walk.rs
