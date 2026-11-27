@@ -530,7 +530,9 @@ powershell -File $d\runs\go.ps1 -Name pX -Updates 14700 -Envs "$a;GENIE_TRACE_OB
 
 ### 13.4 지금 하던 일 (멈출 때마다 이 절을 덮어쓴다)
 
-**2026-11-27 — R65q(가장 최신).** 엔진 = `runs\R65q.patch` = R65p + C8(findings 230 통발, 결과 변화 없음). 전체 세트 7844. 321판: 끝까지 9, 재현 비율 30.4%(평범한 180판 31.7%). 다음: C9(격자 순서, truth30 깨짐 고치는 중), D(truth25~35 첫 어긋남), B66a~j.
+**2026-11-27 — R65v(가장 최신, 확인 진행 중).** 확인 끝난 최신 = R65s(`runs\R65s.patch`): 321판 끝까지 10, 재현 비율 30.9%(평범한 180판 32.5%), 전체 세트 8012. 그 위로 R65t(+B66a~j) -> R65u(+C10·D6) -> R65v(+D7)가 빌드돼 있고(`runs\census_R65t/u/v.exe`, `runs\R65t/u/v.patch`) 차례로 확인 중(findings 231). 이어받는 사람: 각 단계를 바로 앞 단계와 `SPD_P=1 bash SPD/full_fast.sh R65x census_R65x.exe <앞>` + `python B61/cpcheck2.py R65x B61/<앞>` + `SPD/survey_fast.sh S33_R65x census_R65x.exe R65x - S33_<앞>` + `python B60/plain_progress.py` 로 비교하고, 짧아진 판이 없으면 그 패치를 sorted-lists-and-truth-trace.patch로 올림. 짧아진 판이 있으면 그 단계의 고침을 스위치로 끄고 다시 봄. 갈래 사본(PC): genie-b(B 그룹·유닛 AI), genie-c(C 이동·길찾기), genie-d(D 전투·채집·건설) — 각 갈래 커밋은 로컬에만, 넘긴 고침은 `runs\<이름>.diff`.
+
+**2026-11-27 — R65q(R65v 이전).** 엔진 = `runs\R65q.patch` = R65p + C8(findings 230 통발, 결과 변화 없음). 전체 세트 7844. 321판: 끝까지 9, 재현 비율 30.4%(평범한 180판 31.7%). 다음: C9(격자 순서, truth30 깨짐 고치는 중), D(truth25~35 첫 어긋남), B66a~j.
 
 **2026-11-27 — R65p(R65q 이전).** 엔진 = `runs\R65p.patch` = R65o + D3(findings 229 사냥 짐 한 번에 넘기기). 전체 세트 7844. 321판: 끝까지 9, 재현 비율 30.4%(평범한 180판 31.7%). 다음: C8(통발 199)·C9(walk_hits 순서), D 보유 ±1 신호, B66a~j.
 

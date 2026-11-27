@@ -2163,6 +2163,33 @@ index d29be68b..9ae19ce9 100644
  /// `FUN_140fde380`: `master` is of type 70 and up, of class 51 or 54, with a weapon (`+0x810`
  /// above 0): a trebuchet, packed or not, whose kill counts as a unit's.
  pub(crate) fn is_trebuchet(master: &Master, roles: &Roles) -> bool {
+diff --git a/crates/engine/genie-core/src/combat/volley.rs b/crates/engine/genie-core/src/combat/volley.rs
+index 2d173648..a3b50cee 100644
+--- a/crates/engine/genie-core/src/combat/volley.rs
++++ b/crates/engine/genie-core/src/combat/volley.rs
+@@ -157,7 +157,10 @@ impl Unit {
+                 notifies,
+             )?
+         };
+-        if missile || 0 < extra {
++        // 188329 FUN_1412c0c10: the flare and the extra missiles (LAB_1412c1277) come on the
++        // volley's first call with a missile, else only with shots left (0 < extra): a later
++        // call whose count went to 0 or below makes no flare
++        if (missile && (first || !flare_later_188329())) || 0 < extra {
+             // a target of a player but Gaia: its player makes a flare (master 112, slot 0x1c0)
+             // at the attacker's place, which lasts twice as long from a trebuchet (class 54:
+             // its amount, +0x310, doubled)
+@@ -486,3 +489,10 @@ pub(crate) struct Shot {
+     pub(crate) aimer: Aimer,
+     pub(crate) attack_count: AttackCount,
+ }
++
++/// `GENIE_EXPERIMENT_FLARELATER_188329`: a volley's later call makes its flare only with shots
++/// left (188329 `0x12c0c10`), on unless "0".
++fn flare_later_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_FLARELATER_188329").is_none_or(|v| v != "0"))
++}
 diff --git a/crates/engine/genie-core/src/combat/volley/launch.rs b/crates/engine/genie-core/src/combat/volley/launch.rs
 index 9a856bbb..ef88ada7 100644
 --- a/crates/engine/genie-core/src/combat/volley/launch.rs
@@ -2511,10 +2538,10 @@ index 00000000..4308cf7c
 +    }
 +}
 diff --git a/crates/engine/genie-core/src/commands/wall.rs b/crates/engine/genie-core/src/commands/wall.rs
-index 15ff0cfd..f2c27328 100644
+index 15ff0cfd..aab5f52e 100644
 --- a/crates/engine/genie-core/src/commands/wall.rs
 +++ b/crates/engine/genie-core/src/commands/wall.rs
-@@ -374,9 +374,12 @@ impl World {
+@@ -374,9 +374,20 @@ impl World {
              .get(self.players.live(q, idx)?.id)
              .is_none_or(|ai| !w.queued && (!w.commits || !ai.has_unready_order()));
          if direct {
@@ -2523,12 +2550,34 @@ index 15ff0cfd..f2c27328 100644
                  self.build_task(q, id, (player, foundation, master), at)?;
 -            self.build_directly(q, idx, task, (player, foundation, master), at)?;
 +            match task {
-+                Some(task) => self.build_directly(q, idx, task, (player, foundation, master), at)?,
++                Some(task) => {
++                    // 188329: the direct way is slot 0x128 on the foundation with 1, as BUILD's
++                    // (`FUN_141211b80`): a combat object's unit AI empties its queue first
++                    if wall_empties_queue_188329() {
++                        let kind = self.players.live(q, idx)?.master(self.master_tables(), q)?.kind;
++                        self.empty_queue_for_work(q, idx, kind)?;
++                    }
++                    self.build_directly(q, idx, task, (player, foundation, master), at)?;
++                }
 +                None => self.walk_to_foundation(q, idx, foundation, at)?,
 +            }
          } else {
              for &(f, p) in placed {
                  self.queue_build(q, idx, (player, f, master), p)?;
+@@ -427,6 +438,13 @@ impl World {
+     }
+ }
+ 
++/// `GENIE_EXPERIMENT_WALLEMPTY_188329`: a wall builder taken directly empties its unit AI's queue
++/// first, as BUILD's direct path (slot 0x128 with 1), on unless "0".
++fn wall_empties_queue_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_WALLEMPTY_188329").is_none_or(|v| v != "0"))
++}
++
+ #[cfg(test)]
+ mod tests {
+     use super::*;
 diff --git a/crates/engine/genie-core/src/construction/build/completion.rs b/crates/engine/genie-core/src/construction/build/completion.rs
 index f58c1e4d..9b6c51f9 100644
 --- a/crates/engine/genie-core/src/construction/build/completion.rs
@@ -10520,10 +10569,84 @@ index f639a3e9..6c6f2778 100644
  pub mod gathering;
  pub mod groups;
 diff --git a/crates/engine/genie-core/src/map/spatial/grid.rs b/crates/engine/genie-core/src/map/spatial/grid.rs
-index 9f616e05..f1ceb5cf 100644
+index 9f616e05..4cfb5cae 100644
 --- a/crates/engine/genie-core/src/map/spatial/grid.rs
 +++ b/crates/engine/genie-core/src/map/spatial/grid.rs
-@@ -251,12 +251,40 @@ impl Spatial {
+@@ -139,7 +139,9 @@ impl Spatial {
+         if let Some(old) = old
+             && let Some(ids) = records.cells.get_mut(&old)
+         {
+-            let _ = ids.remove(&id);
++            if let Some(i) = ids.iter().position(|&o| o == id) {
++                let _ = ids.swap_remove(i);
++            }
+             if ids.is_empty() {
+                 let _ = records.cells.remove(&old);
+             }
+@@ -147,7 +149,7 @@ impl Spatial {
+         match cell {
+             Some(c) => {
+                 let _ = records.filed.insert(id, c);
+-                let _ = records.cells.entry(c).or_default().insert(id);
++                records.cells.entry(c).or_default().push(id);
+             }
+             None => {
+                 let _ = records.filed.remove(id);
+@@ -189,6 +191,53 @@ impl Spatial {
+         ids
+     }
+ 
++    /// The objects whose record is filed in a cell a query whose grown rectangle is `rect`
++    /// visits, in the game's order (188329 `0x111c660`): the query's tiles (low corner at least
++    /// 0, high corner at most the map's size); `L*`, the finest level one cell of which holds
++    /// both corners (`[mgr+0x1bc]` of the corners' xor >> 3, the smaller of x's and y's); first
++    /// the one cell of each level from `L*` down to 0 (0x111c900..0x111c998), then each finer
++    /// level's cells row by row, y outer and x inner (0x111ca20..0x111cb3f); in a cell, its
++    /// array's order ([`RecordCells`]). Level -1 (the game's query never visits it) comes after
++    /// level 0, as [`Spatial::visited_records`] visits it.
++    ///
++    /// [`RecordCells`]: crate::map::spatial::RecordCells
++    pub(super) fn grid_ordered_records(&self, rect: Rect) -> Vec<ObjectId> {
++        let (w, h) = (self.map.width(), self.map.height());
++        let (x0, y0) = ((rect.x0() as i32).max(0), (rect.y0() as i32).max(0));
++        let (x1, y1) = ((rect.x1() as i32).min(w), (rect.y1() as i32).min(h));
++        let top = self
++            .grid
++            .level((x1 ^ x0) >> 3)
++            .min(self.grid.level((y1 ^ y0) >> 3));
++        let mut ids = Vec::new();
++        let mut cell = |level: i32, cx: i32, cy: i32, ids: &mut Vec<ObjectId>| {
++            if let Some(c) = self.records.cells.get(&(level, cx, cy)) {
++                let at = ids.len();
++                ids.extend(c.iter().copied());
++                if cellsort_188329() {
++                    ids[at..].sort_unstable();
++                }
++            }
++        };
++        for level in (-1..=top).rev() {
++            let [cx0, cy0, cx1, cy1] = self.visited_cells(level, rect);
++            for cy in cy0..=cy1 {
++                for cx in cx0..=cx1 {
++                    cell(level, cx, cy, &mut ids);
++                }
++            }
++        }
++        for level in (top + 1).max(-1)..self.grid.levels {
++            let [cx0, cy0, cx1, cy1] = self.visited_cells(level, rect);
++            for cy in cy0..=cy1 {
++                for cx in cx0..=cx1 {
++                    cell(level, cx, cy, &mut ids);
++                }
++            }
++        }
++        ids
++    }
++
+     /// [`Spatial::visited_records`] with each object's place.
+     pub(super) fn records_in(&self, rect: Rect) -> impl Iterator<Item = (ObjectId, &Placed)> + '_ {
+         self.visited_records(rect)
+@@ -251,12 +300,40 @@ impl Spatial {
          self.manager_ignore.clone()
      }
  
@@ -10564,8 +10687,68 @@ index 9f616e05..f1ceb5cf 100644
      /// The obstruction manager's buffer as the last `FUN_1410562d0` left it
      /// ([`Spatial::set_manager_buffer`]).
      #[must_use]
+@@ -316,7 +393,22 @@ impl Spatial {
+         // through it
+         let reach = Distance::new(grow.get().max(ally_factor * grow.get()));
+         let skip = |p: &Placed| !rect.overlaps(p.bounds().grown(reach));
+-        for (id, p) in self.records_in(query) {
++        // 188329 0x111c660: the cells in the grid's order and at most 25 hits (the edge's
++        // counted, 0x111c81c / 0x111ce45), switch GENIE_EXPERIMENT_GRIDORDER_188329 (on unless "0")
++        let grid_order = gridorder_188329();
++        if grid_order && QUERY_HITS <= hits.len() {
++            hits.truncate(QUERY_HITS);
++            return Ok(hits);
++        }
++        let candidates: Vec<ObjectId> = if grid_order {
++            self.grid_ordered_records(query)
++        } else {
++            self.visited_records(query)
++        };
++        for id in candidates {
++            let Some(p) = self.objects.get(id) else {
++                continue;
++            };
+             let Some(o) = p.obstruction else {
+                 continue;
+             };
+@@ -343,6 +435,9 @@ impl Spatial {
+             let b = p.bounds();
+             if rect.overlaps(b.grown(g)) && record_meets_segment(kind, b, g, walk) {
+                 hits.push(RecordId::from(id));
++                if grid_order && QUERY_HITS <= hits.len() {
++                    break;
++                }
+             }
+         }
+         Ok(hits)
+@@ -454,3 +549,25 @@ impl Spatial {
+         Ok(hits)
+     }
+ }
++
++/// `GENIE_EXPERIMENT_GRIDORDER_188329` (on unless "0"): the walk's query takes the cells in the
++/// grid's order and stops at 25 hits (188329 `0x111c660`, [`Spatial::grid_ordered_records`]).
++fn gridorder_188329() -> bool {
++    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *ON.get_or_init(|| {
++        crate::env_os!("GENIE_EXPERIMENT_GRIDORDER_188329")
++            .is_none_or(|v| std::ffi::OsStr::new(&v) != "0")
++    })
++}
++
++/// `GENIE_EXPERIMENT_CELLSORT_188329` (on unless "0"): with the grid's cell order, each cell's
++/// records in id order instead of its array's (append / swap-remove). The engine refiles a record
++/// only when its cell changes, as `0x11214d0` does, yet the array order broke truth30 at 362 s
++/// (two scouts in one cell, engine array 3751 before 3742) where id order holds it: some reorder
++/// of the game's is not modelled yet.
++fn cellsort_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| {
++        crate::env_os!("GENIE_EXPERIMENT_CELLSORT_188329").is_none_or(|v| v != "0")
++    })
++}
 diff --git a/crates/engine/genie-core/src/map/spatial/mod.rs b/crates/engine/genie-core/src/map/spatial/mod.rs
-index 4cc3b283..68b817d4 100644
+index 4cc3b283..37a11c50 100644
 --- a/crates/engine/genie-core/src/map/spatial/mod.rs
 +++ b/crates/engine/genie-core/src/map/spatial/mod.rs
 @@ -46,6 +46,7 @@ mod objects;
@@ -10576,7 +10759,20 @@ index 4cc3b283..68b817d4 100644
  mod sight;
  mod tile_sight;
  
-@@ -499,6 +500,12 @@ pub struct Spatial {
+@@ -473,8 +474,10 @@ impl Tiles {
+ #[derive(Clone, Debug, Default, PartialEq, Eq)]
+ struct RecordCells {
+     /// The ids by cell, in (level, x, y) order: a query that visits more cells than are held
+-    /// walks one level's range of them.
+-    cells: BTreeMap<(i32, i32, i32), BTreeSet<ObjectId>>,
++    /// walks one level's range of them. Each cell's ids in the game's array order (188329
++    /// `[mgr+0x1b0]` cells of pointer and count): a record that comes is appended, one that goes
++    /// takes the last one into its slot (0x1121f7f..0x1121fb9, 0x11210ca..0x11210f9).
++    cells: BTreeMap<(i32, i32, i32), Vec<ObjectId>>,
+     filed: IdTable<(i32, i32, i32)>,
+ }
+ 
+@@ -499,6 +502,12 @@ pub struct Spatial {
      /// set it reset it at their end but `FindShortPath`'s quick-only exit, and the queries that
      /// set none read what is left ([`Spatial::manager_grow`]).
      manager_buffer: Option<Distance>,
@@ -10589,7 +10785,7 @@ index 4cc3b283..68b817d4 100644
      /// The placed objects by id (T7: a dense column, walked in the ids' order).
      objects: IdTable<Placed>,
      /// The cell of each object's record ([`RecordCells`]), kept with `objects`
-@@ -513,6 +520,15 @@ pub struct Spatial {
+@@ -513,6 +522,15 @@ pub struct Spatial {
      changed: Vec<PlanRect>,
      /// The seconds since each frozen object froze.
      frozen_for: IdTable<Seconds>,

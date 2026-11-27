@@ -2138,3 +2138,11 @@ genie-b is left as R59a + B52a (tree = R59a.patch + B52a.diff; no commit beyond 
 - R65q = R65p + C8. PC: `runs\census_R65q.exe`, `runs\R65q.patch`. 검사: 전체 세트 7844 = 7844, 321판 R65p와 똑같음(끝까지 9, 재현 비율 30.4%, 평범한 180판 31.7%).
 - D 갈래 확인(PC `runs\D\rescmp.py`, 기록의 res와 엔진 자원을 매 표본 비교): truth17 끝까지 같음, truth23 1994.8초까지 소수점까지 같음, truth19~24의 ±10 음식 차이는 모두 물체 어긋남 뒤. 채집·하차·비용 계산은 물체가 맞는 동안 정확함 — 조사의 w1만 다른 판은 뒤따른 결과로 봄.
 - C9a(walk_hits 격자 순서, 0x111c660)는 39판 +13이지만 truth30을 362초쯤 깨서 보류 — 같은 칸 안 순서가 원본과 다름(0x11210ca, 0x11212df 경로 확인 중).
+
+## 231. R65r~R65v: 원본 대조 고침 6개 합치기(확인 일부 진행 중, 2026-11-27)
+- R65r = R65q + C9b + D4. C9b(genie-c 778ce654+03415328, map/spatial): 이동 충돌 찾기가 격자 셀을 원본 순서(거친 단계 -> 고운 단계)로 돌고 25개에서 멈춤(188329 0x111c660, 0x111cb80; GRIDORDER_188329). 셀 안은 id 순서 — 원본 배열 순서(CELLSORT_188329=0)로 하면 39판 +13이지만 truth30이 362초쯤 깨짐, 이유 못 찾음. D4(combat/volley.rs): 일제 사격은 다음 호출 때 쏠 발이 남았을 때만 조명탄(0x12c0c10, FLARELATER_188329). 검사: 전체 세트 7844 = 7844, 321판 R65q와 같음.
+- R65s = R65r + D5(commands/wall.rs, WALLEMPTY_188329): 바로 맡긴 BUILD_WALL이 유닛 AI 큐를 안 비워 예전 되돌아가기 명령이 남아 벽 하나 짓고 열매로 갔음. 188329 BUILD 직접 경로처럼 empty_queue_for_work 뒤 build_directly. 검사: 전체 세트 7844 -> 8012, 321판(S33_R65s) 끝까지 9 -> 10, 재현 비율 30.4% -> 30.9%(평범한 180판 31.7% -> 32.5%), 길어진 판 19, 짧아진 판 0.
+- R65t = R65s + B66a~j(PC `runs\B66r.diff`, genie-b c4fc925c, 18개 파일: groups/steer/to_slots.rs, groups/update/attack.rs·moves.rs·awake.rs, unit_ai 여러 개, gathering/gather_search.rs 등; 원본 대조 A 항목들). B 갈래 확인(R65k 기준): 321판 30.0% -> 31.4%, 끝까지 9 -> 10, 길어진 판 36, 짧아진 판 0. 합친 확인은 진행 중.
+- R65u = R65t + C10(map/spatial/pather.rs·mod.rs, hull_path/node_lists.rs; 움직이는 기록을 속도 대신 기록 비트 0x10으로 거름, RECORDMOVERS_188329, 결과 변화 없음) + D6(players/world_player/income.rs, PLAYERDRAW_188329: 188329 WorldPlayer::update 0x14170e990는 매 갱신 Player 난수를 한 번 뽑고 버림 — 안 뽑으면 마을회관 주민 성별이 어긋남; D 확인 +0.2%, 522099960 125 -> 671초, 521340043 649 -> 753초). 확인 진행 중.
+- R65v = R65u + D7(vision/visibility/object_events.rs, NOBLDTAKE_188329): 가이아 건물(돌벽 117)은 보기만 해서는 플레이어 것이 안 됨. 518960946 P2 8 -> 65, 518730987 P1 0 -> 42. 벽만인지 건물 전체인지 원본 조건은 못 찾음 — 전체 확인으로 판단. 확인 진행 중.
+- 보류: truth29 264.6초(같은 점으로 다시 내린 Ctrl 이동에서 원본은 다음 틱에 점에 놓음, 엔진은 안 움직임 — 그룹 경로 0길이 처리까지는 같음, 멤버 path_end 쪽 의심; PC `runs\C9_notes.txt`), 519167127 678초 원본에만 있는 조명탄 하나(원본 기록 없음, `runs\C11_notes.txt`). D 갈래 확인: 자원 계산은 물체가 맞는 동안 정확함(`runs\D\rescmp.py`).
