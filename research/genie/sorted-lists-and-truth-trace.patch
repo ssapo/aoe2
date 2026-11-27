@@ -3386,6 +3386,18 @@ index 92c1f195..59410b34 100644
  /// The units in gate `gate` (`FUN_1411d0570`): the obstruction manager's query from its first
  /// annex to its second (`+0xbc0`, `+0xbc8`) with flags 0x10, the gate and its annexes ignored
  /// (`FUN_1410562e0`), every record and the query grown by `TurnTuning::gate_grow` (`FUN_1410562d0`), any
+diff --git a/crates/engine/genie-core/src/construction/repair/unit.rs b/crates/engine/genie-core/src/construction/repair/unit.rs
+index 326e7693..ef62ec52 100644
+--- a/crates/engine/genie-core/src/construction/repair/unit.rs
++++ b/crates/engine/genie-core/src/construction/repair/unit.rs
+@@ -160,6 +160,7 @@ impl Unit {
+             scenario: mode.scenario(),
+             firepower,
+             capture,
++            overlaps: false,
+         }
+     }
+ 
 diff --git a/crates/engine/genie-core/src/correction.rs b/crates/engine/genie-core/src/correction.rs
 new file mode 100644
 index 00000000..56e1358d
@@ -4611,7 +4623,7 @@ index d834df33..f38d4bc4 100644
      /// showing its sprite; its code, 1 without one.
      ///
 diff --git a/crates/engine/genie-core/src/gathering/closest_resource.rs b/crates/engine/genie-core/src/gathering/closest_resource.rs
-index 9510abdd..12426307 100644
+index 9510abdd..c23329c0 100644
 --- a/crates/engine/genie-core/src/gathering/closest_resource.rs
 +++ b/crates/engine/genie-core/src/gathering/closest_resource.rs
 @@ -145,6 +145,8 @@ pub(crate) fn closest_resource_of(
@@ -4662,7 +4674,7 @@ index 9510abdd..12426307 100644
          ResourceWorld {
              map: c.spatial.map,
              world: c.spatial,
-@@ -194,11 +218,27 @@ pub(crate) fn closest_resource_of(
+@@ -194,11 +218,29 @@ pub(crate) fn closest_resource_of(
                      (spatial, by_id),
                      plan,
                      id,
@@ -4673,7 +4685,9 @@ index 9510abdd..12426307 100644
              },
 -        },
 +        };
-+    if gather_search::ressearch_188329() && ObjectState::Alive <= min_state {
++    if gather_search::ressearch_188329()
++        && (ObjectState::Alive <= min_state || gather_search::respoint_188329())
++    {
 +        return gather_search::closest_resource_at_188329(
 +            &seeker,
 +            site.as_ref(),
@@ -4692,7 +4706,7 @@ index 9510abdd..12426307 100644
          gather_search_tuning,
      )
  }
-@@ -367,3 +407,187 @@ impl Unit {
+@@ -367,3 +409,187 @@ impl Unit {
          .map(|(id, _)| id)
      }
  }
@@ -5893,7 +5907,7 @@ index b1ab9a1e..061d5530 100644
          }
          let empty = target.amount <= Amount::ZERO
 diff --git a/crates/engine/genie-core/src/gathering/gather_search.rs b/crates/engine/genie-core/src/gathering/gather_search.rs
-index b8879db5..53f29d9a 100644
+index b8879db5..865a51f2 100644
 --- a/crates/engine/genie-core/src/gathering/gather_search.rs
 +++ b/crates/engine/genie-core/src/gathering/gather_search.rs
 @@ -71,6 +71,9 @@ pub struct Candidate {
@@ -5948,13 +5962,13 @@ index b8879db5..53f29d9a 100644
      const NO_STEPS: i32 = 1_000_000;
      const TILE_CENTRE: f32 = GATHER_SEARCH_TILE_CENTRE;
 +    // EXPERIMENT (`GENIE_EXPERIMENT_RESSEARCH_188329`): build 188329's search (0xd23bf0)
-+    if ressearch_188329() && ObjectState::Alive <= seeker.min_state {
++    if ressearch_188329() && (ObjectState::Alive <= seeker.min_state || respoint_188329()) {
 +        return closest_resource_at_188329(seeker, site, kind, reads, gather_search_tuning, false);
 +    }
      let ResourceWorld {
          map,
          world,
-@@ -528,6 +539,331 @@ pub fn closest_resource_at<W>(
+@@ -528,6 +539,341 @@ pub fn closest_resource_at<W>(
      Ok((None, None))
  }
  
@@ -5963,6 +5977,16 @@ index b8879db5..53f29d9a 100644
 +#[must_use]
 +pub fn ressearch_188329() -> bool {
 +    crate::env_os!("GENIE_EXPERIMENT_RESSEARCH_188329").is_some()
++}
++
++/// `GENIE_EXPERIMENT_RESPOINT_188329` (on by default, "0" turns it off): with
++/// [`ressearch_188329`], the search at a point (slot 0x88, 188329 `0xd243c0`, which hands slot
++/// 0x80 `0xd23bf0` a least state of -1 and no worker cap) takes 188329's search too, whatever
++/// the caller's least state.
++#[must_use]
++pub fn respoint_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_RESPOINT_188329").is_none_or(|v| v != "0"))
 +}
 +
 +/// The range the search's reach test passes (slot 0x408): 0 as the old build's; with
@@ -6286,7 +6310,7 @@ index b8879db5..53f29d9a 100644
  /// `FUN_140fdd470` then `FUN_140fdd5f0`: the gather group of a resource held, and the most workers
  /// the Build's search for more work lets an object of it have (`0x140ab0c57`): food (0, 15 to 17)
  /// forage (1) and 6, wood (0) and 2, stone (3) and 3, gold (4) and 3, the rest fish (2) and 2.
-@@ -582,6 +918,7 @@ mod tests {
+@@ -582,6 +928,7 @@ mod tests {
              amount: Amount::new(100.0),
              auto_gather: true,
              gather_group: GatherGroup::WOOD,
@@ -6294,7 +6318,7 @@ index b8879db5..53f29d9a 100644
          }
      }
  
-@@ -596,6 +933,7 @@ mod tests {
+@@ -596,6 +943,7 @@ mod tests {
                  class: class::TREE,
                  workers: WorkerCount::of_data(-1),
                  state: None,
@@ -6302,7 +6326,7 @@ index b8879db5..53f29d9a 100644
                  attribute: Some(attribute::WOOD),
              }],
              livestock: false,
-@@ -678,6 +1016,7 @@ mod tests {
+@@ -678,6 +1026,7 @@ mod tests {
              class: class::CLASS_32,
              workers: WorkerCount::of_data(-1),
              state: None,
@@ -9520,7 +9544,7 @@ index d9156f6d..fd81e8ea 100644
          let near =
              !within && !below_or_unordered(radius * self.model.tuning.group.slot_reach, gap.get());
 diff --git a/crates/engine/genie-core/src/groups/steer/to_slots.rs b/crates/engine/genie-core/src/groups/steer/to_slots.rs
-index 999d44b5..d8b95175 100644
+index 999d44b5..ec7c3560 100644
 --- a/crates/engine/genie-core/src/groups/steer/to_slots.rs
 +++ b/crates/engine/genie-core/src/groups/steer/to_slots.rs
 @@ -61,6 +61,9 @@ impl World {
@@ -9759,7 +9783,27 @@ index 999d44b5..d8b95175 100644
          Ok(hits.is_empty())
      }
  
-@@ -363,7 +555,8 @@ impl World {
+@@ -331,6 +523,10 @@ impl World {
+         let g = self.groups.held_mut(group)?;
+         let moving = g.motion.moving();
+         let waits = g.motion.waits_to_move();
++        // 188329 0x10efcf0..0x10efd19: a slot in place also goes back to 0 while the group is
++        // not formed yet (+0x5cc 0)
++        let unformed =
++            in_place_reset_188329() && crate::groups::forming_188329() && !g.formed;
+         let state = &mut g
+             .current_formation
+             .as_mut()
+@@ -338,7 +534,7 @@ impl World {
+             .slots
+             .checked_mut(slot)?
+             .state;
+-        if *state == SlotState::InPlace && (moving || waits) {
++        if *state == SlotState::InPlace && (moving || waits || unformed) {
+             *state = SlotState::Steering;
+         }
+         if late && self.slot_due(group, index, slot)? {
+@@ -363,7 +559,8 @@ impl World {
      }
  
      /// [`World::steer_to_slot`] of a member that is not idle: it stops unless its action keeps
@@ -9769,7 +9813,7 @@ index 999d44b5..d8b95175 100644
      fn steer_busy_member(
          &mut self,
          group: GroupId,
-@@ -380,6 +573,12 @@ impl World {
+@@ -380,6 +577,12 @@ impl World {
              .checked_mut(index)?
              .specific_move
              .consecutive_move_failures = 0;
@@ -9782,8 +9826,21 @@ index 999d44b5..d8b95175 100644
          let state = &mut g
              .current_formation
              .as_mut()
+@@ -393,3 +596,12 @@ impl World {
+         Ok(())
+     }
+ }
++
++/// `GENIE_EXPERIMENT_INPLACE_188329` (on by default, "0" turns it off; with
++/// `GENIE_EXPERIMENT_FORMING_188329`, which keeps `+0x5cc`): a free member's slot in place goes
++/// back to 0 while the group is not formed, as when it moves or waits (188329 `0x10efd10`).
++#[must_use]
++pub(crate) fn in_place_reset_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_INPLACE_188329").is_none_or(|v| v != "0"))
++}
 diff --git a/crates/engine/genie-core/src/groups/update/attack.rs b/crates/engine/genie-core/src/groups/update/attack.rs
-index 3130ba99..6d74151f 100644
+index 3130ba99..8cc443b9 100644
 --- a/crates/engine/genie-core/src/groups/update/attack.rs
 +++ b/crates/engine/genie-core/src/groups/update/attack.rs
 @@ -144,7 +144,9 @@ impl World {
@@ -9797,7 +9854,7 @@ index 3130ba99..6d74151f 100644
              },
          )?;
          *relayout = true;
-@@ -182,9 +184,9 @@ impl World {
+@@ -182,12 +184,13 @@ impl World {
      /// `finished`. With [`GroupFlags::ARRIVED`] the category is released at once; else it is when
      /// one of its units is within its attack range of the target: the footprint gap less a slack,
      /// at most the category's range (negative or unordered: 0). The slack is
@@ -9809,8 +9866,25 @@ index 3130ba99..6d74151f 100644
 +    /// 0x5c8) and the category's range is above the target's own weapon range (slot 0x230) plus
      /// `GroupTuning::ranged_slack`. A category without one in range ends `finished` (going). A
      /// released category stops the group's walk, clears [`GroupFlags::ATTACKING`] and sends its
-     /// units at the target.
-@@ -261,7 +263,8 @@ impl World {
+-    /// units at the target.
++    /// units at the target; in 188329 (`0x110c30a`, [`release_arrived_188329`]) it also sets
++    /// [`GroupFlags::ARRIVED`], so the later categories go at once.
+     ///
+     /// # Errors
+     ///
+@@ -221,6 +224,11 @@ impl World {
+                 let g = self.groups.held_mut(group)?;
+                 g.motion.stop_walk()?;
+                 g.flags &= !GroupFlags::ATTACKING;
++                // 188329 0x110c301..0x110c316: the release also sets ARRIVED, so every later
++                // category is released this update without its reach test
++                if release_arrived_188329() {
++                    g.flags |= GroupFlags::ARRIVED;
++                }
+                 self.release_units(group, &units, target)?;
+             }
+         }
+@@ -261,7 +269,8 @@ impl World {
              if outranged {
                  self.model.tuning.group.chasing_slack
              } else {
@@ -9820,7 +9894,7 @@ index 3130ba99..6d74151f 100644
              }
          } else {
              self.model.tuning.group.contact_slack
-@@ -320,7 +323,8 @@ impl World {
+@@ -320,7 +329,8 @@ impl World {
                  from.ground(),
                  MoveTo {
                      range: Distance::ZERO,
@@ -9830,7 +9904,7 @@ index 3130ba99..6d74151f 100644
                  },
              )?;
              return Ok(Some(Progress::Going));
-@@ -346,7 +350,9 @@ impl World {
+@@ -346,7 +356,9 @@ impl World {
              at.ground(),
              MoveTo {
                  range,
@@ -9841,8 +9915,22 @@ index 3130ba99..6d74151f 100644
              },
          )?;
          let g = self.groups.held_mut(group)?;
+@@ -417,3 +429,13 @@ fn point_gap(at: Point, radius: Footprint, to: Point) -> f32 {
+     let gy = gap(to.y() - at.y(), radius.y());
+     sqrt(gy * gy + gx * gx)
+ }
++
++/// `GENIE_EXPERIMENT_RELEASEARRIVED_188329` (on by default, "0" turns it off): a released
++/// category also sets [`GroupFlags::ARRIVED`] (188329 `0x110c30a`: `AND ~0x10`, `OR 8`).
++#[must_use]
++pub(crate) fn release_arrived_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| {
++        crate::env_os!("GENIE_EXPERIMENT_RELEASEARRIVED_188329").is_none_or(|v| v != "0")
++    })
++}
 diff --git a/crates/engine/genie-core/src/groups/update/awake.rs b/crates/engine/genie-core/src/groups/update/awake.rs
-index 4ce9b2f7..b8899f03 100644
+index 4ce9b2f7..ff45edac 100644
 --- a/crates/engine/genie-core/src/groups/update/awake.rs
 +++ b/crates/engine/genie-core/src/groups/update/awake.rs
 @@ -106,6 +106,7 @@ impl World {
@@ -9883,7 +9971,7 @@ index 4ce9b2f7..b8899f03 100644
              let g = self.groups.held(group)?;
              let without_path = g.motion.paths.first().is_some_and(|l| !l.has_path);
              self.groups.held_mut(group)?.stored_positions.clear_points();
-@@ -321,7 +338,18 @@ impl World {
+@@ -321,7 +338,30 @@ impl World {
              self.groups.held_mut(group)?.flags &= !GroupFlags::RELAYOUT_AT_TURN;
          }
          self.groups.held_mut(group)?.motion.drop_to_high_level()?;
@@ -9899,10 +9987,22 @@ index 4ce9b2f7..b8899f03 100644
 +            g.motion.position[0] = before;
 +            g.motion.new_position[0] = before;
 +        }
++        // 188329 0x110a6b2..0x110a6d1: a formation with fewer slots (formation+4) than members
++        // (+0xe4) is laid out anew (UpdateDesiredPositions with -1) before the transform
++        if turn_relayout_188329() {
++            let g = self.groups.held(group)?;
++            if g
++                .current_formation
++                .as_ref()
++                .is_some_and(|f| f.slots.len() < g.members.len())
++            {
++                self.update_desired_positions(group, None)?;
++            }
++        }
          if let Some(mut f) = self.groups.held_mut(group)?.current_formation.take() {
              let moved = self.formation_transform(&mut f, group, SlotOrder::Closest);
              self.groups.held_mut(group)?.current_formation = Some(f);
-@@ -434,10 +462,13 @@ impl World {
+@@ -434,10 +474,13 @@ impl World {
  
      /// The relayout's choice (`0x14103e53f`..`0x14103e5f7`) after the update's start counted
      /// `count` members: (relayout, refill). A changed count refills an attack's (9) formation of
@@ -9920,7 +10020,7 @@ index 4ce9b2f7..b8899f03 100644
      pub(super) fn relayout_choice(
          &mut self,
          group: GroupId,
-@@ -445,6 +476,8 @@ impl World {
+@@ -445,6 +488,8 @@ impl World {
      ) -> Result<(bool, bool), GenieError> {
          let idle = self.is_idle(group);
          let g = self.groups.held_mut(group)?;
@@ -9929,7 +10029,7 @@ index 4ce9b2f7..b8899f03 100644
          let (mut relayout, mut refill) = (false, false);
          if count != g.members.len() {
              if g.current_command == ATTACK
-@@ -454,7 +487,7 @@ impl World {
+@@ -454,7 +499,7 @@ impl World {
              {
                  refill = true;
              } else if at_most_or_unordered(
@@ -9938,7 +10038,7 @@ index 4ce9b2f7..b8899f03 100644
                  Distance::new(self.model.tuning.missile.volley_reach_margin).get(),
              ) {
                  g.flags |= GroupFlags::RELAYOUT_SPREAD;
-@@ -463,13 +496,13 @@ impl World {
+@@ -463,13 +508,13 @@ impl World {
              }
          }
          if g.flags.contains(GroupFlags::RELAYOUT_SPREAD)
@@ -9954,6 +10054,21 @@ index 4ce9b2f7..b8899f03 100644
              && idle
          {
              g.flags &= !GroupFlags::RELAYOUT;
+@@ -494,3 +539,14 @@ pub(super) fn awake_group_ends(g: &UnitGroup) -> bool {
+             .as_ref()
+             .is_some_and(|f| f.slots.iter().all(|s| s.state == SlotState::InPlace))
+ }
++
++/// `GENIE_EXPERIMENT_TURNRELAYOUT_188329` (on by default, "0" turns it off): the turn lays the
++/// formation out anew before its transform when it has fewer slots than members (188329
++/// `0x110a6b2`).
++#[must_use]
++pub(crate) fn turn_relayout_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| {
++        crate::env_os!("GENIE_EXPERIMENT_TURNRELAYOUT_188329").is_none_or(|v| v != "0")
++    })
++}
 diff --git a/crates/engine/genie-core/src/groups/update/checks.rs b/crates/engine/genie-core/src/groups/update/checks.rs
 index 1991cb20..85f19f8c 100644
 --- a/crates/engine/genie-core/src/groups/update/checks.rs
@@ -10142,7 +10257,7 @@ index 0e406949..7fbd7594 100644
          }
          if self.current_command == GroupCommandKind::MOVE && self.patrols() {
 diff --git a/crates/engine/genie-core/src/groups/update/moves.rs b/crates/engine/genie-core/src/groups/update/moves.rs
-index a7ba8750..2942648b 100644
+index a7ba8750..636657e6 100644
 --- a/crates/engine/genie-core/src/groups/update/moves.rs
 +++ b/crates/engine/genie-core/src/groups/update/moves.rs
 @@ -17,7 +17,7 @@ use crate::groups::command::MOVE_COMMAND;
@@ -10165,7 +10280,52 @@ index a7ba8750..2942648b 100644
      pub(super) fn command_update(
          &mut self,
          group: GroupId,
-@@ -107,7 +107,17 @@ impl World {
+@@ -78,16 +78,40 @@ impl World {
+                             .master(leader.player(), leader.master_id(self.model.slots))?
+                             .line_of_sight;
+                         let range = sight * self.model.tuning.group.front_share;
+-                        let d = from - moved;
+-                        let squared = d.x() * d.x() + 0.0 + d.y() * d.y();
+-                        if !below_or_unordered(squared, range.squared().get()) {
++                        let follows = if follow_188329() {
++                            // 188329 0x10d3720..0x10d37f8: from the top path's last point
++                            // (0x110fe90, 0x106f250: under two points the origin) when there is
++                            // one, else from +0x3d0; the height counts; strictly beyond
++                            let base = crate::groups::formation::top_path(&g.motion.paths)
++                                .map_or(from, |p| {
++                                    if p.points.len() < 2 {
++                                        crate::math::fmath::BVector::ZERO
++                                    } else {
++                                        p.points.last().copied().unwrap_or(from)
++                                    }
++                                });
++                            let d = base - moved;
++                            let squared =
++                                d.height() * d.height() + d.x() * d.x() + d.y() * d.y();
++                            squared > range.squared().get()
++                        } else {
++                            let d = from - moved;
++                            let squared = d.x() * d.x() + 0.0 + d.y() * d.y();
++                            !below_or_unordered(squared, range.squared().get())
++                        };
++                        if follows {
+                             let _ = self.command_move_to(
+                                 group,
+                                 target,
+                                 at.ground(),
+                                 MoveTo {
+                                     range,
+-                                    flags: MoveFlags::DIRECT,
++                                    // 188329 0x10d3824..0x10d38c6: DIRECT and the last argument 1
++                                    flags: if follow_188329() {
++                                        MoveFlags::DIRECT | MoveFlags::FRESH
++                                    } else {
++                                        MoveFlags::DIRECT
++                                    },
+                                 },
+                             )?;
+                         }
+@@ -107,7 +131,17 @@ impl World {
                  }
                  return Ok(GroupFate::Kept);
              }
@@ -10184,7 +10344,7 @@ index a7ba8750..2942648b 100644
          };
          if finished == Progress::Finished {
              if self.groups.held(group)?.command_queue.is_empty() {
-@@ -151,6 +161,9 @@ impl World {
+@@ -151,6 +185,9 @@ impl World {
              *relayout = true;
              return Ok(Progress::Going);
          }
@@ -10194,7 +10354,7 @@ index a7ba8750..2942648b 100644
          let walks = g
              .motion
              .paths
-@@ -221,6 +234,104 @@ impl World {
+@@ -221,6 +258,104 @@ impl World {
          self.move_members_on(group, walks, patrolling)
      }
  
@@ -10299,7 +10459,7 @@ index a7ba8750..2942648b 100644
      /// [`World::move_update`] of a group whose motion moves: a following group
      /// ([`GroupFlags::FOLLOWED`]) whose top path ends at least `GroupTuning::close` from its target
      /// goes on following; any other asks for a layout anew. The update does not end.
-@@ -456,16 +567,26 @@ impl World {
+@@ -456,16 +591,26 @@ impl World {
                      )
                      .map(|motion| {
                          let pauses = take(&mut mover.pauses);
@@ -10328,6 +10488,19 @@ index a7ba8750..2942648b 100644
          for (other, pause) in pauses {
              self.pause(other, pause);
          }
+@@ -542,3 +687,12 @@ impl World {
+         self.groups.get(group).is_some_and(UnitGroup::is_idle)
+     }
+ }
++
++/// `GENIE_EXPERIMENT_FOLLOW_188329` (on by default, "0" turns it off): the follow update as 188329
++/// `0x10d36a0` runs it: measured from the top path's end (else the target's old place), with the
++/// height, re-commanded only when strictly beyond the range, as a fresh direct move.
++#[must_use]
++pub(crate) fn follow_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_FOLLOW_188329").is_none_or(|v| v != "0"))
++}
 diff --git a/crates/engine/genie-core/src/groups/update/other.rs b/crates/engine/genie-core/src/groups/update/other.rs
 new file mode 100644
 index 00000000..3b17b247
@@ -19971,7 +20144,7 @@ index 38514e3f..1e07358a 100644
          self.attack_object(target, OrderForce::Forced, TargetRules::Own, at, side)
      }
 diff --git a/crates/engine/genie-core/src/unit_ai/attack_pick.rs b/crates/engine/genie-core/src/unit_ai/attack_pick.rs
-index 4bca7b20..6a87074e 100644
+index 4bca7b20..69f4015c 100644
 --- a/crates/engine/genie-core/src/unit_ai/attack_pick.rs
 +++ b/crates/engine/genie-core/src/unit_ai/attack_pick.rs
 @@ -9,7 +9,13 @@ use crate::map::Footprint;
@@ -19988,7 +20161,18 @@ index 4bca7b20..6a87074e 100644
  use crate::objects::ObjectId;
  use crate::objects::ObjectState;
  use crate::objects::WorkerCount;
-@@ -286,6 +292,9 @@ pub struct Seeker {
+@@ -220,6 +226,10 @@ pub struct Attacker {
+     pub firepower: Firepower,
+     /// Its `+0x924` (`FUN_14107cc90`): a Gaia siege unit attacks only with 0.
+     pub capture: CaptureKind,
++    /// 188329 `0xcf3350`: it stands on an own unit that attacks, as a melee unit outside a group
++    /// of at most 6 ([`crate::unit_ai::overlap::stands_on_attacker`]); false until the AI's run
++    /// sets it.
++    pub overlaps: bool,
+ }
+ 
+ bitflags::bitflags! {
+@@ -286,6 +296,9 @@ pub struct Seeker {
      pub last_target_class: Option<ClassId>,
      /// `+0x1c0` holds a patrol path.
      pub patrol_path: bool,
@@ -19998,7 +20182,7 @@ index 4bca7b20..6a87074e 100644
      /// The master type of the current target as the world holds it ([`Surroundings::target`]),
      /// which the siege unit's attack check reads.
      ///
-@@ -293,6 +302,70 @@ pub struct Seeker {
+@@ -293,6 +306,70 @@ pub struct Seeker {
      pub target_master_kind: Option<MasterKind>,
  }
  
@@ -20069,7 +20253,7 @@ index 4bca7b20..6a87074e 100644
  impl Seeker {
      /// `canMoveToAttack` with no target (slot 0x1d0 with −1, `FUN_140c48420`; the slice holds no
      /// unit groups): with an order, or without one in a stance below 2.
-@@ -309,13 +382,31 @@ impl Seeker {
+@@ -309,13 +386,31 @@ impl Seeker {
  /// (`FUN_140c48400`: the boar, the ranged units, the ships, the artifact, the siege tower,
  /// livestock) always; the building's (`FUN_140c18b60`) never; the tower's
  /// ([`tower_can_attack`]), the soldier's ([`soldier_can_attack`]) and the siege unit's. The
@@ -20102,7 +20286,7 @@ index 4bca7b20..6a87074e 100644
  ) -> Result<bool, GenieError> {
      match me.ai_kind {
          UnitAiKind::Hunted => Ok(matches!(me.top_action, Some(ATTACK | ActionKind::COMBAT))),
-@@ -333,14 +424,45 @@ pub fn can_attack(
+@@ -333,16 +428,47 @@ pub fn can_attack(
          UnitAiKind::Civilian => Ok(civilian_may_attack(me.attack_priority, t.class, roles)),
          UnitAiKind::Building => Ok(false),
          UnitAiKind::Tower => tower_can_attack(me, t, roles, unit_ai_tuning),
@@ -20117,9 +20301,9 @@ index 4bca7b20..6a87074e 100644
 -            "an attack check (slot 0xa0) of a unit-AI type not modelled",
 -        )),
 +        UnitAiKind::Priest => priest_can_attack(me, t, roles, converts),
-+    }
-+}
-+
+     }
+ }
+ 
 +/// The priest's slot 0xa0 (188329 `0xcf6d60`, findings 144/147): a Gaia priest only on the
 +/// computer's way (a unit of type 50 or above outside the scenario modes; genie holds no
 +/// `+0x51c`, so 0), any other player's always; of attack priority 3 (the master's `+0x3cc`,
@@ -20139,7 +20323,7 @@ index 4bca7b20..6a87074e 100644
 +    let computer_way = MasterKind::RGE_COMBAT <= me.kind && !me.scenario;
 +    if me.player == PlayerId::GAIA && !computer_way {
 +        return Ok(false);
-     }
++    }
 +    if me.attack_priority == AttackPriority::PRIORITY_3
 +        && !(roles.of_class(t.class).contains(ClassRoles::PRIORITY_3_TARGET)
 +            || t.class.get() == 67)
@@ -20149,10 +20333,12 @@ index 4bca7b20..6a87074e 100644
 +    converts.ok_or(GenieError::unsupported(
 +        "a priest's attack check (slot 0xa0) without its conversion test",
 +    ))
- }
- 
++}
++
  /// The predator's slot 0xa0 (`FUN_140c18ed0`) without its `any` flag: by the master's attack
-@@ -462,6 +584,22 @@ pub fn soldier_can_attack(
+ /// priority 1 and 2 anything, 3 the classes of
+ /// [`ClassRoles::PRIORITY_3_TARGET`](crate::world::layer::ClassRoles::PRIORITY_3_TARGET), any other
+@@ -462,12 +588,40 @@ pub fn soldier_can_attack(
      t: &Target,
      roles: &Roles,
      unit_ai_tuning: &UnitAiTuning,
@@ -20175,16 +20361,40 @@ index 4bca7b20..6a87074e 100644
  ) -> Result<bool, GenieError> {
      if roles.of_class(t.class).contains(ClassRoles::LAND_MINE) {
          return Ok(false);
-@@ -504,7 +642,7 @@ pub fn soldier_can_attack(
+     }
+-    let gaia_combat = !me.scenario && MasterKind::COMBAT <= t.kind && !t.capture.any();
+-    if me.player == PlayerId::GAIA && !gaia_combat {
++    let gaia_combat = if gaia_gate_188329() {
++        // 188329 0xcf7969..0xcf79b5: the target's type at least 50, capture kind 3, or 0
++        // outside the scenario modes
++        taken_by_sight_188329(t.kind, t.capture, me.scenario)
++    } else {
++        !me.scenario && MasterKind::COMBAT <= t.kind && !t.capture.any()
++    };
++    // 188329 0xcf78ac..0xcf7908: the first gate reads the attacker itself
++    let gaia_attacks = if gaia_gate_188329() {
++        taken_by_sight_188329(me.kind, me.capture, me.scenario)
++    } else {
++        gaia_combat
++    };
++    if me.player == PlayerId::GAIA && !gaia_attacks {
+         return Ok(false);
+     }
+     if t.owner == PlayerId::GAIA
+@@ -504,7 +658,11 @@ pub fn soldier_can_attack(
      if s.stance == UnitStance::NoAttack {
          return Ok(false);
      }
 -    if !stance_reaches(me, s, t, unit_ai_tuning)? {
 +    if !stance_reaches_on(me, s, t, unit_ai_tuning, route)? {
++        return Ok(false);
++    }
++    // 188329 0xcf7ba3: "I'm overlapping with an allied unit returning FALSE." (0xcf3350)
++    if crate::unit_ai::overlap::refuses_by_overlap(me, t.position, t.radius) {
          return Ok(false);
      }
      Ok(!me.attack_priority.limited()
-@@ -547,8 +685,82 @@ pub(super) fn stance_reaches(
+@@ -547,8 +705,82 @@ pub(super) fn stance_reaches(
      s: &Seeker,
      t: &Target,
      unit_ai_tuning: &UnitAiTuning,
@@ -20267,8 +20477,29 @@ index 4bca7b20..6a87074e 100644
      let reach = me.range_against()? + Distance::new(unit_ai_tuning.stance_range_growth);
      match s.stance {
          UnitStance::StandGround
+@@ -596,3 +828,20 @@ pub(crate) fn spares_friends(me: &Attacker, t: &Target, roles: &Roles) -> Result
+     }
+     Ok(true)
+ }
++
++/// 188329's "taken on by sight" test of the soldier's attack check (`0xcf7740`) and idle
++/// (`0xcfea62`): an object of type 50 and up whose capture kind (`+0x51c`, `0x114aaa0`) is 3, or
++/// 0 outside the scenario modes.
++fn taken_by_sight_188329(kind: MasterKind, capture: CaptureKind, scenario: bool) -> bool {
++    MasterKind::of_data(50) <= kind
++        && (capture == CaptureKind::Livestock || (!scenario && !capture.any()))
++}
++
++/// `GENIE_EXPERIMENT_GAIAGATE_188329` (on by default, "0" turns it off): the soldier's attack
++/// check's Gaia gates as 188329 `0xcf7740` reads them: the first the attacker, the second the
++/// target, each by [`taken_by_sight_188329`].
++#[must_use]
++pub(crate) fn gaia_gate_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_GAIAGATE_188329").is_none_or(|v| v != "0"))
++}
 diff --git a/crates/engine/genie-core/src/unit_ai/attack_rules.rs b/crates/engine/genie-core/src/unit_ai/attack_rules.rs
-index 87f4b772..15a985c3 100644
+index 87f4b772..582c1071 100644
 --- a/crates/engine/genie-core/src/unit_ai/attack_rules.rs
 +++ b/crates/engine/genie-core/src/unit_ai/attack_rules.rs
 @@ -293,6 +293,15 @@ pub(super) const fn defend_patrol_range() -> Result<(), GenieError> {
@@ -20303,6 +20534,17 @@ index 87f4b772..15a985c3 100644
      }
      Ok(Distance::new(least))
  }
+@@ -417,6 +433,10 @@ pub fn siege_can_attack(
+     if matches!(me.top_action, Some(ActionKind::PACK | ActionKind::UNPACK)) {
+         return Ok(false);
+     }
++    // 188329 0xcf6fd8: the overlap test (0xcf3350)
++    if crate::unit_ai::overlap::refuses_by_overlap(me, t.position, t.radius) {
++        return Ok(false);
++    }
+     Ok(rules == TargetRules::Any || siege_chooses(me, s, t, roles))
+ }
+ 
 diff --git a/crates/engine/genie-core/src/unit_ai/attacked.rs b/crates/engine/genie-core/src/unit_ai/attacked.rs
 index 7e435e73..554e4d39 100644
 --- a/crates/engine/genie-core/src/unit_ai/attacked.rs
@@ -20386,10 +20628,10 @@ index 7e435e73..554e4d39 100644
 +}
 diff --git a/crates/engine/genie-core/src/unit_ai/back_up.rs b/crates/engine/genie-core/src/unit_ai/back_up.rs
 new file mode 100644
-index 00000000..03c10982
+index 00000000..7978f16b
 --- /dev/null
 +++ b/crates/engine/genie-core/src/unit_ai/back_up.rs
-@@ -0,0 +1,263 @@
+@@ -0,0 +1,264 @@
 +//! 188329's soldier back-up from a target under its least range (findings 187): the soldier's
 +//! handler `0xd05f80` case 0x1fe calls `0xd1e420`, which queues an attack in front and moves
 +//! the unit back through the unit AI's slot 0x158 (`0xd27d70`).
@@ -20445,6 +20687,7 @@ index 00000000..03c10982
 +    /// [`UnitAi::move_back_to`]) from its place against the sum of the vectors to the target and
 +    /// to each of its attackers but the target (`+0xc8`), normalized, times the length; a move
 +    /// not taken drops the queue's first order (`0xd39030` with 0) when the attack was queued.
++    /// True when the move was taken (`0xd1ebd6`..`0xd1ec00`: 1), else false (0).
 +    ///
 +    /// # Errors
 +    ///
@@ -20455,24 +20698,24 @@ index 00000000..03c10982
 +        at: &Surroundings,
 +        ai: &mut Well512,
 +        side: &mut dyn UnitSide,
-+    ) -> Result<(), GenieError> {
++    ) -> Result<bool, GenieError> {
 +        // slot 0x220 (the master's speed times its sprite's factor): 0 only when the master
 +        // does not move, as slot 0x208's top speed
 +        if at.speed.get() == 0.0 {
-+            return Ok(());
++            return Ok(false);
 +        }
 +        let Some(t) = target.filter(|&t| t != at.id) else {
-+            return Ok(());
++            return Ok(false);
 +        };
 +        let Some((tp, tr)) = side.object_box(t) else {
-+            return Ok(());
++            return Ok(false);
 +        };
 +        // the target's owner, master and alliance as the world holds them
 +        let Some(seen) = side.seen_unit(t)? else {
-+            return Ok(());
++            return Ok(false);
 +        };
 +        if seen.allied || self.stance == UnitStance::StandGround {
-+            return Ok(());
++            return Ok(false);
 +        }
 +        let least = at.min_range.get();
 +        let u = at.position;
@@ -20522,7 +20765,7 @@ index 00000000..03c10982
 +        if !moved && queued == Answer::Taken && !self.orders.is_empty() {
 +            let _ = self.orders.remove(0);
 +        }
-+        Ok(())
++        Ok(moved)
 +    }
 +
 +    /// The unit AI's slot 0x158 (`0xd27d70`) with arguments 5 and 6 0 and 1: a coordinate that
@@ -21473,7 +21716,7 @@ index 21df231c..08d53ece 100644
              NotifyKind::SENT_OFF => self.sent_off(n, side, ai_rng, roles, unit_ai_tuning),
              // a unit of a group sent off a footprint: the action value 0x2c0
 diff --git a/crates/engine/genie-core/src/unit_ai/idle.rs b/crates/engine/genie-core/src/unit_ai/idle.rs
-index 28ca0268..ad2804f4 100644
+index 28ca0268..2649165a 100644
 --- a/crates/engine/genie-core/src/unit_ai/idle.rs
 +++ b/crates/engine/genie-core/src/unit_ai/idle.rs
 @@ -63,13 +63,11 @@ impl UnitAi {
@@ -21590,7 +21833,26 @@ index 28ca0268..ad2804f4 100644
              size: at.size,
              pick: Pick::Attack {
                  lowest: if at.flags.contains(SurroundingFlags::SCENARIO)
-@@ -645,7 +662,7 @@ impl UnitAi {
+@@ -614,7 +631,17 @@ impl UnitAi {
+                     0
+                 },
+                 seeker: self.seeker(at),
+-                ask: AttackAsk::IDLE,
++                // 188329 0xd31c1f..0xd31c79: paths = the unit's speed (slot 0x220) above 0
++                // (`COMISS`, `SETA`): a unit that does not move takes its first entry untested
++                ask: if tower_paths_188329() && !(0.0 < at.speed.get()) {
++                    AttackAsk {
++                        checks: crate::unit_ai::attack_pick::AttackChecks::IDLE
++                            .union(crate::unit_ai::attack_pick::AttackChecks::ANY_CLASS),
++                        ..AttackAsk::IDLE
++                    }
++                } else {
++                    AttackAsk::IDLE
++                },
+             },
+             memory: self.memory(),
+         })?;
+@@ -645,7 +672,7 @@ impl UnitAi {
      /// What the attack tests read of the unit AI ([`Seeker`]), its current target's master type
      /// `target_master_kind` as the world holds it.
      #[must_use]
@@ -21599,7 +21861,7 @@ index 28ca0268..ad2804f4 100644
          Seeker {
              stance: self.stance,
              state_position: self.state_position,
-@@ -655,6 +672,16 @@ impl UnitAi {
+@@ -655,6 +682,16 @@ impl UnitAi {
              target_class: self.target_class,
              last_target_class: self.last_target_class,
              patrol_path: self.patrol_path.is_some(),
@@ -21616,7 +21878,7 @@ index 28ca0268..ad2804f4 100644
              target_master_kind,
          }
      }
-@@ -687,3 +714,13 @@ impl UnitAi {
+@@ -687,3 +724,22 @@ impl UnitAi {
          Ok(())
      }
  }
@@ -21629,6 +21891,15 @@ index 28ca0268..ad2804f4 100644
 +pub(crate) fn soldier_idle_188329() -> bool {
 +    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
 +    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_SOLDIERIDLE_188329").is_some())
++}
++
++/// `GENIE_EXPERIMENT_TOWERPATHS_188329` (on by default, "0" turns it off): the base processIdle
++/// ([`UnitAi::tower_idle`], 188329 `0xd31a30`) asks `bestUnitToAttack` for path tests only for a
++/// unit whose speed is above 0 (`0xd31c26`..`0xd31c3e`).
++#[must_use]
++pub(crate) fn tower_paths_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_TOWERPATHS_188329").is_none_or(|v| v != "0"))
 +}
 diff --git a/crates/engine/genie-core/src/unit_ai/idle_animals.rs b/crates/engine/genie-core/src/unit_ai/idle_animals.rs
 index bf5761c6..886ccbbe 100644
@@ -22077,7 +22348,7 @@ index d0cbfb72..66238f9c 100644
          let held = roles.of_class(class);
          if held.intersects(
 diff --git a/crates/engine/genie-core/src/unit_ai/kind_notifies.rs b/crates/engine/genie-core/src/unit_ai/kind_notifies.rs
-index 48ac7e77..2d072b4d 100644
+index 48ac7e77..0f73029c 100644
 --- a/crates/engine/genie-core/src/unit_ai/kind_notifies.rs
 +++ b/crates/engine/genie-core/src/unit_ai/kind_notifies.rs
 @@ -75,6 +75,57 @@ impl UnitAi {
@@ -22138,21 +22409,51 @@ index 48ac7e77..2d072b4d 100644
      /// The lion's handler (`FUN_140c266f0`): its completed attack sets its idle timeout
      /// (`FUN_140c41bc0` with 1000, then slot 0x1a8), drops the target and stops; a moved target
      /// is [`UnitAi::lion_target_moved`]'s. Both cases, and any other notify, go on to the base
-@@ -405,7 +456,13 @@ impl UnitAi {
+@@ -393,8 +444,8 @@ impl UnitAi {
+         Ok(BREAK)
+     }
+ 
+-    /// The soldier's handler (`FUN_140c28bb0`): its own cases are the computer's, a backing-up
+-    /// and a healer's search.
++    /// The soldier's handler (`FUN_140c28bb0`, 188329 `0xd062f0`): its own cases are the
++    /// computer's, a backing-up and a healer's search.
+     pub(super) fn soldier_notify(
+         &mut self,
+         n: Notify,
+@@ -405,7 +456,18 @@ impl UnitAi {
          side: &mut dyn UnitSide,
      ) -> Result<u32, GenieError> {
          match n.kind {
 -            NotifyKind::TOO_CLOSE => back_up(),
-+            // 188329 0xd05f80 case 0x1fe: the back-up 0xd1e420 on the notify's object (p[0]),
-+            // else the AI's target, at the unit's least range (slot 600), forced (findings 187)
++            // 188329 0xd062f0 case 0x1fe (0xd06f3f..0xd07028): the back-up 0xd1e420 on the
++            // notify's object (p[0]), else the AI's target, at the unit's least range (slot 600),
++            // forced (findings 187); a back-up that moved ends the notify pass (0xd), else 2
 +            NotifyKind::TOO_CLOSE => {
 +                let target = ObjectId::of_field(n.p[0]).or(self.current_target);
-+                self.back_up_188329(target, at, ai_rng, side)?;
-+                Ok(GO_ON)
++                let moved = self.back_up_188329(target, at, ai_rng, side)?;
++                Ok(if moved && backup_return_188329() {
++                    super::PRODUCED
++                } else {
++                    GO_ON
++                })
 +            }
              NotifyKind::ACTION_EXECUTED | NotifyKind::MISSILE_WARNING
                  if player_kind.is_computer() =>
              {
+@@ -519,3 +581,13 @@ impl UnitAi {
+         }
+     }
+ }
++
++/// `GENIE_EXPERIMENT_BACKUPRETURN_188329` (on by default, "0" turns it off): the soldier's case
++/// 0x1fe returns 0xd when its back-up moved (188329 `0xd07021`), which ends the notify pass.
++#[must_use]
++pub(crate) fn backup_return_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| {
++        crate::env_os!("GENIE_EXPERIMENT_BACKUPRETURN_188329").is_none_or(|v| v != "0")
++    })
++}
 diff --git a/crates/engine/genie-core/src/unit_ai/life.rs b/crates/engine/genie-core/src/unit_ai/life.rs
 index 9feac939..afeb8c37 100644
 --- a/crates/engine/genie-core/src/unit_ai/life.rs
@@ -22188,7 +22489,7 @@ index 9feac939..afeb8c37 100644
          }
          Ok(())
 diff --git a/crates/engine/genie-core/src/unit_ai/mod.rs b/crates/engine/genie-core/src/unit_ai/mod.rs
-index ea0ee786..cf7d97e2 100644
+index ea0ee786..a697d655 100644
 --- a/crates/engine/genie-core/src/unit_ai/mod.rs
 +++ b/crates/engine/genie-core/src/unit_ai/mod.rs
 @@ -16,6 +16,7 @@
@@ -22199,7 +22500,7 @@ index ea0ee786..cf7d97e2 100644
  mod ai_action;
  mod ai_kind;
  pub mod ai_kinds;
-@@ -34,11 +35,12 @@ mod handle;
+@@ -34,16 +35,18 @@ mod handle;
  mod idle;
  mod idle_animals;
  mod idle_part;
@@ -22213,6 +22514,12 @@ index ea0ee786..cf7d97e2 100644
  mod notify_kind;
  mod order_kind;
  mod order_kinds;
+ mod order_outcome;
+ mod order_priority;
++mod overlap;
+ mod process_order;
+ mod queue_end;
+ mod retarget;
 diff --git a/crates/engine/genie-core/src/unit_ai/notifies.rs b/crates/engine/genie-core/src/unit_ai/notifies.rs
 index bf299a83..5761f4ab 100644
 --- a/crates/engine/genie-core/src/unit_ai/notifies.rs
@@ -22247,7 +22554,7 @@ index bf299a83..5761f4ab 100644
              return Answer::NotTaken;
          }
 diff --git a/crates/engine/genie-core/src/unit_ai/order_kinds.rs b/crates/engine/genie-core/src/unit_ai/order_kinds.rs
-index 281192de..e2fd301c 100644
+index 281192de..a5c4ae44 100644
 --- a/crates/engine/genie-core/src/unit_ai/order_kinds.rs
 +++ b/crates/engine/genie-core/src/unit_ai/order_kinds.rs
 @@ -26,8 +26,9 @@ use crate::unit_ai::TakenAs;
@@ -22282,7 +22589,7 @@ index 281192de..e2fd301c 100644
      }
  
      /// Slot 0x168 (`FUN_140c4dab0`, "GOT A FOLLOW ORDER"), the follow of object `target` within
-@@ -397,6 +396,65 @@ impl UnitAi {
+@@ -397,10 +396,71 @@ impl UnitAi {
                  },
              };
              let Some(kind) = self.resource_kind(class, roles) else {
@@ -22348,7 +22655,14 @@ index 281192de..e2fd301c 100644
                  return Ok(OrderOutcome::NotTaken);
              };
              // slot 0x88 (`FUN_140c4b0f0`): slot 0x80 from the order's shown point, without a
-@@ -441,9 +499,11 @@ impl UnitAi {
+-            // drop site, wood (0) for fewer than 2 workers, at any state
++            // drop site, wood (0) for fewer than 2 workers, at any state; 188329's (`0xd243c0`)
++            // least state -1 and no cap take 188329's search
++            // ([`crate::gathering::gather_search::respoint_188329`])
+             let found = side.closest_resource(ResourceSearch {
+                 kind,
+                 cap: if kind == GatherGroup::WOOD {
+@@ -441,9 +501,11 @@ impl UnitAi {
  
      /// Slot 0x1b0 by the unit AI's type: the kind of resource of a target class. The civilian's
      /// (`FUN_140c1c4f0`) and the building's (`FUN_140c1c460`, the same switch,
@@ -22363,6 +22677,133 @@ index 281192de..e2fd301c 100644
          match self.ai_kind {
              UnitAiKind::Civilian | UnitAiKind::Building => civilian_kind(class, roles),
              UnitAiKind::Fishing => {
+diff --git a/crates/engine/genie-core/src/unit_ai/overlap.rs b/crates/engine/genie-core/src/unit_ai/overlap.rs
+new file mode 100644
+index 00000000..ab1d6054
+--- /dev/null
++++ b/crates/engine/genie-core/src/unit_ai/overlap.rs
+@@ -0,0 +1,121 @@
++//! 188329's soldier attack check part `0xcf3350` ("I'm overlapping with an allied unit returning
++//! FALSE."), which the soldier's (`0xcf7740`, at `0xcf7ba3`) and the siege unit's (`0xcf6ec0`, at
++//! `0xcf6fd8`) slot 0xa0 call: a melee unit next to its target that stands on an own unit that
++//! attacks refuses the target. 158041's checks have no such part.
++
++use crate::GenieError;
++use crate::combat::attack::ATTACK;
++use crate::map::Distance;
++use crate::map::Footprint;
++use crate::map::Point;
++use crate::map::Position;
++use crate::movement::footprint_gap_squared;
++use crate::objects::ObjectId;
++use crate::objects::masters::MasterKind;
++use crate::players::PlayerId;
++use crate::unit_ai::Attacker;
++use crate::world::World;
++
++/// The groups of at most this many members (`group+0xe4`, `0xcf339b`) keep the test off.
++const SMALL_GROUP: usize = 6;
++
++/// The share of the unit's radius (`master+0x78`) the query grows the records by (`0x3db0218`).
++const OVERLAP_GROW: f32 = 0.05;
++
++/// `GENIE_EXPERIMENT_OVERLAP_188329` (on by default, "0" turns it off): the soldier's and the siege
++/// unit's attack checks refuse a target as 188329 `0xcf3350` does ([`Attacker::overlaps`]).
++#[must_use]
++pub(crate) fn overlap_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_OVERLAP_188329").is_none_or(|v| v != "0"))
++}
++
++/// The target-free part of `0xcf3350` for unit `id` of `player` at `position` with radii
++/// `radius`, of type `kind`, with a missile or not, in a group of `members` (none without a
++/// group the world holds): with a group of at most 6 (`0xcf339b`), below the combat type (`0x46`,
++/// `0xcf3403`) or with a missile (`master+0x2dc`, `0xcf344b`) it passes (false). Else the
++/// obstruction manager's query at the unit's place (`0x111c660` from `0xcf35ae`: a step of no
++/// length, the records grown by 0.05 of the unit's radius x, `0x1121350`; the unit's own record
++/// ignored, `0x1121360`; at most 0x20 records, here in id order, not the grid's; the ally factor
++/// 1.0) finds an object of the same
++/// player (`obj+0x18`) with an Attack (type 9) in its action list (slot 0x580, `0xb89f80`) and its
++/// top action in a state other than 0, 1, 3, 13 and 14 (slot 0x2c8): true. Read only: the
++/// manager's ignore list (which `0x1121360` leaves set to the unit) is not changed.
++///
++/// # Errors
++///
++/// The query's.
++pub(crate) fn stands_on_attacker(
++    w: &World,
++    (id, player): (ObjectId, PlayerId),
++    (position, radius): (Position, Footprint),
++    (kind, has_missile, members): (MasterKind, bool, Option<usize>),
++) -> Result<bool, GenieError> {
++    if !overlap_188329()
++        || members.is_some_and(|n| n <= SMALL_GROUP)
++        || kind < MasterKind::COMBAT
++        || has_missile
++    {
++        return Ok(false);
++    }
++    let at = Point::new(position.x(), position.y());
++    let grow = Distance::new(OVERLAP_GROW * radius.x());
++    let mut found = 0;
++    for (other, kind, bounds) in w.spatial.records() {
++        // the query's cell test (`0x111cb80`): a tested kind, the unit's own record ignored, the
++        // box grown by the query's grow holds the place (a step of no length)
++        if other == id || !kind.filed().tested() || !bounds.grown(grow).holds(at) {
++            continue;
++        }
++        found += 1;
++        if 0x20 < found {
++            break;
++        }
++        if w.spatial.get(other).is_none_or(|p| p.player != player) {
++            continue;
++        }
++        let actions = w.parts.actions_of(other);
++        if !actions.list.iter().any(|a| a.kind() == ATTACK) {
++            continue;
++        }
++        let state = actions.top_action().map_or(0, |t| t.state.get());
++        if !matches!(state, 0 | 1 | 3 | 13 | 14) {
++            return Ok(true);
++        }
++    }
++    Ok(false)
++}
++
++/// The target part of `0xcf3350`: a unit that stands on an attacker ([`Attacker::overlaps`])
++/// refuses a target whose squared footprint gap to it (`0x124daf0`) is below its range (slot
++/// 0x248, the master's) plus twice its radius x, squared (`COMISS`, `JBE`: a NaN passes).
++#[must_use]
++pub(crate) fn refuses_by_overlap(me: &Attacker, position: Position, radius: Footprint) -> bool {
++    if !me.overlaps {
++        return false;
++    }
++    let reach = me.range.get() + (me.radius.x() + me.radius.x());
++    let gap = footprint_gap_squared(me.position, me.radius, position, radius).get();
++    reach * reach > gap
++}
++
++/// [`stands_on_attacker`] for the attacker `me`, unit `id` in group `group` (its `+0x210`, the
++/// group the world holds).
++///
++/// # Errors
++///
++/// The query's.
++pub(crate) fn overlaps_for(
++    w: &World,
++    id: ObjectId,
++    group: Option<crate::groups::GroupId>,
++    me: &Attacker,
++) -> Result<bool, GenieError> {
++    let members = group.and_then(|g| w.groups.get(g)).map(|g| g.members.len());
++    stands_on_attacker(
++        w,
++        (id, me.player),
++        (me.position, me.radius),
++        (me.kind, me.missile.is_some(), members),
++    )
++}
 diff --git a/crates/engine/genie-core/src/unit_ai/process_order.rs b/crates/engine/genie-core/src/unit_ai/process_order.rs
 index 6f60bbc2..9d9b867f 100644
 --- a/crates/engine/genie-core/src/unit_ai/process_order.rs
@@ -22376,10 +22817,26 @@ index 6f60bbc2..9d9b867f 100644
          }
          at.unit(id)
 diff --git a/crates/engine/genie-core/src/unit_ai/retarget.rs b/crates/engine/genie-core/src/unit_ai/retarget.rs
-index 516e920b..ecc47be9 100644
+index 516e920b..21749576 100644
 --- a/crates/engine/genie-core/src/unit_ai/retarget.rs
 +++ b/crates/engine/genie-core/src/unit_ai/retarget.rs
-@@ -521,6 +521,9 @@ impl UnitAi {
+@@ -137,7 +137,14 @@ impl UnitAi {
+                 self.current_order,
+                 Some(OrderKind::Patrol | OrderKind::AttackMove)
+             )
+-            && !at.group.is_some_and(|g| g.contains(GroupState::PATROL));
++            && !if leash_group_188329() {
++                // 188329 0xd325b8..0xd32629, 0xd32e91: the unit's group (unit+0x210) holds it
++                // busy (0x10dd760), patrolling or not
++                at.group
++                    .is_some_and(|g| !g.contains(GroupState::IDLE_FREE_188329))
++            } else {
++                at.group.is_some_and(|g| g.contains(GroupState::PATROL))
++            };
+         // with patrol information (+0x1c0) the leash is the distance from where the unit last
+         // moved to (slot 0x520) to the patrol's path (FUN_140f95e10): beyond it the unit stops
+         // (slot 0xb0 with 1), forgets its target and walks the patrol on
+@@ -521,6 +528,9 @@ impl UnitAi {
              || unit_ai_tuning.follow_slack_high < dx
              || dy < unit_ai_tuning.follow_slack_low
              || unit_ai_tuning.follow_slack_high < dy;
@@ -22389,7 +22846,7 @@ index 516e920b..ecc47be9 100644
          if !moved {
              return Ok(MiscEnd::GoesOn);
          }
-@@ -528,8 +531,13 @@ impl UnitAi {
+@@ -528,8 +538,13 @@ impl UnitAi {
          let gap = footprint_gap_squared(at.position, at.size, target.position, target.radius);
          let range = self.desired_distance;
          if range.squared() < gap {
@@ -22405,6 +22862,19 @@ index 516e920b..ecc47be9 100644
              return Ok(MiscEnd::Ends);
          }
          Ok(MiscEnd::GoesOn)
+@@ -600,3 +615,12 @@ impl UnitAi {
+         Ok(())
+     }
+ }
++
++/// `GENIE_EXPERIMENT_LEASHGROUP_188329` (on by default, "0" turns it off): the leashes of
++/// [`UnitAi::leash_ends`] are skipped when the unit's group holds it busy (188329 `0x10dd760`,
++/// `0xd325e7`), not when the group patrols.
++#[must_use]
++pub(crate) fn leash_group_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_LEASHGROUP_188329").is_none_or(|v| v != "0"))
++}
 diff --git a/crates/engine/genie-core/src/unit_ai/side.rs b/crates/engine/genie-core/src/unit_ai/side.rs
 index 7fd24514..84166f0c 100644
 --- a/crates/engine/genie-core/src/unit_ai/side.rs
@@ -23070,7 +23540,7 @@ index 4cc9cc71..b603cd5e 100644
      let (r, w) = hear(PlayerKind::Human, Vec::new());
      assert_eq!(r, Ok(GO_ON));
 diff --git a/crates/engine/genie-core/src/unit_ai/unit.rs b/crates/engine/genie-core/src/unit_ai/unit.rs
-index dc286d39..7012b622 100644
+index dc286d39..c3e94ba6 100644
 --- a/crates/engine/genie-core/src/unit_ai/unit.rs
 +++ b/crates/engine/genie-core/src/unit_ai/unit.rs
 @@ -89,9 +89,13 @@ impl Unit {
@@ -23113,7 +23583,43 @@ index dc286d39..7012b622 100644
              min_range: master.map_or(Distance::ZERO, |m| m.combat_part().min_range),
              moved_at: c
                  .w
-@@ -471,6 +481,7 @@ impl Unit {
+@@ -377,7 +387,7 @@ impl Unit {
+             (master, class),
+             (player, busy, interruptible),
+         )?;
+-        let attacker = self.attacker_of(
++        let mut attacker = self.attacker_of(
+             actions,
+             ai_kind,
+             master,
+@@ -391,6 +401,8 @@ impl Unit {
+                     .map_or(Speed::ZERO, |m| m.stats.speed),
+             ),
+         );
++        attacker.overlaps =
++            crate::unit_ai::overlap::overlaps_for(&*c.w, self.id, self.group.id, &attacker)?;
+         self.with_side(
+             actions,
+             c,
+@@ -423,7 +435,7 @@ impl Unit {
+         let master = Some(self.master(c.w.master_tables(), c.player)?);
+         let (player, player_kind) = (c.player, c.w.players.player(c.player)?.kind);
+         let view = OwnerView::of(c, None)?;
+-        let attacker = self.attacker_of(
++        let mut attacker = self.attacker_of(
+             actions,
+             ai_kind,
+             master,
+@@ -437,6 +449,8 @@ impl Unit {
+                     .map_or(Speed::ZERO, |m| m.stats.speed),
+             ),
+         );
++        attacker.overlaps =
++            crate::unit_ai::overlap::overlaps_for(&*c.w, self.id, self.group.id, &attacker)?;
+         self.with_side(
+             actions,
+             c,
+@@ -471,6 +485,7 @@ impl Unit {
          c: &mut Step<'_>,
          captured: Option<&Captured>,
          after: Option<AfterOrder>,
@@ -23121,7 +23627,7 @@ index dc286d39..7012b622 100644
      ) -> Result<Option<AfterOrder>, GenieError> {
          let busy = actions.top_action_kind().is_some() || c.w.parts.unread.contains(self.id);
          // the unit's master: its own (a captured unit's copy), else its owner's
-@@ -483,7 +494,7 @@ impl Unit {
+@@ -483,7 +498,7 @@ impl Unit {
          let class = master.map(|ms| ms.class);
          // a captured unit's unit AI runs as its new owner's (RGE_Combat_Object::update reads the
          // owner then): on that player's turn, with its time as it stands
@@ -23130,7 +23636,7 @@ index dc286d39..7012b622 100644
              Some(k) if k.main => (
                  (k.new == c.w.player_turn)
                      .then(|| c.w.player_time.get(k.new.index()).copied())
-@@ -495,13 +506,31 @@ impl Unit {
+@@ -495,13 +510,31 @@ impl Unit {
              ),
              _ => (c.turn, c.player, c.w.players.player(c.player)?.kind),
          };
@@ -23163,15 +23669,26 @@ index dc286d39..7012b622 100644
          }
          if turn.is_some()
              && after.is_none()
-@@ -549,6 +578,7 @@ impl Unit {
+@@ -535,7 +568,7 @@ impl Unit {
+         )?;
+         // the unit AI runs on its own; what it asks of its unit comes back through `UnitView`
+         let world_time = c.w.world_time;
+-        let attacker = self.attacker_of(
++        let mut attacker = self.attacker_of(
+             actions,
+             ai_kind,
+             master,
+@@ -549,6 +582,9 @@ impl Unit {
                      .map_or(Speed::ZERO, |m| m.stats.speed),
              ),
          );
++        attacker.overlaps =
++            crate::unit_ai::overlap::overlaps_for(&*c.w, self.id, self.group.id, &attacker)?;
 +        let self_id_for_trace = self.id;
          self.with_side(
              actions,
              c,
-@@ -562,6 +592,10 @@ impl Unit {
+@@ -562,6 +598,10 @@ impl Unit {
                          .after_order(after, world_time, player_kind, &at, ai_stream, side)
                          .map(|()| None),
                      (Some(dt), None) => {
@@ -23182,7 +23699,7 @@ index dc286d39..7012b622 100644
                          ai.update(dt, world_time, player_kind, &at, ai_stream, side)
                      }
                      (None, _) => ai
-@@ -656,6 +690,7 @@ impl Unit {
+@@ -656,6 +696,7 @@ impl Unit {
                      owner,
                      AllyTest::WithRelation4,
                  ),
@@ -23190,7 +23707,7 @@ index dc286d39..7012b622 100644
              });
          }
          Ok(seen)
-@@ -691,3 +726,47 @@ impl Unit {
+@@ -691,3 +732,47 @@ impl Unit {
          Ok(())
      }
  }
@@ -24097,7 +24614,7 @@ index 77dc93ea..a20aceef 100644
          let (at, player_kind) = (self.unit.position(), self.player_kind);
          // the search about the town centre only while the player has no scout map
 diff --git a/crates/engine/genie-core/src/unit_ai/world_view/unit_view.rs b/crates/engine/genie-core/src/unit_ai/world_view/unit_view.rs
-index 9fe88757..75a190dc 100644
+index 9fe88757..bdba335b 100644
 --- a/crates/engine/genie-core/src/unit_ai/world_view/unit_view.rs
 +++ b/crates/engine/genie-core/src/unit_ai/world_view/unit_view.rs
 @@ -17,7 +17,7 @@ use crate::players::PlayerId;
@@ -24138,7 +24655,23 @@ index 9fe88757..75a190dc 100644
          )?
          .then_some((t.class, t.position)))
      }
-@@ -199,12 +214,27 @@ impl UnitView<'_, '_> {
+@@ -177,7 +192,7 @@ impl UnitView<'_, '_> {
+             .as_ref()
+             .and_then(|v| v.seer(u.id))
+             .map_or(CaptureKind::None, |s| s.capture);
+-        let me = u.attacker_of(
++        let mut me = u.attacker_of(
+             actions,
+             ai.ai_kind,
+             Some(m),
+@@ -193,18 +208,34 @@ impl UnitView<'_, '_> {
+                     .map_or(Speed::ZERO, |m| m.stats.speed),
+             ),
+         );
++        me.overlaps = crate::unit_ai::overlap::overlaps_for(&*self.c.w, u.id, u.group.id, &me)?;
+         let target_master_kind = match ai.current_target.and_then(find) {
+             Some((q, o)) => Some(o.master(self.c.w.master_tables(), q)?.kind),
+             None => None,
          };
          let picker = self.picker(None)?;
          let (target, _) = picker.target(&self.c.w.spatial, attacker)?;

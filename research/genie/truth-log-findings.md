@@ -2146,3 +2146,8 @@ genie-b is left as R59a + B52a (tree = R59a.patch + B52a.diff; no commit beyond 
 - R65u = R65t + C10(map/spatial/pather.rs·mod.rs, hull_path/node_lists.rs; 움직이는 기록을 속도 대신 기록 비트 0x10으로 거름, RECORDMOVERS_188329, 결과 변화 없음) + D6(players/world_player/income.rs, PLAYERDRAW_188329: 188329 WorldPlayer::update 0x14170e990는 매 갱신 Player 난수를 한 번 뽑고 버림 — 안 뽑으면 마을회관 주민 성별이 어긋남; D 확인 +0.2%, 522099960 125 -> 671초, 521340043 649 -> 753초). 확인 진행 중.
 - R65v = R65u + D7(vision/visibility/object_events.rs, NOBLDTAKE_188329): 가이아 건물(돌벽 117)은 보기만 해서는 플레이어 것이 안 됨. 518960946 P2 8 -> 65, 518730987 P1 0 -> 42. 벽만인지 건물 전체인지 원본 조건은 못 찾음 — 전체 확인으로 판단. 확인 진행 중.
 - 보류: truth29 264.6초(같은 점으로 다시 내린 Ctrl 이동에서 원본은 다음 틱에 점에 놓음, 엔진은 안 움직임 — 그룹 경로 0길이 처리까지는 같음, 멤버 path_end 쪽 의심; PC `runs\C9_notes.txt`), 519167127 678초 원본에만 있는 조명탄 하나(원본 기록 없음, `runs\C11_notes.txt`). D 갈래 확인: 자원 계산은 물체가 맞는 동안 정확함(`runs\D\rescmp.py`).
+
+## 232. R65t 확인 끝(B66a~j 그룹·유닛 AI 원본 대조 고침 10개)
+- R65t = R65s + B66a~j(PC `runs\B66r.diff`, genie-b c4fc925c; 스위치 BACKUPRETURN, FOLLOW, FORMING, GAIAGATE, INPLACE, LEASHGROUP, OVERLAP, RELEASEARRIVED, RESPOINT, RESSEARCH, TOWERPATHS, TURNRELAYOUT 기본 켬).
+- 검사: 전체 세트 8012 -> 8504, 나빠진 판 없음; 321판(S33_R65t): 끝까지 10 -> 11, 재현 비율 30.9% -> 32.4%(분 3577 -> 3722), 평범한 180판 32.5% -> 34.2%(끝까지 5 -> 6), 길어진 판 29, 짧아진 판 2.
+- 짧아진 판(스위치를 하나씩 끈 확인, PC `runs\BIS65t\`): 520592057 769 -> 723초는 OVERLAP(B66a) 때문(끄면 769), 521849352 541 -> 535초는 RELEASEARRIVED 때문(끄면 541). 둘 다 원본에서 옮긴 고침이라 그대로 두고, 그 뒤에 드러난 다른 차이를 찾을 단서로 남김.
