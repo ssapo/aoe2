@@ -2166,3 +2166,8 @@ genie-b is left as R59a + B52a (tree = R59a.patch + B52a.diff; no commit beyond 
 - 녹화로 보이는 상태는 모두 같고, 다를 수 있는 건 녹화에 없는 내부 값(+0x168 대기, +0x1e0/+0x1e8 재시도, +0xc8 공격자 집합, 행동 목록 내부)이나 아직 못 본 호출 경로뿐.
 - 다음: 사용자가 허락하면 truth23 리플을 게임에서 다시 틀어 1983500~1983850을 매 표본 찍는 좁은 녹화(필드 목록 PC `runs\B61\truth23_fields.txt`). 그 전까지 보류.
 - 함께 들어간 원본 맞추기(결과 변화 없음): B67a MoveTo 끝에 경로 데이터 초기화(0xb92a70 -> 0x1072bb0, MOVETORESET_188329).
+
+## 236. R65w 확인 끝(C17 + D8 + D9 + B67a~c)
+- R65w = R65v + C17(garrison/let_out.rs, LETOUTASK_188329: 집결점 대상이 건물이면 내보낸 유닛도 수비대 작업을 찾아 Enter, 원본 let_out 0x12a16e0) + D8(movement/mod.rs, GATEPARTS_188329: 문 끝 부품 공격 사거리에 본체·다른 부품 — slot 0x6e0 뜻은 아직 가정, D8b로 원본 확인 중) + D9(CARRYNOTHING_188329: 빈손 내려놓기 Gather set_state(8) — 원본 unit slot 0x2d0 대신 엔진 REGATHERED 사용, 가정; MISSILEDONE_188329: 투사체 상태 1은 대상 확인만) + B67a(MOVETORESET_188329: MoveTo 끝에 경로 데이터 초기화 0xb92a70 -> 0x1072bb0) + B67b(EVACGROUPS_188329: 분할기가 무리로 묶은 비킴 유닛, 0x16dd8d0..0x16dda15) + B67c(RELICPOINT_188329: 유물 줍기/내려놓기 중 지점 이동, slot 0x40 0xbc3320/0xbaaa20).
+- 검사: truth24~35 R65v와 같음; 전체 세트 8504 -> 8601; 321판(S33_R65w): 끝까지 11, 재현 비율 32.7% -> 32.9%(분 3747 -> 3768), 평범한 180판 34.5% -> 34.6%, 길어진 판 9, 짧아진 판 1(520785795 488 -> 482초, CARRYNOTHING 탓 — 스위치를 하나씩 끈 확인 PC `runs\BIS65w\`). 엔진 멈춤 판 521831385·522091758·520592057·521349117·520596921이 넘어감.
+- 확인 중 사고: runs\census_R65w.exe가 11-28 01:30~04:09 사이 사라지고(실행 109판 "No such file"), 다시 빌드한 뒤에도 실행 순간 "Permission denied"가 10판 남(백신 검사로 보임, 확인 못 함). 실행 파일 해시가 빈 stamp(`exe ` 뒤 공백) 5판은 중간에 잘린 실행이라 다시 돌림. 앞으로 결과가 이상하면 .done의 run=126/127과 빈 exe stamp부터 볼 것. 백업 PC `runs\keep\`.
