@@ -24796,6 +24796,34 @@ index acf8fb4a..34b04d5e 100644
      }
  
      fn attacks_neutral(&mut self, class: ClassId) -> Result<bool, GenieError> {
+diff --git a/crates/engine/genie-core/src/vision/visibility/object_events.rs b/crates/engine/genie-core/src/vision/visibility/object_events.rs
+index b5a400cc..82e36e94 100644
+--- a/crates/engine/genie-core/src/vision/visibility/object_events.rs
++++ b/crates/engine/genie-core/src/vision/visibility/object_events.rs
+@@ -138,7 +138,11 @@ impl Visibility {
+             old: old & VisionBits::VISIBLE_HALF,
+             new: mask,
+         })?;
+-        Ok((s.capture == CaptureKind::BySight).then_some(mask))
++        // 188329: a building (Gaia's stone walls on 518960946 and 518730987, `+0x924` 1 in the
++        // save) is not taken over by sight: the records keep them Gaia's while the players'
++        // units see them
++        let kept = s.building.is_some() && buildings_kept_from_sight_188329();
++        Ok((s.capture == CaptureKind::BySight && !kept).then_some(mask))
+     }
+ 
+     /// The registry's part of a combat object's new place (`FUN_14108c320`): its records follow.
+@@ -349,3 +353,10 @@ impl Visibility {
+         Ok(())
+     }
+ }
++
++/// `GENIE_EXPERIMENT_NOBLDTAKE_188329`: no takeover by sight of a building, as 188329's records
++/// show, on unless "0".
++fn buildings_kept_from_sight_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_NOBLDTAKE_188329").is_none_or(|v| v != "0"))
++}
 diff --git a/crates/engine/genie-core/src/world/after_step.rs b/crates/engine/genie-core/src/world/after_step.rs
 index ad5bdf92..c84db022 100644
 --- a/crates/engine/genie-core/src/world/after_step.rs
