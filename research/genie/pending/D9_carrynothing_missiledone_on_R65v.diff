@@ -1,0 +1,89 @@
+--- a/crates/engine/genie-core/src/gathering/drop_off.rs
++++ b/crates/engine/genie-core/src/gathering/drop_off.rs
+@@ -456,6 +456,9 @@
+         c: &mut Step<'_>,
+         roles: &Roles,
+     ) -> Result<(), GenieError> {
++        if self.life.amount <= Amount::ZERO && carry_nothing_188329() {
++            return self.gather_carry_nothing(actions, c, roles);
++        }
+         let (mover, by_id) =
+             c.w.parts
+                 .lend_mover(self.id, (&c.w.players, &c.w.index, &c.w.model));
+@@ -755,3 +758,10 @@
+         crate::env_os!("GENIE_EXPERIMENT_TRAPWAIT_188329").is_none_or(|v| v != "0")
+     })
+ }
++
++/// `GENIE_EXPERIMENT_CARRYNOTHING_188329`: a gatherer's drop-off carrying nothing searches
++/// (188329 `set_state(8)` -> `set_state(3)`), on unless "0".
++fn carry_nothing_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_CARRYNOTHING_188329").is_none_or(|v| v != "0"))
++}
+--- a/crates/engine/genie-core/src/gathering/gather/unit.rs
++++ b/crates/engine/genie-core/src/gathering/gather/unit.rs
+@@ -445,6 +445,40 @@
+         Ok(HeadCode::Keeps)
+     }
+ 
++    /// 188329 Gather `set_state(8)` of a gatherer carrying nothing (0xb7f94d -> 0xb7fe3d..0xb7fef6):
++    /// a target left with nothing (`+0x168` at most 0) that the unit's slot 0x2d0 on its master
++    /// does not keep (taken here as a master that is not gathered again) goes (slot 0x68 with
++    /// none), then `set_state(3)`: the search ([`GatherAction::begin_search`], notify 0x202).
++    ///
++    /// # Errors
++    ///
++    /// The release's, the reads' and the search's.
++    pub(crate) fn gather_carry_nothing(
++        &mut self,
++        actions: &mut Action,
++        c: &mut Step<'_>,
++        roles: &Roles,
++    ) -> Result<(), GenieError> {
++        let mut gather = *actions.list.gather().ok_or(NO_GATHER)?;
++        let by = self.releaser(c)?;
++        if let Some(t) = gather.target {
++            let empty = readable(c, t)?.is_some_and(|(_, u, _)| {
++                u.life.amount <= Amount::ZERO
++                    && !roles
++                        .of_master(u.life.master_id)
++                        .contains(crate::world::layer::MasterRoles::REGATHERED)
++            });
++            if empty {
++                gather.target = None;
++                release(c, self, t.id(), by)?;
++            }
++        }
++        let reads = self.gather_reads(c, &gather, roles)?;
++        gather.begin_search(c, self, &reads)?;
++        actions.put_gather(gather);
++        self.gather_search(actions, c)
++    }
++
+     /// The Gather's search in state 3 (`0x140a8cd40` case 3 and its repeat, `0x140a8e1d0` case
+     /// 2): the unit's notify 0x202 to its unit AI (slot 0x328) with the gather action (`0x261`),
+     /// the Gather's target type (`+0x68`) and a drop site: the second target's, else for a master
+--- a/crates/engine/genie-core/src/combat/missile/unit.rs
++++ b/crates/engine/genie-core/src/combat/missile/unit.rs
+@@ -180,6 +180,9 @@
+         self.missile_ends(action, c)?;
+         match action.state {
+             MissileState::Flying => {}
++            // 188329 0xb8fd60 (0xb8ffa9..0xb8ffb0 -> 0xb9203b): state 1 does nothing more after the
++            // target and shooter checks and answers 1
++            MissileState::Done if missile_done_188329() => return Ok(()),
+             MissileState::Done => {
+                 return Err(GenieError::unsupported(
+                     "a missile action's update in state 1",
+@@ -871,3 +874,10 @@
+         crate::env_os!("GENIE_EXPERIMENT_HUSSITESTOP_188329").is_none_or(|v| v != "0")
+     })
+ }
++
++/// `GENIE_EXPERIMENT_MISSILEDONE_188329`: a missile action's update in state 1 does nothing (188329
++/// `0xb8fd60`), on unless "0".
++fn missile_done_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_MISSILEDONE_188329").is_none_or(|v| v != "0"))
++}

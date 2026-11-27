@@ -1,0 +1,36 @@
+--- a/crates/engine/genie-core/src/movement/mod.rs
++++ b/crates/engine/genie-core/src/movement/mod.rs
+@@ -535,7 +535,18 @@
+         return own;
+     }
+     let mut gap = own;
+-    for a in by_id.annexes(id).ids().take(2) {
++    // 188329 (TEST): a gate's part (an annex: palisade gate 791 beside its main 789) measures its
++    // main and the main's other part
++    let parts: Vec<ObjectId> = match by_id.annex_of(id) {
++        Some(main) if gate_parts_188329() && by_id.annexes(id).ids().next().is_none() => {
++            std::iter::once(main.id())
++                .chain(by_id.annexes(main.id()).ids().filter(|&a| a != id))
++                .take(2)
++                .collect()
++        }
++        _ => by_id.annexes(id).ids().take(2).collect(),
++    };
++    for a in parts {
+         if let Some(p) = world.get(a) {
+             gap = Distance::new(minss(
+                 annex(footprint_gap(at, radius, p.position, p.radius)).get(),
+@@ -546,6 +557,13 @@
+     gap
+ }
+ 
++/// `GENIE_EXPERIMENT_GATEPARTS_188329`: a gate part's reach also measures its main and the main's
++/// other part, on unless "0".
++fn gate_parts_188329() -> bool {
++    static FLAG: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
++    *FLAG.get_or_init(|| crate::env_os!("GENIE_EXPERIMENT_GATEPARTS_188329").is_none_or(|v| v != "0"))
++}
++
+ /// [`Mover::avoid`]'s rank for the pause of a walker (`me` of `player`, of `player_type`)
+ /// over the hit `id` (`other` its record): a human walker ranks another player's unit, or one of
+ /// its own ordered at another time, by their last human order times (`+0x650`: the older order
